@@ -1,12 +1,28 @@
-node_modules
+# Dependencies
+node_modules/
 
-# Environment variables
+# Turbo
+.turbo/
+
+# Next build
+.next/
+out/
+
+# Logs
+*.log
+
+# Env
 .env
+.env.*
 .env.local
-.env.*.local
+*.env
 
-# OS junk
+# Python
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# macOS
 .DS_Store
-
-# Node
-node_modules
+**/.DS_Store
