@@ -1,6 +1,6 @@
 // apps/web/src/app/stocks/[ticker]/page.tsx
 import Link from "next/link";
-import { annualizedVolatility, maxDrawdown, var95 } from "@/lib/metrics";
+import { annualizedVolatility, maxDrawdown, var95, cvar95 } from "@/lib/metrics";
 import PriceChart, { type PriceChartPoint } from "@/components/PriceChart";
 
 type PriceRow = {
