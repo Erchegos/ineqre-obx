@@ -1,5 +1,6 @@
 // apps/web/src/app/stocks/[ticker]/page.tsx
 import Link from "next/link";
+import { annualizedVolatility, maxDrawdown } from "@/lib/metrics";
 
 type PriceRow = {
   date: string;
@@ -27,9 +28,10 @@ export default async function TickerPage({
   const ticker = decodeURIComponent(raw || "").trim();
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-  const res = await fetch(`${baseUrl}/api/prices/${encodeURIComponent(ticker)}`, {
-    cache: "no-store",
-  });
+  const res = await fetch(
+    `${baseUrl}/api/prices/${encodeURIComponent(ticker)}`,
+    { cache: "no-store" }
+  );
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -47,20 +49,31 @@ export default async function TickerPage({
   const returns = json.returns ?? [];
   const volatility = json.volatility ?? [];
 
-  const lastReturn = returns.length ? returns[returns.length - 1].log_return : null;
-  const lastVol = volatility.length ? volatility[volatility.length - 1].volatility : null;
-
+  // determine data source FIRST
   const dataSource =
     rows.length && rows.every((r) => r.source === "mock") ? "mock" : "real";
 
-  // server-side sanity log (remove later)
-  console.log({
-    ticker,
-    rows: rows.length,
-    lastReturn,
-    lastVol,
-    dataSource,
-  });
+  const metricsEnabled = dataSource === "real";
+
+  const prices = rows.map((r) => r.close);
+
+  const annVol =
+    metricsEnabled && returns.length >= 60
+      ? annualizedVolatility(returns.map((r) => r.log_return))
+      : null;
+
+  const mdd =
+    metricsEnabled && prices.length >= 60
+      ? maxDrawdown(prices)
+      : null;
+
+  const lastReturn = returns.length
+    ? returns[returns.length - 1].log_return
+    : null;
+
+  const lastVol = volatility.length
+    ? volatility[volatility.length - 1].volatility
+    : null;
 
   return (
     <main style={{ padding: 24 }}>
@@ -70,7 +83,9 @@ export default async function TickerPage({
         </Link>
       </div>
 
-      <h1 style={{ fontSize: 32, fontWeight: 700, margin: "8px 0" }}>{ticker}</h1>
+      <h1 style={{ fontSize: 32, fontWeight: 700, margin: "8px 0" }}>
+        {ticker}
+      </h1>
 
       <div
         style={{
@@ -98,9 +113,27 @@ export default async function TickerPage({
         </div>
 
         <div>
-          <div style={{ opacity: 0.7, fontSize: 12 }}>20d volatility (daily)</div>
+          <div style={{ opacity: 0.7, fontSize: 12 }}>
+            20d volatility (daily)
+          </div>
           <div style={{ fontSize: 16, fontWeight: 600 }}>
             {lastVol == null ? "n/a" : pct(lastVol)}
+          </div>
+        </div>
+
+        <div>
+          <div style={{ opacity: 0.7, fontSize: 12 }}>
+            Annualized volatility
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 600 }}>
+            {annVol == null ? "n/a" : pct(annVol)}
+          </div>
+        </div>
+
+        <div>
+          <div style={{ opacity: 0.7, fontSize: 12 }}>Max drawdown</div>
+          <div style={{ fontSize: 16, fontWeight: 600 }}>
+            {mdd == null ? "n/a" : pct(mdd)}
           </div>
         </div>
 
@@ -131,7 +164,12 @@ export default async function TickerPage({
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.date} style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+              <tr
+                key={r.date}
+                style={{
+                  borderTop: "1px solid rgba(255,255,255,0.06)",
+                }}
+              >
                 <td style={tdMono}>{r.date}</td>
                 <td style={td}>{fmt(r.open)}</td>
                 <td style={td}>{fmt(r.high)}</td>
@@ -171,7 +209,8 @@ const td: React.CSSProperties = {
 
 const tdMono: React.CSSProperties = {
   ...td,
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+  fontFamily:
+    "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
 };
 
 function fmt(x: number | null) {
