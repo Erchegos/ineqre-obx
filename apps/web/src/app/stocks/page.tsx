@@ -1,4 +1,5 @@
-import Link from 'next/link';
+// apps/web/src/app/stocks/page.tsx
+import Link from "next/link";
 
 type Stock = {
   ticker: string;
@@ -14,13 +15,30 @@ type StocksResponse = {
   stocks: Stock[];
 };
 
+function getBaseUrl() {
+  // Preferred: explicit override (set in Vercel)
+  const explicit = process.env.NEXT_PUBLIC_BASE_URL;
+  if (explicit) return explicit.replace(/\/$/, "");
+
+  // Vercel: VERCEL_URL is like "www.ineqre.no" (no protocol)
+  const vercelUrl = process.env.VERCEL_URL;
+  if (vercelUrl) return `https://${vercelUrl}`;
+
+  // Local dev fallback
+ return "https://www.ineqre.no";
+
+}
+
 async function getStocks(): Promise<StocksResponse> {
-  const res = await fetch('http://localhost:3000/api/stocks', {
-    cache: 'no-store',
+  const baseUrl = getBaseUrl();
+
+  const res = await fetch(`${baseUrl}/api/stocks`, {
+    cache: "no-store",
   });
 
   if (!res.ok) {
-    throw new Error(`Failed to load stocks: ${res.status} ${res.statusText}`);
+    const text = await res.text().catch(() => "");
+    throw new Error(`Failed to load stocks (${res.status}): ${text}`);
   }
 
   return res.json();
@@ -30,47 +48,83 @@ export default async function StocksPage() {
   const { count, stocks } = await getStocks();
 
   return (
-    <main
-      style={{
-        padding: 24,
-        fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-      }}
-    >
-      <div style={{ marginBottom: 16 }}>
-        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700 }}>Stocks</h1>
-        <p style={{ margin: '6px 0 0', opacity: 0.75 }}>Universe coverage: {count}</p>
+    <main style={{ padding: 24 }}>
+      <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 12 }}>
+        Intelligence Equity Research
+      </h1>
+
+      <div style={{ opacity: 0.8, marginBottom: 16 }}>Open stocks universe</div>
+
+      <div style={{ opacity: 0.7, fontSize: 12, marginBottom: 10 }}>
+        Total: {count}
       </div>
 
-      <div style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div
+        style={{
+          borderRadius: 12,
+          overflow: "hidden",
+          border: "1px solid rgba(255,255,255,0.08)",
+        }}
+      >
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
-            <tr style={{ background: 'rgba(255,255,255,0.06)', textAlign: 'left' }}>
-              <th style={{ padding: '12px 14px' }}>Ticker</th>
-              <th style={{ padding: '12px 14px' }}>Name</th>
-              <th style={{ padding: '12px 14px' }}>Sector</th>
-              <th style={{ padding: '12px 14px' }}>Exchange</th>
-              <th style={{ padding: '12px 14px' }}>Currency</th>
-              <th style={{ padding: '12px 14px' }}>Active</th>
+            <tr style={{ background: "rgba(255,255,255,0.04)" }}>
+              <th style={th}>Ticker</th>
+              <th style={th}>Name</th>
+              <th style={th}>Sector</th>
+              <th style={th}>Exchange</th>
+              <th style={th}>Currency</th>
+              <th style={th}>Active</th>
             </tr>
           </thead>
           <tbody>
             {stocks.map((s) => (
-              <tr key={s.ticker} style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                <td style={{ padding: '12px 14px', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
-                  <Link href={`/stocks/${encodeURIComponent(s.ticker)}`} style={{ textDecoration: 'none' }}>
+              <tr
+                key={s.ticker}
+                style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
+              >
+                <td style={tdMono}>
+                  <Link href={`/stocks/${encodeURIComponent(s.ticker)}`}>
                     {s.ticker}
                   </Link>
                 </td>
-                <td style={{ padding: '12px 14px' }}>{s.name}</td>
-                <td style={{ padding: '12px 14px' }}>{s.sector ?? ''}</td>
-                <td style={{ padding: '12px 14px' }}>{s.exchange ?? ''}</td>
-                <td style={{ padding: '12px 14px' }}>{s.currency ?? ''}</td>
-                <td style={{ padding: '12px 14px' }}>{s.is_active ? 'Yes' : 'No'}</td>
+                <td style={td}>{s.name}</td>
+                <td style={td}>{s.sector ?? ""}</td>
+                <td style={td}>{s.exchange ?? ""}</td>
+                <td style={td}>{s.currency ?? ""}</td>
+                <td style={td}>{s.is_active == null ? "" : s.is_active ? "yes" : "no"}</td>
               </tr>
             ))}
+
+            {!stocks.length && (
+              <tr>
+                <td style={{ ...td, padding: 16 }} colSpan={6}>
+                  No data
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
     </main>
   );
 }
+
+const th: React.CSSProperties = {
+  textAlign: "left",
+  padding: "12px 14px",
+  fontSize: 12,
+  letterSpacing: 0.2,
+  opacity: 0.8,
+};
+
+const td: React.CSSProperties = {
+  padding: "10px 14px",
+  fontSize: 13,
+  opacity: 0.95,
+};
+
+const tdMono: React.CSSProperties = {
+  ...td,
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+};

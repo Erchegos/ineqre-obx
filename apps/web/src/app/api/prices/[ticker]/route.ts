@@ -12,23 +12,23 @@ type PriceRow = {
   source: string;
 };
 
-function computeLogReturns(rows: PriceRow[]) {
-  const out: { date: string; log_return: number }[] = [];
+type ReturnRow = { date: string; log_return: number };
+type VolRow = { date: string; volatility: number };
+
+function computeLogReturns(rows: PriceRow[]): ReturnRow[] {
+  const out: ReturnRow[] = [];
   for (let i = 1; i < rows.length; i++) {
     const p0 = rows[i - 1].close;
     const p1 = rows[i].close;
-    if (p0 > 0 && p1 > 0) {
+    if (Number.isFinite(p0) && Number.isFinite(p1) && p0 > 0 && p1 > 0) {
       out.push({ date: rows[i].date, log_return: Math.log(p1 / p0) });
     }
   }
   return out;
 }
 
-function computeVolatility(
-  returns: { date: string; log_return: number }[],
-  window = 20
-) {
-  const out: { date: string; volatility: number }[] = [];
+function computeVolatility(returns: ReturnRow[], window = 20): VolRow[] {
+  const out: VolRow[] = [];
   if (returns.length < window) return out;
 
   for (let i = window - 1; i < returns.length; i++) {
@@ -45,6 +45,41 @@ function computeVolatility(
   return out;
 }
 
+function json(
+  body: unknown,
+  status = 200,
+  extraHeaders?: Record<string, string>
+) {
+  return NextResponse.json(body, {
+    status,
+    headers: {
+      "Cache-Control": "no-store",
+      ...(extraHeaders ?? {}),
+    },
+  });
+}
+
+function getSupabaseConfig() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  // Prefer server-only keys, fall back to anon for read-only use if needed
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  return { url, key };
+}
+
+async function withTimeout<T>(p: Promise<T>, timeoutMs: number): Promise<T> {
+  return await Promise.race([
+    p,
+    new Promise<T>((_resolve, reject) =>
+      setTimeout(() => reject(new Error("supabase query timeout")), timeoutMs)
+    ),
+  ]);
+}
+
 export async function GET(
   _req: Request,
   ctx: { params: Promise<{ ticker: string }> }
@@ -54,76 +89,76 @@ export async function GET(
     const ticker = decodeURIComponent(raw || "").trim();
 
     if (!ticker) {
-      return NextResponse.json({ error: "ticker is required" }, { status: 400 });
+      return json({ error: "ticker is required" }, 400);
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      process.env.SUPABASE_KEY ||
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const { url: supabaseUrl, key: supabaseKey } = getSupabaseConfig();
 
     if (!supabaseUrl || !supabaseKey) {
-      return NextResponse.json(
+      // Do not crash SSR pages with opaque digests; return explicit JSON error.
+      return json(
         {
-          error: "supabase env missing",
+          error: "Supabase environment variables missing",
           missing: {
             NEXT_PUBLIC_SUPABASE_URL: !supabaseUrl,
             SUPABASE_SERVICE_ROLE_KEY: !process.env.SUPABASE_SERVICE_ROLE_KEY,
             SUPABASE_KEY: !process.env.SUPABASE_KEY,
-            NEXT_PUBLIC_SUPABASE_ANON_KEY: !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+            NEXT_PUBLIC_SUPABASE_ANON_KEY:
+              !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
           },
         },
-        { status: 500 }
+        500
       );
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const timeoutMs = 4000;
+    const timeoutMs = Number(process.env.SUPABASE_QUERY_TIMEOUT_MS ?? 6000);
 
-    const supabasePromise = supabase
+    const query = supabase
       .from("prices_daily")
       .select("date, open, high, low, close, volume, source")
       .eq("ticker", ticker)
-      .order("date", { ascending: true });
+      .order("date", { ascending: true })
+      .limit(5000);
 
-    const timeoutPromise = new Promise((resolve) =>
-      setTimeout(
-        () =>
-          resolve({
-            data: null,
-            error: { message: "supabase query timeout" },
-          }),
-        timeoutMs
-      )
-    );
+    const result = await withTimeout(query, timeoutMs);
 
-    const raced = (await Promise.race([supabasePromise, timeoutPromise])) as any;
-    const data = (raced.data ?? null) as any[] | null;
-    const error = (raced.error ?? null) as { message: string } | null;
+    // Supabase client returns { data, error }
+    const data = (result as any).data as PriceRow[] | null;
+    const error = (result as any).error as { message?: string } | null;
 
     if (error) {
-      return NextResponse.json(
-        { error: error.message, ticker },
-        { status: 500 }
+      return json(
+        {
+          error: error.message ?? "supabase query error",
+          ticker,
+        },
+        500
       );
     }
 
-    const rowsAll: PriceRow[] = (data ?? []) as PriceRow[];
+    const rowsAll: PriceRow[] = Array.isArray(data) ? data : [];
 
-    // prefer real data over mock
-    const hasReal = rowsAll.some((r) => r.source !== "mock");
+    // Prefer real over mock, but keep mock if that is all we have
+    const hasReal = rowsAll.some((r) => r.source && r.source !== "mock");
     const rows = hasReal ? rowsAll.filter((r) => r.source !== "mock") : rowsAll;
 
     const returns = computeLogReturns(rows);
     const volatility = computeVolatility(returns, 20);
 
-    return NextResponse.json({ ticker, rows, returns, volatility });
+    return json({
+      ticker,
+      rows,
+      returns,
+      volatility,
+    });
   } catch (e: any) {
-    return NextResponse.json(
-      { error: e?.message ?? "unknown error" },
-      { status: 500 }
+    return json(
+      {
+        error: e?.message ?? "unknown error",
+      },
+      500
     );
   }
 }
