@@ -181,3 +181,5 @@ export function PriceChart({
     </div>
   );
 }
+
+export default PriceChart;
