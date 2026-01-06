@@ -47,4 +47,23 @@ export function cvar95(dailyReturns: number[]): number | null {
   return tail.reduce((a, b) => a + b, 0) / tail.length;
 }
 
+// apps/web/src/lib/metrics.ts
+
+export function varCvar95FromLogReturns(logReturns: number[]) {
+  // 1-day VaR/CVaR at 95% from log returns
+  if (!logReturns.length) return { var95: null as number | null, cvar95: null as number | null };
+
+  const sorted = [...logReturns].sort((a, b) => a - b);
+  const idx = Math.floor(0.05 * (sorted.length - 1));
+  const threshold = sorted[idx];
+
+  const tail = sorted.filter((x) => x <= threshold);
+  const cvar = tail.length ? tail.reduce((s, x) => s + x, 0) / tail.length : threshold;
+
+  // convert to loss as positive number (so 0.05 = 5% loss)
+  const var95 = -threshold;
+  const cvar95 = -cvar;
+
+  return { var95, cvar95 };
+}
 
