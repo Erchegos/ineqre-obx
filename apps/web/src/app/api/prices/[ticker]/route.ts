@@ -2,6 +2,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+export const runtime = "nodejs";
+
 type PriceRow = {
   date: string;
   open: number | null;
@@ -45,37 +47,11 @@ function computeVolatility(returns: ReturnRow[], window = 20): VolRow[] {
   return out;
 }
 
-function json(
-  body: unknown,
-  status = 200,
-  extraHeaders?: Record<string, string>
-) {
-  return NextResponse.json(body, {
-    status,
-    headers: {
-      "Cache-Control": "no-store",
-      ...(extraHeaders ?? {}),
-    },
-  });
-}
-
-function getSupabaseConfig() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-  // Prefer server-only keys, fall back to anon for read-only use if needed
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  return { url, key };
-}
-
-async function withTimeout<T>(p: Promise<T>, timeoutMs: number): Promise<T> {
-  return await Promise.race([
-    p,
-    new Promise<T>((_resolve, reject) =>
-      setTimeout(() => reject(new Error("supabase query timeout")), timeoutMs)
+function withTimeout<T>(p: PromiseLike<T>, ms: number): Promise<T> {
+  return Promise.race([
+    Promise.resolve(p),
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error("supabase query timeout")), ms)
     ),
   ]);
 }
@@ -89,31 +65,33 @@ export async function GET(
     const ticker = decodeURIComponent(raw || "").trim();
 
     if (!ticker) {
-      return json({ error: "ticker is required" }, 400);
+      return NextResponse.json({ error: "ticker is required" }, { status: 400 });
     }
 
-    const { url: supabaseUrl, key: supabaseKey } = getSupabaseConfig();
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey =
+      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.SUPABASE_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!supabaseUrl || !supabaseKey) {
-      // Do not crash SSR pages with opaque digests; return explicit JSON error.
-      return json(
+      return NextResponse.json(
         {
-          error: "Supabase environment variables missing",
+          error: "supabase env missing",
           missing: {
             NEXT_PUBLIC_SUPABASE_URL: !supabaseUrl,
             SUPABASE_SERVICE_ROLE_KEY: !process.env.SUPABASE_SERVICE_ROLE_KEY,
             SUPABASE_KEY: !process.env.SUPABASE_KEY,
-            NEXT_PUBLIC_SUPABASE_ANON_KEY:
-              !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+            NEXT_PUBLIC_SUPABASE_ANON_KEY: !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
           },
         },
-        500
+        { status: 500 }
       );
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const timeoutMs = Number(process.env.SUPABASE_QUERY_TIMEOUT_MS ?? 6000);
+    const timeoutMs = 8000;
 
     const query = supabase
       .from("prices_daily")
@@ -124,41 +102,29 @@ export async function GET(
 
     const result = await withTimeout(query, timeoutMs);
 
-    // Supabase client returns { data, error }
-    const data = (result as any).data as PriceRow[] | null;
-    const error = (result as any).error as { message?: string } | null;
+    const { data, error } = result as unknown as {
+      data: PriceRow[] | null;
+      error: { message: string } | null;
+    };
 
     if (error) {
-      return json(
-        {
-          error: error.message ?? "supabase query error",
-          ticker,
-        },
-        500
-      );
+      return NextResponse.json({ error: error.message, ticker }, { status: 500 });
     }
 
-    const rowsAll: PriceRow[] = Array.isArray(data) ? data : [];
+    const rowsAll: PriceRow[] = (data ?? []).filter(
+      (r) => r && typeof r.date === "string" && Number.isFinite(r.close)
+    );
 
-    // Prefer real over mock, but keep mock if that is all we have
-    const hasReal = rowsAll.some((r) => r.source && r.source !== "mock");
+    // Prefer real data over mock when mixed
+    const hasReal = rowsAll.some((r) => r.source !== "mock");
     const rows = hasReal ? rowsAll.filter((r) => r.source !== "mock") : rowsAll;
 
     const returns = computeLogReturns(rows);
     const volatility = computeVolatility(returns, 20);
 
-    return json({
-      ticker,
-      rows,
-      returns,
-      volatility,
-    });
-  } catch (e: any) {
-    return json(
-      {
-        error: e?.message ?? "unknown error",
-      },
-      500
-    );
+    return NextResponse.json({ ticker, rows, returns, volatility });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
