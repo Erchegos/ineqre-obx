@@ -1,5 +1,6 @@
 // apps/web/src/app/stocks/page.tsx
 import Link from "next/link";
+import type { CSSProperties } from "react";
 
 type Stock = {
   ticker: string;
@@ -16,32 +17,30 @@ type StocksResponse = {
 };
 
 function getBaseUrl() {
-  // Preferred: explicit override (set in Vercel)
-  const explicit = process.env.NEXT_PUBLIC_BASE_URL;
+  // 1) Explicit override (recommended for Production)
+  const explicit = process.env.NEXT_PUBLIC_BASE_URL?.trim();
   if (explicit) return explicit.replace(/\/$/, "");
 
-  // Vercel: VERCEL_URL is like "www.ineqre.no" (no protocol)
-  const vercelUrl = process.env.VERCEL_URL;
+  // 2) Vercel runtime host (works for Preview + Production)
+  const vercelUrl = process.env.VERCEL_URL?.trim();
   if (vercelUrl) return `https://${vercelUrl}`;
 
-  // Local dev fallback
- return "https://www.ineqre.no";
-
+  // 3) Local dev fallback only
+  return "http://localhost:3000";
 }
 
 async function getStocks(): Promise<StocksResponse> {
   const baseUrl = getBaseUrl();
+  const url = `${baseUrl}/api/stocks`;
 
-  const res = await fetch(`${baseUrl}/api/stocks`, {
-    cache: "no-store",
-  });
+  const res = await fetch(url, { cache: "no-store" });
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Failed to load stocks (${res.status}): ${text}`);
   }
 
-  return res.json();
+  return (await res.json()) as StocksResponse;
 }
 
 export default async function StocksPage() {
@@ -92,7 +91,9 @@ export default async function StocksPage() {
                 <td style={td}>{s.sector ?? ""}</td>
                 <td style={td}>{s.exchange ?? ""}</td>
                 <td style={td}>{s.currency ?? ""}</td>
-                <td style={td}>{s.is_active == null ? "" : s.is_active ? "yes" : "no"}</td>
+                <td style={td}>
+                  {s.is_active == null ? "" : s.is_active ? "yes" : "no"}
+                </td>
               </tr>
             ))}
 
@@ -110,7 +111,7 @@ export default async function StocksPage() {
   );
 }
 
-const th: React.CSSProperties = {
+const th: CSSProperties = {
   textAlign: "left",
   padding: "12px 14px",
   fontSize: 12,
@@ -118,13 +119,13 @@ const th: React.CSSProperties = {
   opacity: 0.8,
 };
 
-const td: React.CSSProperties = {
+const td: CSSProperties = {
   padding: "10px 14px",
   fontSize: 13,
   opacity: 0.95,
 };
 
-const tdMono: React.CSSProperties = {
+const tdMono: CSSProperties = {
   ...td,
   fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
 };
