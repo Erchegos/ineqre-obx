@@ -1,0 +1,120 @@
+from __future__ import annotations
+
+import re
+import pandas as pd
+
+from pathlib import Path
+
+INPUT_DIR = Path("/Users/olaslettebak/Documents/Intelligence Equity Research /CSV_OBX_Equity")
+OUTPUT_DIR = Path("/Users/olaslettebak/Documents/Intelligence Equity Research /CSV_OBX_Equity_CLEAN")
+
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+
+def infer_ticker_from_filename(name: str) -> str:
+    # Examples:
+    # EQNR_XOSL_EURONEXT_ADJ.csv
+    # BAKKAFROST_XOSL_EURONEXT_ADJ.csv
+    base = Path(name).stem
+    return base.split("_")[0].strip().upper()
+
+
+def to_float_series(s: pd.Series) -> pd.Series:
+    # Euronext uses dot decimals in your export, but this guards both cases
+    s = s.astype(str).str.replace(" ", "", regex=False)
+    s = s.str.replace(",", ".", regex=False)
+    s = s.replace({"": None, "nan": None, "None": None})
+    return pd.to_numeric(s, errors="coerce")
+
+
+def clean_one_file(fp: Path) -> pd.DataFrame:
+    df = pd.read_csv(fp)
+
+    df.columns = [c.strip() for c in df.columns]
+
+    required = {"Date", "Open", "High", "Low", "Close"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"{fp.name}: missing columns {sorted(missing)}")
+
+    ticker = infer_ticker_from_filename(fp.name)
+
+    # Parse dd/mm/yyyy
+    df["date"] = pd.to_datetime(df["Date"], format="%d/%m/%Y", errors="coerce")
+    df = df.dropna(subset=["date"])
+
+    # Numeric columns
+    df["open"] = to_float_series(df["Open"])
+    df["high"] = to_float_series(df["High"])
+    df["low"] = to_float_series(df["Low"])
+    df["close"] = to_float_series(df["Close"])
+
+    # Volume is "Number of Shares" in your export
+    vol_col = None
+    for c in ["Number of Shares", "Number of shares", "Number_of_Shares"]:
+        if c in df.columns:
+            vol_col = c
+            break
+
+    if vol_col is None:
+        # If not present, keep rows with close and let volume be NA
+        df["volume"] = pd.NA
+    else:
+        df["volume"] = pd.to_numeric(df[vol_col], errors="coerce")
+
+    # Optional vwap
+    if "vwap" in df.columns:
+        df["vwap"] = to_float_series(df["vwap"])
+    elif "VWAP" in df.columns:
+        df["vwap"] = to_float_series(df["VWAP"])
+    else:
+        df["vwap"] = pd.NA
+
+    # Drop non trading days: volume == 0
+    if vol_col is not None:
+        df = df[df["volume"].fillna(0) > 0]
+
+    out = df[["date", "open", "high", "low", "close", "volume", "vwap"]].copy()
+    out.insert(0, "ticker", ticker)
+
+    out = out.dropna(subset=["close"])
+    out = out.sort_values(["ticker", "date"], ascending=[True, True])
+    out["date"] = out["date"].dt.strftime("%Y-%m-%d")
+
+    return out
+
+
+def main() -> None:
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    files = sorted(INPUT_DIR.glob("*.csv"))
+    if not files:
+        raise SystemExit(f"No csv files found in {INPUT_DIR}")
+
+    all_frames: list[pd.DataFrame] = []
+    for fp in files:
+        try:
+            clean = clean_one_file(fp)
+        except Exception as e:
+            print(f"SKIP {fp.name}: {e}")
+            continue
+
+        all_frames.append(clean)
+        out_fp = OUTPUT_DIR / f"{clean.iloc[0]['ticker']}.clean.csv"
+        clean.to_csv(out_fp, index=False)
+        print(f"OK {fp.name} -> {out_fp.name} rows={len(clean)}")
+
+    combined = pd.concat(all_frames, ignore_index=True) if all_frames else pd.DataFrame()
+    combined_fp = OUTPUT_DIR / "obx_equities.clean.csv"
+    combined.to_csv(combined_fp, index=False)
+    print(f"DONE combined -> {combined_fp} rows={len(combined)}")
+
+
+if __name__ == "__main__":
+    main()
+
+
+q
+xxx
+

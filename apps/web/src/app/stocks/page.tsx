@@ -1,68 +1,66 @@
 // apps/web/src/app/stocks/page.tsx
 import Link from "next/link";
-import type { CSSProperties } from "react";
 
-type Stock = {
+type StockRow = {
   ticker: string;
-  name: string;
+  name: string | null;
   sector: string | null;
   exchange: string | null;
   currency: string | null;
-  is_active: boolean | null;
-};
-
-type StocksResponse = {
-  count: number;
-  stocks: Stock[];
+  isActive: boolean | null;
+  lastDate: string | null;
+  lastClose: unknown; // numeric from Postgres can arrive as string
 };
 
 function getBaseUrl() {
-  // 1) Explicit override (recommended for Production)
-  const explicit = process.env.NEXT_PUBLIC_BASE_URL?.trim();
+  const explicit = process.env.NEXT_PUBLIC_BASE_URL;
   if (explicit) return explicit.replace(/\/$/, "");
-
-  // 2) Vercel runtime host (works for Preview + Production)
-  const vercelUrl = process.env.VERCEL_URL?.trim();
-  if (vercelUrl) return `https://${vercelUrl}`;
-
-  // 3) Local dev fallback only
+  const vercel = process.env.VERCEL_URL;
+  if (vercel) return `https://${vercel}`;
   return "http://localhost:3000";
 }
 
-async function getStocks(): Promise<StocksResponse> {
+function fmt2(x: unknown) {
+  if (x == null) return "";
+  const n = typeof x === "number" ? x : Number(x);
+  return Number.isFinite(n) ? n.toFixed(2) : "";
+}
+
+export default async function StocksPage() {
   const baseUrl = getBaseUrl();
-  const url = `${baseUrl}/api/stocks`;
 
-  const res = await fetch(url, { cache: "no-store" });
-
+  const res = await fetch(`${baseUrl}/api/stocks`, { cache: "no-store" });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Failed to load stocks (${res.status}): ${text}`);
   }
 
-  return (await res.json()) as StocksResponse;
-}
+  const json = (await res.json()) as { count?: number; rows?: StockRow[] };
 
-export default async function StocksPage() {
-  const { count, stocks } = await getStocks();
+  const rows: StockRow[] = Array.isArray(json.rows) ? json.rows : [];
+  const total = typeof json.count === "number" ? json.count : rows.length;
 
   return (
-    <main style={{ padding: 24 }}>
-      <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 12 }}>
+    <main
+      style={{
+        padding: 24,
+        fontFamily:
+          "system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
+      }}
+    >
+      <h1 style={{ fontSize: 44, fontWeight: 850, margin: "12px 0 4px" }}>
         Intelligence Equity Research
       </h1>
+      <div style={{ opacity: 0.75, marginBottom: 18 }}>Open stocks universe</div>
 
-      <div style={{ opacity: 0.8, marginBottom: 16 }}>Open stocks universe</div>
-
-      <div style={{ opacity: 0.7, fontSize: 12, marginBottom: 10 }}>
-        Total: {count}
-      </div>
+      <div style={{ opacity: 0.75, marginBottom: 12 }}>Total: {total}</div>
 
       <div
         style={{
-          borderRadius: 12,
+          borderRadius: 16,
           overflow: "hidden",
           border: "1px solid rgba(255,255,255,0.08)",
+          background: "rgba(255,255,255,0.02)",
         }}
       >
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -74,44 +72,54 @@ export default async function StocksPage() {
               <th style={th}>Exchange</th>
               <th style={th}>Currency</th>
               <th style={th}>Active</th>
+              <th style={th}>Last date</th>
+              <th style={th}>Last close</th>
             </tr>
           </thead>
+
           <tbody>
-            {stocks.map((s) => (
+            {rows.map((r) => (
               <tr
-                key={s.ticker}
+                key={r.ticker}
                 style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
               >
                 <td style={tdMono}>
-                  <Link href={`/stocks/${encodeURIComponent(s.ticker)}`}>
-                    {s.ticker}
+                  <Link
+                    href={`/stocks/${encodeURIComponent(r.ticker)}`}
+                    style={{ textDecoration: "none", opacity: 0.95 }}
+                  >
+                    {r.ticker}
                   </Link>
                 </td>
-                <td style={td}>{s.name}</td>
-                <td style={td}>{s.sector ?? ""}</td>
-                <td style={td}>{s.exchange ?? ""}</td>
-                <td style={td}>{s.currency ?? ""}</td>
-                <td style={td}>
-                  {s.is_active == null ? "" : s.is_active ? "yes" : "no"}
-                </td>
+                <td style={td}>{r.name ?? ""}</td>
+                <td style={td}>{r.sector ?? ""}</td>
+                <td style={td}>{r.exchange ?? ""}</td>
+                <td style={td}>{r.currency ?? ""}</td>
+                <td style={td}>{r.isActive ? "yes" : "no"}</td>
+                <td style={tdMono}>{r.lastDate ?? ""}</td>
+                <td style={td}>{fmt2(r.lastClose)}</td>
               </tr>
             ))}
 
-            {!stocks.length && (
+            {!rows.length && (
               <tr>
-                <td style={{ ...td, padding: 16 }} colSpan={6}>
-                  No data
+                <td style={{ ...td, padding: 16 }} colSpan={8}>
+                  No data returned from /api/stocks
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+
+      <div style={{ marginTop: 12, opacity: 0.55, fontSize: 12 }}>
+        Data source: Postgres (obx_equities)
+      </div>
     </main>
   );
 }
 
-const th: CSSProperties = {
+const th: React.CSSProperties = {
   textAlign: "left",
   padding: "12px 14px",
   fontSize: 12,
@@ -119,13 +127,13 @@ const th: CSSProperties = {
   opacity: 0.8,
 };
 
-const td: CSSProperties = {
+const td: React.CSSProperties = {
   padding: "10px 14px",
   fontSize: 13,
   opacity: 0.95,
 };
 
-const tdMono: CSSProperties = {
+const tdMono: React.CSSProperties = {
   ...td,
   fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
 };

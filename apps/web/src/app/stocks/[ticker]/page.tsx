@@ -1,16 +1,28 @@
 // apps/web/src/app/stocks/[ticker]/page.tsx
 import Link from "next/link";
-import { annualizedVolatility, maxDrawdown, var95, cvar95 } from "@/lib/metrics";
+import { annualizedVolatility, maxDrawdown, var95 } from "@/lib/metrics";
 import PriceChart, { type PriceChartPoint } from "@/components/PriceChart";
 
 type PriceRow = {
   date: string;
-  open: number | null;
-  high: number | null;
-  low: number | null;
-  close: number;
-  volume: number | null;
+  open: unknown;
+  high: unknown;
+  low: unknown;
+  close: unknown;
+  volume: unknown;
+  vwap?: unknown;
+  numberOfShares?: unknown;
+  numberOfTrades?: unknown;
+  turnover?: unknown;
   source: string;
+};
+
+
+type FeatureRow = {
+  ticker: string;
+  date: string;
+  ret1d: number | null;
+  vol20d: number | null;
 };
 
 type ReturnRow = { date: string; log_return: number };
@@ -20,31 +32,63 @@ function pct(x: number) {
   return `${(x * 100).toFixed(2)}%`;
 }
 
-function fmt(x: number | null) {
+function fmt(x: unknown) {
   if (x == null) return "";
-  return Number.isFinite(x) ? x.toFixed(2) : "";
+  const n = typeof x === "number" ? x : Number(x);
+  return Number.isFinite(n) ? n.toFixed(2) : "";
 }
 
+
 function getBaseUrl() {
-  // Prefer explicit public base URL
   const explicit = process.env.NEXT_PUBLIC_BASE_URL;
   if (explicit) return explicit.replace(/\/$/, "");
 
-  // Vercel provides this at runtime
+  if (process.env.NODE_ENV === "development") return "http://localhost:3000";
+
   const vercel = process.env.VERCEL_URL;
   if (vercel) return `https://${vercel}`;
 
-  // Final fallback: your production domain
   return "https://www.ineqre.no";
 }
 
 function buildChartData(rows: PriceRow[]): PriceChartPoint[] {
   let peak = -Infinity;
   return rows.map((r) => {
-    peak = Math.max(peak, r.close);
-    const drawdown = peak > 0 ? (r.close - peak) / peak : 0;
-    return { date: r.date, close: r.close, drawdown };
+    const close = typeof r.close === "number" ? r.close : Number(r.close);
+    peak = Math.max(peak, close);
+    const drawdown = peak > 0 ? (close - peak) / peak : 0;
+    return { date: r.date, close, drawdown };
   });
+}
+
+
+function computeLogReturns(rowsAsc: EquityRow[]): ReturnRow[] {
+  const out: ReturnRow[] = [];
+  for (let i = 1; i < rowsAsc.length; i++) {
+    const prev = rowsAsc[i - 1].close;
+    const cur = rowsAsc[i].close;
+    if (prev > 0 && cur > 0) {
+      out.push({
+        date: rowsAsc[i].date,
+        log_return: Math.log(cur / prev),
+      });
+    }
+  }
+  return out;
+}
+
+function rollingVol(returns: ReturnRow[], window = 20): VolRow[] {
+  const out: VolRow[] = [];
+  for (let i = 0; i < returns.length; i++) {
+    if (i + 1 < window) continue;
+    const slice = returns.slice(i + 1 - window, i + 1).map((r) => r.log_return);
+    const mean = slice.reduce((a, b) => a + b, 0) / slice.length;
+    const varp =
+      slice.reduce((a, b) => a + (b - mean) * (b - mean), 0) /
+      (slice.length - 1);
+    out.push({ date: returns[i].date, volatility: Math.sqrt(varp) });
+  }
+  return out;
 }
 
 function Panel({
@@ -96,25 +140,14 @@ function Stat({
 }
 
 function Interpretation({
-  metricsEnabled,
   annVol,
   mdd,
   var95_1d,
 }: {
-  metricsEnabled: boolean;
   annVol: number | null;
   mdd: number | null;
   var95_1d: number | null;
 }) {
-  if (!metricsEnabled) {
-    return (
-      <div style={{ opacity: 0.85, fontSize: 13, lineHeight: 1.6 }}>
-        Metrics are disabled because this ticker is currently served from mock
-        data.
-      </div>
-    );
-  }
-
   return (
     <div style={{ fontSize: 13, lineHeight: 1.7 }}>
       <div>
@@ -147,55 +180,56 @@ export default async function TickerPage({
   params: Promise<{ ticker: string }>;
 }) {
   const { ticker: raw } = await params;
-  const ticker = decodeURIComponent(raw || "").trim();
+  const ticker = decodeURIComponent(raw || "").trim().toUpperCase();
 
   const baseUrl = getBaseUrl();
-  const res = await fetch(
-    `${baseUrl}/api/prices/${encodeURIComponent(ticker)}`,
+
+  const pricesRes = await fetch(
+    `${baseUrl}/api/equities/${encodeURIComponent(ticker)}?limit=1000`,
     { cache: "no-store" }
   );
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Failed to fetch prices (${res.status}): ${text}`);
+  if (!pricesRes.ok) {
+    const text = await pricesRes.text().catch(() => "");
+    throw new Error(`Failed to fetch equities (${pricesRes.status}): ${text}`);
   }
 
-  const json = (await res.json()) as {
+  const pricesJson = (await pricesRes.json()) as {
     ticker: string;
-    rows: PriceRow[];
-    returns: ReturnRow[];
-    volatility: VolRow[];
+    count: number;
+    rows: EquityRow[];
   };
 
-  const rows = json.rows ?? [];
-  const returns = json.returns ?? [];
-  const volatility = json.volatility ?? [];
+  // API likely returns newest-first; normalize to ascending for returns math
+  const rowsDesc = pricesJson.rows ?? [];
+  const rowsAsc = [...rowsDesc].sort((a, b) => a.date.localeCompare(b.date));
 
-  // Determine data source first
-  const dataSource =
-    rows.length && rows.every((r) => r.source === "mock") ? "mock" : "real";
-  const metricsEnabled = dataSource === "real";
+  const returns = computeLogReturns(rowsAsc);
+  const volatility = rollingVol(returns, 20);
+
+  const featuresRes = await fetch(
+    `${baseUrl}/api/features/${encodeURIComponent(ticker)}?limit=1`,
+    { cache: "no-store" }
+  );
+
+  const featuresJson = featuresRes.ok
+    ? ((await featuresRes.json()) as { ticker: string; rows: FeatureRow[] })
+    : null;
+
+  const latestFeature = featuresJson?.rows?.[0] ?? null;
 
   const lastReturn =
     returns.length > 0 ? returns[returns.length - 1].log_return : null;
   const lastVol =
     volatility.length > 0 ? volatility[volatility.length - 1].volatility : null;
 
-  const prices = rows.map((r) => r.close);
-  const chartData = buildChartData(rows);
+  const prices = rowsAsc.map((r) => r.close);
+  const chartData = buildChartData(rowsAsc);
 
-  const annVol =
-    metricsEnabled && returns.length >= 60
-      ? annualizedVolatility(returns.map((r) => r.log_return))
-      : null;
-
-  const mdd = metricsEnabled && prices.length >= 60 ? maxDrawdown(prices) : null;
-
-  // IMPORTANT: this expects var95(logReturns) export to exist in metrics.ts
+  const annVol = returns.length >= 60 ? annualizedVolatility(returns.map((r) => r.log_return)) : null;
+  const mdd = prices.length >= 60 ? maxDrawdown(prices) : null;
   const var95_1d =
-    metricsEnabled && returns.length >= 60
-      ? var95(returns.map((r) => r.log_return))
-      : null;
+    returns.length >= 60 ? var95(returns.map((r) => r.log_return)) : null;
 
   return (
     <main
@@ -231,7 +265,7 @@ export default async function TickerPage({
               gap: 12,
             }}
           >
-            <Stat label="Data source" value={dataSource} />
+            <Stat label="Data source" value={"db"} />
             <Stat
               label="Last daily return"
               value={lastReturn == null ? "n/a" : pct(lastReturn)}
@@ -240,7 +274,7 @@ export default async function TickerPage({
               label="20d volatility (daily)"
               value={lastVol == null ? "n/a" : pct(lastVol)}
             />
-            <Stat label="Daily rows" value={rows.length} />
+            <Stat label="Daily rows" value={rowsAsc.length} />
           </div>
         </Panel>
 
@@ -256,10 +290,7 @@ export default async function TickerPage({
               label="Annualized volatility"
               value={annVol == null ? "n/a" : pct(annVol)}
             />
-            <Stat
-              label="Max drawdown"
-              value={mdd == null ? "n/a" : pct(mdd)}
-            />
+            <Stat label="Max drawdown" value={mdd == null ? "n/a" : pct(mdd)} />
             <Stat
               label="VaR 95% (1d)"
               value={var95_1d == null ? "n/a" : `-${pct(var95_1d)}`}
@@ -270,12 +301,7 @@ export default async function TickerPage({
       </div>
 
       <Panel title="Risk interpretation">
-        <Interpretation
-          metricsEnabled={metricsEnabled}
-          annVol={annVol}
-          mdd={mdd}
-          var95_1d={var95_1d}
-        />
+        <Interpretation annVol={annVol} mdd={mdd} var95_1d={var95_1d} />
       </Panel>
 
       <Panel title="Price and drawdown">
@@ -289,6 +315,19 @@ export default async function TickerPage({
           }}
         >
           <PriceChart data={chartData} />
+        </div>
+      </Panel>
+
+      <Panel title="Latest features">
+        <div style={{ fontSize: 13, lineHeight: 1.8 }}>
+          <div>
+            <b>ret1d:</b>{" "}
+            {latestFeature?.ret1d == null ? "n/a" : pct(latestFeature.ret1d)}
+          </div>
+          <div>
+            <b>vol20d:</b>{" "}
+            {latestFeature?.vol20d == null ? "n/a" : pct(latestFeature.vol20d)}
+          </div>
         </div>
       </Panel>
 
@@ -308,12 +347,14 @@ export default async function TickerPage({
               <th style={th}>High</th>
               <th style={th}>Low</th>
               <th style={th}>Close</th>
-              <th style={th}>Volume</th>
-              <th style={th}>Source</th>
+              <th style={th}>Shares</th>
+              <th style={th}>Trades</th>
+              <th style={th}>Turnover</th>
+              <th style={th}>VWAP</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
+            {rowsAsc.map((r) => (
               <tr
                 key={r.date}
                 style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
@@ -323,13 +364,15 @@ export default async function TickerPage({
                 <td style={td}>{fmt(r.high)}</td>
                 <td style={td}>{fmt(r.low)}</td>
                 <td style={td}>{fmt(r.close)}</td>
-                <td style={td}>{r.volume ?? ""}</td>
-                <td style={td}>{r.source}</td>
+                <td style={td}>{r.numberOfShares ?? ""}</td>
+                <td style={td}>{r.numberOfTrades ?? ""}</td>
+                <td style={td}>{r.turnover ?? ""}</td>
+                <td style={td}>{fmt(r.vwap)}</td>
               </tr>
             ))}
-            {!rows.length && (
+            {!rowsAsc.length && (
               <tr>
-                <td style={{ ...td, padding: 16 }} colSpan={7}>
+                <td style={{ ...td, padding: 16 }} colSpan={9}>
                   No data
                 </td>
               </tr>

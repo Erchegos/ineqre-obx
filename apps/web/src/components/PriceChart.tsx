@@ -13,12 +13,14 @@ import {
   Legend,
   Brush,
 } from "recharts";
+import type { TooltipProps } from "recharts";
+import type { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
 
 export type PriceChartPoint = {
-  date: string;          // "YYYY-MM-DD"
-  close: number;         // price
-  drawdown: number;      // <= 0, e.g. -0.25 for -25%
-  normalized?: number;   // optional, indexed series (base 100)
+  date: string; // YYYY-MM-DD
+  close: number;
+  drawdown: number; // <= 0, e.g. -0.25
+  normalized?: number; // base 100
 };
 
 function pct(v: number) {
@@ -27,6 +29,71 @@ function pct(v: number) {
 
 function num(v: number) {
   return Number.isFinite(v) ? v.toFixed(2) : "";
+}
+
+type SeriesKey = "close" | "normalized" | "drawdown";
+type SeriesMap = Partial<Record<SeriesKey, number>>;
+
+function PriceTooltipContent(
+  props: TooltipProps<ValueType, NameType> & {
+    mode: "price" | "indexed";
+    leftLabel: string;
+  }
+) {
+  const { active, payload, label, mode, leftLabel } = props;
+
+  if (!active || !payload || payload.length === 0) return null;
+
+  const map: SeriesMap = {};
+  for (const item of payload) {
+    const dk = item.dataKey;
+    if (dk === "close" || dk === "normalized" || dk === "drawdown") {
+      const v = item.value;
+      map[dk] = typeof v === "number" ? v : Number(v);
+    }
+  }
+
+  const leftVal = mode === "price" ? map.close : map.normalized;
+  const ddVal = map.drawdown;
+
+  return (
+    <div
+      style={{
+        borderRadius: 10,
+        border: "1px solid rgba(255,255,255,0.18)",
+        background: "rgba(0,0,0,0.82)",
+        padding: "10px 12px",
+        fontSize: 13,
+        lineHeight: 1.55,
+      }}
+    >
+      <div
+        style={{
+          opacity: 0.85,
+          fontFamily:
+            "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+        }}
+      >
+        {String(label)}
+      </div>
+
+      <div style={{ marginTop: 6 }}>
+        <div style={{ display: "flex", gap: 8 }}>
+          <span style={{ opacity: 0.65 }}>{leftLabel}</span>
+          <span style={{ fontWeight: 650 }}>
+            {leftVal == null ? "n/a" : num(leftVal)}
+          </span>
+        </div>
+
+        <div style={{ display: "flex", gap: 8 }}>
+          <span style={{ opacity: 0.65 }}>Drawdown</span>
+          <span style={{ fontWeight: 650 }}>
+            {ddVal == null ? "n/a" : pct(ddVal)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function PriceChart({
@@ -58,19 +125,25 @@ export function PriceChart({
     );
   }
 
-  // Ensure we always have an indexed series if caller did not supply it.
-  const base = data[0].close > 0 ? data[0].close : 1;
-  const chart = data.map((p) => ({
-    ...p,
-    normalized: p.normalized ?? (p.close / base) * 100,
-  }));
+  const base = data[0]?.close > 0 ? data[0].close : 1;
+  const chart: Array<Required<Pick<PriceChartPoint, "date" | "close" | "drawdown">> & { normalized: number }> =
+    data.map((p) => ({
+      date: p.date,
+      close: p.close,
+      drawdown: p.drawdown,
+      normalized: p.normalized ?? (p.close / base) * 100,
+    }));
 
   const leftLabel = mode === "price" ? "Close" : "Indexed (100)";
+  const leftKey: SeriesKey = mode === "price" ? "close" : "normalized";
 
   return (
     <div style={{ width: "100%", height }}>
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={chart} margin={{ top: 10, right: 24, left: 10, bottom: 0 }}>
+        <ComposedChart
+          data={chart}
+          margin={{ top: 10, right: 24, left: 10, bottom: 0 }}
+        >
           <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
 
           <XAxis
@@ -113,55 +186,19 @@ export function PriceChart({
           />
 
           <Tooltip
-            content={({ active, payload, label }) => {
-              if (!active || !payload || payload.length === 0) return null;
-
-              const map = payload.reduce<Record<string, any>>((acc, item) => {
-                acc[String(item.dataKey)] = item.value;
-                return acc;
-              }, {});
-
-              const leftVal =
-                mode === "price" ? (map.close as number | undefined) : (map.normalized as number | undefined);
-              const ddVal = map.drawdown as number | undefined;
-
-              return (
-                <div
-                  style={{
-                    borderRadius: 10,
-                    border: "1px solid rgba(255,255,255,0.18)",
-                    background: "rgba(0,0,0,0.82)",
-                    padding: "10px 12px",
-                    fontSize: 13,
-                    lineHeight: 1.55,
-                  }}
-                >
-                  <div style={{ opacity: 0.85, fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }}>
-                    {label}
-                  </div>
-
-                  <div style={{ marginTop: 6 }}>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <span style={{ opacity: 0.65 }}>{leftLabel}</span>
-                      <span style={{ fontWeight: 650 }}>{leftVal == null ? "n/a" : num(Number(leftVal))}</span>
-                    </div>
-
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <span style={{ opacity: 0.65 }}>Drawdown</span>
-                      <span style={{ fontWeight: 650 }}>{ddVal == null ? "n/a" : pct(Number(ddVal))}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            }}
+            content={(p) => (
+              <PriceTooltipContent {...p} mode={mode} leftLabel={leftLabel} />
+            )}
           />
 
-          <Legend wrapperStyle={{ color: "rgba(255,255,255,0.65)", fontSize: 12 }} />
+          <Legend
+            wrapperStyle={{ color: "rgba(255,255,255,0.65)", fontSize: 12 }}
+          />
 
           <Line
             yAxisId="left"
             type="monotone"
-            dataKey={mode === "price" ? "close" : "normalized"}
+            dataKey={leftKey}
             name={mode === "price" ? "Close" : "Asset (indexed)"}
             dot={false}
             strokeWidth={2}
@@ -175,7 +212,12 @@ export function PriceChart({
             opacity={0.22}
           />
 
-          <Brush dataKey="date" height={22} stroke="rgba(255,255,255,0.35)" travellerWidth={10} />
+          <Brush
+            dataKey="date"
+            height={22}
+            stroke="rgba(255,255,255,0.35)"
+            travellerWidth={10}
+          />
         </ComposedChart>
       </ResponsiveContainer>
     </div>

@@ -1,1 +1,1 @@
-export * from "./contracts/market";
+export * from "./schema";

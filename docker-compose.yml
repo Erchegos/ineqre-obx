@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16
+    container_name: ineqre_db
+    environment:
+      POSTGRES_USER: ineqre
+      POSTGRES_PASSWORD: ineqre
+      POSTGRES_DB: ineqre
+    ports:
+      - "5433:5432"
+    volumes:
+      - ineqre_pg:/var/lib/postgresql/data
+
+volumes:
+  ineqre_pg:
+
