@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "drizzle-orm": "^0.44.0",
+    "drizzle-orm": "0.47.4",
     "zod": "^3.23.0"
   }
 }
