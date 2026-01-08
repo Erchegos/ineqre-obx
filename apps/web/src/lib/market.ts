@@ -1,7 +1,12 @@
-import { DailyBarSchema, type DailyBar } from "@ineqre/db";
+import { z } from "zod"
 
-// compile-time check only
-export function validateDailyBar(input: unknown): DailyBar {
-  return DailyBarSchema.parse(input);
-}
+export const DailyBarSchema = z.object({
+  date: z.string(),
+  open: z.number().nullable(),
+  high: z.number().nullable(),
+  low: z.number().nullable(),
+  close: z.number().nullable(),
+  volume: z.number().nullable().optional(),
+})
 
+export type DailyBar = z.infer<typeof DailyBarSchema>
