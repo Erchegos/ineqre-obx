@@ -1,7 +1,32 @@
 import { NextResponse } from "next/server";
-import { asc, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { obxEquities, obxFeatures } from "@ineqre/db/schema";
+import { sql } from "drizzle-orm";
+
+export const dynamic = "force-dynamic";
+
+type RawRow = {
+  date: unknown;
+  open: unknown;
+  high: unknown;
+  low: unknown;
+  close: unknown;
+  volume: unknown;
+};
+
+type PriceRow = {
+  date: string;
+  open: number | null;
+  high: number | null;
+  low: number | null;
+  close: number | null;
+  volume: number | null;
+};
+
+function clampInt(v: string | null, def: number, min: number, max: number) {
+  const n = v ? Number(v) : Number.NaN;
+  if (!Number.isFinite(n)) return def;
+  return Math.min(Math.max(Math.trunc(n), min), max);
+}
 
 function toNum(v: unknown): number | null {
   if (v === null || v === undefined) return null;
@@ -9,70 +34,61 @@ function toNum(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export async function GET(
-  _req: Request,
-  ctx: { params: Promise<{ ticker: string }> }
-) {
-  const { ticker: raw } = await ctx.params;
-  const ticker = decodeURIComponent(raw || "").trim().toUpperCase();
+function toISODate(d: unknown): string {
+  // supports Date, string, etc
+  const s = String(d);
+  // if already YYYY-MM-DD
+  if (s.length >= 10 && s[4] === "-" && s[7] === "-") return s.slice(0, 10);
+  const dt = new Date(s);
+  if (Number.isNaN(dt.getTime())) return s.slice(0, 10);
+  return dt.toISOString().slice(0, 10);
+}
 
-  const url = new URL(_req.url);
-  const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 500), 1), 2000);
+export async function GET(req: Request, ctx: { params: Promise<{ ticker: string }> }) {
+  try {
+    const { ticker } = await ctx.params;
+    const url = new URL(req.url);
 
-  const rows = await db
-    .select({
-      date: obxEquities.date,
-      open: obxEquities.open,
-      high: obxEquities.high,
-      low: obxEquities.low,
-      close: obxEquities.close,
-      numberOfShares: obxEquities.numberOfShares,
-      numberOfTrades: obxEquities.numberOfTrades,
-      turnover: obxEquities.turnover,
-      vwap: obxEquities.vwap,
-      ret1d: obxFeatures.ret1d,
-      vol20d: obxFeatures.vol20d,
-    })
-    .from(obxEquities)
-    .leftJoin(
-      obxFeatures,
-      eq(obxFeatures.ticker, obxEquities.ticker)
-    )
-    .where(eq(obxEquities.ticker, ticker))
-    .orderBy(desc(obxEquities.date))
-    .limit(limit);
+    const limit = clampInt(url.searchParams.get("limit"), 1500, 1, 5000);
 
-  // UI expects oldest to newest for chart logic
-  const ordered = rows.reverse();
+    // This endpoint reads from the raw prices table/view used elsewhere in your app.
+    // Keep SQL generic to avoid tight coupling to drizzle schema until Phase 2 tables are live.
+    const q = sql`
+      select
+        date::date as date,
+        open,
+        high,
+        low,
+        close,
+        volume
+      from public.prices_daily
+      where upper(ticker) = upper(${ticker})
+      order by date desc
+      limit ${limit}
+    `;
 
-  const priceRows = ordered.map((r) => ({
-    date: new Date(r.date).toISOString().slice(0, 10),
-    open: toNum(r.open),
-    high: toNum(r.high),
-    low: toNum(r.low),
-    close: toNum(r.close) ?? 0,
-    volume: toNum(r.numberOfShares),
-    source: "db",
-  }));
+    const res = await db.execute(q);
+    const rows = (((res as any)?.rows ?? []) as RawRow[]);
 
-  const returns = ordered
-    .filter((r) => r.ret1d !== null && r.ret1d !== undefined)
-    .map((r) => ({
-      date: new Date(r.date).toISOString().slice(0, 10),
-      log_return: toNum(r.ret1d) ?? 0,
+    // Reverse to ascending for chart consumers
+    const ordered = rows.slice().reverse();
+
+    const priceRows: PriceRow[] = ordered.map((r: RawRow) => ({
+      date: toISODate(r.date),
+      open: toNum(r.open),
+      high: toNum(r.high),
+      low: toNum(r.low),
+      close: toNum(r.close),
+      volume: toNum(r.volume),
     }));
 
-  const volatility = ordered
-    .filter((r) => r.vol20d !== null && r.vol20d !== undefined)
-    .map((r) => ({
-      date: new Date(r.date).toISOString().slice(0, 10),
-      volatility: toNum(r.vol20d) ?? 0,
-    }));
-
-  return NextResponse.json({
-    ticker,
-    rows: priceRows,
-    returns,
-    volatility,
-  });
+    return NextResponse.json({
+      ticker: ticker.toUpperCase(),
+      count: priceRows.length,
+      rows: priceRows,
+    });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }
