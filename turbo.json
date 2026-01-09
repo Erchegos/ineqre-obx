@@ -1,17 +1,23 @@
 {
-  "$schema": "https://turbo.build/schema.json",
+  "$schema": "https://turborepo.org/schema.json",
   "tasks": {
-    "typecheck": {
-      "dependsOn": ["^typecheck"]
-    },
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "dist/**"]
+      "outputs": [".next/**", "dist/**", "build/**"],
+      "env": ["DATABASE_URL"]
     },
-    "lint": {},
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "env": ["DATABASE_URL"]
+    },
+    "lint": {
+      "dependsOn": ["^lint"],
+      "env": ["DATABASE_URL"]
+    },
+    "typecheck": {
+      "dependsOn": ["^typecheck"],
+      "env": ["DATABASE_URL"]
     }
   }
 }
