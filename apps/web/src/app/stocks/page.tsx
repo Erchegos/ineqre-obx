@@ -46,7 +46,7 @@ function textCell(v: string | null) {
 }
 
 async function fetchStocks(limit = 5000): Promise<{ count: number; rows: StockRow[] }> {
-  const res = await fetch(`http://localhost:3000/api/stocks?limit=${limit}`, {
+  const res = await fetch(`/api/stocks?limit=${limit}`, {
     cache: "no-store",
   });
 
@@ -56,8 +56,9 @@ async function fetchStocks(limit = 5000): Promise<{ count: number; rows: StockRo
   }
 
   const json = (await res.json()) as { count?: number; rows?: StockRow[] };
+
   return {
-    count: Number(json.count ?? 0),
+    count: typeof json.count === "number" ? json.count : 0,
     rows: Array.isArray(json.rows) ? json.rows : [],
   };
 }
