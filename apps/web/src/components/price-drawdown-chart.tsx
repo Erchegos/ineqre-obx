@@ -1,98 +1,118 @@
-"use client"
+"use client";
 
-import React from "react"
+import * as React from "react";
 import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
   Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  Tooltip,
-  CartesianGrid,
-} from "recharts"
+} from "recharts";
 
-type Point = {
-  date: string
-  close: number | null
-  drawdown: number | null
+type DrawdownRow = {
+  date: string; // YYYY-MM-DD
+  drawdown?: number | string | null; // negative values
+};
+
+function toNum(v: unknown): number | null {
+  if (v === null || v === undefined) return null;
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v === "string") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
 }
 
-function pct(x: number) {
-  return `${(x * 100).toFixed(2)}%`
+function formatDateShort(d: string) {
+  return (d ?? "").slice(0, 10);
 }
 
-function CustomTooltip(props: any) {
-  const { active, payload, label } = props || {}
-  if (!active || !payload?.length) return null
+function formatPct(v: number) {
+  return new Intl.NumberFormat(undefined, {
+    style: "percent",
+    maximumFractionDigits: 2,
+  }).format(v);
+}
 
-  const close = payload.find((p: any) => p?.dataKey === "close")?.value as number | null
-  const dd = payload.find((p: any) => p?.dataKey === "drawdown")?.value as number | null
+function useMeasuredSize<T extends HTMLElement>() {
+  const ref = React.useRef<T | null>(null);
+  const [size, setSize] = React.useState({ w: 0, h: 0 });
+
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const setFromRect = (rect: DOMRectReadOnly | DOMRect) => {
+      const w = Math.floor(rect.width);
+      const h = Math.floor(rect.height);
+      if (w > 0 && h > 0) setSize({ w, h });
+    };
+
+    setFromRect(el.getBoundingClientRect());
+
+    const ro = new ResizeObserver((entries) => {
+      const cr = entries[0]?.contentRect;
+      if (!cr) return;
+      setFromRect(cr);
+    });
+
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return { ref, size };
+}
+
+export default function PriceDrawdownChart(props: {
+  data: DrawdownRow[];
+  height?: number;
+  className?: string;
+}) {
+  const height = props.height ?? 240;
+  const { ref, size } = useMeasuredSize<HTMLDivElement>();
+
+  const chartData = React.useMemo(() => {
+    return (props.data ?? [])
+      .map((p) => {
+        const dd = toNum(p.drawdown);
+        return { date: p.date, drawdown: dd };
+      })
+      .filter((p) => p.date && p.drawdown !== null) as Array<{ date: string; drawdown: number }>;
+  }, [props.data]);
 
   return (
     <div
-      style={{
-        background: "rgba(0,0,0,0.85)",
-        border: "1px solid rgba(255,255,255,0.12)",
-        borderRadius: 10,
-        padding: "10px 12px",
-        fontSize: 12,
-        maxWidth: 260,
-      }}
+      ref={ref}
+      className={props.className}
+      style={{ width: "100%", height, minHeight: height }}
     >
-      <div style={{ opacity: 0.8, marginBottom: 6 }}>{label}</div>
-      <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }}>
-        <div>close: {typeof close === "number" ? close.toFixed(2) : "n/a"}</div>
-        <div>drawdown: {typeof dd === "number" ? pct(dd) : "n/a"}</div>
-      </div>
+      {size.w > 20 && size.h > 20 ? (
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={chartData} margin={{ top: 8, right: 12, left: 6, bottom: 8 }}>
+            <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+            <XAxis
+              dataKey="date"
+              tickFormatter={formatDateShort}
+              minTickGap={28}
+              tick={{ fontSize: 12 }}
+            />
+            <YAxis width={64} tick={{ fontSize: 12 }} tickFormatter={(v) => formatPct(Number(v))} />
+            <Tooltip
+              labelFormatter={(label: any) => formatDateShort(String(label))}
+              formatter={(value: any) => {
+                const n = toNum(value);
+                return n === null ? "n/a" : formatPct(n);
+              }}
+            />
+            <Area type="monotone" dataKey="drawdown" strokeWidth={2} isAnimationActive={false} />
+          </AreaChart>
+        </ResponsiveContainer>
+      ) : (
+        <div style={{ width: "100%", height: "100%" }} />
+      )}
     </div>
-  )
-}
-
-export default function PriceDrawdownChart(props: { data: Point[]; height?: number }) {
-  const height = typeof props.height === "number" ? props.height : 320
-
-  return (
-    <div style={{ width: "100%", height }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={props.data} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
-          <CartesianGrid stroke="rgba(255,255,255,0.08)" />
-          <XAxis dataKey="date" tick={{ fontSize: 12, fill: "rgba(255,255,255,0.65)" }} />
-          <YAxis
-            yAxisId="price"
-            tick={{ fontSize: 12, fill: "rgba(255,255,255,0.65)" }}
-            domain={["auto", "auto"]}
-          />
-          <YAxis
-            yAxisId="dd"
-            orientation="right"
-            tick={{ fontSize: 12, fill: "rgba(255,255,255,0.65)" }}
-            tickFormatter={(v: any) => (typeof v === "number" ? pct(v) : "")}
-            domain={[-1, 0]}
-          />
-
-          <Tooltip content={<CustomTooltip />} />
-
-          <Area
-            type="monotone"
-            dataKey="drawdown"
-            yAxisId="dd"
-            stroke="rgba(255,255,255,0.15)"
-            fill="rgba(255,255,255,0.08)"
-            isAnimationActive={false}
-          />
-
-          <Line
-            type="monotone"
-            dataKey="close"
-            yAxisId="price"
-            stroke="rgba(120,180,255,0.95)"
-            dot={false}
-            strokeWidth={2}
-            isAnimationActive={false}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
-  )
+  );
 }

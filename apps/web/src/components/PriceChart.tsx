@@ -1,82 +1,120 @@
-"use client"
+"use client";
 
-import React from "react"
+import * as React from "react";
 import {
-  ResponsiveContainer,
-  LineChart,
+  CartesianGrid,
   Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  Tooltip,
-  CartesianGrid,
-} from "recharts"
+} from "recharts";
 
-export type SeriesKey = "close" | "open" | "high" | "low"
+type PriceRow = {
+  date: string; // YYYY-MM-DD
+  close?: number | string | null;
+};
 
-export type PriceChartDatum = {
-  date: string
-} & Partial<Record<SeriesKey, number | null>>
+function toNum(v: unknown): number | null {
+  if (v === null || v === undefined) return null;
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v === "string") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
 
-function CustomTooltip(props: any) {
-  const { active, payload, label } = props || {}
-  if (!active || !payload?.length) return null
+function formatDateShort(d: string) {
+  return (d ?? "").slice(0, 10);
+}
 
-  return (
-    <div
-      style={{
-        background: "rgba(0,0,0,0.85)",
-        border: "1px solid rgba(255,255,255,0.12)",
-        borderRadius: 10,
-        padding: "10px 12px",
-        fontSize: 12,
-        maxWidth: 260,
-      }}
-    >
-      <div style={{ opacity: 0.8, marginBottom: 6 }}>{label}</div>
-      <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }}>
-        {payload.map((p: any) => {
-          const name = String(p?.name ?? p?.dataKey ?? "")
-          const v = p?.value
-          return (
-            <div key={name}>
-              {name}: {typeof v === "number" ? v.toFixed(2) : "n/a"}
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
+function formatNumber(v: number) {
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(v);
+}
+
+function useMeasuredSize<T extends HTMLElement>() {
+  const ref = React.useRef<T | null>(null);
+  const [size, setSize] = React.useState({ w: 0, h: 0 });
+
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const setFromRect = (rect: DOMRectReadOnly | DOMRect) => {
+      const w = Math.floor(rect.width);
+      const h = Math.floor(rect.height);
+      if (w > 0 && h > 0) setSize({ w, h });
+    };
+
+    // Initial measure
+    setFromRect(el.getBoundingClientRect());
+
+    const ro = new ResizeObserver((entries) => {
+      const cr = entries[0]?.contentRect;
+      if (!cr) return;
+      setFromRect(cr);
+    });
+
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return { ref, size };
 }
 
 export default function PriceChart(props: {
-  data: PriceChartDatum[]
-  height?: number
-  series?: SeriesKey[]
+  data: PriceRow[];
+  height?: number;
+  className?: string;
 }) {
-  const height = typeof props.height === "number" ? props.height : 320
-  const series = props.series?.length ? props.series : (["close"] as SeriesKey[])
+  const height = props.height ?? 320;
+  const { ref, size } = useMeasuredSize<HTMLDivElement>();
+
+  const chartData = React.useMemo(() => {
+    return (props.data ?? [])
+      .map((p) => {
+        const close = toNum(p.close);
+        return { date: p.date, close };
+      })
+      .filter((p) => p.date && p.close !== null) as Array<{ date: string; close: number }>;
+  }, [props.data]);
 
   return (
-    <div style={{ width: "100%", height }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={props.data} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
-          <CartesianGrid stroke="rgba(255,255,255,0.08)" />
-          <XAxis dataKey="date" tick={{ fontSize: 12, fill: "rgba(255,255,255,0.65)" }} />
-          <YAxis tick={{ fontSize: 12, fill: "rgba(255,255,255,0.65)" }} domain={["auto", "auto"]} />
-          <Tooltip content={<CustomTooltip />} />
-
-          {series.map((key) => (
-            <Line
-              key={key}
-              type="monotone"
-              dataKey={key}
-              dot={false}
-              strokeWidth={2}
-              isAnimationActive={false}
+    <div
+      ref={ref}
+      className={props.className}
+      style={{ width: "100%", height, minHeight: height }}
+    >
+      {size.w > 20 && size.h > 20 ? (
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartData} margin={{ top: 8, right: 12, left: 6, bottom: 8 }}>
+            <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+            <XAxis
+              dataKey="date"
+              tickFormatter={formatDateShort}
+              minTickGap={28}
+              tick={{ fontSize: 12 }}
             />
-          ))}
-        </LineChart>
-      </ResponsiveContainer>
+            <YAxis
+              width={56}
+              tick={{ fontSize: 12 }}
+              tickFormatter={(v) => formatNumber(Number(v))}
+            />
+            <Tooltip
+              labelFormatter={(label: any) => formatDateShort(String(label))}
+              formatter={(value: any) => {
+                const n = toNum(value);
+                return n === null ? "n/a" : formatNumber(n);
+              }}
+            />
+            <Line type="monotone" dataKey="close" dot={false} strokeWidth={2} isAnimationActive={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      ) : (
+        <div style={{ width: "100%", height: "100%" }} />
+      )}
     </div>
-  )
+  );
 }
