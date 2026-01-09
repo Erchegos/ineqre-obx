@@ -10,14 +10,22 @@ function clampInt(v: string | null, def: number, min: number, max: number) {
   return Math.min(Math.max(Math.trunc(n), min), max);
 }
 
+function pgErrorPayload(e: unknown) {
+  const anyE = e as any;
+  return {
+    message: anyE?.message ?? String(e),
+    code: anyE?.code ?? null,
+    detail: anyE?.detail ?? null,
+    hint: anyE?.hint ?? null,
+    where: anyE?.where ?? null
+  };
+}
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const limit = clampInt(url.searchParams.get("limit"), 5000, 1, 5000);
 
-    // Build a stable "stocks list" contract for the frontend:
-    // - base metadata from stocks_latest
-    // - startDate/endDate/rows derived from prices_daily (aggregate)
     const q = sql`
       with px as (
         select
@@ -49,13 +57,11 @@ export async function GET(req: Request) {
     const res = await db.execute(q);
     const rows = ((res as any)?.rows ?? []) as any[];
 
-    return NextResponse.json({
-      count: rows.length,
-      rows,
-      source: "stocks_latest + prices_daily"
-    });
+    return NextResponse.json({ count: rows.length, rows });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json(
+      { error: "stocks api failed", pg: pgErrorPayload(e) },
+      { status: 500 }
+    );
   }
 }
