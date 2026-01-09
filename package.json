@@ -1,25 +1,21 @@
 {
   "name": "ineqre-obx",
   "private": true,
+  "packageManager": "pnpm@8.15.0",
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
-    "test": "turbo test",
-    "format": "prettier --write ."
+    "test": "turbo test"
   },
   "devDependencies": {
-    "@types/pg": "^8.16.0",
-    "prettier": "^3.2.0",
-    "turbo": "^2.0.0",
+    "turbo": "^2.7.3",
     "typescript": "^5.4.0"
   },
-  "packageManager": "pnpm@8.15.0",
-  "engines": {
-    "node": ">=20.0.0"
-  },
-  "dependencies": {
-    "dotenv": "^17.2.3"
+  "pnpm": {
+    "overrides": {
+      "drizzle-orm": "0.45.1"
+    }
   }
 }
