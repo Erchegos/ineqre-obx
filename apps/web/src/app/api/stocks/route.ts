@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 function clampInt(v: string | null, def: number, min: number, max: number) {
   const n = v ? Number(v) : Number.NaN;
@@ -12,16 +11,14 @@ function clampInt(v: string | null, def: number, min: number, max: number) {
 
 function errShape(e: unknown) {
   const x = e as any;
-  const root = x?.cause ?? x; // critical: unwrap drizzle/node errors
-
   return {
-    message: root?.message ?? x?.message ?? String(e),
-    code: root?.code ?? x?.code ?? null,
-    detail: root?.detail ?? x?.detail ?? null,
-    hint: root?.hint ?? x?.hint ?? null,
-    where: root?.where ?? x?.where ?? null,
-    name: root?.name ?? x?.name ?? null,
-    stack: root?.stack ?? x?.stack ?? null,
+    message: x?.message ?? String(e),
+    code: x?.code ?? null,
+    detail: x?.detail ?? null,
+    hint: x?.hint ?? null,
+    where: x?.where ?? null,
+    name: x?.name ?? null,
+    stack: x?.stack ?? null,
   };
 }
 
