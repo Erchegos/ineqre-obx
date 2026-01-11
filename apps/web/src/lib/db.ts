@@ -1,4 +1,3 @@
-// apps/web/src/lib/db.ts
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 
@@ -8,13 +7,11 @@ if (!connectionString) {
   throw new Error("DATABASE_URL is missing");
 }
 
-const isSupabase =
-  connectionString.includes("supabase.com") ||
-  connectionString.includes("pooler.supabase.com");
+const isProd = process.env.NODE_ENV === "production";
 
 export const pool = new Pool({
   connectionString,
-  ssl: isSupabase ? { rejectUnauthorized: false } : undefined,
+  ssl: isProd ? { rejectUnauthorized: false } : undefined,
 });
 
 export const db = drizzle(pool);
