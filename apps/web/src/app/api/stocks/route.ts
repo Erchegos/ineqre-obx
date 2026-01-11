@@ -1,5 +1,7 @@
+// apps/web/src/app/api/stocks/route.ts
 import { NextResponse } from "next/server";
-import { Pool } from "pg";
+import { db, pool } from "@/lib/db";
+import { sql } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +22,7 @@ function errShape(e: unknown) {
   };
 }
 
-async function listColumns(pool: Pool, tableName: string) {
+async function listColumns(tableName: string) {
   const r = await pool.query(
     `
     select column_name, data_type
@@ -42,13 +44,8 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "DATABASE_URL missing" }, { status: 500 });
   }
 
-  const pool = new Pool({
-    connectionString,
-    ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
-  });
-
   try {
-    const q = `
+    const q = sql`
       with px as (
         select
           upper(ticker) as ticker,
@@ -73,29 +70,31 @@ export async function GET(req: Request) {
       from public.stocks_latest s
       left join px p on p.ticker = upper(s.ticker)
       order by upper(s.ticker) asc
-      limit $1
+      limit ${limit}
     `;
 
-    const r = await pool.query(q, [limit]);
+    const r = await db.execute(q);
+
+    // drizzle node-postgres returns { rows } typically, but keep defensive
+    const rows = (r as any)?.rows ?? (Array.isArray(r) ? r : []);
 
     return NextResponse.json({
-      count: r.rows.length,
-      rows: r.rows,
+      count: rows.length,
+      rows,
       source: "stocks_latest + prices_daily",
     });
   } catch (e: unknown) {
-    // Include live schema introspection so we can fix the column mismatch immediately
     let pricesDailyCols: any[] | null = null;
     let stocksLatestCols: any[] | null = null;
 
     try {
-      pricesDailyCols = await listColumns(pool, "prices_daily");
+      pricesDailyCols = await listColumns("prices_daily");
     } catch {
       pricesDailyCols = null;
     }
 
     try {
-      stocksLatestCols = await listColumns(pool, "stocks_latest");
+      stocksLatestCols = await listColumns("stocks_latest");
     } catch {
       stocksLatestCols = null;
     }
@@ -111,7 +110,5 @@ export async function GET(req: Request) {
       },
       { status: 500 }
     );
-  } finally {
-    await pool.end().catch(() => {});
   }
 }
