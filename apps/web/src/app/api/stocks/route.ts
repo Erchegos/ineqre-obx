@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 function clampInt(v: string | null, def: number, min: number, max: number) {
   const n = v ? Number(v) : Number.NaN;

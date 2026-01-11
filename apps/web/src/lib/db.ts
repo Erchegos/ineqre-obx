@@ -2,20 +2,32 @@
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 
-const connectionString = process.env.DATABASE_URL;
+const raw = process.env.DATABASE_URL;
 
-if (!connectionString) {
+if (!raw) {
   throw new Error("DATABASE_URL is missing");
 }
 
-function shouldRelaxSSL(cs: string) {
-  const s = cs.toLowerCase();
-  return s.includes("supabase.com") || s.includes("pooler.supabase.com") || process.env.NODE_ENV === "production";
+function stripSslMode(cs: string) {
+  try {
+    const u = new URL(cs);
+    u.searchParams.delete("sslmode");
+    return u.toString();
+  } catch {
+    return cs;
+  }
 }
+
+function isSupabase(cs: string) {
+  const s = cs.toLowerCase();
+  return s.includes("supabase.com") || s.includes("pooler.supabase.com");
+}
+
+const connectionString = stripSslMode(raw);
 
 export const pool = new Pool({
   connectionString,
-  ssl: shouldRelaxSSL(connectionString) ? { rejectUnauthorized: false } : undefined,
+  ssl: isSupabase(connectionString) ? { rejectUnauthorized: false } : undefined,
   max: 5,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 10_000,
