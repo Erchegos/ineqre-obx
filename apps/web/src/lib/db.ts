@@ -8,15 +8,17 @@ if (!connectionString) {
   throw new Error("DATABASE_URL is missing");
 }
 
-// Supabase can be supabase.com, supabase.co, and pooler.supabase.com
-const isSupabase =
-  connectionString.includes("supabase.com") ||
-  connectionString.includes("supabase.co") ||
-  connectionString.includes("pooler.supabase.com");
+function shouldRelaxSSL(cs: string) {
+  const s = cs.toLowerCase();
+  return s.includes("supabase.com") || s.includes("pooler.supabase.com") || process.env.NODE_ENV === "production";
+}
 
 export const pool = new Pool({
   connectionString,
-  ssl: isSupabase ? { rejectUnauthorized: false } : undefined,
+  ssl: shouldRelaxSSL(connectionString) ? { rejectUnauthorized: false } : undefined,
+  max: 5,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 10_000,
 });
 
 export const db = drizzle(pool);

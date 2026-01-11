@@ -22,6 +22,22 @@ function errShape(e: unknown) {
   };
 }
 
+function deployMeta() {
+  const cs = process.env.DATABASE_URL ?? "";
+  let host: string | null = null;
+  try {
+    host = new URL(cs).host;
+  } catch {
+    host = null;
+  }
+
+  return {
+    vercelCommit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
+    nodeEnv: process.env.NODE_ENV ?? null,
+    dbUrlHost: host,
+  };
+}
+
 async function listColumns(tableName: string) {
   const r = await pool.query(
     `
@@ -71,6 +87,7 @@ export async function GET(req: Request) {
     const r = await pool.query(q, [limit]);
 
     return NextResponse.json({
+      ...deployMeta(),
       count: r.rows.length,
       rows: r.rows,
       source: "stocks_latest + prices_daily",
@@ -93,6 +110,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json(
       {
+        ...deployMeta(),
         error: "stocks api failed",
         pg: errShape(e),
         schema: {
