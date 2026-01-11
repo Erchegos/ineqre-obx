@@ -1,9 +1,8 @@
-// apps/web/src/app/api/stocks/route.ts
 import { NextResponse } from "next/server";
-import { db, pool } from "@/lib/db";
-import { sql } from "drizzle-orm";
+import { pool } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 function clampInt(v: string | null, def: number, min: number, max: number) {
   const n = v ? Number(v) : Number.NaN;
@@ -13,12 +12,16 @@ function clampInt(v: string | null, def: number, min: number, max: number) {
 
 function errShape(e: unknown) {
   const x = e as any;
+  const root = x?.cause ?? x; // critical: unwrap drizzle/node errors
+
   return {
-    message: x?.message ?? String(e),
-    code: x?.code ?? null,
-    detail: x?.detail ?? null,
-    hint: x?.hint ?? null,
-    where: x?.where ?? null,
+    message: root?.message ?? x?.message ?? String(e),
+    code: root?.code ?? x?.code ?? null,
+    detail: root?.detail ?? x?.detail ?? null,
+    hint: root?.hint ?? x?.hint ?? null,
+    where: root?.where ?? x?.where ?? null,
+    name: root?.name ?? x?.name ?? null,
+    stack: root?.stack ?? x?.stack ?? null,
   };
 }
 
@@ -39,13 +42,8 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const limit = clampInt(url.searchParams.get("limit"), 5000, 1, 5000);
 
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    return NextResponse.json({ error: "DATABASE_URL missing" }, { status: 500 });
-  }
-
   try {
-    const q = sql`
+    const q = `
       with px as (
         select
           upper(ticker) as ticker,
@@ -70,17 +68,14 @@ export async function GET(req: Request) {
       from public.stocks_latest s
       left join px p on p.ticker = upper(s.ticker)
       order by upper(s.ticker) asc
-      limit ${limit}
+      limit $1
     `;
 
-    const r = await db.execute(q);
-
-    // drizzle node-postgres returns { rows } typically, but keep defensive
-    const rows = (r as any)?.rows ?? (Array.isArray(r) ? r : []);
+    const r = await pool.query(q, [limit]);
 
     return NextResponse.json({
-      count: rows.length,
-      rows,
+      count: r.rows.length,
+      rows: r.rows,
       source: "stocks_latest + prices_daily",
     });
   } catch (e: unknown) {
