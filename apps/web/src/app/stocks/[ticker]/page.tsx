@@ -1,6 +1,7 @@
 import Link from "next/link";
 import PriceChart, { type PriceChartPoint } from "@/components/PriceChart";
 import { annualizedVolatility, maxDrawdown, var95 } from "@/lib/metrics";
+console.log("TLS_REJECT", process.env.NODE_TLS_REJECT_UNAUTHORIZED);
 
 export const dynamic = "force-dynamic";
 

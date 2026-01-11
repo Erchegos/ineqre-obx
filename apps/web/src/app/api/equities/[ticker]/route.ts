@@ -1,5 +1,7 @@
+// apps/web/src/app/api/equities/[ticker]/route.ts
 import { NextResponse } from "next/server";
-import { pool } from "@/lib/db";
+import { db } from "@/lib/db";
+import { sql } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,8 @@ function errShape(e: unknown) {
     detail: x?.detail ?? null,
     hint: x?.hint ?? null,
     where: x?.where ?? null,
+    name: x?.name ?? null,
+    stack: x?.stack ?? null,
   };
 }
 
@@ -25,47 +29,44 @@ export async function GET(
   ctx: { params: Promise<{ ticker: string }> }
 ) {
   const { ticker } = await ctx.params;
-
   const url = new URL(req.url);
   const limit = clampInt(url.searchParams.get("limit"), 1500, 1, 5000);
 
-  const t = (ticker ?? "").trim();
-  if (!t) {
-    return NextResponse.json({ error: "ticker missing" }, { status: 400 });
-  }
-
   try {
-    const q = `
+    // Only select columns that exist in public.prices_daily in production.
+    // number_of_shares and number_of_trades are NOT present, so do not reference them.
+    const q = sql`
       select
         pd.date::date as date,
         pd.open,
         pd.high,
         pd.low,
         pd.close,
-        pd.number_of_shares as volume,
+        pd.volume,
         pd.vwap,
         pd.turnover,
-        pd.number_of_trades as "numberOfTrades",
-        pd.number_of_shares as "numberOfShares",
         upper(pd.ticker) as ticker,
         pd.source
       from public.prices_daily pd
-      where upper(pd.ticker) = upper($1)
+      where upper(pd.ticker) = upper(${ticker})
       order by pd.date asc
-      limit $2
+      limit ${limit};
     `;
 
-    const r = await pool.query(q, [t, limit]);
+    const r = await db.execute(q);
 
     return NextResponse.json({
-      ticker: t.toUpperCase(),
+      ticker: ticker.toUpperCase(),
       count: r.rows.length,
       rows: r.rows,
       source: "prices_daily",
     });
   } catch (e: unknown) {
     return NextResponse.json(
-      { error: "equities api failed", pg: errShape(e) },
+      {
+        error: "equities api failed",
+        pg: errShape(e),
+      },
       { status: 500 }
     );
   }
