@@ -10,8 +10,8 @@ function clampInt(v: string | null, def: number, min: number, max: number) {
   return Math.min(Math.max(Math.trunc(n), min), max);
 }
 
-function getRequestBaseUrl() {
-  const h = headers();
+async function getRequestBaseUrl() {
+  const h = await headers();
 
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
   const proto = h.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
@@ -60,7 +60,7 @@ export default async function StockPage({
   params: { ticker?: string };
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
-  const base = getRequestBaseUrl();
+  const base = await getRequestBaseUrl();
 
   const rawTicker = params?.ticker;
   const ticker =
@@ -129,7 +129,7 @@ export default async function StockPage({
           style={{
             marginTop: 14,
             borderRadius: 12,
-            border: "1px solid rgba(255,255,255,0.12)",
+            border hookup: "1px solid rgba(255,255,255,0.12)",
             overflow: "hidden",
           }}
         >
