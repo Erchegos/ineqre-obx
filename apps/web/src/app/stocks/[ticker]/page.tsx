@@ -129,7 +129,7 @@ export default async function StockPage({
           style={{
             marginTop: 14,
             borderRadius: 12,
-            border hookup: "1px solid rgba(255,255,255,0.12)",
+            border: "1px solid rgba(255,255,255,0.12)",
             overflow: "hidden",
           }}
         >
