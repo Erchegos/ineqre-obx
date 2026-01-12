@@ -1,6 +1,5 @@
-// apps/web/src/app/api/equities/[ticker]/route.ts
 import { NextResponse } from "next/server";
-import { Pool } from "pg";
+import { pool } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -18,17 +17,16 @@ function errShape(e: unknown) {
     detail: x?.detail ?? null,
     hint: x?.hint ?? null,
     where: x?.where ?? null,
-    name: x?.name ?? null,
-    stack: x?.stack ?? null,
   };
 }
 
-async function getPublicTableColumns(pool: Pool, tableName: string): Promise<Set<string>> {
+async function getPublicTableColumns(tableName: string): Promise<Set<string>> {
   const r = await pool.query(
     `
     select column_name
     from information_schema.columns
-    where table_schema = 'public' and table_name = $1
+    where table_schema = 'public'
+      and table_name = $1
     `,
     [tableName]
   );
@@ -40,44 +38,51 @@ export async function GET(
   ctx: { params: Promise<{ ticker: string }> }
 ) {
   const { ticker } = await ctx.params;
+
   const url = new URL(req.url);
   const limit = clampInt(url.searchParams.get("limit"), 1500, 1, 5000);
 
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    return NextResponse.json({ error: "DATABASE_URL missing" }, { status: 500 });
-  }
+  const connectionString = process.env.DATABASE_URL ?? "";
+  const dbUrlHost = (() => {
+    try {
+      const u = new URL(connectionString);
+      return `${u.host}${u.port ? `:${u.port}` : ""}`;
+    } catch {
+      return null;
+    }
+  })();
 
-  const isSupabase =
-    connectionString.includes("supabase.com") ||
-    connectionString.includes("pooler.supabase.com");
-
-  const pool = new Pool({
-    connectionString,
-    ssl: isSupabase ? { rejectUnauthorized: false } : undefined,
-  });
+  const meta = {
+    vercelCommit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
+    nodeEnv: process.env.NODE_ENV ?? null,
+    dbUrlHost,
+  };
 
   try {
-    // 1) Introspect once so we never select columns that do not exist
-    const cols = await getPublicTableColumns(pool, "prices_daily");
+    const cols = await getPublicTableColumns("prices_daily");
 
-    // 2) Base columns that must exist for the app to function
+    const has = (c: string) => cols.has(c);
+
     const selectParts: string[] = [
       "pd.date::date as date",
       "pd.open",
       "pd.high",
       "pd.low",
       "pd.close",
-      "pd.volume",
+      // volume + source are present in your working stocks query
+      has("volume") ? "pd.volume" : "null::numeric as volume",
       "upper(pd.ticker) as ticker",
+      has("source") ? "pd.source" : "null::text as source",
+      // optional
+      has("vwap") ? "pd.vwap" : "null::numeric as vwap",
+      has("turnover") ? "pd.turnover" : "null::numeric as turnover",
+      has("number_of_trades")
+        ? 'pd.number_of_trades as "numberOfTrades"'
+        : 'null::int as "numberOfTrades"',
+      has("number_of_shares")
+        ? 'pd.number_of_shares as "numberOfShares"'
+        : 'null::int as "numberOfShares"',
     ];
-
-    // 3) Optional columns depending on your merge schema
-    if (cols.has("vwap")) selectParts.push("pd.vwap");
-    if (cols.has("turnover")) selectParts.push("pd.turnover");
-    if (cols.has("source")) selectParts.push("pd.source");
-    if (cols.has("number_of_trades")) selectParts.push('pd.number_of_trades as "numberOfTrades"');
-    if (cols.has("number_of_shares")) selectParts.push('pd.number_of_shares as "numberOfShares"');
 
     const q = `
       select
@@ -91,31 +96,31 @@ export async function GET(
     const r = await pool.query(q, [ticker, limit]);
 
     return NextResponse.json({
+      ...meta,
       ticker: ticker.toUpperCase(),
       count: r.rows.length,
       rows: r.rows,
-      selectedColumns: selectParts.map((s) => s.split(" as ")[0].trim()),
+      source: "prices_daily",
+      selected: selectParts,
+      pricesDailyColumns: Array.from(cols).sort(),
     });
   } catch (e: unknown) {
-    let pricesDailyCols: string[] | null = null;
+    let pricesDailyColumns: string[] | null = null;
     try {
-      const cols = await getPublicTableColumns(pool, "prices_daily");
-      pricesDailyCols = Array.from(cols).sort();
+      const cols = await getPublicTableColumns("prices_daily");
+      pricesDailyColumns = Array.from(cols).sort();
     } catch {
-      pricesDailyCols = null;
+      pricesDailyColumns = null;
     }
 
     return NextResponse.json(
       {
+        ...meta,
         error: "equities api failed",
         pg: errShape(e),
-        schema: {
-          prices_daily_columns: pricesDailyCols,
-        },
+        schema: { prices_daily_columns: pricesDailyColumns },
       },
       { status: 500 }
     );
-  } finally {
-    await pool.end().catch(() => {});
   }
 }
