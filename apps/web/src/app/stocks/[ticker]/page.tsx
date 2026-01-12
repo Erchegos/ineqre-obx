@@ -1,281 +1,325 @@
-// apps/web/src/app/stocks/[ticker]/page.tsx
-import Link from "next/link";
-import { headers } from "next/headers";
+"use client";
 
-export const dynamic = "force-dynamic";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 
 type EquityRow = {
-  date: string;
+  date: string; // ISO
   open: string | number | null;
   high: string | number | null;
   low: string | number | null;
   close: string | number | null;
   volume: string | number | null;
-  vwap: string | number | null;
-  turnover: string | number | null;
-  numberOfTrades: string | number | null;
-  numberOfShares: string | number | null;
-  ticker: string;
+  vwap?: string | number | null;
+  turnover?: string | number | null;
+  numberOfTrades?: string | number | null;
+  numberOfShares?: string | number | null;
+  ticker?: string;
   source?: string | null;
 };
 
-type EquitiesApiResponse =
-  | {
-      vercelCommit?: string;
-      nodeEnv?: string;
-      dbUrlHost?: string;
-      ticker: string;
-      count: number;
-      rows: EquityRow[];
-      selectedColumns?: string[];
-      source?: string;
-    }
-  | {
-      error: string;
-      pg?: any;
-      schema?: any;
-    };
+type EquityApiOk = {
+  ticker: string;
+  count: number;
+  rows: EquityRow[];
+  source?: string;
+};
 
-function clampInt(v: string | undefined, def: number, min: number, max: number) {
+type EquityApiErr = {
+  error: string;
+  pg?: { message?: string; code?: string | null };
+  [k: string]: any;
+};
+
+function clampInt(v: string | null, def: number, min: number, max: number) {
   const n = v ? Number(v) : Number.NaN;
   if (!Number.isFinite(n)) return def;
   return Math.min(Math.max(Math.trunc(n), min), max);
 }
 
-function fmtDate(d: string | null | undefined) {
-  if (!d) return "NA";
-  const x = new Date(d);
-  if (Number.isNaN(x.getTime())) return String(d);
-  return x.toISOString().slice(0, 10);
+function toNum(x: any): number | null {
+  if (x === null || x === undefined) return null;
+  const n = typeof x === "number" ? x : Number(x);
+  return Number.isFinite(n) ? n : null;
 }
 
-function fmtNum(x: any) {
-  if (x === null || x === undefined) return "NA";
-  const n = typeof x === "string" ? Number(x) : x;
-  if (!Number.isFinite(n)) return String(x);
-  return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+function fmtNum(x: any, digits = 2) {
+  const n = toNum(x);
+  if (n === null) return "NA";
+  return n.toFixed(digits);
 }
 
-async function getBaseUrl() {
-  // Next 16 returns Promise<ReadonlyHeaders> in some setups
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-  const proto = h.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
-  return `${proto}://${host}`;
+function fmtInt(x: any) {
+  const n = toNum(x);
+  if (n === null) return "NA";
+  return Math.trunc(n).toLocaleString("en-US");
 }
 
-export default async function StockTickerPage({
-  params,
-  searchParams,
-}: {
-  params: { ticker?: string };
-  searchParams?: { limit?: string };
-}) {
-  const tickerRaw = params?.ticker ?? "";
-  const ticker = String(tickerRaw).trim().toUpperCase();
+function fmtDate(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toISOString().slice(0, 10);
+}
 
-  const limit = clampInt(searchParams?.limit, 1500, 1, 5000);
+export default function StockTickerPage() {
+  const params = useParams<{ ticker?: string }>();
+  const searchParams = useSearchParams();
 
-  if (!ticker) {
-    return (
-      <main style={{ padding: 24 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>Stock</h1>
-        <p style={{ opacity: 0.8, marginTop: 8 }}>
-          <Link href="/stocks">Back to stocks</Link>
-        </p>
+  const ticker = useMemo(() => {
+    const t = params?.ticker;
+    return typeof t === "string" && t.length ? decodeURIComponent(t).toUpperCase() : "";
+  }, [params]);
 
-        <div
-          style={{
-            marginTop: 16,
-            padding: 16,
-            borderRadius: 12,
-            border: "1px solid rgba(255,255,255,0.12)",
-            background: "rgba(255, 0, 0, 0.08)",
-          }}
-        >
-          <div style={{ fontWeight: 700 }}>Application error</div>
-          <div style={{ marginTop: 6 }}>Missing ticker in route params.</div>
-        </div>
-      </main>
-    );
-  }
+  const initialLimit = useMemo(() => {
+    return clampInt(searchParams.get("limit"), 1500, 20, 5000);
+  }, [searchParams]);
 
-  const base = await getBaseUrl();
+  const [limit, setLimit] = useState<number>(initialLimit);
 
-  // Use SAME ORIGIN in production to avoid Vercel Deployment Protection 401s.
-  // Relative fetch is the most reliable path.
-  const url = `/api/equities/${encodeURIComponent(ticker)}?limit=${limit}`;
+  const [loading, setLoading] = useState<boolean>(true);
+  const [data, setData] = useState<EquityApiOk | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [rawError, setRawError] = useState<string | null>(null);
 
-  let data: EquitiesApiResponse | null = null;
-  let errorText: string | null = null;
+  useEffect(() => {
+    let cancelled = false;
 
-  try {
-    const res = await fetch(url, { cache: "no-store" });
+    async function run() {
+      if (!ticker) {
+        setLoading(false);
+        setData(null);
+        setError("Missing ticker in route params.");
+        return;
+      }
 
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      errorText = `Equities API failed (${res.status} ${res.statusText}). URL=${url}. Body=${body.slice(0, 800)}`;
-    } else {
-      data = (await res.json()) as EquitiesApiResponse;
-      if ((data as any)?.error) {
-        errorText = `Equities API returned error payload. URL=${url}. error=${(data as any).error}`;
+      setLoading(true);
+      setError(null);
+      setRawError(null);
+
+      try {
+        const url = `/api/equities/${encodeURIComponent(ticker)}?limit=${encodeURIComponent(
+          String(limit)
+        )}`;
+
+        const res = await fetch(url, {
+          method: "GET",
+          headers: { "accept": "application/json" },
+          cache: "no-store",
+        });
+
+        const text = await res.text();
+
+        if (!res.ok) {
+          // Try JSON first, otherwise keep raw body
+          try {
+            const j = JSON.parse(text) as EquityApiErr;
+            const msg =
+              j?.pg?.message ??
+              j?.error ??
+              `Equities API failed (${res.status} ${res.statusText}).`;
+            if (!cancelled) {
+              setError(msg);
+              setRawError(text);
+              setData(null);
+            }
+          } catch {
+            if (!cancelled) {
+              setError(`Equities API failed (${res.status} ${res.statusText}).`);
+              setRawError(text);
+              setData(null);
+            }
+          }
+          return;
+        }
+
+        const json = JSON.parse(text) as EquityApiOk;
+
+        if (!cancelled) {
+          setData(json);
+          setLoading(false);
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setError(e?.message ?? String(e));
+          setRawError(null);
+          setData(null);
+          setLoading(false);
+        }
       }
     }
-  } catch (e: any) {
-    errorText = `Network failure calling equities API. URL=${url}. message=${e?.message ?? String(e)}`;
-  }
 
-  const rows = (data && "rows" in data ? data.rows : []) ?? [];
-  const count = (data && "count" in data ? data.count : 0) ?? 0;
-  const source = (data && "source" in data ? data.source : null) ?? "prices_daily";
-
-  const startDate = rows.length ? rows[0]?.date : null;
-  const endDate = rows.length ? rows[rows.length - 1]?.date : null;
-  const last = rows.length ? rows[rows.length - 1] : null;
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [ticker, limit]);
 
   return (
     <main style={{ padding: 24 }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 16 }}>
-        <h1 style={{ fontSize: 34, fontWeight: 800, margin: 0 }}>Stock {ticker}</h1>
-        <Link href="/stocks" style={{ opacity: 0.8 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+        <h1 style={{ fontSize: 36, fontWeight: 800, margin: 0 }}>
+          Stock {ticker || "?"}
+        </h1>
+        <Link
+          href="/stocks"
+          style={{ color: "rgba(255,255,255,0.7)", textDecoration: "none" }}
+        >
           Back to stocks
         </Link>
       </div>
 
-      <div style={{ marginTop: 10, opacity: 0.8 }}>
-        Limit: {limit} | Base: {base}
+      <div style={{ marginTop: 10, color: "rgba(255,255,255,0.75)" }}>
+        Limit:&nbsp;
+        <input
+          type="number"
+          min={20}
+          max={5000}
+          step={1}
+          value={limit}
+          onChange={(e) => setLimit(clampInt(e.target.value, 1500, 20, 5000))}
+          style={{
+            width: 110,
+            padding: "6px 8px",
+            borderRadius: 8,
+            border: "1px solid rgba(255,255,255,0.12)",
+            background: "rgba(0,0,0,0.25)",
+            color: "white",
+            outline: "none",
+            marginLeft: 6,
+          }}
+        />
+        {data?.source ? (
+          <span style={{ marginLeft: 12, opacity: 0.7 }}>Source: {data.source}</span>
+        ) : null}
       </div>
 
-      {errorText ? (
+      {loading ? (
         <div
           style={{
-            marginTop: 16,
-            padding: 16,
+            marginTop: 18,
+            padding: 14,
             borderRadius: 12,
             border: "1px solid rgba(255,255,255,0.12)",
-            background: "rgba(255, 0, 0, 0.08)",
-            whiteSpace: "pre-wrap",
+            background: "rgba(255,255,255,0.04)",
           }}
         >
-          <div style={{ fontWeight: 800, fontSize: 18 }}>Application error</div>
-          <div style={{ marginTop: 8 }}>{errorText}</div>
-          <div style={{ marginTop: 10, opacity: 0.9 }}>
-            Direct check:{" "}
-            <a href={url} style={{ textDecoration: "underline" }}>
-              {url}
+          Loading…
+        </div>
+      ) : null}
+
+      {!loading && error ? (
+        <div
+          style={{
+            marginTop: 18,
+            padding: 16,
+            borderRadius: 12,
+            border: "1px solid rgba(255,140,140,0.35)",
+            background: "rgba(120,0,0,0.22)",
+          }}
+        >
+          <div style={{ fontWeight: 800, fontSize: 20, marginBottom: 8 }}>
+            Application error
+          </div>
+          <div style={{ opacity: 0.95 }}>{error}</div>
+          {rawError ? (
+            <pre
+              style={{
+                marginTop: 12,
+                padding: 12,
+                borderRadius: 10,
+                background: "rgba(0,0,0,0.35)",
+                overflowX: "auto",
+                fontSize: 12,
+                lineHeight: 1.35,
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+              }}
+            >
+              {rawError}
+            </pre>
+          ) : null}
+          <div style={{ marginTop: 10, opacity: 0.85 }}>
+            Direct check:&nbsp;
+            <a
+              href={`/api/equities/${encodeURIComponent(ticker || "")}?limit=20`}
+              style={{ color: "rgba(130,190,255,1)", textDecoration: "none" }}
+            >
+              /api/equities/{ticker || ""}?limit=20
             </a>
           </div>
         </div>
-      ) : (
-        <>
-          <div
-            style={{
-              marginTop: 16,
-              padding: 16,
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.12)",
-              background: "rgba(255,255,255,0.04)",
-            }}
-          >
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 18, rowGap: 10 }}>
-              <div>
-                <div style={{ opacity: 0.75, fontSize: 12 }}>Source</div>
-                <div style={{ fontWeight: 700 }}>{source}</div>
-              </div>
-              <div>
-                <div style={{ opacity: 0.75, fontSize: 12 }}>Rows</div>
-                <div style={{ fontWeight: 700 }}>{count}</div>
-              </div>
-              <div>
-                <div style={{ opacity: 0.75, fontSize: 12 }}>Start</div>
-                <div style={{ fontWeight: 700 }}>{fmtDate(startDate)}</div>
-              </div>
-              <div>
-                <div style={{ opacity: 0.75, fontSize: 12 }}>End</div>
-                <div style={{ fontWeight: 700 }}>{fmtDate(endDate)}</div>
-              </div>
-              <div>
-                <div style={{ opacity: 0.75, fontSize: 12 }}>Last close</div>
-                <div style={{ fontWeight: 700 }}>{fmtNum(last?.close)}</div>
-              </div>
-              <div>
-                <div style={{ opacity: 0.75, fontSize: 12 }}>Last volume</div>
-                <div style={{ fontWeight: 700 }}>{fmtNum(last?.volume)}</div>
-              </div>
-            </div>
+      ) : null}
+
+      {!loading && data ? (
+        <div
+          style={{
+            marginTop: 18,
+            borderRadius: 12,
+            border: "1px solid rgba(255,255,255,0.12)",
+            overflow: "hidden",
+            background: "rgba(255,255,255,0.03)",
+          }}
+        >
+          <div style={{ padding: 14, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+            Rows: <b>{data.count}</b>
           </div>
 
-          <div
-            style={{
-              marginTop: 16,
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.12)",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                padding: 12,
-                background: "rgba(255,255,255,0.04)",
-                borderBottom: "1px solid rgba(255,255,255,0.12)",
-                fontWeight: 800,
-              }}
-            >
-              First 30 rows (chronological)
-            </div>
-
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ textAlign: "left", opacity: 0.85 }}>
-                    {[
-                      "date",
-                      "open",
-                      "high",
-                      "low",
-                      "close",
-                      "volume",
-                      "vwap",
-                      "turnover",
-                      "numberOfTrades",
-                      "numberOfShares",
-                      "source",
-                    ].map((k) => (
-                      <th key={k} style={{ padding: "10px 12px", borderBottom: "1px solid rgba(255,255,255,0.10)" }}>
-                        {k}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.slice(0, 30).map((r, i) => (
-                    <tr key={`${r.date}-${i}`} style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                      <td style={{ padding: "10px 12px" }}>{fmtDate(r.date)}</td>
-                      <td style={{ padding: "10px 12px" }}>{fmtNum(r.open)}</td>
-                      <td style={{ padding: "10px 12px" }}>{fmtNum(r.high)}</td>
-                      <td style={{ padding: "10px 12px" }}>{fmtNum(r.low)}</td>
-                      <td style={{ padding: "10px 12px" }}>{fmtNum(r.close)}</td>
-                      <td style={{ padding: "10px 12px" }}>{fmtNum(r.volume)}</td>
-                      <td style={{ padding: "10px 12px" }}>{fmtNum(r.vwap)}</td>
-                      <td style={{ padding: "10px 12px" }}>{fmtNum(r.turnover)}</td>
-                      <td style={{ padding: "10px 12px" }}>{fmtNum(r.numberOfTrades)}</td>
-                      <td style={{ padding: "10px 12px" }}>{fmtNum(r.numberOfShares)}</td>
-                      <td style={{ padding: "10px 12px" }}>{r.source ?? "NA"}</td>
-                    </tr>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+              <thead>
+                <tr style={{ textAlign: "left" }}>
+                  {[
+                    "Date",
+                    "Open",
+                    "High",
+                    "Low",
+                    "Close",
+                    "Volume",
+                    "VWAP",
+                    "Turnover",
+                    "Trades",
+                    "Shares",
+                    "Source",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      style={{
+                        padding: "10px 12px",
+                        borderBottom: "1px solid rgba(255,255,255,0.08)",
+                        color: "rgba(255,255,255,0.8)",
+                        fontWeight: 700,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {h}
+                    </th>
                   ))}
-                  {rows.length === 0 ? (
-                    <tr>
-                      <td style={{ padding: "12px" }} colSpan={11}>
-                        No rows returned for {ticker}.
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
+                </tr>
+              </thead>
+              <tbody>
+                {data.rows.map((r, i) => (
+                  <tr key={`${r.date}-${i}`} style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                    <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>{fmtDate(r.date)}</td>
+                    <td style={{ padding: "10px 12px" }}>{fmtNum(r.open, 2)}</td>
+                    <td style={{ padding: "10px 12px" }}>{fmtNum(r.high, 2)}</td>
+                    <td style={{ padding: "10px 12px" }}>{fmtNum(r.low, 2)}</td>
+                    <td style={{ padding: "10px 12px" }}>{fmtNum(r.close, 2)}</td>
+                    <td style={{ padding: "10px 12px" }}>{fmtInt(r.volume)}</td>
+                    <td style={{ padding: "10px 12px" }}>{fmtNum(r.vwap, 4)}</td>
+                    <td style={{ padding: "10px 12px" }}>{fmtNum(r.turnover, 2)}</td>
+                    <td style={{ padding: "10px 12px" }}>{fmtInt(r.numberOfTrades)}</td>
+                    <td style={{ padding: "10px 12px" }}>{fmtInt(r.numberOfShares)}</td>
+                    <td style={{ padding: "10px 12px", opacity: 0.85 }}>
+                      {r.source ?? "NA"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </>
-      )}
+        </div>
+      ) : null}
     </main>
   );
 }
