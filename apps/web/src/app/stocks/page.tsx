@@ -1,21 +1,14 @@
 // apps/web/src/app/stocks/page.tsx
 import Link from "next/link";
-import { db } from "@/lib/db";
-import { sql } from "drizzle-orm";
+import { pool } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 type StockRow = {
   ticker: string;
-  name: string | null;
-  sector: string | null;
-  exchange: string | null;
-  currency: string | null;
-  isActive: boolean | null;
-  lastDate: string | null;
-  lastClose: number | null;
   startDate: string | null;
   endDate: string | null;
+  lastClose: number | null;
   rows: number;
 };
 
@@ -31,50 +24,44 @@ function toDate10(v: unknown): string | null {
   return s.length >= 10 ? s.slice(0, 10) : s;
 }
 
-async function getStocks(limit = 5000): Promise<{ count: number; rows: StockRow[] }> {
-  const q = sql`
-    with px as (
-      select
+async function getStocks(): Promise<{ count: number; rows: StockRow[] }> {
+  const query = `
+    WITH ticker_stats AS (
+      SELECT 
         upper(ticker) as ticker,
-        min(date::date) as "startDate",
-        max(date::date) as "endDate",
-        count(*)::int as rows
-      from public.prices_daily
-      group by upper(ticker)
+        min(date) as start_date,
+        max(date) as end_date,
+        count(*) as row_count
+      FROM public.obx_equities
+      GROUP BY upper(ticker)
+    ),
+    latest_prices AS (
+      SELECT DISTINCT ON (upper(ticker))
+        upper(ticker) as ticker,
+        close as last_close
+      FROM public.obx_equities
+      WHERE close IS NOT NULL
+      ORDER BY upper(ticker), date DESC
     )
-    select
-      upper(s.ticker) as ticker,
-      s.name as name,
-      s.sector as sector,
-      s.exchange as exchange,
-      s.currency as currency,
-      s.is_active as "isActive",
-      s.last_date::date as "lastDate",
-      s.last_close as "lastClose",
-      p."startDate" as "startDate",
-      p."endDate" as "endDate",
-      coalesce(p.rows, 0) as rows
-    from public.stocks_latest s
-    left join px p on p.ticker = upper(s.ticker)
-    order by upper(s.ticker) asc
-    limit ${limit}
+    SELECT 
+      t.ticker,
+      t.start_date::text as "startDate",
+      t.end_date::text as "endDate",
+      l.last_close as "lastClose",
+      t.row_count as rows
+    FROM ticker_stats t
+    LEFT JOIN latest_prices l ON l.ticker = t.ticker
+    ORDER BY t.ticker
   `;
 
-  const res = await db.execute(q);
-  const raw = ((res as any)?.rows ?? []) as any[];
-
-  const rows: StockRow[] = raw.map((r) => ({
+  const result = await pool.query(query);
+  
+  const rows: StockRow[] = result.rows.map((r: any) => ({
     ticker: String(r.ticker ?? "").toUpperCase(),
-    name: r.name ?? null,
-    sector: r.sector ?? null,
-    exchange: r.exchange ?? null,
-    currency: r.currency ?? null,
-    isActive: r.isActive ?? null,
-    lastDate: toDate10(r.lastDate),
-    lastClose: toNum(r.lastClose),
     startDate: toDate10(r.startDate),
     endDate: toDate10(r.endDate),
-    rows: typeof r.rows === "number" ? r.rows : Number(r.rows ?? 0),
+    lastClose: toNum(r.lastClose),
+    rows: Number(r.rows ?? 0),
   }));
 
   return { count: rows.length, rows };
@@ -83,7 +70,7 @@ async function getStocks(limit = 5000): Promise<{ count: number; rows: StockRow[
 function fmtNum(n: number | null): string {
   if (n === null) return "NA";
   if (!Number.isFinite(n)) return "NA";
-  return n.toLocaleString("en-US", { maximumFractionDigits: 6 });
+  return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 }
 
 export default async function StocksPage() {
@@ -91,7 +78,7 @@ export default async function StocksPage() {
   let err: string | null = null;
 
   try {
-    data = await getStocks(5000);
+    data = await getStocks();
   } catch (e: any) {
     err = e?.message ?? String(e);
   }
@@ -101,10 +88,10 @@ export default async function StocksPage() {
       <main className="mx-auto max-w-6xl px-6 py-10">
         <h1 className="text-2xl font-semibold">Stocks</h1>
         <p className="mt-4 text-sm text-red-400">
-          Server error while loading stocks. {err}
+          Server error while loading stocks: {err}
         </p>
         <p className="mt-2 text-sm text-zinc-400">
-          Action: verify DATABASE_URL, DNS reachability to Supabase, and that public.stocks_latest and public.prices_daily exist.
+          Check that DATABASE_URL is set and obx_equities table exists.
         </p>
       </main>
     );
@@ -123,7 +110,7 @@ export default async function StocksPage() {
         </div>
 
         <div className="text-sm text-zinc-400">
-          Source: stocks_latest + prices_daily
+          Source: obx_equities
         </div>
       </div>
 
@@ -132,16 +119,10 @@ export default async function StocksPage() {
           <thead className="bg-zinc-950">
             <tr className="text-left text-zinc-300">
               <th className="px-4 py-3">Ticker</th>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Sector</th>
-              <th className="px-4 py-3">Exchange</th>
-              <th className="px-4 py-3">Currency</th>
-              <th className="px-4 py-3">Last date</th>
-              <th className="px-4 py-3">Last close</th>
-              <th className="px-4 py-3">Start</th>
-              <th className="px-4 py-3">End</th>
+              <th className="px-4 py-3">Last Close</th>
+              <th className="px-4 py-3">Start Date</th>
+              <th className="px-4 py-3">End Date</th>
               <th className="px-4 py-3">Rows</th>
-              <th className="px-4 py-3">Status</th>
             </tr>
           </thead>
 
@@ -156,25 +137,17 @@ export default async function StocksPage() {
                     {r.ticker}
                   </Link>
                 </td>
-                <td className="px-4 py-3">{r.name ?? "NA"}</td>
-                <td className="px-4 py-3">{r.sector ?? "NA"}</td>
-                <td className="px-4 py-3">{r.exchange ?? "NA"}</td>
-                <td className="px-4 py-3">{r.currency ?? "NA"}</td>
-                <td className="px-4 py-3">{r.lastDate ?? "NA"}</td>
                 <td className="px-4 py-3">{fmtNum(r.lastClose)}</td>
                 <td className="px-4 py-3">{r.startDate ?? "NA"}</td>
                 <td className="px-4 py-3">{r.endDate ?? "NA"}</td>
-                <td className="px-4 py-3">{Number.isFinite(r.rows) ? r.rows.toLocaleString() : "0"}</td>
-                <td className="px-4 py-3">
-                  {r.isActive === null ? "NA" : r.isActive ? "active" : "inactive"}
-                </td>
+                <td className="px-4 py-3">{r.rows.toLocaleString()}</td>
               </tr>
             ))}
 
             {!rows.length && (
               <tr>
-                <td className="px-4 py-6 text-zinc-400" colSpan={11}>
-                  No rows returned. Validate that public.stocks_latest is populated.
+                <td className="px-4 py-6 text-zinc-400" colSpan={5}>
+                  No data in obx_equities table.
                 </td>
               </tr>
             )}

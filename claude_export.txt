@@ -1,0 +1,2424 @@
+===== FILE: apps/web/README.md =====
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+
+## Getting Started
+
+First, run the development server:
+
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+===== FILE: apps/web/drizzle.config.ts =====
+import path from "path";
+import dotenv from "dotenv";
+import type { Config } from "drizzle-kit";
+
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
+
+export default {
+  schema: path.resolve(__dirname, "../../packages/db/schema.ts"),
+  dialect: "postgresql",
+  dbCredentials: {
+    url: process.env.DATABASE_URL!,
+  },
+} satisfies Config;
+
+===== FILE: apps/web/eslint.config.mjs =====
+import { defineConfig, globalIgnores } from "eslint/config";
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTs from "eslint-config-next/typescript";
+
+const eslintConfig = defineConfig([
+  ...nextVitals,
+  ...nextTs,
+  // Override default ignores of eslint-config-next.
+  globalIgnores([
+    // Default ignores of eslint-config-next:
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+  ]),
+]);
+
+export default eslintConfig;
+
+===== FILE: apps/web/package.json =====
+{
+  "name": "web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ineqre/db": "workspace:*",
+    "@supabase/supabase-js": "^2.89.0",
+    "drizzle-orm": "^0.45.1",
+    "next": "16.1.1",
+    "pg": "^8.16.3",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "recharts": "^3.6.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/pg": "^8.16.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "dotenv": "^17.2.3",
+    "drizzle-kit": "^0.31.8",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.1",
+    "tailwindcss": "^4",
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}
+
+===== FILE: apps/web/postcss.config.mjs =====
+const config = {
+  plugins: {
+    "@tailwindcss/postcss": {},
+  },
+};
+
+export default config;
+
+===== FILE: apps/web/public/file.svg =====
+<svg fill="none" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M14.5 13.5V5.41a1 1 0 0 0-.3-.7L9.8.29A1 1 0 0 0 9.08 0H1.5v13.5A2.5 2.5 0 0 0 4 16h8a2.5 2.5 0 0 0 2.5-2.5m-1.5 0v-7H8v-5H3v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1M9.5 5V2.12L12.38 5zM5.13 5h-.62v1.25h2.12V5zm-.62 3h7.12v1.25H4.5zm.62 3h-.62v1.25h7.12V11z" clip-rule="evenodd" fill="#666" fill-rule="evenodd"/></svg>
+===== FILE: apps/web/public/globe.svg =====
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><g clip-path="url(#a)"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.27 14.1a6.5 6.5 0 0 0 3.67-3.45q-1.24.21-2.7.34-.31 1.83-.97 3.1M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m.48-1.52a7 7 0 0 1-.96 0H7.5a4 4 0 0 1-.84-1.32q-.38-.89-.63-2.08a40 40 0 0 0 3.92 0q-.25 1.2-.63 2.08a4 4 0 0 1-.84 1.31zm2.94-4.76q1.66-.15 2.95-.43a7 7 0 0 0 0-2.58q-1.3-.27-2.95-.43a18 18 0 0 1 0 3.44m-1.27-3.54a17 17 0 0 1 0 3.64 39 39 0 0 1-4.3 0 17 17 0 0 1 0-3.64 39 39 0 0 1 4.3 0m1.1-1.17q1.45.13 2.69.34a6.5 6.5 0 0 0-3.67-3.44q.65 1.26.98 3.1M8.48 1.5l.01.02q.41.37.84 1.31.38.89.63 2.08a40 40 0 0 0-3.92 0q.25-1.2.63-2.08a4 4 0 0 1 .85-1.32 7 7 0 0 1 .96 0m-2.75.4a6.5 6.5 0 0 0-3.67 3.44 29 29 0 0 1 2.7-.34q.31-1.83.97-3.1M4.58 6.28q-1.66.16-2.95.43a7 7 0 0 0 0 2.58q1.3.27 2.95.43a18 18 0 0 1 0-3.44m.17 4.71q-1.45-.12-2.69-.34a6.5 6.5 0 0 0 3.67 3.44q-.65-1.27-.98-3.1" fill="#666"/></g><defs><clipPath id="a"><path fill="#fff" d="M0 0h16v16H0z"/></clipPath></defs></svg>
+===== FILE: apps/web/public/vercel.svg =====
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1155 1000"><path d="m577.3 0 577.4 1000H0z" fill="#fff"/></svg>
+===== FILE: apps/web/public/window.svg =====
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill-rule="evenodd" clip-rule="evenodd" d="M1.5 2.5h13v10a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1zM0 1h16v11.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 0 12.5zm3.75 4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5M7 4.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0m1.75.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5" fill="#666"/></svg>
+===== FILE: apps/web/scripts/ingest-prices-mock.mjs =====
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import dotenv from "dotenv";
+import { createClient } from "@supabase/supabase-js";
+
+// Load repo root .env regardless of current working directory
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
+
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+const SOURCE = "mock";
+
+function iso(d) {
+  return d.toISOString().slice(0, 10);
+}
+
+function makeSeries(ticker, days = 250) {
+  const out = [];
+  const start = new Date();
+  start.setDate(start.getDate() - days);
+
+  let px = 100 + (ticker.charCodeAt(0) % 20);
+
+  for (let i = 0; i < days; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+
+    // skip weekends
+    const wd = d.getDay();
+    if (wd === 0 || wd === 6) continue;
+
+    // deterministic drift + wobble
+    const wobble = ((i % 17) - 8) * 0.08;
+    px = Math.max(5, px * (1 + 0.0006 + wobble / 100));
+
+    const close = Number(px.toFixed(4));
+    const open = Number((close * 0.998).toFixed(4));
+    const high = Number((close * 1.006).toFixed(4));
+    const low = Number((close * 0.994).toFixed(4));
+    const volume = 100000 + (i % 50) * 1000;
+
+    out.push({
+      ticker,
+      date: iso(d),
+      open,
+      high,
+      low,
+      close,
+      adj_close: close,
+      volume,
+      source: SOURCE,
+    });
+  }
+
+  return out;
+}
+
+async function fetchUniverse() {
+  const { data, error } = await supabase.from("stocks").select("ticker").eq("is_active", true);
+  if (error) throw error;
+  return (data ?? []).map((r) => r.ticker);
+}
+
+async function hasAnyRows(ticker) {
+  const { data, error } = await supabase
+    .from("prices_daily")
+    .select("id")
+    .eq("ticker", ticker)
+    .limit(1);
+
+  if (error) throw error;
+  return (data ?? []).length > 0;
+}
+
+async function upsertBatch(rows) {
+  for (let i = 0; i < rows.length; i += 500) {
+    const batch = rows.slice(i, i + 500);
+    const { error } = await supabase.from("prices_daily").upsert(batch);
+    if (error) throw error;
+  }
+}
+
+async function main() {
+  const tickers = await fetchUniverse();
+
+  let filled = 0;
+  for (const t of tickers) {
+    const exists = await hasAnyRows(t);
+    if (exists) {
+      console.log(`Skip: ${t} already has data`);
+      continue;
+    }
+
+    const rows = makeSeries(t);
+    await upsertBatch(rows);
+    console.log(`Mock upserted: ${rows.length} rows for ${t}`);
+    filled += 1;
+  }
+
+  console.log(`Done. Filled tickers: ${filled}`);
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
+
+===== FILE: apps/web/scripts/ingest_phase2_to_supabase.ts =====
+import fs from "node:fs";
+import path from "node:path";
+import { Client } from "pg";
+
+type CsvRow = Record<string, string>;
+
+function splitCsvLine(line: string): string[] {
+  const out: string[] = [];
+  let cur = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      const next = line[i + 1];
+      if (inQuotes && next === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+    if (ch === "," && !inQuotes) {
+      out.push(cur);
+      cur = "";
+      continue;
+    }
+    cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+
+function parseCsv(content: string): CsvRow[] {
+  const lines = content.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (lines.length < 2) return [];
+
+  const header = splitCsvLine(lines[0]).map((h) => h.trim());
+  const rows: CsvRow[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = splitCsvLine(lines[i]);
+    const row: CsvRow = {};
+    for (let j = 0; j < header.length; j++) row[header[j]] = (cols[j] ?? "").trim();
+    rows.push(row);
+  }
+  return rows;
+}
+
+function toNum(v: string): number | null {
+  const s = (v ?? "").trim();
+  if (!s) return null;
+  const n = Number(s.replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+}
+
+function normDate(v: string): string {
+  const s = (v ?? "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if (/^\d{2}\.\d{2}\.\d{4}$/.test(s)) {
+    const [dd, mm, yyyy] = s.split(".");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) throw new Error(`Bad date: ${v}`);
+  return d.toISOString().slice(0, 10);
+}
+
+async function upsertStage(client: Client, rows: any[]) {
+  if (rows.length === 0) return;
+
+  const cols = [
+    "ticker",
+    "date",
+    "open",
+    "high",
+    "low",
+    "close",
+    "adj_close",
+    "number_of_shares",
+    "number_of_trades",
+    "turnover",
+    "vwap",
+  ];
+
+  const chunkSize = 2000;
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const chunk = rows.slice(i, i + chunkSize);
+
+    const values: any[] = [];
+    const placeholders: string[] = [];
+    let p = 1;
+
+    for (const r of chunk) {
+      placeholders.push(
+        `($${p++}, $${p++}::date, $${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++})`
+      );
+      values.push(
+        String(r.ticker).toUpperCase(),
+        r.date,
+        r.open,
+        r.high,
+        r.low,
+        r.close,
+        r.adj_close,
+        r.number_of_shares,
+        r.number_of_trades,
+        r.turnover,
+        r.vwap
+      );
+    }
+
+    const q = `
+      insert into public.prices_daily_stage_euronext
+        (${cols.join(",")})
+      values
+        ${placeholders.join(",")}
+      on conflict (ticker, date) do update set
+        open = excluded.open,
+        high = excluded.high,
+        low = excluded.low,
+        close = excluded.close,
+        adj_close = excluded.adj_close,
+        number_of_shares = excluded.number_of_shares,
+        number_of_trades = excluded.number_of_trades,
+        turnover = excluded.turnover,
+        vwap = excluded.vwap
+    `;
+
+    await client.query(q, values);
+  }
+}
+
+async function promoteToPricesDaily(client: Client) {
+  const q = `
+    insert into public.prices_daily
+      (ticker, date, open, high, low, close, adj_close, volume, source)
+    select
+      upper(s.ticker) as ticker,
+      s.date::date as date,
+      s.open,
+      s.high,
+      s.low,
+      s.close,
+      s.adj_close,
+      coalesce(s.number_of_shares, 0)::bigint as volume,
+      'euronext' as source
+    from public.prices_daily_stage_euronext s
+    where s.ticker is not null and s.date is not null
+    on conflict (ticker, date) do update set
+      open = excluded.open,
+      high = excluded.high,
+      low = excluded.low,
+      close = excluded.close,
+      adj_close = excluded.adj_close,
+      volume = excluded.volume,
+      source = excluded.source
+  `;
+  await client.query(q);
+}
+
+async function main() {
+  const databaseUrl = process.env.SUPABASE_DATABASE_URL;
+  if (!databaseUrl) throw new Error("SUPABASE_DATABASE_URL missing");
+
+  const baseDir =
+    "/Users/olaslettebak/Documents/Intelligence Equity Research /CSV_OBX_Equity_CLEAN";
+
+  const equityFile = path.join(baseDir, "obx_equities.clean.csv");
+  if (!fs.existsSync(equityFile)) throw new Error(`Missing: ${equityFile}`);
+
+  const csv = fs.readFileSync(equityFile, "utf8");
+  const parsed = parseCsv(csv);
+
+  const rows = parsed
+    .map((r) => {
+      const ticker = r["ticker"] || r["Ticker"] || r["symbol"] || r["Symbol"];
+      const date = r["date"] || r["Date"];
+
+      if (!ticker || !date) return null;
+
+      const open = toNum(r["open"] || r["Open"] || "");
+      const high = toNum(r["high"] || r["High"] || "");
+      const low = toNum(r["low"] || r["Low"] || "");
+      const close = toNum(r["close"] || r["Close"] || "");
+      const adjClose =
+        toNum(r["adj_close"] || r["Adj Close"] || r["adjClose"] || "") ?? close;
+
+      const shares = toNum(r["number_of_shares"] || r["Number of shares"] || "");
+      const trades = toNum(r["number_of_trades"] || r["Number of trades"] || "");
+      const turnover = toNum(r["turnover"] || r["Turnover"] || "");
+      const vwap = toNum(r["vwap"] || r["VWAP"] || "");
+
+      return {
+        ticker: String(ticker).trim(),
+        date: normDate(String(date)),
+        open,
+        high,
+        low,
+        close,
+        adj_close: adjClose,
+        number_of_shares: shares,
+        number_of_trades: trades,
+        turnover,
+        vwap,
+      };
+    })
+    .filter(Boolean) as any[];
+
+  const client = new Client({
+    connectionString: databaseUrl,
+    // Supabase pooler uses TLS; Node sometimes rejects the chain on macOS.
+    // This is acceptable for a controlled ingestion job.
+    ssl: { rejectUnauthorized: false },
+  });
+
+  await client.connect();
+
+  await client.query("truncate table public.prices_daily_stage_euronext");
+  await upsertStage(client, rows);
+  await promoteToPricesDaily(client);
+
+  const stats = await client.query(`
+    select
+      count(*) as rows,
+      count(distinct ticker) as tickers,
+      min(date)::date as min_date,
+      max(date)::date as max_date
+    from public.prices_daily
+    where source = 'euronext'
+  `);
+
+  console.log(stats.rows[0]);
+
+  await client.end();
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
+
+===== FILE: apps/web/src/app/api/equities/[ticker]/route.ts =====
+import { NextResponse } from "next/server";
+import { pool } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
+
+function clampInt(v: string | null, def: number, min: number, max: number) {
+  const n = v ? Number(v) : Number.NaN;
+  if (!Number.isFinite(n)) return def;
+  return Math.min(Math.max(Math.trunc(n), min), max);
+}
+
+function errShape(e: unknown) {
+  const x = e as any;
+  return {
+    message: x?.message ?? String(e),
+    code: x?.code ?? null,
+    detail: x?.detail ?? null,
+    hint: x?.hint ?? null,
+    where: x?.where ?? null,
+  };
+}
+
+async function getPublicTableColumns(tableName: string): Promise<Set<string>> {
+  const r = await pool.query(
+    `
+    select column_name
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = $1
+    `,
+    [tableName]
+  );
+  return new Set(r.rows.map((x: any) => String(x.column_name)));
+}
+
+export async function GET(
+  req: Request,
+  ctx: { params: Promise<{ ticker: string }> }
+) {
+  const { ticker } = await ctx.params;
+
+  const url = new URL(req.url);
+  const limit = clampInt(url.searchParams.get("limit"), 1500, 1, 5000);
+
+  const connectionString = process.env.DATABASE_URL ?? "";
+  const dbUrlHost = (() => {
+    try {
+      const u = new URL(connectionString);
+      return `${u.host}${u.port ? `:${u.port}` : ""}`;
+    } catch {
+      return null;
+    }
+  })();
+
+  const meta = {
+    vercelCommit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
+    nodeEnv: process.env.NODE_ENV ?? null,
+    dbUrlHost,
+  };
+
+  try {
+    const cols = await getPublicTableColumns("prices_daily");
+
+    const has = (c: string) => cols.has(c);
+
+    const selectParts: string[] = [
+      "pd.date::date as date",
+      "pd.open",
+      "pd.high",
+      "pd.low",
+      "pd.close",
+      // volume + source are present in your working stocks query
+      has("volume") ? "pd.volume" : "null::numeric as volume",
+      "upper(pd.ticker) as ticker",
+      has("source") ? "pd.source" : "null::text as source",
+      // optional
+      has("vwap") ? "pd.vwap" : "null::numeric as vwap",
+      has("turnover") ? "pd.turnover" : "null::numeric as turnover",
+      has("number_of_trades")
+        ? 'pd.number_of_trades as "numberOfTrades"'
+        : 'null::int as "numberOfTrades"',
+      has("number_of_shares")
+        ? 'pd.number_of_shares as "numberOfShares"'
+        : 'null::int as "numberOfShares"',
+    ];
+
+    const q = `
+      select
+        ${selectParts.join(",\n        ")}
+      from public.prices_daily pd
+      where upper(pd.ticker) = upper($1)
+      order by pd.date asc
+      limit $2
+    `;
+
+    const r = await pool.query(q, [ticker, limit]);
+
+    return NextResponse.json({
+      ...meta,
+      ticker: ticker.toUpperCase(),
+      count: r.rows.length,
+      rows: r.rows,
+      source: "prices_daily",
+      selected: selectParts,
+      pricesDailyColumns: Array.from(cols).sort(),
+    });
+  } catch (e: unknown) {
+    let pricesDailyColumns: string[] | null = null;
+    try {
+      const cols = await getPublicTableColumns("prices_daily");
+      pricesDailyColumns = Array.from(cols).sort();
+    } catch {
+      pricesDailyColumns = null;
+    }
+
+    return NextResponse.json(
+      {
+        ...meta,
+        error: "equities api failed",
+        pg: errShape(e),
+        schema: { prices_daily_columns: pricesDailyColumns },
+      },
+      { status: 500 }
+    );
+  }
+}
+
+===== FILE: apps/web/src/app/api/features/[ticker]/route.ts =====
+// apps/web/src/app/api/features/[ticker]/route.ts
+import { NextResponse } from "next/server";
+import { and, asc, eq, gte, lte } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { obxFeatures } from "@ineqre/db/schema";
+
+export async function GET(
+  req: Request,
+  ctx: { params: Promise<{ ticker: string }> }
+) {
+  try {
+    const { ticker } = await ctx.params;
+
+    const url = new URL(req.url);
+    const from = url.searchParams.get("from"); // YYYY-MM-DD
+    const to = url.searchParams.get("to"); // YYYY-MM-DD
+    const limitRaw = url.searchParams.get("limit");
+
+    const limit = Math.min(Math.max(Number(limitRaw ?? 100) || 100, 1), 1000);
+
+    const conditions = [
+      eq(obxFeatures.ticker, ticker.toUpperCase()),
+      from ? gte(obxFeatures.date, from) : undefined,
+      to ? lte(obxFeatures.date, to) : undefined,
+    ].filter(Boolean) as any[];
+
+    const rows = await db
+      .select({
+        date: obxFeatures.date,
+        ticker: obxFeatures.ticker,
+        ret1d: obxFeatures.ret1d,
+        vol20d: obxFeatures.vol20d,
+      })
+      .from(obxFeatures)
+      .where(and(...conditions))
+      .orderBy(asc(obxFeatures.date))
+      .limit(limit);
+
+    const latest = rows.length ? rows[rows.length - 1] : null;
+
+    // Backward-compatible payload:
+    // - rows: current canonical array
+    // - features: alias for rows (common frontend expectation)
+    // - latest: single latest row (common frontend expectation)
+    // - snake_case aliases for consumers expecting DB column names
+    const normalizedRows = rows.map((r) => ({
+      ...r,
+      ret_1d: r.ret1d,
+      vol_20d: r.vol20d,
+    }));
+
+    const normalizedLatest = latest
+      ? {
+          ...latest,
+          ret_1d: latest.ret1d,
+          vol_20d: latest.vol20d,
+        }
+      : null;
+
+    return NextResponse.json({
+      ticker: ticker.toUpperCase(),
+      count: normalizedRows.length,
+
+      // canonical
+      rows: normalizedRows,
+
+      // compatibility aliases
+      features: normalizedRows,
+      latest: normalizedLatest,
+    });
+  } catch (e: any) {
+    return NextResponse.json(
+      {
+        message: e?.message ?? String(e),
+        code: e?.code,
+        detail: e?.detail,
+        hint: e?.hint,
+        where: e?.where,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+===== FILE: apps/web/src/app/api/market-proxy/route.ts =====
+import { NextResponse } from "next/server";
+import { asc, gte, lte } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { obxMarketProxy } from "@ineqre/db/schema";
+
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const from = url.searchParams.get("from");
+  const to = url.searchParams.get("to");
+  const limitRaw = url.searchParams.get("limit");
+  const limit = Math.min(Math.max(Number(limitRaw || 2000), 1), 10000);
+
+  const where =
+    from && to
+      ? (row: any) => gte(obxMarketProxy.date, from) && lte(obxMarketProxy.date, to)
+      : from
+      ? gte(obxMarketProxy.date, from)
+      : to
+      ? lte(obxMarketProxy.date, to)
+      : undefined;
+
+  const q = db.select().from(obxMarketProxy).orderBy(asc(obxMarketProxy.date)).limit(limit);
+
+  const rows = where ? await q.where(where as any) : await q;
+
+  return NextResponse.json({ count: rows.length, rows });
+}
+
+===== FILE: apps/web/src/app/api/prices/[ticker]/route.ts =====
+import { NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { sql } from "drizzle-orm";
+
+export const dynamic = "force-dynamic";
+
+type RawRow = {
+  date: unknown;
+  open: unknown;
+  high: unknown;
+  low: unknown;
+  close: unknown;
+  volume: unknown;
+};
+
+type PriceRow = {
+  date: string;
+  open: number | null;
+  high: number | null;
+  low: number | null;
+  close: number | null;
+  volume: number | null;
+};
+
+function clampInt(v: string | null, def: number, min: number, max: number) {
+  const n = v ? Number(v) : Number.NaN;
+  if (!Number.isFinite(n)) return def;
+  return Math.min(Math.max(Math.trunc(n), min), max);
+}
+
+function toNum(v: unknown): number | null {
+  if (v === null || v === undefined) return null;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function toISODate(d: unknown): string {
+  // supports Date, string, etc
+  const s = String(d);
+  // if already YYYY-MM-DD
+  if (s.length >= 10 && s[4] === "-" && s[7] === "-") return s.slice(0, 10);
+  const dt = new Date(s);
+  if (Number.isNaN(dt.getTime())) return s.slice(0, 10);
+  return dt.toISOString().slice(0, 10);
+}
+
+export async function GET(req: Request, ctx: { params: Promise<{ ticker: string }> }) {
+  try {
+    const { ticker } = await ctx.params;
+    const url = new URL(req.url);
+
+    const limit = clampInt(url.searchParams.get("limit"), 1500, 1, 5000);
+
+    // This endpoint reads from the raw prices table/view used elsewhere in your app.
+    // Keep SQL generic to avoid tight coupling to drizzle schema until Phase 2 tables are live.
+    const q = sql`
+      select
+        date::date as date,
+        open,
+        high,
+        low,
+        close,
+        volume
+      from public.prices_daily
+      where upper(ticker) = upper(${ticker})
+      order by date desc
+      limit ${limit}
+    `;
+
+    const res = await db.execute(q);
+    const rows = (((res as any)?.rows ?? []) as RawRow[]);
+
+    // Reverse to ascending for chart consumers
+    const ordered = rows.slice().reverse();
+
+    const priceRows: PriceRow[] = ordered.map((r: RawRow) => ({
+      date: toISODate(r.date),
+      open: toNum(r.open),
+      high: toNum(r.high),
+      low: toNum(r.low),
+      close: toNum(r.close),
+      volume: toNum(r.volume),
+    }));
+
+    return NextResponse.json({
+      ticker: ticker.toUpperCase(),
+      count: priceRows.length,
+      rows: priceRows,
+    });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
+===== FILE: apps/web/src/app/api/stocks/route.ts =====
+import { NextResponse } from "next/server";
+import { pool } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+function clampInt(v: string | null, def: number, min: number, max: number) {
+  const n = v ? Number(v) : Number.NaN;
+  if (!Number.isFinite(n)) return def;
+  return Math.min(Math.max(Math.trunc(n), min), max);
+}
+
+function errShape(e: unknown) {
+  const x = e as any;
+  return {
+    message: x?.message ?? String(e),
+    code: x?.code ?? null,
+    detail: x?.detail ?? null,
+    hint: x?.hint ?? null,
+    where: x?.where ?? null,
+    name: x?.name ?? null,
+    stack: x?.stack ?? null,
+  };
+}
+
+function deployMeta() {
+  const cs = process.env.DATABASE_URL ?? "";
+  let host: string | null = null;
+  try {
+    host = new URL(cs).host;
+  } catch {
+    host = null;
+  }
+
+  return {
+    vercelCommit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
+    nodeEnv: process.env.NODE_ENV ?? null,
+    dbUrlHost: host,
+  };
+}
+
+async function listColumns(tableName: string) {
+  const r = await pool.query(
+    `
+    select column_name, data_type
+    from information_schema.columns
+    where table_schema = 'public' and table_name = $1
+    order by ordinal_position
+    `,
+    [tableName]
+  );
+  return r.rows;
+}
+
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const limit = clampInt(url.searchParams.get("limit"), 5000, 1, 5000);
+
+  try {
+    const q = `
+      with px as (
+        select
+          upper(ticker) as ticker,
+          min(date::date) as "startDate",
+          max(date::date) as "endDate",
+          count(*)::int as rows
+        from public.prices_daily
+        group by upper(ticker)
+      )
+      select
+        upper(s.ticker) as ticker,
+        s.name as name,
+        s.sector as sector,
+        s.exchange as exchange,
+        s.currency as currency,
+        s.is_active as "isActive",
+        s.last_date::date as "lastDate",
+        s.last_close as "lastClose",
+        p."startDate" as "startDate",
+        p."endDate" as "endDate",
+        coalesce(p.rows, 0) as rows
+      from public.stocks_latest s
+      left join px p on p.ticker = upper(s.ticker)
+      order by upper(s.ticker) asc
+      limit $1
+    `;
+
+    const r = await pool.query(q, [limit]);
+
+    return NextResponse.json({
+      ...deployMeta(),
+      count: r.rows.length,
+      rows: r.rows,
+      source: "stocks_latest + prices_daily",
+    });
+  } catch (e: unknown) {
+    let pricesDailyCols: any[] | null = null;
+    let stocksLatestCols: any[] | null = null;
+
+    try {
+      pricesDailyCols = await listColumns("prices_daily");
+    } catch {
+      pricesDailyCols = null;
+    }
+
+    try {
+      stocksLatestCols = await listColumns("stocks_latest");
+    } catch {
+      stocksLatestCols = null;
+    }
+
+    return NextResponse.json(
+      {
+        ...deployMeta(),
+        error: "stocks api failed",
+        pg: errShape(e),
+        schema: {
+          prices_daily: pricesDailyCols,
+          stocks_latest: stocksLatestCols,
+        },
+      },
+      { status: 500 }
+    );
+  }
+}
+
+===== FILE: apps/web/src/app/globals.css =====
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+===== FILE: apps/web/src/app/layout.tsx =====
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "Create Next App",
+  description: "Generated by create next app",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en">
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
+        {children}
+      </body>
+    </html>
+  );
+}
+
+===== FILE: apps/web/src/app/page.tsx =====
+import Link from "next/link";
+
+export default function Home() {
+  return (
+    <main style={{ padding: 24 }}>
+      <h1>Intelligence Equity Research</h1>
+
+      <p style={{ marginTop: 12 }}>
+        <Link href="/stocks">Open stocks universe</Link>
+      </p>
+    </main>
+  );
+}
+
+===== FILE: apps/web/src/app/stocks/[ticker]/page.tsx =====
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
+
+type EquityRow = {
+  date: string; // ISO
+  open: string | number | null;
+  high: string | number | null;
+  low: string | number | null;
+  close: string | number | null;
+  volume: string | number | null;
+  vwap?: string | number | null;
+  turnover?: string | number | null;
+  numberOfTrades?: string | number | null;
+  numberOfShares?: string | number | null;
+  ticker?: string;
+  source?: string | null;
+};
+
+type EquityApiOk = {
+  ticker: string;
+  count: number;
+  rows: EquityRow[];
+  source?: string;
+};
+
+type EquityApiErr = {
+  error: string;
+  pg?: { message?: string; code?: string | null };
+  [k: string]: any;
+};
+
+function clampInt(v: string | null, def: number, min: number, max: number) {
+  const n = v ? Number(v) : Number.NaN;
+  if (!Number.isFinite(n)) return def;
+  return Math.min(Math.max(Math.trunc(n), min), max);
+}
+
+function toNum(x: any): number | null {
+  if (x === null || x === undefined) return null;
+  const n = typeof x === "number" ? x : Number(x);
+  return Number.isFinite(n) ? n : null;
+}
+
+function fmtNum(x: any, digits = 2) {
+  const n = toNum(x);
+  if (n === null) return "NA";
+  return n.toFixed(digits);
+}
+
+function fmtInt(x: any) {
+  const n = toNum(x);
+  if (n === null) return "NA";
+  return Math.trunc(n).toLocaleString("en-US");
+}
+
+function fmtDate(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toISOString().slice(0, 10);
+}
+
+export default function StockTickerPage() {
+  const params = useParams<{ ticker?: string }>();
+  const searchParams = useSearchParams();
+
+  const ticker = useMemo(() => {
+    const t = params?.ticker;
+    return typeof t === "string" && t.length ? decodeURIComponent(t).toUpperCase() : "";
+  }, [params]);
+
+  const initialLimit = useMemo(() => {
+    return clampInt(searchParams.get("limit"), 1500, 20, 5000);
+  }, [searchParams]);
+
+  const [limit, setLimit] = useState<number>(initialLimit);
+
+  const [loading, setLoading] = useState<boolean>(true);
+  const [data, setData] = useState<EquityApiOk | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [rawError, setRawError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      if (!ticker) {
+        setLoading(false);
+        setData(null);
+        setError("Missing ticker in route params.");
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+      setRawError(null);
+
+      try {
+        const url = `/api/equities/${encodeURIComponent(ticker)}?limit=${encodeURIComponent(
+          String(limit)
+        )}`;
+
+        const res = await fetch(url, {
+          method: "GET",
+          headers: { "accept": "application/json" },
+          cache: "no-store",
+        });
+
+        const text = await res.text();
+
+        if (!res.ok) {
+          // Try JSON first, otherwise keep raw body
+          try {
+            const j = JSON.parse(text) as EquityApiErr;
+            const msg =
+              j?.pg?.message ??
+              j?.error ??
+              `Equities API failed (${res.status} ${res.statusText}).`;
+            if (!cancelled) {
+              setError(msg);
+              setRawError(text);
+              setData(null);
+            }
+          } catch {
+            if (!cancelled) {
+              setError(`Equities API failed (${res.status} ${res.statusText}).`);
+              setRawError(text);
+              setData(null);
+            }
+          }
+          return;
+        }
+
+        const json = JSON.parse(text) as EquityApiOk;
+
+        if (!cancelled) {
+          setData(json);
+          setLoading(false);
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setError(e?.message ?? String(e));
+          setRawError(null);
+          setData(null);
+          setLoading(false);
+        }
+      }
+    }
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [ticker, limit]);
+
+  return (
+    <main style={{ padding: 24 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+        <h1 style={{ fontSize: 36, fontWeight: 800, margin: 0 }}>
+          Stock {ticker || "?"}
+        </h1>
+        <Link
+          href="/stocks"
+          style={{ color: "rgba(255,255,255,0.7)", textDecoration: "none" }}
+        >
+          Back to stocks
+        </Link>
+      </div>
+
+      <div style={{ marginTop: 10, color: "rgba(255,255,255,0.75)" }}>
+        Limit:&nbsp;
+        <input
+          type="number"
+          min={20}
+          max={5000}
+          step={1}
+          value={limit}
+          onChange={(e) => setLimit(clampInt(e.target.value, 1500, 20, 5000))}
+          style={{
+            width: 110,
+            padding: "6px 8px",
+            borderRadius: 8,
+            border: "1px solid rgba(255,255,255,0.12)",
+            background: "rgba(0,0,0,0.25)",
+            color: "white",
+            outline: "none",
+            marginLeft: 6,
+          }}
+        />
+        {data?.source ? (
+          <span style={{ marginLeft: 12, opacity: 0.7 }}>Source: {data.source}</span>
+        ) : null}
+      </div>
+
+      {loading ? (
+        <div
+          style={{
+            marginTop: 18,
+            padding: 14,
+            borderRadius: 12,
+            border: "1px solid rgba(255,255,255,0.12)",
+            background: "rgba(255,255,255,0.04)",
+          }}
+        >
+          Loading…
+        </div>
+      ) : null}
+
+      {!loading && error ? (
+        <div
+          style={{
+            marginTop: 18,
+            padding: 16,
+            borderRadius: 12,
+            border: "1px solid rgba(255,140,140,0.35)",
+            background: "rgba(120,0,0,0.22)",
+          }}
+        >
+          <div style={{ fontWeight: 800, fontSize: 20, marginBottom: 8 }}>
+            Application error
+          </div>
+          <div style={{ opacity: 0.95 }}>{error}</div>
+          {rawError ? (
+            <pre
+              style={{
+                marginTop: 12,
+                padding: 12,
+                borderRadius: 10,
+                background: "rgba(0,0,0,0.35)",
+                overflowX: "auto",
+                fontSize: 12,
+                lineHeight: 1.35,
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+              }}
+            >
+              {rawError}
+            </pre>
+          ) : null}
+          <div style={{ marginTop: 10, opacity: 0.85 }}>
+            Direct check:&nbsp;
+            <a
+              href={`/api/equities/${encodeURIComponent(ticker || "")}?limit=20`}
+              style={{ color: "rgba(130,190,255,1)", textDecoration: "none" }}
+            >
+              /api/equities/{ticker || ""}?limit=20
+            </a>
+          </div>
+        </div>
+      ) : null}
+
+      {!loading && data ? (
+        <div
+          style={{
+            marginTop: 18,
+            borderRadius: 12,
+            border: "1px solid rgba(255,255,255,0.12)",
+            overflow: "hidden",
+            background: "rgba(255,255,255,0.03)",
+          }}
+        >
+          <div style={{ padding: 14, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+            Rows: <b>{data.count}</b>
+          </div>
+
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+              <thead>
+                <tr style={{ textAlign: "left" }}>
+                  {[
+                    "Date",
+                    "Open",
+                    "High",
+                    "Low",
+                    "Close",
+                    "Volume",
+                    "VWAP",
+                    "Turnover",
+                    "Trades",
+                    "Shares",
+                    "Source",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      style={{
+                        padding: "10px 12px",
+                        borderBottom: "1px solid rgba(255,255,255,0.08)",
+                        color: "rgba(255,255,255,0.8)",
+                        fontWeight: 700,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.rows.map((r, i) => (
+                  <tr key={`${r.date}-${i}`} style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                    <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>{fmtDate(r.date)}</td>
+                    <td style={{ padding: "10px 12px" }}>{fmtNum(r.open, 2)}</td>
+                    <td style={{ padding: "10px 12px" }}>{fmtNum(r.high, 2)}</td>
+                    <td style={{ padding: "10px 12px" }}>{fmtNum(r.low, 2)}</td>
+                    <td style={{ padding: "10px 12px" }}>{fmtNum(r.close, 2)}</td>
+                    <td style={{ padding: "10px 12px" }}>{fmtInt(r.volume)}</td>
+                    <td style={{ padding: "10px 12px" }}>{fmtNum(r.vwap, 4)}</td>
+                    <td style={{ padding: "10px 12px" }}>{fmtNum(r.turnover, 2)}</td>
+                    <td style={{ padding: "10px 12px" }}>{fmtInt(r.numberOfTrades)}</td>
+                    <td style={{ padding: "10px 12px" }}>{fmtInt(r.numberOfShares)}</td>
+                    <td style={{ padding: "10px 12px", opacity: 0.85 }}>
+                      {r.source ?? "NA"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
+    </main>
+  );
+}
+
+===== FILE: apps/web/src/app/stocks/page.tsx =====
+// apps/web/src/app/stocks/page.tsx
+import Link from "next/link";
+import { db } from "@/lib/db";
+import { sql } from "drizzle-orm";
+
+export const dynamic = "force-dynamic";
+
+type StockRow = {
+  ticker: string;
+  name: string | null;
+  sector: string | null;
+  exchange: string | null;
+  currency: string | null;
+  isActive: boolean | null;
+  lastDate: string | null;
+  lastClose: number | null;
+  startDate: string | null;
+  endDate: string | null;
+  rows: number;
+};
+
+function toNum(v: unknown): number | null {
+  if (v === null || v === undefined) return null;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function toDate10(v: unknown): string | null {
+  if (!v) return null;
+  const s = String(v);
+  return s.length >= 10 ? s.slice(0, 10) : s;
+}
+
+async function getStocks(limit = 5000): Promise<{ count: number; rows: StockRow[] }> {
+  const q = sql`
+    with px as (
+      select
+        upper(ticker) as ticker,
+        min(date::date) as "startDate",
+        max(date::date) as "endDate",
+        count(*)::int as rows
+      from public.prices_daily
+      group by upper(ticker)
+    )
+    select
+      upper(s.ticker) as ticker,
+      s.name as name,
+      s.sector as sector,
+      s.exchange as exchange,
+      s.currency as currency,
+      s.is_active as "isActive",
+      s.last_date::date as "lastDate",
+      s.last_close as "lastClose",
+      p."startDate" as "startDate",
+      p."endDate" as "endDate",
+      coalesce(p.rows, 0) as rows
+    from public.stocks_latest s
+    left join px p on p.ticker = upper(s.ticker)
+    order by upper(s.ticker) asc
+    limit ${limit}
+  `;
+
+  const res = await db.execute(q);
+  const raw = ((res as any)?.rows ?? []) as any[];
+
+  const rows: StockRow[] = raw.map((r) => ({
+    ticker: String(r.ticker ?? "").toUpperCase(),
+    name: r.name ?? null,
+    sector: r.sector ?? null,
+    exchange: r.exchange ?? null,
+    currency: r.currency ?? null,
+    isActive: r.isActive ?? null,
+    lastDate: toDate10(r.lastDate),
+    lastClose: toNum(r.lastClose),
+    startDate: toDate10(r.startDate),
+    endDate: toDate10(r.endDate),
+    rows: typeof r.rows === "number" ? r.rows : Number(r.rows ?? 0),
+  }));
+
+  return { count: rows.length, rows };
+}
+
+function fmtNum(n: number | null): string {
+  if (n === null) return "NA";
+  if (!Number.isFinite(n)) return "NA";
+  return n.toLocaleString("en-US", { maximumFractionDigits: 6 });
+}
+
+export default async function StocksPage() {
+  let data: { count: number; rows: StockRow[] } | null = null;
+  let err: string | null = null;
+
+  try {
+    data = await getStocks(5000);
+  } catch (e: any) {
+    err = e?.message ?? String(e);
+  }
+
+  if (err) {
+    return (
+      <main className="mx-auto max-w-6xl px-6 py-10">
+        <h1 className="text-2xl font-semibold">Stocks</h1>
+        <p className="mt-4 text-sm text-red-400">
+          Server error while loading stocks. {err}
+        </p>
+        <p className="mt-2 text-sm text-zinc-400">
+          Action: verify DATABASE_URL, DNS reachability to Supabase, and that public.stocks_latest and public.prices_daily exist.
+        </p>
+      </main>
+    );
+  }
+
+  const rows = data?.rows ?? [];
+
+  return (
+    <main className="mx-auto max-w-6xl px-6 py-10">
+      <div className="flex items-baseline justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Stocks</h1>
+          <p className="mt-1 text-sm text-zinc-400">
+            Universe: {data?.count ?? 0} tickers
+          </p>
+        </div>
+
+        <div className="text-sm text-zinc-400">
+          Source: stocks_latest + prices_daily
+        </div>
+      </div>
+
+      <div className="mt-6 overflow-x-auto rounded-xl border border-zinc-800">
+        <table className="min-w-full text-sm">
+          <thead className="bg-zinc-950">
+            <tr className="text-left text-zinc-300">
+              <th className="px-4 py-3">Ticker</th>
+              <th className="px-4 py-3">Name</th>
+              <th className="px-4 py-3">Sector</th>
+              <th className="px-4 py-3">Exchange</th>
+              <th className="px-4 py-3">Currency</th>
+              <th className="px-4 py-3">Last date</th>
+              <th className="px-4 py-3">Last close</th>
+              <th className="px-4 py-3">Start</th>
+              <th className="px-4 py-3">End</th>
+              <th className="px-4 py-3">Rows</th>
+              <th className="px-4 py-3">Status</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.ticker} className="border-t border-zinc-800 hover:bg-zinc-950">
+                <td className="px-4 py-3 font-medium">
+                  <Link
+                    href={`/stocks/${encodeURIComponent(r.ticker)}`}
+                    className="text-blue-400 hover:underline"
+                  >
+                    {r.ticker}
+                  </Link>
+                </td>
+                <td className="px-4 py-3">{r.name ?? "NA"}</td>
+                <td className="px-4 py-3">{r.sector ?? "NA"}</td>
+                <td className="px-4 py-3">{r.exchange ?? "NA"}</td>
+                <td className="px-4 py-3">{r.currency ?? "NA"}</td>
+                <td className="px-4 py-3">{r.lastDate ?? "NA"}</td>
+                <td className="px-4 py-3">{fmtNum(r.lastClose)}</td>
+                <td className="px-4 py-3">{r.startDate ?? "NA"}</td>
+                <td className="px-4 py-3">{r.endDate ?? "NA"}</td>
+                <td className="px-4 py-3">{Number.isFinite(r.rows) ? r.rows.toLocaleString() : "0"}</td>
+                <td className="px-4 py-3">
+                  {r.isActive === null ? "NA" : r.isActive ? "active" : "inactive"}
+                </td>
+              </tr>
+            ))}
+
+            {!rows.length && (
+              <tr>
+                <td className="px-4 py-6 text-zinc-400" colSpan={11}>
+                  No rows returned. Validate that public.stocks_latest is populated.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </main>
+  );
+}
+
+===== FILE: apps/web/src/components/PriceChart.tsx =====
+"use client";
+
+import * as React from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
+
+export type PriceChartPoint = {
+  date: string;
+  close: number;
+};
+
+type Props = {
+  data: PriceChartPoint[];
+  height?: number;
+};
+
+function formatDateLabel(v: string) {
+  // expects YYYY-MM-DD
+  if (!v) return "";
+  const parts = v.split("-");
+  if (parts.length !== 3) return v;
+  return `${parts[2]}.${parts[1]}`;
+}
+
+export default function PriceChart({ data, height = 320 }: Props) {
+  return (
+    <div style={{ width: "100%", height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 8, right: 12, bottom: 8, left: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis
+            dataKey="date"
+            tickFormatter={formatDateLabel}
+            minTickGap={24}
+          />
+          <YAxis
+            domain={["auto", "auto"]}
+            tickFormatter={(v) => (Number.isFinite(v) ? Number(v).toFixed(0) : "")}
+          />
+          <Tooltip
+            formatter={(value) => {
+              const n = typeof value === "number" ? value : Number(value);
+              return Number.isFinite(n) ? n.toFixed(2) : String(value);
+            }}
+            labelFormatter={(label) => String(label)}
+          />
+          <Line type="monotone" dataKey="close" dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+===== FILE: apps/web/src/components/price-drawdown-chart.tsx =====
+"use client";
+
+import * as React from "react";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+
+type DrawdownRow = {
+  date: string; // YYYY-MM-DD
+  drawdown?: number | string | null; // negative values
+};
+
+function toNum(v: unknown): number | null {
+  if (v === null || v === undefined) return null;
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v === "string") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+function formatDateShort(d: string) {
+  return (d ?? "").slice(0, 10);
+}
+
+function formatPct(v: number) {
+  return new Intl.NumberFormat(undefined, {
+    style: "percent",
+    maximumFractionDigits: 2,
+  }).format(v);
+}
+
+function useMeasuredSize<T extends HTMLElement>() {
+  const ref = React.useRef<T | null>(null);
+  const [size, setSize] = React.useState({ w: 0, h: 0 });
+
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const setFromRect = (rect: DOMRectReadOnly | DOMRect) => {
+      const w = Math.floor(rect.width);
+      const h = Math.floor(rect.height);
+      if (w > 0 && h > 0) setSize({ w, h });
+    };
+
+    setFromRect(el.getBoundingClientRect());
+
+    const ro = new ResizeObserver((entries) => {
+      const cr = entries[0]?.contentRect;
+      if (!cr) return;
+      setFromRect(cr);
+    });
+
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return { ref, size };
+}
+
+export default function PriceDrawdownChart(props: {
+  data: DrawdownRow[];
+  height?: number;
+  className?: string;
+}) {
+  const height = props.height ?? 240;
+  const { ref, size } = useMeasuredSize<HTMLDivElement>();
+
+  const chartData = React.useMemo(() => {
+    return (props.data ?? [])
+      .map((p) => {
+        const dd = toNum(p.drawdown);
+        return { date: p.date, drawdown: dd };
+      })
+      .filter((p) => p.date && p.drawdown !== null) as Array<{ date: string; drawdown: number }>;
+  }, [props.data]);
+
+  return (
+    <div
+      ref={ref}
+      className={props.className}
+      style={{ width: "100%", height, minHeight: height }}
+    >
+      {size.w > 20 && size.h > 20 ? (
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={chartData} margin={{ top: 8, right: 12, left: 6, bottom: 8 }}>
+            <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+            <XAxis
+              dataKey="date"
+              tickFormatter={formatDateShort}
+              minTickGap={28}
+              tick={{ fontSize: 12 }}
+            />
+            <YAxis width={64} tick={{ fontSize: 12 }} tickFormatter={(v) => formatPct(Number(v))} />
+            <Tooltip
+              labelFormatter={(label: any) => formatDateShort(String(label))}
+              formatter={(value: any) => {
+                const n = toNum(value);
+                return n === null ? "n/a" : formatPct(n);
+              }}
+            />
+            <Area type="monotone" dataKey="drawdown" strokeWidth={2} isAnimationActive={false} />
+          </AreaChart>
+        </ResponsiveContainer>
+      ) : (
+        <div style={{ width: "100%", height: "100%" }} />
+      )}
+    </div>
+  );
+}
+
+===== FILE: apps/web/src/lib/db.ts =====
+// apps/web/src/lib/db.ts
+import { Pool } from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
+
+const raw = process.env.DATABASE_URL;
+
+if (!raw) {
+  throw new Error("DATABASE_URL is missing");
+}
+
+function stripSslMode(cs: string) {
+  try {
+    const u = new URL(cs);
+    u.searchParams.delete("sslmode");
+    return u.toString();
+  } catch {
+    return cs;
+  }
+}
+
+function isSupabase(cs: string) {
+  const s = cs.toLowerCase();
+  return s.includes("supabase.com") || s.includes("pooler.supabase.com");
+}
+
+const connectionString = stripSslMode(raw);
+
+export const pool = new Pool({
+  connectionString,
+  ssl: isSupabase(connectionString) ? { rejectUnauthorized: false } : undefined,
+  max: 5,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 10_000,
+});
+
+export const db = drizzle(pool);
+
+===== FILE: apps/web/src/lib/market.ts =====
+// apps/web/src/lib/market.ts
+export type DailyBar = {
+  date: string;
+  open: number | null;
+  high: number | null;
+  low: number | null;
+  close: number;
+  volume: number | null;
+  source: "obx_csv_db";
+};
+
+export type ReturnRow = { date: string; log_return: number };
+export type VolRow = { date: string; volatility: number };
+
+export function computeLogReturns(rowsAsc: DailyBar[]): ReturnRow[] {
+  const out: ReturnRow[] = [];
+  for (let i = 1; i < rowsAsc.length; i++) {
+    const prev = rowsAsc[i - 1]?.close;
+    const cur = rowsAsc[i]?.close;
+    if (prev > 0 && cur > 0) {
+      out.push({ date: rowsAsc[i].date, log_return: Math.log(cur / prev) });
+    }
+  }
+  return out;
+}
+
+export function rollingVolatility(returns: ReturnRow[], window: number): VolRow[] {
+  if (window <= 1) return [];
+  const out: VolRow[] = [];
+  const buf: number[] = [];
+
+  const std = (xs: number[]) => {
+    const n = xs.length;
+    if (n < 2) return 0;
+    let mean = 0;
+    for (const x of xs) mean += x;
+    mean /= n;
+
+    let v = 0;
+    for (const x of xs) v += (x - mean) * (x - mean);
+    v /= n - 1;
+    return Math.sqrt(v);
+  };
+
+  for (const r of returns) {
+    buf.push(r.log_return);
+    if (buf.length > window) buf.shift();
+    if (buf.length === window) {
+      out.push({ date: r.date, volatility: std(buf) });
+    }
+  }
+  return out;
+}
+
+===== FILE: apps/web/src/lib/metrics.ts =====
+export function annualizedVolatility(returns: number[]): number {
+  if (returns.length === 0) return 0;
+  const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+  const variance =
+    returns.reduce((s, r) => s + (r - mean) ** 2, 0) / (returns.length - 1);
+  return Math.sqrt(variance) * Math.sqrt(252);
+}
+
+export function maxDrawdown(prices: number[]): number {
+  let peak = prices[0] ?? 0;
+  let maxDd = 0;
+  for (const p of prices) {
+    peak = Math.max(peak, p);
+    const dd = peak > 0 ? (p - peak) / peak : 0;
+    maxDd = Math.min(maxDd, dd);
+  }
+  return maxDd;
+}
+
+export function var95(returns: number[]): number {
+  if (returns.length < 30) return 0;
+  const sorted = [...returns].sort((a, b) => a - b);
+  const idx = Math.floor(0.05 * sorted.length);
+  return sorted[idx];
+}
+
+export function cvar95(returns: number[]): number {
+  const v = var95(returns);
+  const tail = returns.filter((r) => r <= v);
+  if (!tail.length) return v;
+  return tail.reduce((a, b) => a + b, 0) / tail.length;
+}
+
+===== FILE: apps/web/src/lib/stocks-server.ts =====
+// apps/web/src/lib/stocks-server.ts
+import { db } from "@/lib/db";
+import { sql } from "drizzle-orm";
+
+export type StockRow = {
+  ticker: string;
+  name: string | null;
+  sector: string | null;
+  exchange: string | null;
+  currency: string | null;
+  isActive: boolean | null;
+  lastDate: string | null;
+  lastClose: number | null;
+  startDate: string | null;
+  endDate: string | null;
+  rows: number;
+};
+
+function toNum(v: unknown): number | null {
+  if (v === null || v === undefined) return null;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+export async function getStocks(limit = 5000): Promise<{ count: number; rows: StockRow[] }> {
+  const q = sql`
+    with px as (
+      select
+        upper(ticker) as ticker,
+        min(date::date) as "startDate",
+        max(date::date) as "endDate",
+        count(*)::int as rows
+      from public.prices_daily
+      group by upper(ticker)
+    )
+    select
+      upper(s.ticker) as ticker,
+      s.name as name,
+      s.sector as sector,
+      s.exchange as exchange,
+      s.currency as currency,
+      s.is_active as "isActive",
+      s.last_date::date as "lastDate",
+      s.last_close as "lastClose",
+      p."startDate" as "startDate",
+      p."endDate" as "endDate",
+      coalesce(p.rows, 0) as rows
+    from public.stocks_latest s
+    left join px p on p.ticker = upper(s.ticker)
+    order by upper(s.ticker) asc
+    limit ${limit}
+  `;
+
+  const res = await db.execute(q);
+  const raw = ((res as any)?.rows ?? []) as any[];
+
+  const rows: StockRow[] = raw.map((r) => ({
+    ticker: String(r.ticker ?? ""),
+    name: r.name ?? null,
+    sector: r.sector ?? null,
+    exchange: r.exchange ?? null,
+    currency: r.currency ?? null,
+    isActive: r.isActive ?? null,
+    lastDate: r.lastDate ? String(r.lastDate).slice(0, 10) : null,
+    lastClose: toNum(r.lastClose),
+    startDate: r.startDate ? String(r.startDate).slice(0, 10) : null,
+    endDate: r.endDate ? String(r.endDate).slice(0, 10) : null,
+    rows: typeof r.rows === "number" ? r.rows : Number(r.rows ?? 0),
+  }));
+
+  return { count: rows.length, rows };
+}
+
+===== FILE: apps/web/src/lib/supabase.ts =====
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase env vars. Check apps/web/.env.local');
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+===== FILE: apps/web/tsconfig.json =====
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "**/*.mts"
+  ],
+  "exclude": ["node_modules"]
+}
+
+===== FILE: packages/db/contracts/index.ts =====
+export * from "./stocks";
+
+===== FILE: packages/db/contracts/market.ts =====
+import {
+  pgTable,
+  date,
+  text,
+  integer,
+  bigint,
+  numeric,
+} from "drizzle-orm/pg-core";
+
+export const obxEquities = pgTable("obx_equities", {
+  ticker: text("ticker").notNull(),
+  date: date("date").notNull(),
+
+  open: numeric("open", { precision: 18, scale: 6 }),
+  high: numeric("high", { precision: 18, scale: 6 }),
+  low: numeric("low", { precision: 18, scale: 6 }),
+  close: numeric("close", { precision: 18, scale: 6 }),
+
+  numberOfShares: bigint("number_of_shares", { mode: "number" }),
+  numberOfTrades: integer("number_of_trades"),
+  turnover: bigint("turnover", { mode: "number" }),
+  vwap: numeric("vwap", { precision: 18, scale: 6 }),
+});
+
+export const obxFeatures = pgTable("obx_features", {
+  ticker: text("ticker").notNull(),
+  date: date("date").notNull(),
+
+  ret1d: numeric("ret_1d", { precision: 18, scale: 10 }),
+  vol20d: numeric("vol_20d", { precision: 18, scale: 10 }),
+});
+
+export const obxMarketProxy = pgTable("obx_market_proxy", {
+  date: date("date").notNull(),
+  close: numeric("close", { precision: 18, scale: 6 }),
+});
+
+===== FILE: packages/db/index.ts =====
+export * from "./schema";
+
+===== FILE: packages/db/market.ts =====
+export * from "./contracts/market";
+
+===== FILE: packages/db/package.json =====
+{
+  "name": "@ineqre/db",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "drizzle-orm": "0.45.1"
+  }
+}
+
+===== FILE: packages/db/schema.ts =====
+export * from "./contracts/market";
+
+===== FILE: packages/db/schema/001_initial.sql =====
+-- Enable UUID generation
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Master stock reference table
+CREATE TABLE IF NOT EXISTS stocks (
+  ticker VARCHAR(20) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  isin VARCHAR(12),
+  sector VARCHAR(100),
+  currency VARCHAR(3) DEFAULT 'NOK',
+  exchange VARCHAR(20) DEFAULT 'OSE',
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Daily price data with source tracking
+CREATE TABLE IF NOT EXISTS prices_daily (
+  id BIGSERIAL PRIMARY KEY,
+  ticker VARCHAR(20) NOT NULL REFERENCES stocks(ticker) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  open NUMERIC(12, 4),
+  high NUMERIC(12, 4),
+  low NUMERIC(12, 4),
+  close NUMERIC(12, 4) NOT NULL,
+  adj_close NUMERIC(12, 4),
+  volume BIGINT NOT NULL CHECK (volume >= 0),
+  source VARCHAR(50) NOT NULL DEFAULT 'yfinance',
+  inserted_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (ticker, date, source)
+);
+
+-- Fundamentals as point-in-time snapshots
+CREATE TABLE IF NOT EXISTS fundamentals_snapshot (
+  id BIGSERIAL PRIMARY KEY,
+  ticker VARCHAR(20) NOT NULL REFERENCES stocks(ticker) ON DELETE CASCADE,
+  as_of_date DATE NOT NULL,
+  pe_ratio NUMERIC(10, 2),
+  ev_ebitda NUMERIC(10, 2),
+  pb_ratio NUMERIC(10, 2),
+  dividend_yield NUMERIC(10, 4),
+  market_cap NUMERIC(20, 2),
+  shares_outstanding NUMERIC(20, 2),
+  net_debt NUMERIC(20, 2),
+  revenue_ttm NUMERIC(20, 2),
+  ebitda_ttm NUMERIC(20, 2),
+  source VARCHAR(50) NOT NULL DEFAULT 'yfinance',
+  inserted_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (ticker, as_of_date, source)
+);
+
+-- Raw news with dedupe hash
+CREATE TABLE IF NOT EXISTS news_raw (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  ticker VARCHAR(20) REFERENCES stocks(ticker) ON DELETE SET NULL,
+  source VARCHAR(100) NOT NULL,
+  url TEXT NOT NULL,
+  published_at TIMESTAMPTZ,
+  title TEXT NOT NULL,
+  body TEXT,
+  hash VARCHAR(64) NOT NULL,
+  fetched_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (hash)
+);
+
+-- AI briefs with reproducibility
+CREATE TABLE IF NOT EXISTS summaries (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  ticker VARCHAR(20) NOT NULL REFERENCES stocks(ticker) ON DELETE CASCADE,
+  window_start DATE NOT NULL,
+  window_end DATE NOT NULL,
+  summary_json JSONB NOT NULL,
+  model VARCHAR(100) NOT NULL,
+  prompt_version VARCHAR(50) NOT NULL,
+  input_hash VARCHAR(64) NOT NULL,
+  generated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (ticker, window_start, window_end, model, prompt_version)
+);
+
+-- Change events
+CREATE TABLE IF NOT EXISTS changes (
+  id BIGSERIAL PRIMARY KEY,
+  ticker VARCHAR(20) REFERENCES stocks(ticker) ON DELETE SET NULL,
+  detected_at TIMESTAMPTZ DEFAULT NOW(),
+  change_type VARCHAR(50) NOT NULL,
+  old_value TEXT,
+  new_value TEXT,
+  source_ref TEXT
+);
+
+-- Job run tracking for observability
+CREATE TABLE IF NOT EXISTS job_runs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  job_name VARCHAR(100) NOT NULL,
+  started_at TIMESTAMPTZ NOT NULL,
+  finished_at TIMESTAMPTZ,
+  status VARCHAR(20) NOT NULL,
+  rows_inserted INT DEFAULT 0,
+  rows_updated INT DEFAULT 0,
+  rows_skipped INT DEFAULT 0,
+  errors INT DEFAULT 0,
+  error TEXT
+);
+
+-- Helpful indexes
+CREATE INDEX IF NOT EXISTS idx_prices_daily_ticker_date ON prices_daily (ticker, date DESC);
+CREATE INDEX IF NOT EXISTS idx_news_raw_ticker_published ON news_raw (ticker, published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_changes_detected ON changes (detected_at DESC);
+CREATE INDEX IF NOT EXISTS idx_summaries_ticker_window ON summaries (ticker, window_end DESC);
+
+===== FILE: packages/db/schema/002_seed_stocks.sql =====
+INSERT INTO stocks (ticker, name, sector, exchange, currency)
+VALUES
+  ('EQNR.OL', 'Equinor', 'Energy', 'OSE', 'NOK'),
+  ('DNB.OL', 'DNB', 'Financials', 'OSE', 'NOK'),
+  ('NHY.OL', 'Norsk Hydro', 'Materials', 'OSE', 'NOK'),
+  ('MOWI.OL', 'Mowi', 'Consumer Staples', 'OSE', 'NOK'),
+  ('FRO.OL', 'Frontline', 'Shipping', 'OSE', 'NOK')
+ON CONFLICT (ticker) DO NOTHING;
+
+===== FILE: packages/db/schema/schema.ts =====
+import {
+  pgTable,
+  date,
+  numeric,
+  integer,
+  varchar
+} from "drizzle-orm/pg-core";
+
+export const equities = pgTable("equities", {
+  date: date("date").notNull(),
+  ticker: varchar("ticker", { length: 16 }).notNull(),
+
+  open: numeric("open"),
+  high: numeric("high"),
+  low: numeric("low"),
+  close: numeric("close"),
+
+  numberOfShares: integer("number_of_shares"),
+  numberOfTrades: integer("number_of_trades"),
+  turnover: numeric("turnover"),
+  vwap: numeric("vwap"),
+});
+
+
+===== FILE: packages/db/src/index.ts =====
+schema: "../../packages/db/src/schema/index.ts",
+
+===== FILE: packages/db/src/schema.ts =====
+// packages/db/src/schema.ts
+export { obxEquities } from "./schema/obxEquities";
+export { obxFeatures, obxMarketProxy } from "./schema/obxFeatures";
+
+===== FILE: packages/db/src/schema/001_initial.sql =====
+-- Enable UUID generation
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Master stock reference table
+CREATE TABLE IF NOT EXISTS stocks (
+  ticker VARCHAR(20) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  isin VARCHAR(12),
+  sector VARCHAR(100),
+  currency VARCHAR(3) DEFAULT 'NOK',
+  exchange VARCHAR(20) DEFAULT 'OSE',
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Daily price data with source tracking
+CREATE TABLE IF NOT EXISTS prices_daily (
+  id BIGSERIAL PRIMARY KEY,
+  ticker VARCHAR(20) NOT NULL REFERENCES stocks(ticker) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  open NUMERIC(12, 4),
+  high NUMERIC(12, 4),
+  low NUMERIC(12, 4),
+  close NUMERIC(12, 4) NOT NULL,
+  adj_close NUMERIC(12, 4),
+  volume BIGINT NOT NULL CHECK (volume >= 0),
+  source VARCHAR(50) NOT NULL DEFAULT 'yfinance',
+  inserted_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (ticker, date, source)
+);
+
+-- Fundamentals as point-in-time snapshots
+CREATE TABLE IF NOT EXISTS fundamentals_snapshot (
+  id BIGSERIAL PRIMARY KEY,
+  ticker VARCHAR(20) NOT NULL REFERENCES stocks(ticker) ON DELETE CASCADE,
+  as_of_date DATE NOT NULL,
+  pe_ratio NUMERIC(10, 2),
+  ev_ebitda NUMERIC(10, 2),
+  pb_ratio NUMERIC(10, 2),
+  dividend_yield NUMERIC(10, 4),
+  market_cap NUMERIC(20, 2),
+  shares_outstanding NUMERIC(20, 2),
+  net_debt NUMERIC(20, 2),
+  revenue_ttm NUMERIC(20, 2),
+  ebitda_ttm NUMERIC(20, 2),
+  source VARCHAR(50) NOT NULL DEFAULT 'yfinance',
+  inserted_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (ticker, as_of_date, source)
+);
+
+-- Raw news with dedupe hash
+CREATE TABLE IF NOT EXISTS news_raw (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  ticker VARCHAR(20) REFERENCES stocks(ticker) ON DELETE SET NULL,
+  source VARCHAR(100) NOT NULL,
+  url TEXT NOT NULL,
+  published_at TIMESTAMPTZ,
+  title TEXT NOT NULL,
+  body TEXT,
+  hash VARCHAR(64) NOT NULL,
+  fetched_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (hash)
+);
+
+-- AI briefs with reproducibility
+CREATE TABLE IF NOT EXISTS summaries (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  ticker VARCHAR(20) NOT NULL REFERENCES stocks(ticker) ON DELETE CASCADE,
+  window_start DATE NOT NULL,
+  window_end DATE NOT NULL,
+  summary_json JSONB NOT NULL,
+  model VARCHAR(100) NOT NULL,
+  prompt_version VARCHAR(50) NOT NULL,
+  input_hash VARCHAR(64) NOT NULL,
+  generated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (ticker, window_start, window_end, model, prompt_version)
+);
+
+-- Change events
+CREATE TABLE IF NOT EXISTS changes (
+  id BIGSERIAL PRIMARY KEY,
+  ticker VARCHAR(20) REFERENCES stocks(ticker) ON DELETE SET NULL,
+  detected_at TIMESTAMPTZ DEFAULT NOW(),
+  change_type VARCHAR(50) NOT NULL,
+  old_value TEXT,
+  new_value TEXT,
+  source_ref TEXT
+);
+
+-- Job run tracking for observability
+CREATE TABLE IF NOT EXISTS job_runs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  job_name VARCHAR(100) NOT NULL,
+  started_at TIMESTAMPTZ NOT NULL,
+  finished_at TIMESTAMPTZ,
+  status VARCHAR(20) NOT NULL,
+  rows_inserted INT DEFAULT 0,
+  rows_updated INT DEFAULT 0,
+  rows_skipped INT DEFAULT 0,
+  errors INT DEFAULT 0,
+  error TEXT
+);
+
+-- Helpful indexes
+CREATE INDEX IF NOT EXISTS idx_prices_daily_ticker_date ON prices_daily (ticker, date DESC);
+CREATE INDEX IF NOT EXISTS idx_news_raw_ticker_published ON news_raw (ticker, published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_changes_detected ON changes (detected_at DESC);
+CREATE INDEX IF NOT EXISTS idx_summaries_ticker_window ON summaries (ticker, window_end DESC);
+
+===== FILE: packages/db/src/schema/002_seed_stocks.sql =====
+INSERT INTO stocks (ticker, name, sector, exchange, currency)
+VALUES
+  ('EQNR.OL', 'Equinor', 'Energy', 'OSE', 'NOK'),
+  ('DNB.OL', 'DNB', 'Financials', 'OSE', 'NOK'),
+  ('NHY.OL', 'Norsk Hydro', 'Materials', 'OSE', 'NOK'),
+  ('MOWI.OL', 'Mowi', 'Consumer Staples', 'OSE', 'NOK'),
+  ('FRO.OL', 'Frontline', 'Shipping', 'OSE', 'NOK')
+ON CONFLICT (ticker) DO NOTHING;
+
+===== FILE: packages/db/src/schema/obxEquities.ts =====
+// packages/db/src/schema/obxEquities.ts
+import { pgTable, varchar, date, numeric, integer } from "drizzle-orm/pg-core";
+
+export const obxEquities = pgTable("obx_equities", {
+  date: date("date").notNull(),
+  ticker: varchar("ticker", { length: 20 }).notNull(),
+
+  open: numeric("open"),
+  high: numeric("high"),
+  low: numeric("low"),
+  close: numeric("close"),
+
+  numberOfShares: numeric("number_of_shares"),
+  numberOfTrades: integer("number_of_trades"),
+  turnover: numeric("turnover"),
+  vwap: numeric("vwap"),
+});
+
+===== FILE: packages/db/src/schema/obxFeatures.ts =====
+// packages/db/src/schema/obxFeatures.ts
+import { pgTable, text, date, numeric } from "drizzle-orm/pg-core";
+
+export const obxFeatures = pgTable("obx_features", {
+  ticker: text("ticker").notNull(),
+  date: date("date").notNull(),
+  ret1d: numeric("ret_1d", { precision: 18, scale: 10 }).notNull(),
+  vol20d: numeric("vol_20d", { precision: 18, scale: 10 }),
+});
+
+export const obxMarketProxy = obxFeatures;
+
+===== FILE: packages/db/src/schema/pricesDaily.ts =====
+import {
+  pgTable,
+  varchar,
+  date,
+  numeric,
+  bigint,
+  timestamp,
+} from "drizzle-orm/pg-core";
+
+export const pricesDaily = pgTable("prices_daily", {
+  id: bigint("id", { mode: "bigint" }).primaryKey(),
+  ticker: varchar("ticker", { length: 20 }).notNull(),
+  date: date("date").notNull(),
+
+  open: numeric("open", { precision: 12, scale: 4 }),
+  high: numeric("high", { precision: 12, scale: 4 }),
+  low: numeric("low", { precision: 12, scale: 4 }),
+  close: numeric("close", { precision: 12, scale: 4 }).notNull(),
+  adjClose: numeric("adj_close", { precision: 12, scale: 4 }),
+
+  volume: bigint("volume", { mode: "bigint" }).notNull(),
+  source: varchar("source", { length: 50 }).notNull(),
+
+  insertedAt: timestamp("inserted_at", { withTimezone: true }),
+});
+
+===== FILE: packages/db/src/schema/schema.ts =====
+import {
+  pgTable,
+  date,
+  numeric,
+  integer,
+  varchar
+} from "drizzle-orm/pg-core";
+
+export const equities = pgTable("equities", {
+  date: date("date").notNull(),
+  ticker: varchar("ticker", { length: 16 }).notNull(),
+
+  open: numeric("open"),
+  high: numeric("high"),
+  low: numeric("low"),
+  close: numeric("close"),
+
+  numberOfShares: integer("number_of_shares"),
+  numberOfTrades: integer("number_of_trades"),
+  turnover: numeric("turnover"),
+  vwap: numeric("vwap"),
+});
+
+export { obxEquities } from "./schema/obxEquities";
+export { obxFeatures } from "./schema/obxFeatures";
+
+===== FILE: packages/db/tsconfig.json =====
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true
+  },
+  "include": ["index.ts", "contracts/**/*.ts"]
+}
+
+===== FILE: packages/db/vercel.json =====
+{
+  "functions": {
+    "api/**/*.ts": {
+      "runtime": "nodejs22.x"
+    }
+  }
+}
+

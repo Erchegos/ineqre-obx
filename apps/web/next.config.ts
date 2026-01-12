@@ -1,5 +1,7 @@
-const nextConfig = {
-  transpilePackages: ["@ineqre/db"],
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  /* config options here */
 };
 
 export default nextConfig;

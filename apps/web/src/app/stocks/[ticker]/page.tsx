@@ -3,33 +3,29 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
+import PriceChart from "@/components/PriceChart";
+import PriceDrawdownChart from "@/components/price-drawdown-chart";
 
-type EquityRow = {
-  date: string; // ISO
-  open: string | number | null;
-  high: string | number | null;
-  low: string | number | null;
-  close: string | number | null;
-  volume: string | number | null;
-  vwap?: string | number | null;
-  turnover?: string | number | null;
-  numberOfTrades?: string | number | null;
-  numberOfShares?: string | number | null;
-  ticker?: string;
-  source?: string | null;
-};
-
-type EquityApiOk = {
+type AnalyticsData = {
   ticker: string;
   count: number;
-  rows: EquityRow[];
-  source?: string;
-};
-
-type EquityApiErr = {
-  error: string;
-  pg?: { message?: string; code?: string | null };
-  [k: string]: any;
+  summary: {
+    totalReturn: number;
+    annualizedReturn: number;
+    volatility: number;
+    maxDrawdown: number;
+    var95: number;
+    cvar95: number;
+    beta: number;
+    sharpeRatio: number;
+  };
+  prices: Array<{ date: string; close: number }>;
+  returns: Array<{ date: string; return: number }>;
+  drawdown: Array<{ date: string; drawdown: number }>;
+  dateRange: {
+    start: string;
+    end: string;
+  };
 };
 
 function clampInt(v: string | null, def: number, min: number, max: number) {
@@ -38,28 +34,14 @@ function clampInt(v: string | null, def: number, min: number, max: number) {
   return Math.min(Math.max(Math.trunc(n), min), max);
 }
 
-function toNum(x: any): number | null {
-  if (x === null || x === undefined) return null;
-  const n = typeof x === "number" ? x : Number(x);
-  return Number.isFinite(n) ? n : null;
+function fmtPct(x: number | null, digits = 2): string {
+  if (x === null || !Number.isFinite(x)) return "NA";
+  return (x * 100).toFixed(digits) + "%";
 }
 
-function fmtNum(x: any, digits = 2) {
-  const n = toNum(x);
-  if (n === null) return "NA";
-  return n.toFixed(digits);
-}
-
-function fmtInt(x: any) {
-  const n = toNum(x);
-  if (n === null) return "NA";
-  return Math.trunc(n).toLocaleString("en-US");
-}
-
-function fmtDate(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toISOString().slice(0, 10);
+function fmtNum(x: number | null, digits = 2): string {
+  if (x === null || !Number.isFinite(x)) return "NA";
+  return x.toFixed(digits);
 }
 
 export default function StockTickerPage() {
@@ -76,11 +58,9 @@ export default function StockTickerPage() {
   }, [searchParams]);
 
   const [limit, setLimit] = useState<number>(initialLimit);
-
   const [loading, setLoading] = useState<boolean>(true);
-  const [data, setData] = useState<EquityApiOk | null>(null);
+  const [data, setData] = useState<AnalyticsData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [rawError, setRawError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -95,10 +75,9 @@ export default function StockTickerPage() {
 
       setLoading(true);
       setError(null);
-      setRawError(null);
 
       try {
-        const url = `/api/equities/${encodeURIComponent(ticker)}?limit=${encodeURIComponent(
+        const url = `/api/analytics/${encodeURIComponent(ticker)}?limit=${encodeURIComponent(
           String(limit)
         )}`;
 
@@ -108,32 +87,16 @@ export default function StockTickerPage() {
           cache: "no-store",
         });
 
-        const text = await res.text();
-
         if (!res.ok) {
-          // Try JSON first, otherwise keep raw body
-          try {
-            const j = JSON.parse(text) as EquityApiErr;
-            const msg =
-              j?.pg?.message ??
-              j?.error ??
-              `Equities API failed (${res.status} ${res.statusText}).`;
-            if (!cancelled) {
-              setError(msg);
-              setRawError(text);
-              setData(null);
-            }
-          } catch {
-            if (!cancelled) {
-              setError(`Equities API failed (${res.status} ${res.statusText}).`);
-              setRawError(text);
-              setData(null);
-            }
+          const text = await res.text();
+          if (!cancelled) {
+            setError(`Analytics API failed (${res.status} ${res.statusText}): ${text}`);
+            setData(null);
           }
           return;
         }
 
-        const json = JSON.parse(text) as EquityApiOk;
+        const json = await res.json() as AnalyticsData;
 
         if (!cancelled) {
           setData(json);
@@ -142,7 +105,6 @@ export default function StockTickerPage() {
       } catch (e: any) {
         if (!cancelled) {
           setError(e?.message ?? String(e));
-          setRawError(null);
           setData(null);
           setLoading(false);
         }
@@ -156,20 +118,20 @@ export default function StockTickerPage() {
   }, [ticker, limit]);
 
   return (
-    <main style={{ padding: 24 }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+    <main style={{ padding: 24, maxWidth: 1400, margin: "0 auto" }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 20 }}>
         <h1 style={{ fontSize: 36, fontWeight: 800, margin: 0 }}>
-          Stock {ticker || "?"}
+          {ticker || "?"}
         </h1>
         <Link
           href="/stocks"
           style={{ color: "rgba(255,255,255,0.7)", textDecoration: "none" }}
         >
-          Back to stocks
+          ← Back to stocks
         </Link>
       </div>
 
-      <div style={{ marginTop: 10, color: "rgba(255,255,255,0.75)" }}>
+      <div style={{ marginBottom: 16, color: "rgba(255,255,255,0.75)" }}>
         Limit:&nbsp;
         <input
           type="number"
@@ -189,137 +151,214 @@ export default function StockTickerPage() {
             marginLeft: 6,
           }}
         />
-        {data?.source ? (
-          <span style={{ marginLeft: 12, opacity: 0.7 }}>Source: {data.source}</span>
-        ) : null}
       </div>
 
-      {loading ? (
+      {loading && (
         <div
           style={{
-            marginTop: 18,
-            padding: 14,
+            padding: 20,
             borderRadius: 12,
             border: "1px solid rgba(255,255,255,0.12)",
             background: "rgba(255,255,255,0.04)",
           }}
         >
-          Loading…
+          Loading analytics...
         </div>
-      ) : null}
+      )}
 
-      {!loading && error ? (
+      {!loading && error && (
         <div
           style={{
-            marginTop: 18,
-            padding: 16,
+            padding: 20,
             borderRadius: 12,
             border: "1px solid rgba(255,140,140,0.35)",
             background: "rgba(120,0,0,0.22)",
           }}
         >
-          <div style={{ fontWeight: 800, fontSize: 20, marginBottom: 8 }}>
-            Application error
-          </div>
-          <div style={{ opacity: 0.95 }}>{error}</div>
-          {rawError ? (
-            <pre
-              style={{
-                marginTop: 12,
-                padding: 12,
-                borderRadius: 10,
-                background: "rgba(0,0,0,0.35)",
-                overflowX: "auto",
-                fontSize: 12,
-                lineHeight: 1.35,
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-              }}
-            >
-              {rawError}
-            </pre>
-          ) : null}
-          <div style={{ marginTop: 10, opacity: 0.85 }}>
-            Direct check:&nbsp;
-            <a
-              href={`/api/equities/${encodeURIComponent(ticker || "")}?limit=20`}
-              style={{ color: "rgba(130,190,255,1)", textDecoration: "none" }}
-            >
-              /api/equities/{ticker || ""}?limit=20
-            </a>
-          </div>
+          <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>Error</div>
+          <div>{error}</div>
         </div>
-      ) : null}
+      )}
 
-      {!loading && data ? (
-        <div
-          style={{
-            marginTop: 18,
-            borderRadius: 12,
-            border: "1px solid rgba(255,255,255,0.12)",
-            overflow: "hidden",
-            background: "rgba(255,255,255,0.03)",
-          }}
-        >
-          <div style={{ padding: 14, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-            Rows: <b>{data.count}</b>
+      {!loading && data && (
+        <>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gap: 16,
+              marginBottom: 24,
+            }}
+          >
+            <MetricCard
+              label="Total Return"
+              value={fmtPct(data.summary.totalReturn)}
+              color="rgba(100,200,100,0.9)"
+            />
+            <MetricCard
+              label="Annualized Return"
+              value={fmtPct(data.summary.annualizedReturn)}
+            />
+            <MetricCard
+              label="Volatility (Ann.)"
+              value={fmtPct(data.summary.volatility)}
+            />
+            <MetricCard
+              label="Max Drawdown"
+              value={fmtPct(data.summary.maxDrawdown)}
+              color="rgba(255,140,140,0.9)"
+            />
+            <MetricCard
+              label="VaR (95%)"
+              value={fmtPct(data.summary.var95)}
+            />
+            <MetricCard
+              label="CVaR (95%)"
+              value={fmtPct(data.summary.cvar95)}
+            />
+            <MetricCard
+              label="Beta (vs OBX)"
+              value={fmtNum(data.summary.beta, 3)}
+            />
+            <MetricCard
+              label="Sharpe Ratio"
+              value={fmtNum(data.summary.sharpeRatio, 3)}
+            />
           </div>
 
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-              <thead>
-                <tr style={{ textAlign: "left" }}>
-                  {[
-                    "Date",
-                    "Open",
-                    "High",
-                    "Low",
-                    "Close",
-                    "Volume",
-                    "VWAP",
-                    "Turnover",
-                    "Trades",
-                    "Shares",
-                    "Source",
-                  ].map((h) => (
+          <div style={{ marginBottom: 24, color: "rgba(255,255,255,0.7)", fontSize: 14 }}>
+            Data range: {data.dateRange.start} to {data.dateRange.end} ({data.count} days)
+          </div>
+
+          <div
+            style={{
+              marginBottom: 24,
+              padding: 20,
+              borderRadius: 12,
+              border: "1px solid rgba(255,255,255,0.12)",
+              background: "rgba(255,255,255,0.03)",
+            }}
+          >
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>
+              Price History
+            </h2>
+            <PriceChart data={data.prices} height={320} />
+          </div>
+
+          <div
+            style={{
+              marginBottom: 24,
+              padding: 20,
+              borderRadius: 12,
+              border: "1px solid rgba(255,255,255,0.12)",
+              background: "rgba(255,255,255,0.03)",
+            }}
+          >
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>
+              Drawdown
+            </h2>
+            <PriceDrawdownChart data={data.drawdown} height={280} />
+          </div>
+
+          <div
+            style={{
+              padding: 20,
+              borderRadius: 12,
+              border: "1px solid rgba(255,255,255,0.12)",
+              background: "rgba(255,255,255,0.03)",
+            }}
+          >
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>
+              Recent Daily Returns
+            </h2>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                <thead>
+                  <tr style={{ textAlign: "left" }}>
                     <th
-                      key={h}
                       style={{
                         padding: "10px 12px",
                         borderBottom: "1px solid rgba(255,255,255,0.08)",
                         color: "rgba(255,255,255,0.8)",
                         fontWeight: 700,
-                        whiteSpace: "nowrap",
                       }}
                     >
-                      {h}
+                      Date
                     </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {data.rows.map((r, i) => (
-                  <tr key={`${r.date}-${i}`} style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                    <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>{fmtDate(r.date)}</td>
-                    <td style={{ padding: "10px 12px" }}>{fmtNum(r.open, 2)}</td>
-                    <td style={{ padding: "10px 12px" }}>{fmtNum(r.high, 2)}</td>
-                    <td style={{ padding: "10px 12px" }}>{fmtNum(r.low, 2)}</td>
-                    <td style={{ padding: "10px 12px" }}>{fmtNum(r.close, 2)}</td>
-                    <td style={{ padding: "10px 12px" }}>{fmtInt(r.volume)}</td>
-                    <td style={{ padding: "10px 12px" }}>{fmtNum(r.vwap, 4)}</td>
-                    <td style={{ padding: "10px 12px" }}>{fmtNum(r.turnover, 2)}</td>
-                    <td style={{ padding: "10px 12px" }}>{fmtInt(r.numberOfTrades)}</td>
-                    <td style={{ padding: "10px 12px" }}>{fmtInt(r.numberOfShares)}</td>
-                    <td style={{ padding: "10px 12px", opacity: 0.85 }}>
-                      {r.source ?? "NA"}
-                    </td>
+                    <th
+                      style={{
+                        padding: "10px 12px",
+                        borderBottom: "1px solid rgba(255,255,255,0.08)",
+                        color: "rgba(255,255,255,0.8)",
+                        fontWeight: 700,
+                      }}
+                    >
+                      Return
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data.returns.slice(-20).reverse().map((r) => (
+                    <tr
+                      key={r.date}
+                      style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
+                    >
+                      <td style={{ padding: "10px 12px" }}>{r.date}</td>
+                      <td
+                        style={{
+                          padding: "10px 12px",
+                          color:
+                            r.return > 0
+                              ? "rgba(100,200,100,1)"
+                              : r.return < 0
+                              ? "rgba(255,140,140,1)"
+                              : "inherit",
+                        }}
+                      >
+                        {fmtPct(r.return, 4)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      ) : null}
+        </>
+      )}
     </main>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string;
+  color?: string;
+}) {
+  return (
+    <div
+      style={{
+        padding: 16,
+        borderRadius: 10,
+        border: "1px solid rgba(255,255,255,0.12)",
+        background: "rgba(255,255,255,0.03)",
+      }}
+    >
+      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", marginBottom: 6 }}>
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: 24,
+          fontWeight: 700,
+          color: color || "rgba(255,255,255,0.95)",
+        }}
+      >
+        {value}
+      </div>
+    </div>
   );
 }
