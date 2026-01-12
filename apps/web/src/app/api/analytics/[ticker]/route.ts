@@ -13,7 +13,7 @@ type PriceRow = {
 async function fetchPrices(ticker: string, limit: number): Promise<PriceRow[]> {
   const q = `
     SELECT date::date as date, close
-    FROM public.obx_equities
+    FROM public.prices_daily
     WHERE upper(ticker) = upper($1)
       AND close IS NOT NULL
       AND close > 0
@@ -32,7 +32,7 @@ async function fetchMarketPrices(limit: number): Promise<PriceRow[]> {
   // OBX as market proxy
   const q = `
     SELECT date::date as date, close
-    FROM public.obx_equities
+    FROM public.prices_daily
     WHERE upper(ticker) = 'OBX'
       AND close IS NOT NULL
       AND close > 0

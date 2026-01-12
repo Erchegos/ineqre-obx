@@ -32,14 +32,14 @@ async function getStocks(): Promise<{ count: number; rows: StockRow[] }> {
         min(date) as start_date,
         max(date) as end_date,
         count(*) as row_count
-      FROM public.obx_equities
+      FROM public.prices_daily
       GROUP BY upper(ticker)
     ),
     latest_prices AS (
       SELECT DISTINCT ON (upper(ticker))
         upper(ticker) as ticker,
         close as last_close
-      FROM public.obx_equities
+      FROM public.prices_daily
       WHERE close IS NOT NULL
       ORDER BY upper(ticker), date DESC
     )
@@ -91,7 +91,7 @@ export default async function StocksPage() {
           Server error while loading stocks: {err}
         </p>
         <p className="mt-2 text-sm text-zinc-400">
-          Check that DATABASE_URL is set and obx_equities table exists.
+          Check that DATABASE_URL is set and prices_daily table exists.
         </p>
       </main>
     );
@@ -110,7 +110,7 @@ export default async function StocksPage() {
         </div>
 
         <div className="text-sm text-zinc-400">
-          Source: obx_equities
+          Source: prices_daily
         </div>
       </div>
 
@@ -147,7 +147,7 @@ export default async function StocksPage() {
             {!rows.length && (
               <tr>
                 <td className="px-4 py-6 text-zinc-400" colSpan={5}>
-                  No data in obx_equities table.
+                  No data in prices_daily table.
                 </td>
               </tr>
             )}
