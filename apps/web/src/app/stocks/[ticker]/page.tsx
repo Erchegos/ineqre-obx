@@ -10,7 +10,6 @@ function clampInt(v: string | null, def: number, min: number, max: number) {
 }
 
 function getBaseUrl() {
-  // Works in Vercel and locally. Avoids protected preview URLs.
   const vercelUrl = process.env.VERCEL_URL;
   if (vercelUrl) return `https://${vercelUrl}`;
   return "http://localhost:3000";
@@ -44,7 +43,9 @@ async function fetchEquity(ticker: string, limit: number): Promise<EquityApiOk> 
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Equities API failed (${res.status} ${res.statusText}). URL=${url}. Body=${body.slice(0, 2000)}`);
+    throw new Error(
+      `Equities API failed (${res.status} ${res.statusText}). URL=${url}. Body=${body.slice(0, 2000)}`
+    );
   }
 
   return (await res.json()) as EquityApiOk;
@@ -54,20 +55,26 @@ export default async function StockPage({
   params,
   searchParams,
 }: {
-  params: { ticker?: string };
-  searchParams?: Record<string, string | string[] | undefined>;
+  params: Promise<{ ticker?: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const raw = params?.ticker;
-  const ticker = typeof raw === "string" && raw.length > 0 ? decodeURIComponent(raw).toUpperCase() : "";
+  const p = await params;
+  const sp = (await searchParams) ?? {};
 
-  const limitParam = typeof searchParams?.limit === "string" ? searchParams.limit : null;
+  const rawTicker = p?.ticker;
+  const ticker =
+    typeof rawTicker === "string" && rawTicker.length > 0
+      ? decodeURIComponent(rawTicker).toUpperCase()
+      : "";
+
+  const limitParam = typeof sp.limit === "string" ? sp.limit : null;
   const limit = clampInt(limitParam, 1500, 20, 5000);
 
   let data: EquityApiOk | null = null;
   let error: string | null = null;
 
   if (!ticker) {
-    error = "Missing ticker in route params.";
+    error = `Missing ticker in route params. Raw params=${JSON.stringify(p)}`;
   } else {
     try {
       data = await fetchEquity(ticker, limit);
@@ -79,7 +86,7 @@ export default async function StockPage({
   return (
     <main style={{ padding: 24 }}>
       <div style={{ display: "flex", gap: 12, alignItems: "baseline" }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>Stock {ticker}</h1>
+        <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>Stock {ticker || "?"}</h1>
         <span style={{ opacity: 0.7 }}>
           <Link href="/stocks">Back to stocks</Link>
         </span>
@@ -104,6 +111,7 @@ export default async function StockPage({
         >
           <div style={{ fontWeight: 700, marginBottom: 8 }}>Application error</div>
           <div style={{ whiteSpace: "pre-wrap", fontFamily: "ui-monospace" }}>{error}</div>
+
           {ticker ? (
             <div style={{ marginTop: 10, opacity: 0.85 }}>
               Direct check:{" "}
@@ -138,7 +146,7 @@ export default async function StockPage({
               </tr>
             </thead>
             <tbody>
-              {data.rows.slice(0, 50).map((r, i) => (
+              {data.rows.slice(0, 200).map((r, i) => (
                 <tr key={`${r.date}-${i}`} style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
                   <td style={{ padding: 10 }}>{String(r.date).slice(0, 10)}</td>
                   <td style={{ padding: 10, textAlign: "right" }}>{r.open ?? ""}</td>
