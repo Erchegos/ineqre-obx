@@ -1,5 +1,6 @@
 // apps/web/src/app/stocks/[ticker]/page.tsx
 import Link from "next/link";
+import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
@@ -9,10 +10,13 @@ function clampInt(v: string | null, def: number, min: number, max: number) {
   return Math.min(Math.max(Math.trunc(n), min), max);
 }
 
-function getBaseUrl() {
-  const vercelUrl = process.env.VERCEL_URL;
-  if (vercelUrl) return `https://${vercelUrl}`;
-  return "http://localhost:3000";
+function getRequestBaseUrl() {
+  const h = headers();
+
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+  const proto = h.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
+
+  return `${proto}://${host}`;
 }
 
 type EquityRow = {
@@ -35,10 +39,8 @@ type EquityApiOk = {
   source?: string;
 };
 
-async function fetchEquity(ticker: string, limit: number): Promise<EquityApiOk> {
-  const base = getBaseUrl();
+async function fetchEquity(base: string, ticker: string, limit: number): Promise<EquityApiOk> {
   const url = `${base}/api/equities/${encodeURIComponent(ticker)}?limit=${limit}`;
-
   const res = await fetch(url, { cache: "no-store" });
 
   if (!res.ok) {
@@ -55,29 +57,26 @@ export default async function StockPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ ticker?: string }>;
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+  params: { ticker?: string };
+  searchParams?: Record<string, string | string[] | undefined>;
 }) {
-  const p = await params;
-  const sp = (await searchParams) ?? {};
+  const base = getRequestBaseUrl();
 
-  const rawTicker = p?.ticker;
+  const rawTicker = params?.ticker;
   const ticker =
-    typeof rawTicker === "string" && rawTicker.length > 0
-      ? decodeURIComponent(rawTicker).toUpperCase()
-      : "";
+    typeof rawTicker === "string" && rawTicker.length > 0 ? decodeURIComponent(rawTicker).toUpperCase() : "";
 
-  const limitParam = typeof sp.limit === "string" ? sp.limit : null;
+  const limitParam = typeof searchParams?.limit === "string" ? searchParams.limit : null;
   const limit = clampInt(limitParam, 1500, 20, 5000);
 
   let data: EquityApiOk | null = null;
   let error: string | null = null;
 
   if (!ticker) {
-    error = `Missing ticker in route params. Raw params=${JSON.stringify(p)}`;
+    error = `Missing ticker in route params. params=${JSON.stringify(params)}`;
   } else {
     try {
-      data = await fetchEquity(ticker, limit);
+      data = await fetchEquity(base, ticker, limit);
     } catch (e: unknown) {
       error = (e as any)?.message ?? String(e);
     }
@@ -94,6 +93,8 @@ export default async function StockPage({
 
       <div style={{ marginTop: 10, opacity: 0.8 }}>
         Limit: {limit}
+        {" | "}
+        Base: {base}
         {data?.source ? ` | Source: ${data.source}` : ""}
         {data ? ` | Rows: ${data.count}` : ""}
       </div>
