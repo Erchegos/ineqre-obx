@@ -1,6 +1,5 @@
 // apps/web/src/app/stocks/[ticker]/page.tsx
 import Link from "next/link";
-import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
@@ -8,15 +7,6 @@ function clampInt(v: string | null, def: number, min: number, max: number) {
   const n = v ? Number(v) : Number.NaN;
   if (!Number.isFinite(n)) return def;
   return Math.min(Math.max(Math.trunc(n), min), max);
-}
-
-function getBaseUrl() {
-  // Server-side fetch MUST be absolute in production.
-  const h = headers();
-  const proto = h.get("x-forwarded-proto") ?? "https";
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
-  if (!host) return null;
-  return `${proto}://${host}`;
 }
 
 type EquityRow = {
@@ -28,8 +18,8 @@ type EquityRow = {
   volume?: string | number | null;
   vwap?: string | number | null;
   turnover?: string | number | null;
-  source?: string | null;
   ticker?: string;
+  source?: string | null;
 };
 
 type EquityApiOk = {
@@ -39,20 +29,37 @@ type EquityApiOk = {
   source?: string;
 };
 
-async function fetchEquity(baseUrl: string, ticker: string, limit: number): Promise<EquityApiOk> {
-  const url = `${baseUrl}/api/equities/${encodeURIComponent(ticker)}?limit=${limit}`;
+type EquityApiErr = {
+  error: string;
+  pg?: any;
+  schema?: any;
+};
 
-  const res = await fetch(url, { cache: "no-store" });
+async function fetchEquity(ticker: string, limit: number): Promise<EquityApiOk> {
+  // CRITICAL: same-origin relative URL. Do not use Vercel deployment URLs.
+  const url = `/api/equities/${encodeURIComponent(ticker)}?limit=${limit}`;
+
+  const res = await fetch(url, {
+    cache: "no-store",
+    // Next.js server component fetch. Same-origin works in production and avoids Vercel protection.
+  });
 
   if (!res.ok) {
-    let payload: string;
+    let body: any = null;
     try {
-      const j = await res.json();
-      payload = JSON.stringify(j, null, 2);
+      body = await res.json();
     } catch {
-      payload = await res.text().catch(() => "");
+      body = await res.text().catch(() => null);
     }
-    throw new Error(`Equities API failed (${res.status} ${res.statusText}). URL=${url}. Payload=${payload.slice(0, 4000)}`);
+
+    const payload =
+      typeof body === "string"
+        ? body.slice(0, 3000)
+        : JSON.stringify(body, null, 2).slice(0, 3000);
+
+    throw new Error(
+      `Equities API failed (${res.status} ${res.statusText}). Payload: ${payload}`
+    );
   }
 
   return (await res.json()) as EquityApiOk;
@@ -62,37 +69,30 @@ export default async function StockPage({
   params,
   searchParams,
 }: {
-  params: { ticker?: string };
+  params: { ticker: string };
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
-  const raw = params?.ticker;
-  const ticker = typeof raw === "string" && raw.length > 0 ? decodeURIComponent(raw).toUpperCase() : "";
+  const rawTicker = params.ticker ?? "";
+  const ticker = decodeURIComponent(rawTicker).toUpperCase();
 
-  const limitParam = typeof searchParams?.limit === "string" ? searchParams.limit : null;
+  const limitParam =
+    typeof searchParams?.limit === "string" ? searchParams?.limit : null;
   const limit = clampInt(limitParam, 1500, 20, 5000);
-
-  const baseUrl = getBaseUrl();
 
   let data: EquityApiOk | null = null;
   let error: string | null = null;
 
-  if (!ticker) {
-    error = "Missing route param: ticker. Confirm the file path is apps/web/src/app/stocks/[ticker]/page.tsx (folder name must be [ticker]).";
-  } else if (!baseUrl) {
-    error = "Cannot resolve host headers to build absolute base URL for server fetch.";
-  } else {
-    try {
-      data = await fetchEquity(baseUrl, ticker, limit);
-    } catch (e: unknown) {
-      error = (e as any)?.message ?? String(e);
-    }
+  try {
+    data = await fetchEquity(ticker, limit);
+  } catch (e: unknown) {
+    error = (e as any)?.message ?? String(e);
   }
 
   return (
     <main style={{ padding: 24 }}>
       <div style={{ display: "flex", gap: 12, alignItems: "baseline" }}>
         <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>
-          Stock {ticker || ""}
+          Stock {ticker}
         </h1>
         <span style={{ opacity: 0.7 }}>
           <Link href="/stocks">Back to stocks</Link>
@@ -101,7 +101,6 @@ export default async function StockPage({
 
       <div style={{ marginTop: 10, opacity: 0.8 }}>
         Limit: {limit}
-        {baseUrl ? ` | Host: ${baseUrl}` : ""}
         {data?.source ? ` | Source: ${data.source}` : ""}
         {data ? ` | Rows: ${data.count}` : ""}
       </div>
@@ -117,23 +116,37 @@ export default async function StockPage({
             overflow: "auto",
           }}
         >
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>Application error</div>
-          <div style={{ whiteSpace: "pre-wrap", fontFamily: "ui-monospace" }}>{error}</div>
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>
+            Application error
+          </div>
+          <div style={{ whiteSpace: "pre-wrap", fontFamily: "ui-monospace" }}>
+            {error}
+          </div>
 
-          {ticker && baseUrl ? (
-            <div style={{ marginTop: 10, opacity: 0.85 }}>
-              Direct check:{" "}
-              <a href={`/api/equities/${encodeURIComponent(ticker)}?limit=20`}>
-                /api/equities/{ticker}?limit=20
-              </a>
-            </div>
-          ) : null}
+          <div style={{ marginTop: 12, opacity: 0.85 }}>
+            Fast checks:
+            <ul>
+              <li>
+                Open{" "}
+                <a href={`/api/equities/${ticker}?limit=20`}>
+                  /api/equities/{ticker}?limit=20
+                </a>{" "}
+                and verify 200 JSON
+              </li>
+              <li>
+                Confirm public.prices_daily has the columns your equities route
+                selects
+              </li>
+            </ul>
+          </div>
         </div>
       ) : null}
 
       {data && !error ? (
         <>
-          <h2 style={{ marginTop: 18, fontSize: 18, fontWeight: 700 }}>Preview (first 20 rows)</h2>
+          <h2 style={{ marginTop: 18, fontSize: 18, fontWeight: 700 }}>
+            Preview (first 20 rows)
+          </h2>
 
           <div
             style={{
@@ -158,14 +171,31 @@ export default async function StockPage({
               </thead>
               <tbody>
                 {data.rows.slice(0, 20).map((r, i) => (
-                  <tr key={`${r.date}-${i}`} style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                  <tr
+                    key={`${r.date}-${i}`}
+                    style={{
+                      borderTop: "1px solid rgba(255,255,255,0.08)",
+                    }}
+                  >
                     <td style={{ padding: 10 }}>{String(r.date).slice(0, 10)}</td>
-                    <td style={{ padding: 10, textAlign: "right" }}>{r.open ?? ""}</td>
-                    <td style={{ padding: 10, textAlign: "right" }}>{r.high ?? ""}</td>
-                    <td style={{ padding: 10, textAlign: "right" }}>{r.low ?? ""}</td>
-                    <td style={{ padding: 10, textAlign: "right" }}>{r.close ?? ""}</td>
-                    <td style={{ padding: 10, textAlign: "right" }}>{r.volume ?? ""}</td>
-                    <td style={{ padding: 10, textAlign: "right" }}>{r.vwap ?? ""}</td>
+                    <td style={{ padding: 10, textAlign: "right" }}>
+                      {r.open ?? ""}
+                    </td>
+                    <td style={{ padding: 10, textAlign: "right" }}>
+                      {r.high ?? ""}
+                    </td>
+                    <td style={{ padding: 10, textAlign: "right" }}>
+                      {r.low ?? ""}
+                    </td>
+                    <td style={{ padding: 10, textAlign: "right" }}>
+                      {r.close ?? ""}
+                    </td>
+                    <td style={{ padding: 10, textAlign: "right" }}>
+                      {r.volume ?? ""}
+                    </td>
+                    <td style={{ padding: 10, textAlign: "right" }}>
+                      {r.vwap ?? ""}
+                    </td>
                     <td style={{ padding: 10 }}>{r.source ?? ""}</td>
                   </tr>
                 ))}
@@ -174,7 +204,9 @@ export default async function StockPage({
           </div>
 
           <details style={{ marginTop: 16 }}>
-            <summary style={{ cursor: "pointer", opacity: 0.85 }}>Raw JSON (debug)</summary>
+            <summary style={{ cursor: "pointer", opacity: 0.85 }}>
+              Raw JSON (debug)
+            </summary>
             <pre
               style={{
                 marginTop: 10,
