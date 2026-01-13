@@ -21,8 +21,8 @@ type PriceBar = {
  * Sanitize a number for JSON serialization
  * Converts NaN and Infinity to null
  */
-function sanitizeNumber(n: number): number | null {
-  if (isNaN(n) || !isFinite(n)) return null;
+function sanitizeNumber(n: number | undefined): number | null {
+  if (n === undefined || isNaN(n) || !isFinite(n)) return null;
   return n;
 }
 
