@@ -60,8 +60,8 @@ export default function VolatilityChart({ data, events = [], height = 400 }: Pro
     setVisibleLines(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const formatPercent = (value: number) => {
-    if (!value || !isFinite(value)) return "";
+  const formatPercent = (value: number | undefined): string => {
+    if (value === undefined || !isFinite(value)) return "";
     return `${(value * 100).toFixed(1)}%`;
   };
 
