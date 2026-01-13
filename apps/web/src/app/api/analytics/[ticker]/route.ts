@@ -1,7 +1,12 @@
-// apps/web/src/app/api/analytics/[ticker]/route.ts
 import { NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { annualizedVolatility, maxDrawdown, var95, cvar95 } from "@/lib/metrics";
+import { getPriceTable } from "@/lib/price-data-adapter";
+import {
+  computeReturns,
+  computeBeta,
+  computeDrawdownSeries,
+  computeSharpeRatio,
+} from "@/lib/metrics";
 
 export const dynamic = "force-dynamic";
 
@@ -11,9 +16,11 @@ type PriceRow = {
 };
 
 async function fetchPrices(ticker: string, limit: number): Promise<PriceRow[]> {
+  const tableName = await getPriceTable();
+  
   const q = `
     SELECT date::date as date, close
-    FROM public.prices_daily
+    FROM public.${tableName}
     WHERE upper(ticker) = upper($1)
       AND close IS NOT NULL
       AND close > 0
@@ -24,15 +31,16 @@ async function fetchPrices(ticker: string, limit: number): Promise<PriceRow[]> {
   const result = await pool.query(q, [ticker, limit]);
   return result.rows.map(r => ({
     date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date),
-    close: Number(r.close)
+    close: Number(r.close),
   }));
 }
 
 async function fetchMarketPrices(limit: number): Promise<PriceRow[]> {
-  // OBX as market proxy
+  const tableName = await getPriceTable();
+  
   const q = `
     SELECT date::date as date, close
-    FROM public.prices_daily
+    FROM public.${tableName}
     WHERE upper(ticker) = 'OBX'
       AND close IS NOT NULL
       AND close > 0
@@ -43,49 +51,8 @@ async function fetchMarketPrices(limit: number): Promise<PriceRow[]> {
   const result = await pool.query(q, [limit]);
   return result.rows.map(r => ({
     date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date),
-    close: Number(r.close)
+    close: Number(r.close),
   }));
-}
-
-function computeReturns(prices: number[]): number[] {
-  const returns: number[] = [];
-  for (let i = 1; i < prices.length; i++) {
-    const ret = (prices[i] - prices[i - 1]) / prices[i - 1];
-    returns.push(ret);
-  }
-  return returns;
-}
-
-function computeDrawdownSeries(prices: number[]): Array<{ date: string; drawdown: number }> {
-  const result: Array<{ date: string; drawdown: number }> = [];
-  let peak = prices[0] ?? 0;
-  
-  return prices.map((p, i) => {
-    peak = Math.max(peak, p);
-    const dd = peak > 0 ? (p - peak) / peak : 0;
-    return { date: "", drawdown: dd }; // date will be filled by caller
-  });
-}
-
-function computeBeta(assetReturns: number[], marketReturns: number[]): number {
-  const n = Math.min(assetReturns.length, marketReturns.length);
-  if (n < 20) return 0;
-  
-  const assetMean = assetReturns.slice(0, n).reduce((a, b) => a + b, 0) / n;
-  const marketMean = marketReturns.slice(0, n).reduce((a, b) => a + b, 0) / n;
-  
-  let covariance = 0;
-  let marketVariance = 0;
-  
-  for (let i = 0; i < n; i++) {
-    const assetDev = assetReturns[i] - assetMean;
-    const marketDev = marketReturns[i] - marketMean;
-    covariance += assetDev * marketDev;
-    marketVariance += marketDev * marketDev;
-  }
-  
-  if (marketVariance === 0) return 0;
-  return covariance / marketVariance;
 }
 
 export async function GET(
@@ -97,99 +64,112 @@ export async function GET(
     const url = new URL(req.url);
     const limitRaw = url.searchParams.get("limit");
     const limit = Math.min(Math.max(Number(limitRaw || 1500), 20), 5000);
-    
-    // Fetch price data
+
+    // Fetch prices for the ticker
     const prices = await fetchPrices(ticker, limit);
-    
-    if (prices.length === 0) {
-      return NextResponse.json({
-        ticker: ticker.toUpperCase(),
-        error: "No price data found",
-      }, { status: 404 });
+
+    // Reduced minimum requirement from 252 to 20 days
+    if (prices.length < 20) {
+      return NextResponse.json(
+        {
+          ticker: ticker.toUpperCase(),
+          error: `Insufficient data: only ${prices.length} days available (minimum 20 required)`,
+        },
+        { status: 400 }
+      );
     }
-    
-    // Extract arrays
-    const dates = prices.map(p => p.date);
-    const closes = prices.map(p => p.close);
-    
+
     // Compute returns
-    const returns = computeReturns(closes);
+    const closes = prices.map(p => p.close);
+    const dates = prices.map(p => p.date);
+    const logReturns = computeReturns(closes);
+
+    if (logReturns.length === 0) {
+      return NextResponse.json(
+        {
+          ticker: ticker.toUpperCase(),
+          error: "Unable to compute returns",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Compute summary statistics
+    const totalReturn = (closes[closes.length - 1] - closes[0]) / closes[0];
     
-    // Compute metrics
-    const vol = annualizedVolatility(returns);
-    const maxDd = maxDrawdown(closes);
-    const valueAtRisk = var95(returns);
-    const cValueAtRisk = cvar95(returns);
-    
-    // Compute drawdown series
-    const drawdownBase = computeDrawdownSeries(closes);
-    const drawdownSeries = drawdownBase.map((dd, i) => ({
-      date: dates[i],
-      drawdown: dd.drawdown
-    }));
-    
+    // Calculate number of years for annualization
+    const days = closes.length;
+    const years = days / 252;
+    const annualizedReturn = years > 0 ? Math.pow(1 + totalReturn, 1 / years) - 1 : 0;
+
+    // Volatility (annualized)
+    const mean = logReturns.reduce((a, b) => a + b, 0) / logReturns.length;
+    const variance = logReturns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / (logReturns.length - 1);
+    const volatility = Math.sqrt(variance * 252);
+
+    // Max drawdown
+    const drawdownSeries = computeDrawdownSeries(closes);
+    const maxDrawdown = Math.min(...drawdownSeries.map(d => d.drawdown));
+
+    // VaR and CVaR (95%)
+    const sortedReturns = [...logReturns].sort((a, b) => a - b);
+    const var95Index = Math.floor(logReturns.length * 0.05);
+    const var95 = sortedReturns[var95Index] || 0;
+    const cvar95 =
+      sortedReturns.slice(0, var95Index + 1).reduce((a, b) => a + b, 0) / (var95Index + 1 || 1);
+
     // Compute beta vs OBX
     let beta = 0;
     try {
       const marketPrices = await fetchMarketPrices(limit);
-      const marketCloses = marketPrices.map(p => p.close);
-      const marketReturns = computeReturns(marketCloses);
-      beta = computeBeta(returns, marketReturns);
+      
+      // Only compute beta if we have sufficient overlapping data
+      if (marketPrices.length >= 20) {
+        const marketCloses = marketPrices.map(p => p.close);
+        const marketReturns = computeReturns(marketCloses);
+        beta = computeBeta(logReturns, marketReturns);
+      }
     } catch (e) {
       console.warn("Failed to compute beta:", e);
+      // Beta remains 0 if computation fails
     }
-    
-    // Cumulative return
-    const totalReturn = closes.length > 1 
-      ? (closes[closes.length - 1] - closes[0]) / closes[0]
-      : 0;
-    
-    // Annualized return (simple approximation)
-    const days = closes.length;
-    const years = days / 252;
-    const annualizedReturn = years > 0 
-      ? Math.pow(1 + totalReturn, 1 / years) - 1
-      : 0;
-    
-    // Return series with returns
-    const returnSeries = returns.map((ret, i) => ({
-      date: dates[i + 1], // returns start at index 1
-      return: ret
+
+    // Sharpe ratio (assuming risk-free rate = 0)
+    const sharpeRatio = computeSharpeRatio(logReturns, 0);
+
+    // Build return series
+    const returnSeries = logReturns.map((r, i) => ({
+      date: dates[i + 1],
+      return: r,
     }));
-    
+
     return NextResponse.json({
       ticker: ticker.toUpperCase(),
       count: prices.length,
-      
-      // Summary metrics
       summary: {
         totalReturn,
         annualizedReturn,
-        volatility: vol,
-        maxDrawdown: maxDd,
-        var95: valueAtRisk,
-        cvar95: cValueAtRisk,
+        volatility,
+        maxDrawdown,
+        var95,
+        cvar95,
         beta,
-        sharpeRatio: vol > 0 ? annualizedReturn / vol : 0,
+        sharpeRatio,
       },
-      
-      // Time series
       prices: prices.map(p => ({ date: p.date, close: p.close })),
       returns: returnSeries,
       drawdown: drawdownSeries,
-      
-      // Metadata
       dateRange: {
         start: dates[0],
         end: dates[dates.length - 1],
       },
     });
   } catch (e: any) {
+    console.error("[Analytics API] Error:", e);
     return NextResponse.json(
       {
         error: "Analytics computation failed",
         message: e?.message ?? String(e),
-        code: e?.code,
       },
       { status: 500 }
     );

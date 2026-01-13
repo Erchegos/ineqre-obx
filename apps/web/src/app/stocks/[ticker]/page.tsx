@@ -83,7 +83,7 @@ export default function StockTickerPage() {
 
         const res = await fetch(url, {
           method: "GET",
-          headers: { "accept": "application/json" },
+          headers: { accept: "application/json" },
           cache: "no-store",
         });
 
@@ -96,7 +96,7 @@ export default function StockTickerPage() {
           return;
         }
 
-        const json = await res.json() as AnalyticsData;
+        const json = (await res.json()) as AnalyticsData;
 
         if (!cancelled) {
           setData(json);
@@ -119,20 +119,43 @@ export default function StockTickerPage() {
 
   return (
     <main style={{ padding: 24, maxWidth: 1400, margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 20 }}>
-        <h1 style={{ fontSize: 36, fontWeight: 800, margin: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
+        <h1 style={{ fontSize: 32, fontWeight: 600, margin: 0, letterSpacing: "-0.02em" }}>
           {ticker || "?"}
         </h1>
         <Link
           href="/stocks"
-          style={{ color: "rgba(255,255,255,0.7)", textDecoration: "none" }}
+          style={{ color: "rgba(255,255,255,0.6)", textDecoration: "none", fontSize: 14 }}
         >
           ← Back to stocks
         </Link>
+        <div style={{ flex: 1 }} />
+        
+        {/* Volatility Analysis Link */}
+        <Link
+          href={`/volatility/${ticker}`}
+          style={{
+            padding: "8px 16px",
+            borderRadius: 4,
+            background: "rgba(100, 100, 100, 0.2)",
+            border: "1px solid rgba(255, 255, 255, 0.2)",
+            color: "rgba(255, 255, 255, 0.9)",
+            fontSize: 13,
+            fontWeight: 500,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            textDecoration: "none",
+            letterSpacing: "0.01em",
+            transition: "all 0.15s",
+          }}
+        >
+          Volatility Analysis
+        </Link>
       </div>
 
-      <div style={{ marginBottom: 16, color: "rgba(255,255,255,0.75)" }}>
-        Limit:&nbsp;
+      <div style={{ marginBottom: 20, color: "rgba(255,255,255,0.6)", fontSize: 13 }}>
+        Sample size:&nbsp;
         <input
           type="number"
           min={20}
@@ -141,25 +164,28 @@ export default function StockTickerPage() {
           value={limit}
           onChange={(e) => setLimit(clampInt(e.target.value, 1500, 20, 5000))}
           style={{
-            width: 110,
-            padding: "6px 8px",
-            borderRadius: 8,
-            border: "1px solid rgba(255,255,255,0.12)",
-            background: "rgba(0,0,0,0.25)",
+            width: 90,
+            padding: "6px 10px",
+            borderRadius: 3,
+            border: "1px solid rgba(255,255,255,0.15)",
+            background: "rgba(0,0,0,0.3)",
             color: "white",
             outline: "none",
-            marginLeft: 6,
+            fontSize: 13,
           }}
         />
+        {" "}observations
       </div>
 
       {loading && (
         <div
           style={{
             padding: 20,
-            borderRadius: 12,
-            border: "1px solid rgba(255,255,255,0.12)",
-            background: "rgba(255,255,255,0.04)",
+            borderRadius: 4,
+            border: "1px solid rgba(255,255,255,0.1)",
+            background: "rgba(255,255,255,0.02)",
+            color: "rgba(255,255,255,0.6)",
+            fontSize: 14,
           }}
         >
           Loading analytics...
@@ -170,77 +196,94 @@ export default function StockTickerPage() {
         <div
           style={{
             padding: 20,
-            borderRadius: 12,
-            border: "1px solid rgba(255,140,140,0.35)",
-            background: "rgba(120,0,0,0.22)",
+            borderRadius: 4,
+            border: "1px solid rgba(220, 80, 80, 0.3)",
+            background: "rgba(120, 0, 0, 0.15)",
           }}
         >
-          <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>Error</div>
-          <div>{error}</div>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6, color: "rgba(255, 150, 150, 1)" }}>
+            Error
+          </div>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>{error}</div>
         </div>
       )}
 
-      {!loading && data && (
+      {!loading && data && !data.summary && (
+        <div
+          style={{
+            padding: 20,
+            borderRadius: 4,
+            border: "1px solid rgba(200, 160, 80, 0.3)",
+            background: "rgba(100, 70, 0, 0.15)",
+          }}
+        >
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, color: "rgba(230, 200, 120, 1)" }}>
+            Insufficient Data
+          </div>
+          <div style={{ color: "rgba(255,255,255,0.7)", lineHeight: 1.6, fontSize: 13 }}>
+            This ticker has insufficient data for returns and volatility analytics.
+            <br />
+            Consider the{" "}
+            <Link
+              href={`/volatility/${ticker}`}
+              style={{
+                color: "rgba(147, 197, 253, 1)",
+                textDecoration: "underline",
+              }}
+            >
+              Volatility Analysis
+            </Link>
+            {" "}module (requires OHLC data).
+          </div>
+        </div>
+      )}
+
+      {!loading && data && data.summary && (
         <>
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-              gap: 16,
-              marginBottom: 24,
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              gap: 12,
+              marginBottom: 28,
             }}
           >
             <MetricCard
               label="Total Return"
               value={fmtPct(data.summary.totalReturn)}
-              color="rgba(100,200,100,0.9)"
+              color={data.summary.totalReturn >= 0 ? "rgba(80,180,80,0.9)" : "rgba(200,80,80,0.9)"}
             />
             <MetricCard
               label="Annualized Return"
               value={fmtPct(data.summary.annualizedReturn)}
             />
-            <MetricCard
-              label="Volatility (Ann.)"
-              value={fmtPct(data.summary.volatility)}
-            />
+            <MetricCard label="Volatility (Ann.)" value={fmtPct(data.summary.volatility)} />
             <MetricCard
               label="Max Drawdown"
               value={fmtPct(data.summary.maxDrawdown)}
-              color="rgba(255,140,140,0.9)"
+              color="rgba(200,100,100,0.9)"
             />
-            <MetricCard
-              label="VaR (95%)"
-              value={fmtPct(data.summary.var95)}
-            />
-            <MetricCard
-              label="CVaR (95%)"
-              value={fmtPct(data.summary.cvar95)}
-            />
-            <MetricCard
-              label="Beta (vs OBX)"
-              value={fmtNum(data.summary.beta, 3)}
-            />
-            <MetricCard
-              label="Sharpe Ratio"
-              value={fmtNum(data.summary.sharpeRatio, 3)}
-            />
+            <MetricCard label="VaR (95%)" value={fmtPct(data.summary.var95)} />
+            <MetricCard label="CVaR (95%)" value={fmtPct(data.summary.cvar95)} />
+            <MetricCard label="Beta (vs OBX)" value={fmtNum(data.summary.beta, 3)} />
+            <MetricCard label="Sharpe Ratio" value={fmtNum(data.summary.sharpeRatio, 3)} />
           </div>
 
-          <div style={{ marginBottom: 24, color: "rgba(255,255,255,0.7)", fontSize: 14 }}>
-            Data range: {data.dateRange.start} to {data.dateRange.end} ({data.count} days)
+          <div style={{ marginBottom: 24, color: "rgba(255,255,255,0.5)", fontSize: 12, letterSpacing: "0.02em" }}>
+            Sample: {data.dateRange.start} to {data.dateRange.end} ({data.count} observations)
           </div>
 
           <div
             style={{
               marginBottom: 24,
               padding: 20,
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.12)",
-              background: "rgba(255,255,255,0.03)",
+              borderRadius: 4,
+              border: "1px solid rgba(255,255,255,0.08)",
+              background: "rgba(255,255,255,0.02)",
             }}
           >
-            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>
-              Price History
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, letterSpacing: "0.01em" }}>
+              Price Series
             </h2>
             <PriceChart data={data.prices} height={320} />
           </div>
@@ -249,13 +292,13 @@ export default function StockTickerPage() {
             style={{
               marginBottom: 24,
               padding: 20,
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.12)",
-              background: "rgba(255,255,255,0.03)",
+              borderRadius: 4,
+              border: "1px solid rgba(255,255,255,0.08)",
+              background: "rgba(255,255,255,0.02)",
             }}
           >
-            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>
-              Drawdown
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, letterSpacing: "0.01em" }}>
+              Drawdown Analysis
             </h2>
             <PriceDrawdownChart data={data.drawdown} height={280} />
           </div>
@@ -263,24 +306,27 @@ export default function StockTickerPage() {
           <div
             style={{
               padding: 20,
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.12)",
-              background: "rgba(255,255,255,0.03)",
+              borderRadius: 4,
+              border: "1px solid rgba(255,255,255,0.08)",
+              background: "rgba(255,255,255,0.02)",
             }}
           >
-            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>
-              Recent Daily Returns
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, letterSpacing: "0.01em" }}>
+              Daily Returns (Recent 20)
             </h2>
             <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ textAlign: "left" }}>
                     <th
                       style={{
                         padding: "10px 12px",
-                        borderBottom: "1px solid rgba(255,255,255,0.08)",
-                        color: "rgba(255,255,255,0.8)",
-                        fontWeight: 700,
+                        borderBottom: "1px solid rgba(255,255,255,0.1)",
+                        color: "rgba(255,255,255,0.6)",
+                        fontWeight: 500,
+                        fontSize: 12,
+                        letterSpacing: "0.03em",
+                        textTransform: "uppercase",
                       }}
                     >
                       Date
@@ -288,9 +334,12 @@ export default function StockTickerPage() {
                     <th
                       style={{
                         padding: "10px 12px",
-                        borderBottom: "1px solid rgba(255,255,255,0.08)",
-                        color: "rgba(255,255,255,0.8)",
-                        fontWeight: 700,
+                        borderBottom: "1px solid rgba(255,255,255,0.1)",
+                        color: "rgba(255,255,255,0.6)",
+                        fontWeight: 500,
+                        fontSize: 12,
+                        letterSpacing: "0.03em",
+                        textTransform: "uppercase",
                       }}
                     >
                       Return
@@ -298,27 +347,33 @@ export default function StockTickerPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.returns.slice(-20).reverse().map((r) => (
-                    <tr
-                      key={r.date}
-                      style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
-                    >
-                      <td style={{ padding: "10px 12px" }}>{r.date}</td>
-                      <td
-                        style={{
-                          padding: "10px 12px",
-                          color:
-                            r.return > 0
-                              ? "rgba(100,200,100,1)"
-                              : r.return < 0
-                              ? "rgba(255,140,140,1)"
-                              : "inherit",
-                        }}
+                  {data.returns
+                    .slice(-20)
+                    .reverse()
+                    .map((r) => (
+                      <tr
+                        key={r.date}
+                        style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
                       >
-                        {fmtPct(r.return, 4)}
-                      </td>
-                    </tr>
-                  ))}
+                        <td style={{ padding: "10px 12px", color: "rgba(255,255,255,0.7)" }}>
+                          {r.date}
+                        </td>
+                        <td
+                          style={{
+                            padding: "10px 12px",
+                            fontFamily: "monospace",
+                            color:
+                              r.return > 0
+                                ? "rgba(80,180,80,1)"
+                                : r.return < 0
+                                ? "rgba(200,80,80,1)"
+                                : "rgba(255,255,255,0.7)",
+                          }}
+                        >
+                          {fmtPct(r.return, 4)}
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
@@ -341,20 +396,21 @@ function MetricCard({
   return (
     <div
       style={{
-        padding: 16,
-        borderRadius: 10,
-        border: "1px solid rgba(255,255,255,0.12)",
-        background: "rgba(255,255,255,0.03)",
+        padding: 14,
+        borderRadius: 3,
+        border: "1px solid rgba(255,255,255,0.08)",
+        background: "rgba(255,255,255,0.02)",
       }}
     >
-      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", marginBottom: 6 }}>
+      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginBottom: 6, letterSpacing: "0.03em", textTransform: "uppercase" }}>
         {label}
       </div>
       <div
         style={{
-          fontSize: 24,
-          fontWeight: 700,
+          fontSize: 22,
+          fontWeight: 600,
           color: color || "rgba(255,255,255,0.95)",
+          fontFamily: "monospace",
         }}
       >
         {value}

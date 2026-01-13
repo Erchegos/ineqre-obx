@@ -1,6 +1,7 @@
 // apps/web/src/app/stocks/page.tsx
 import Link from "next/link";
 import { pool } from "@/lib/db";
+import { getPriceTable } from "@/lib/price-data-adapter";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,9 @@ function toDate10(v: unknown): string | null {
   return s.length >= 10 ? s.slice(0, 10) : s;
 }
 
-async function getStocks(): Promise<{ count: number; rows: StockRow[] }> {
+async function getStocks(): Promise<{ count: number; rows: StockRow[]; source: string }> {
+  const tableName = await getPriceTable();
+  
   const query = `
     WITH ticker_stats AS (
       SELECT 
@@ -32,14 +35,14 @@ async function getStocks(): Promise<{ count: number; rows: StockRow[] }> {
         min(date) as start_date,
         max(date) as end_date,
         count(*) as row_count
-      FROM public.prices_daily
+      FROM public.${tableName}
       GROUP BY upper(ticker)
     ),
     latest_prices AS (
       SELECT DISTINCT ON (upper(ticker))
         upper(ticker) as ticker,
         close as last_close
-      FROM public.prices_daily
+      FROM public.${tableName}
       WHERE close IS NOT NULL
       ORDER BY upper(ticker), date DESC
     )
@@ -64,7 +67,7 @@ async function getStocks(): Promise<{ count: number; rows: StockRow[] }> {
     rows: Number(r.rows ?? 0),
   }));
 
-  return { count: rows.length, rows };
+  return { count: rows.length, rows, source: tableName };
 }
 
 function fmtNum(n: number | null): string {
@@ -74,7 +77,7 @@ function fmtNum(n: number | null): string {
 }
 
 export default async function StocksPage() {
-  let data: { count: number; rows: StockRow[] } | null = null;
+  let data: { count: number; rows: StockRow[]; source: string } | null = null;
   let err: string | null = null;
 
   try {
@@ -91,7 +94,7 @@ export default async function StocksPage() {
           Server error while loading stocks: {err}
         </p>
         <p className="mt-2 text-sm text-zinc-400">
-          Check that DATABASE_URL is set and prices_daily table exists.
+          Check that DATABASE_URL is set and price tables exist.
         </p>
       </main>
     );
@@ -110,7 +113,7 @@ export default async function StocksPage() {
         </div>
 
         <div className="text-sm text-zinc-400">
-          Source: prices_daily
+          Source: {data?.source || "unknown"}
         </div>
       </div>
 
@@ -147,7 +150,7 @@ export default async function StocksPage() {
             {!rows.length && (
               <tr>
                 <td className="px-4 py-6 text-zinc-400" colSpan={5}>
-                  No data in prices_daily table.
+                  No data found.
                 </td>
               </tr>
             )}
