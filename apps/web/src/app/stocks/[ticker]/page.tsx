@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import PriceChart from "@/components/PriceChart";
 import PriceDrawdownChart from "@/components/price-drawdown-chart";
+import { Suspense } from "react";
 
 type AnalyticsData = {
   ticker: string;
