@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import VolatilityChart from "@/components/VolatilityChart";
+import TimeframeSelector from "@/components/TimeframeSelector";
 
 type VolatilityData = {
   ticker: string;
@@ -76,6 +77,7 @@ export default function VolatilityPage() {
   const [events, setEvents] = useState<EventInput[]>([]);
   const [newEventDate, setNewEventDate] = useState("");
   const [newEventLabel, setNewEventLabel] = useState("");
+  const [limit, setLimit] = useState(500);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,7 +94,7 @@ export default function VolatilityPage() {
 
       try {
         const eventDatesParam = events.map(e => e.date).join(",");
-        const url = `/api/volatility/${encodeURIComponent(ticker)}?limit=500${
+        const url = `/api/volatility/${encodeURIComponent(ticker)}?limit=${limit}${
           eventDatesParam ? `&events=${eventDatesParam}` : ""
         }`;
 
@@ -130,7 +132,7 @@ export default function VolatilityPage() {
     return () => {
       cancelled = true;
     };
-  }, [ticker, events]);
+  }, [ticker, events, limit]);
 
   const addEvent = () => {
     if (!newEventDate) return;
@@ -152,6 +154,13 @@ export default function VolatilityPage() {
         <Link href="/stocks" style={{ color: "rgba(255,255,255,0.6)", textDecoration: "none", fontSize: 14 }}>
           ← Back to stocks
         </Link>
+      </div>
+
+      <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
+        <span style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", letterSpacing: "0.02em", textTransform: "uppercase" }}>
+          Timeframe
+        </span>
+        <TimeframeSelector selected={limit} onChange={setLimit} />
       </div>
 
       {loading && (

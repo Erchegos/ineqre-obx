@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import PriceChart from "@/components/PriceChart";
 import PriceDrawdownChart from "@/components/price-drawdown-chart";
-import { Suspense } from "react";
+import TimeframeSelector from "@/components/TimeframeSelector";
 
 type AnalyticsData = {
   ticker: string;
@@ -132,7 +132,6 @@ export default function StockTickerPage() {
         </Link>
         <div style={{ flex: 1 }} />
         
-        {/* Volatility Analysis Link */}
         <Link
           href={`/volatility/${ticker}`}
           style={{
@@ -155,27 +154,11 @@ export default function StockTickerPage() {
         </Link>
       </div>
 
-      <div style={{ marginBottom: 20, color: "rgba(255,255,255,0.6)", fontSize: 13 }}>
-        Sample size:&nbsp;
-        <input
-          type="number"
-          min={20}
-          max={5000}
-          step={1}
-          value={limit}
-          onChange={(e) => setLimit(clampInt(e.target.value, 1500, 20, 5000))}
-          style={{
-            width: 90,
-            padding: "6px 10px",
-            borderRadius: 3,
-            border: "1px solid rgba(255,255,255,0.15)",
-            background: "rgba(0,0,0,0.3)",
-            color: "white",
-            outline: "none",
-            fontSize: 13,
-          }}
-        />
-        {" "}observations
+      <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
+        <span style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", letterSpacing: "0.02em", textTransform: "uppercase" }}>
+          Timeframe
+        </span>
+        <TimeframeSelector selected={limit} onChange={setLimit} />
       </div>
 
       {loading && (
