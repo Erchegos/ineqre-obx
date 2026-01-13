@@ -91,10 +91,10 @@ export default function PriceDrawdownChart({ data, height = 280 }: Props) {
             fontSize: 13,
             fontWeight: 500,
           }}
-          formatter={(value: number) => [
-            formatPercent(value),
-            "Drawdown",
-          ]}
+          formatter={(value: number | undefined) => {
+            if (value === undefined) return ["", "Drawdown"];
+            return [formatPercent(value), "Drawdown"];
+          }}
         />
         <ReferenceLine
           y={0}

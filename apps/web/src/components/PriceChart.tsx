@@ -90,10 +90,10 @@ export default function PriceChart({ data, height = 400 }: Props) {
             fontSize: 13,
             fontWeight: 500,
           }}
-          formatter={(value: number) => [
-            `${value.toFixed(2)}`,
-            "Close",
-          ]}
+          formatter={(value: number | undefined) => {
+            if (value === undefined) return ["", "Close"];
+            return [`${value.toFixed(2)}`, "Close"];
+          }}
           labelFormatter={(label) => {
             // Show full date in tooltip
             return label;
