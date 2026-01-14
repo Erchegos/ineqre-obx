@@ -122,11 +122,12 @@ export default function VolatilityChart({
             boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
           }}
           labelStyle={{ color: textColor, fontSize: 12 }}
-          formatter={(value: number | undefined, name: string) => {
-            if (value === undefined) return ["N/A", MEASURE_NAMES[name] || name];
+          formatter={(value: number | undefined, name: string | undefined) => {
+            const measureName = name ? (MEASURE_NAMES[name] || name) : "Unknown";
+            if (value === undefined) return ["N/A", measureName];
             return [
               `${value.toFixed(2)}%`,
-              MEASURE_NAMES[name] || name,
+              measureName,
             ];
           }}
           cursor={{ stroke: gridColor, strokeWidth: 1, strokeDasharray: "5 5" }}
