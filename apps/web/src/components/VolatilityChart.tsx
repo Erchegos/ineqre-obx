@@ -1,216 +1,156 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   LineChart,
   Line,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
-  ReferenceLine,
+  CartesianGrid,
 } from "recharts";
 
-type VolatilityPoint = {
-  date: string;
-  historical?: number;
-  rolling20?: number;
-  rolling60?: number;
-  rolling120?: number;
-  ewma94?: number;
-  ewma97?: number;
-  parkinson?: number;
-  garmanKlass?: number;
-};
-
-type EventMarker = {
-  date: string;
-  label: string;
-};
-
-type Props = {
-  data: VolatilityPoint[];
-  events?: EventMarker[];
+type VolatilityChartProps = {
+  data: Array<{
+    date: string;
+    rolling20?: number;
+    rolling60?: number;
+    rolling120?: number;
+    ewma94?: number;
+    ewma97?: number;
+    parkinson?: number;
+    garmanKlass?: number;
+  }>;
+  selectedMeasures: string[];
   height?: number;
 };
 
-const COLORS = {
+const MEASURE_COLORS: Record<string, string> = {
   rolling20: "#3b82f6",
-  rolling60: "#8b5cf6",
-  rolling120: "#ec4899",
-  ewma94: "#10b981",
-  ewma97: "#f59e0b",
+  rolling60: "#10b981",
+  rolling120: "#f59e0b",
+  ewma94: "#8b5cf6",
+  ewma97: "#ec4899",
   parkinson: "#ef4444",
   garmanKlass: "#06b6d4",
 };
 
-export default function VolatilityChart({ data, events = [], height = 400 }: Props) {
-  const [visibleLines, setVisibleLines] = useState<Record<string, boolean>>({
-    rolling20: true,
-    rolling60: true,
-    ewma94: true,
-    rolling120: false,
-    ewma97: false,
-    parkinson: false,
-    garmanKlass: false,
-  });
+const MEASURE_NAMES: Record<string, string> = {
+  rolling20: "20-Day Rolling",
+  rolling60: "60-Day Rolling",
+  rolling120: "120-Day Rolling",
+  ewma94: "EWMA (λ=0.94)",
+  ewma97: "EWMA (λ=0.97)",
+  parkinson: "Parkinson",
+  garmanKlass: "Garman-Klass",
+};
 
-  const toggleLine = (key: string) => {
-    setVisibleLines(prev => ({ ...prev, [key]: !prev[key] }));
-  };
+export default function VolatilityChart({ 
+  data, 
+  selectedMeasures, 
+  height = 400 
+}: VolatilityChartProps) {
+  const [isDark, setIsDark] = useState(true);
 
-  const formatPercent = (value: number | undefined): string => {
-    if (value === undefined || !isFinite(value)) return "";
-    return `${(value * 100).toFixed(1)}%`;
-  };
+  useEffect(() => {
+    const checkTheme = () => {
+      const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setIsDark(dark);
+    };
+
+    checkTheme();
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    mediaQuery.addEventListener('change', checkTheme);
+
+    return () => mediaQuery.removeEventListener('change', checkTheme);
+  }, []);
+
+  if (!data || data.length === 0) {
+    return (
+      <div style={{ height, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ color: "var(--muted)" }}>No volatility data available</span>
+      </div>
+    );
+  }
+
+  const gridColor = isDark ? "rgba(255, 255, 255, 0.1)" : "#e5e7eb";
+  const textColor = isDark ? "rgba(255, 255, 255, 0.6)" : "#6b7280";
+  const tooltipBg = isDark ? "#1a1a1a" : "#ffffff";
+  const tooltipBorder = isDark ? "#333" : "#d1d5db";
+
+  // Format data - convert to percentage
+  const formattedData = data.map(d => ({
+    ...d,
+    rolling20: d.rolling20 ? d.rolling20 * 100 : undefined,
+    rolling60: d.rolling60 ? d.rolling60 * 100 : undefined,
+    rolling120: d.rolling120 ? d.rolling120 * 100 : undefined,
+    ewma94: d.ewma94 ? d.ewma94 * 100 : undefined,
+    ewma97: d.ewma97 ? d.ewma97 * 100 : undefined,
+    parkinson: d.parkinson ? d.parkinson * 100 : undefined,
+    garmanKlass: d.garmanKlass ? d.garmanKlass * 100 : undefined,
+  }));
 
   return (
-    <div>
-      <div className="mb-4 flex flex-wrap gap-3">
-        {Object.entries({
-          rolling20: "20-Day Rolling",
-          rolling60: "60-Day Rolling",
-          rolling120: "120-Day Rolling",
-          ewma94: "EWMA (λ=0.94)",
-          ewma97: "EWMA (λ=0.97)",
-          parkinson: "Parkinson",
-          garmanKlass: "Garman-Klass",
-        }).map(([key, label]) => (
-          <button
-            key={key}
-            onClick={() => toggleLine(key)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all"
-            style={{
-              backgroundColor: visibleLines[key] ? `${COLORS[key as keyof typeof COLORS]}20` : "rgba(255,255,255,0.05)",
-              border: `2px solid ${visibleLines[key] ? COLORS[key as keyof typeof COLORS] : "rgba(255,255,255,0.1)"}`,
-              opacity: visibleLines[key] ? 1 : 0.5,
-            }}
-          >
-            <div
-              className="w-3 h-3 rounded"
-              style={{ backgroundColor: COLORS[key as keyof typeof COLORS] }}
-            />
-            <span style={{ color: visibleLines[key] ? "white" : "rgba(255,255,255,0.6)" }}>
-              {label}
+    <ResponsiveContainer width="100%" height={height}>
+      <LineChart data={formattedData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+        
+        <XAxis
+          dataKey="date"
+          stroke={textColor}
+          tick={{ fill: textColor, fontSize: 12 }}
+          tickLine={{ stroke: gridColor }}
+          minTickGap={50}
+        />
+        
+        <YAxis
+          stroke={textColor}
+          tick={{ fill: textColor, fontSize: 12 }}
+          tickLine={{ stroke: gridColor }}
+          tickFormatter={(value) => `${value.toFixed(0)}%`}
+          width={60}
+        />
+        
+        <Tooltip
+          contentStyle={{
+            backgroundColor: tooltipBg,
+            border: `1px solid ${tooltipBorder}`,
+            borderRadius: 4,
+            padding: 8,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+          }}
+          labelStyle={{ color: textColor, fontSize: 12 }}
+          formatter={(value: number, name: string) => [
+            `${value.toFixed(2)}%`,
+            MEASURE_NAMES[name] || name,
+          ]}
+          cursor={{ stroke: gridColor, strokeWidth: 1, strokeDasharray: "5 5" }}
+        />
+        
+        <Legend
+          wrapperStyle={{ paddingTop: 10 }}
+          iconType="line"
+          formatter={(value) => (
+            <span style={{ color: textColor, fontSize: 13 }}>
+              {MEASURE_NAMES[value] || value}
             </span>
-          </button>
+          )}
+        />
+        
+        {selectedMeasures.map((measure) => (
+          <Line
+            key={measure}
+            type="monotone"
+            dataKey={measure}
+            stroke={MEASURE_COLORS[measure]}
+            strokeWidth={2}
+            dot={false}
+            isAnimationActive={false}
+          />
         ))}
-      </div>
-
-      <ResponsiveContainer width="100%" height={height}>
-        <LineChart data={data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-          <XAxis
-            dataKey="date"
-            tick={{ fontSize: 12 }}
-            tickFormatter={(date) => {
-              const parts = date.split("-");
-              return parts.length >= 2 ? `${parts[1]}/${parts[0].slice(2)}` : date;
-            }}
-          />
-          <YAxis
-            tick={{ fontSize: 12 }}
-            tickFormatter={formatPercent}
-            domain={["auto", "auto"]}
-          />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: "rgba(0, 0, 0, 0.9)",
-              border: "1px solid rgba(255, 255, 255, 0.2)",
-              borderRadius: "8px",
-            }}
-            formatter={formatPercent}
-            labelStyle={{ color: "rgba(255, 255, 255, 0.7)" }}
-          />
-
-          {events.map((event) => (
-            <ReferenceLine
-              key={event.date}
-              x={event.date}
-              stroke="rgba(255, 255, 255, 0.3)"
-              strokeDasharray="5 5"
-              label={{
-                value: event.label,
-                position: "top",
-                fill: "rgba(255, 255, 255, 0.7)",
-                fontSize: 11,
-              }}
-            />
-          ))}
-
-          {visibleLines.rolling20 && (
-            <Line
-              type="monotone"
-              dataKey="rolling20"
-              stroke={COLORS.rolling20}
-              strokeWidth={2}
-              dot={false}
-              name="20-Day"
-            />
-          )}
-          {visibleLines.rolling60 && (
-            <Line
-              type="monotone"
-              dataKey="rolling60"
-              stroke={COLORS.rolling60}
-              strokeWidth={2}
-              dot={false}
-              name="60-Day"
-            />
-          )}
-          {visibleLines.rolling120 && (
-            <Line
-              type="monotone"
-              dataKey="rolling120"
-              stroke={COLORS.rolling120}
-              strokeWidth={2}
-              dot={false}
-              name="120-Day"
-            />
-          )}
-          {visibleLines.ewma94 && (
-            <Line
-              type="monotone"
-              dataKey="ewma94"
-              stroke={COLORS.ewma94}
-              strokeWidth={2}
-              dot={false}
-              name="EWMA 0.94"
-            />
-          )}
-          {visibleLines.ewma97 && (
-            <Line
-              type="monotone"
-              dataKey="ewma97"
-              stroke={COLORS.ewma97}
-              strokeWidth={2}
-              dot={false}
-              name="EWMA 0.97"
-            />
-          )}
-          {visibleLines.parkinson && (
-            <Line
-              type="monotone"
-              dataKey="parkinson"
-              stroke={COLORS.parkinson}
-              strokeWidth={2}
-              dot={false}
-              name="Parkinson"
-            />
-          )}
-          {visibleLines.garmanKlass && (
-            <Line
-              type="monotone"
-              dataKey="garmanKlass"
-              stroke={COLORS.garmanKlass}
-              strokeWidth={2}
-              dot={false}
-              name="Garman-Klass"
-            />
-          )}
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
+      </LineChart>
+    </ResponsiveContainer>
   );
 }

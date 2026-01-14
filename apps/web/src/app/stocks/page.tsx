@@ -62,12 +62,10 @@ export default async function StocksPage({
 
   let stocks = await getStocksData();
 
-  // Client-side sorting
   stocks.sort((a, b) => {
     let aVal: any = a[sortBy as keyof StockData];
     let bVal: any = b[sortBy as keyof StockData];
 
-    // Handle string vs number comparison
     if (typeof aVal === "string") {
       aVal = aVal.toLowerCase();
       bVal = (bVal as string).toLowerCase();
@@ -87,67 +85,152 @@ export default async function StocksPage({
   };
 
   const SortIcon = ({ column }: { column: string }) => {
-    if (sortBy !== column) return <span className="opacity-40">↕</span>;
+    if (sortBy !== column) return <span style={{ opacity: 0.4 }}>↕</span>;
     return sortOrder === "asc" ? <span>↑</span> : <span>↓</span>;
   };
 
   return (
-    <div className="min-h-screen bg-black text-white p-8">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-4xl font-bold mb-2">Stocks</h1>
-        <p className="text-gray-400 mb-8">
+    <div style={{ 
+      minHeight: "100vh", 
+      background: "var(--background)", 
+      color: "var(--foreground)", 
+      padding: 32 
+    }}>
+      <style dangerouslySetInnerHTML={{ __html: `
+        .stock-table tbody tr {
+          border-bottom: 1px solid var(--table-border);
+          transition: background 0.15s;
+        }
+        .stock-table tbody tr:hover {
+          background: var(--hover-bg) !important;
+        }
+      `}} />
+      
+      <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+        <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 8 }}>Stocks</h1>
+        <p style={{ color: "var(--muted)", marginBottom: 32, fontSize: 14 }}>
           Universe: {stocks.length} tickers
-          <span className="ml-4 text-sm">Source: Interactive Brokers</span>
+          <span style={{ marginLeft: 16, fontSize: 13 }}>Source: prices_daily</span>
         </p>
 
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
+        <div style={{ overflowX: "auto" }}>
+          <table className="stock-table" style={{ 
+            width: "100%", 
+            borderCollapse: "collapse",
+            background: "var(--card-bg)",
+            border: "1px solid var(--card-border)",
+            borderRadius: 4,
+          }}>
             <thead>
-              <tr className="border-b border-gray-800">
-                <th className="text-left py-4 px-4">
+              <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                <th style={{ textAlign: "left", padding: "16px" }}>
                   <Link
                     href={toggleSort("ticker")}
-                    className="hover:text-blue-400 flex items-center gap-2"
+                    style={{ 
+                      color: "var(--foreground)", 
+                      textDecoration: "none", 
+                      display: "flex", 
+                      alignItems: "center", 
+                      gap: 8,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
                   >
                     Ticker <SortIcon column="ticker" />
                   </Link>
                 </th>
-                <th className="text-left py-4 px-4">
+                <th style={{ textAlign: "left", padding: "16px" }}>
                   <Link
                     href={toggleSort("name")}
-                    className="hover:text-blue-400 flex items-center gap-2"
+                    style={{ 
+                      color: "var(--foreground)", 
+                      textDecoration: "none", 
+                      display: "flex", 
+                      alignItems: "center", 
+                      gap: 8,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
                   >
                     Name <SortIcon column="name" />
                   </Link>
                 </th>
-                <th className="text-right py-4 px-4">
+                <th style={{ textAlign: "right", padding: "16px" }}>
                   <Link
                     href={toggleSort("last_close")}
-                    className="hover:text-blue-400 flex items-center justify-end gap-2"
+                    style={{ 
+                      color: "var(--foreground)", 
+                      textDecoration: "none", 
+                      display: "flex", 
+                      alignItems: "center", 
+                      justifyContent: "flex-end", 
+                      gap: 8,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
                   >
                     Last Close <SortIcon column="last_close" />
                   </Link>
                 </th>
-                <th className="text-right py-4 px-4">
+                <th style={{ textAlign: "right", padding: "16px" }}>
                   <Link
                     href={toggleSort("start_date")}
-                    className="hover:text-blue-400 flex items-center justify-end gap-2"
+                    style={{ 
+                      color: "var(--foreground)", 
+                      textDecoration: "none", 
+                      display: "flex", 
+                      alignItems: "center", 
+                      justifyContent: "flex-end", 
+                      gap: 8,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
                   >
                     Start Date <SortIcon column="start_date" />
                   </Link>
                 </th>
-                <th className="text-right py-4 px-4">
+                <th style={{ textAlign: "right", padding: "16px" }}>
                   <Link
                     href={toggleSort("end_date")}
-                    className="hover:text-blue-400 flex items-center justify-end gap-2"
+                    style={{ 
+                      color: "var(--foreground)", 
+                      textDecoration: "none", 
+                      display: "flex", 
+                      alignItems: "center", 
+                      justifyContent: "flex-end", 
+                      gap: 8,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
                   >
                     End Date <SortIcon column="end_date" />
                   </Link>
                 </th>
-                <th className="text-right py-4 px-4">
+                <th style={{ textAlign: "right", padding: "16px" }}>
                   <Link
                     href={toggleSort("rows")}
-                    className="hover:text-blue-400 flex items-center justify-end gap-2"
+                    style={{ 
+                      color: "var(--foreground)", 
+                      textDecoration: "none", 
+                      display: "flex", 
+                      alignItems: "center", 
+                      justifyContent: "flex-end", 
+                      gap: 8,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
                   >
                     Rows <SortIcon column="rows" />
                   </Link>
@@ -156,31 +239,39 @@ export default async function StocksPage({
             </thead>
             <tbody>
               {stocks.map((stock) => (
-                <tr
-                  key={stock.ticker}
-                  className="border-b border-gray-900 hover:bg-gray-900"
-                >
-                  <td className="py-4 px-4">
+                <tr key={stock.ticker}>
+                  <td style={{ padding: "16px" }}>
                     <Link
                       href={`/stocks/${stock.ticker}`}
-                      className="text-blue-400 hover:text-blue-300 font-medium"
+                      style={{ 
+                        color: "var(--accent)", 
+                        textDecoration: "none", 
+                        fontWeight: 600,
+                        fontSize: 14,
+                      }}
                     >
                       {stock.ticker}
                     </Link>
                   </td>
-                  <td className="py-4 px-4 text-gray-300">
+                  <td style={{ padding: "16px", color: "var(--foreground)", fontSize: 14 }}>
                     {stock.name}
                   </td>
-                  <td className="py-4 px-4 text-right font-mono">
+                  <td style={{ 
+                    padding: "16px", 
+                    textAlign: "right", 
+                    fontFamily: "monospace",
+                    color: "var(--foreground)",
+                    fontSize: 14,
+                  }}>
                     {stock.last_close.toFixed(2)}
                   </td>
-                  <td className="py-4 px-4 text-right text-gray-400">
+                  <td style={{ padding: "16px", textAlign: "right", color: "var(--muted)", fontSize: 13 }}>
                     {stock.start_date}
                   </td>
-                  <td className="py-4 px-4 text-right text-gray-400">
+                  <td style={{ padding: "16px", textAlign: "right", color: "var(--muted)", fontSize: 13 }}>
                     {stock.end_date}
                   </td>
-                  <td className="py-4 px-4 text-right text-gray-400">
+                  <td style={{ padding: "16px", textAlign: "right", color: "var(--muted)", fontSize: 13 }}>
                     {stock.rows.toLocaleString()}
                   </td>
                 </tr>
@@ -190,7 +281,11 @@ export default async function StocksPage({
         </div>
 
         {stocks.length === 0 && (
-          <div className="text-center py-12 text-gray-500">
+          <div style={{ 
+            textAlign: "center", 
+            padding: 48, 
+            color: "var(--muted)" 
+          }}>
             No stocks found with sufficient IBKR data
           </div>
         )}
