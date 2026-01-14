@@ -1,116 +1,93 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   LineChart,
   Line,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  CartesianGrid,
 } from "recharts";
 
-type DataPoint = {
-  date: string;
-  close: number;
-};
-
-type Props = {
-  data: DataPoint[];
+type PriceChartProps = {
+  data: Array<{ date: string; close: number }>;
   height?: number;
 };
 
-export default function PriceChart({ data, height = 400 }: Props) {
-  const formatDate = (dateStr: string) => {
-    // Parse date string (YYYY-MM-DD)
-    const parts = dateStr.split("-");
-    if (parts.length === 3) {
-      const month = parts[1];
-      const year = parts[0].slice(2); // Last 2 digits of year
-      return `${month}/${year}`;
-    }
-    return dateStr;
-  };
+export default function PriceChart({ data, height = 320 }: PriceChartProps) {
+  const [isDark, setIsDark] = useState(true);
 
-  const formatPrice = (value: number) => {
-    return value.toFixed(2);
-  };
+  useEffect(() => {
+    const checkTheme = () => {
+      const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setIsDark(dark);
+    };
 
-  // Calculate tick interval to show ~6-8 dates
-  const tickInterval = Math.floor(data.length / 7);
+    checkTheme();
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    mediaQuery.addEventListener('change', checkTheme);
+
+    return () => mediaQuery.removeEventListener('change', checkTheme);
+  }, []);
+
+  if (!data || data.length === 0) {
+    return (
+      <div style={{ height, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ color: "var(--muted)" }}>No price data available</span>
+      </div>
+    );
+  }
+
+  const lineColor = "#3b82f6";
+  const gridColor = isDark ? "rgba(255, 255, 255, 0.1)" : "#e5e7eb";
+  const textColor = isDark ? "rgba(255, 255, 255, 0.6)" : "#6b7280";
+  const tooltipBg = isDark ? "#1a1a1a" : "#ffffff";
+  const tooltipBorder = isDark ? "#333" : "#d1d5db";
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <LineChart
-        data={data}
-        margin={{ top: 10, right: 30, left: 10, bottom: 20 }}
-      >
-        <CartesianGrid
-          strokeDasharray="3 3"
-          stroke="rgba(255, 255, 255, 0.1)"
-          strokeOpacity={0.5}
-        />
+      <LineChart data={data} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+        
         <XAxis
           dataKey="date"
-          tickFormatter={formatDate}
-          interval={tickInterval}
-          angle={-45}
-          textAnchor="end"
-          height={60}
-          tick={{
-            fill: "rgba(255, 255, 255, 0.6)",
-            fontSize: 12,
-          }}
-          stroke="rgba(255, 255, 255, 0.2)"
+          stroke={textColor}
+          tick={{ fill: textColor, fontSize: 12 }}
+          tickLine={{ stroke: gridColor }}
+          minTickGap={50}
         />
+        
         <YAxis
-          tickFormatter={formatPrice}
-          tick={{
-            fill: "rgba(255, 255, 255, 0.6)",
-            fontSize: 12,
-          }}
-          stroke="rgba(255, 255, 255, 0.2)"
-          domain={["auto", "auto"]}
+          stroke={textColor}
+          tick={{ fill: textColor, fontSize: 12 }}
+          tickLine={{ stroke: gridColor }}
+          tickFormatter={(value) => value.toFixed(2)}
+          width={60}
         />
+        
         <Tooltip
           contentStyle={{
-            backgroundColor: "rgba(0, 0, 0, 0.92)",
-            border: "1px solid rgba(255, 255, 255, 0.2)",
-            borderRadius: "6px",
-            padding: "8px 12px",
-            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.5)",
+            backgroundColor: tooltipBg,
+            border: `1px solid ${tooltipBorder}`,
+            borderRadius: 4,
+            padding: 8,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
           }}
-          labelStyle={{
-            color: "rgba(255, 255, 255, 0.7)",
-            fontSize: 12,
-            marginBottom: 4,
-          }}
-          itemStyle={{
-            color: "rgba(255, 255, 255, 0.95)",
-            fontSize: 13,
-            fontWeight: 500,
-          }}
-          formatter={(value: number | undefined) => {
-            if (value === undefined) return ["", "Close"];
-            return [`${value.toFixed(2)}`, "Close"];
-          }}
-          labelFormatter={(label) => {
-            // Show full date in tooltip
-            return label;
-          }}
+          labelStyle={{ color: textColor, fontSize: 12 }}
+          itemStyle={{ color: lineColor, fontSize: 13, fontFamily: "monospace" }}
+          formatter={(value: number) => [`${value.toFixed(2)} NOK`, ""]}
+          cursor={{ stroke: lineColor, strokeWidth: 1, strokeDasharray: "5 5" }}
         />
+
         <Line
           type="monotone"
           dataKey="close"
-          stroke="rgba(59, 130, 246, 1)"
+          stroke={lineColor}
           strokeWidth={2}
           dot={false}
-          activeDot={{
-            r: 6,
-            fill: "rgba(59, 130, 246, 1)",
-            stroke: "rgba(255, 255, 255, 0.8)",
-            strokeWidth: 2,
-          }}
+          isAnimationActive={false}
         />
       </LineChart>
     </ResponsiveContainer>
