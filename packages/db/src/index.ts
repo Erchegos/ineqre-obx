@@ -1,1 +1,2 @@
-schema: "../../packages/db/src/schema/index.ts",
+// packages/db/src/index.ts
+export * from "./schema/schema";

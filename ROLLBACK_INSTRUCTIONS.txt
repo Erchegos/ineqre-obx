@@ -1,0 +1,39 @@
+RESTORE POINT CREATED: Wed Jan 14 13:05:10 CET 2026
+======================================
+
+Tag: pre-cleanup-20260114-130510
+Branch: backup/pre-ibkr-cleanup-20260114-130510
+Commit: 60f6867
+
+ROLLBACK COMMANDS:
+==================
+
+1. Restore to tagged state (RECOMMENDED):
+   git checkout pre-cleanup-20260114-130510
+   git checkout -b restore-from-tag
+   
+2. Restore from backup branch:
+   git checkout backup/pre-ibkr-cleanup-20260114-130510
+   
+3. Hard reset current branch:
+   git reset --hard pre-cleanup-20260114-130510
+
+4. Push to remote (for safety):
+   git push origin pre-cleanup-20260114-130510
+   git push origin backup/pre-ibkr-cleanup-20260114-130510
+
+VERIFICATION:
+=============
+
+After restore, verify:
+- pnpm install
+- pnpm build
+- pnpm dev
+
+NOTES:
+======
+- Tag includes all committed changes
+- Uncommitted changes at time of tag creation are NOT included
+- Tags are local until pushed to remote
+- Backup branch can be deleted after successful cleanup:
+  git branch -D backup/pre-ibkr-cleanup-20260114-130510
