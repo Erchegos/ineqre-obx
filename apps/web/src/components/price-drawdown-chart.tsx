@@ -80,7 +80,10 @@ export default function PriceDrawdownChart({ data, height = 280 }: PriceDrawdown
           }}
           labelStyle={{ color: textColor, fontSize: 12 }}
           itemStyle={{ color: lineColor, fontSize: 13, fontFamily: "monospace" }}
-          formatter={(value: number) => [`${(value * 100).toFixed(2)}%`, "Drawdown"]}
+          formatter={(value: number | undefined) => {
+            if (value === undefined) return ["N/A", "Drawdown"];
+            return [`${(value * 100).toFixed(2)}%`, "Drawdown"];
+          }}
           cursor={{ stroke: lineColor, strokeWidth: 1, strokeDasharray: "5 5" }}
         />
 
