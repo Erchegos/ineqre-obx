@@ -66,18 +66,19 @@ async function fetchBars(ticker: string, limit: number): Promise<PriceBar[]> {
       AND open > 0
       AND high > 0
       AND low > 0
-    ORDER BY date ASC
+    ORDER BY date DESC
     LIMIT $2
   `;
   
   const result = await pool.query(q, [ticker, limit]);
-  return result.rows.map(r => ({
+  const mapped = result.rows.map(r => ({
     date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date),
     open: Number(r.open),
     high: Number(r.high),
     low: Number(r.low),
     close: Number(r.close),
   }));
+  return mapped.reverse();
 }
 
 export async function GET(

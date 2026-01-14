@@ -24,15 +24,17 @@ async function fetchPrices(ticker: string, limit: number): Promise<PriceRow[]> {
     WHERE upper(ticker) = upper($1)
       AND close IS NOT NULL
       AND close > 0
-    ORDER BY date ASC
+    ORDER BY date DESC
     LIMIT $2
   `;
   
   const result = await pool.query(q, [ticker, limit]);
-  return result.rows.map(r => ({
+  // Map first, then reverse to get chronological order (oldest → newest)
+  const mapped = result.rows.map(r => ({
     date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date),
     close: Number(r.close),
   }));
+  return mapped.reverse();
 }
 
 async function fetchMarketPrices(limit: number): Promise<PriceRow[]> {
@@ -44,15 +46,16 @@ async function fetchMarketPrices(limit: number): Promise<PriceRow[]> {
     WHERE upper(ticker) = 'OBX'
       AND close IS NOT NULL
       AND close > 0
-    ORDER BY date ASC
+    ORDER BY date DESC
     LIMIT $1
   `;
   
   const result = await pool.query(q, [limit]);
-  return result.rows.map(r => ({
+  const mapped = result.rows.map(r => ({
     date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date),
     close: Number(r.close),
   }));
+  return mapped.reverse();
 }
 
 export async function GET(
