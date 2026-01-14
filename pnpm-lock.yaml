@@ -23,6 +23,9 @@ importers:
       '@ineqre/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@ineqre/ibkr':
+        specifier: workspace:*
+        version: link:../../packages/ibkr
       '@supabase/supabase-js':
         specifier: ^2.89.0
         version: 2.90.0
@@ -90,6 +93,19 @@ importers:
       drizzle-orm:
         specifier: 0.45.1
         version: 0.45.1(@types/pg@8.16.0)(pg@8.16.3)
+
+  packages/ibkr:
+    dependencies:
+      zod:
+        specifier: ^3.23.0
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^20
+        version: 20.19.27
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
 
 packages:
 

@@ -1,0 +1,11 @@
+// packages/ibkr/src/index.ts
+export { IBKRClient } from "./client";
+export { OBX_TICKERS, OBX_INDEX_TICKER, ALL_TICKERS } from "./obx-tickers";
+export type {
+  IBKRConfig,
+  Contract,
+  HistoricalBar,
+  HistoricalDataResponse,
+  PriceData,
+  IngestionResult,
+} from "./types";
