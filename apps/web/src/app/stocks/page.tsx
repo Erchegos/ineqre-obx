@@ -110,7 +110,7 @@ export default async function StocksPage({
         <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 8 }}>Stocks</h1>
         <p style={{ color: "var(--muted)", marginBottom: 32, fontSize: 14 }}>
           Universe: {stocks.length} tickers
-          <span style={{ marginLeft: 16, fontSize: 13 }}>Source: prices_daily</span>
+          <span style={{ marginLeft: 16, fontSize: 13 }}>Source: Interactive Brokers</span>
         </p>
 
         <div style={{ overflowX: "auto" }}>
