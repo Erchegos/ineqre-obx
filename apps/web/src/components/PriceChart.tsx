@@ -77,7 +77,10 @@ export default function PriceChart({ data, height = 320 }: PriceChartProps) {
           }}
           labelStyle={{ color: textColor, fontSize: 12 }}
           itemStyle={{ color: lineColor, fontSize: 13, fontFamily: "monospace" }}
-          formatter={(value: number) => [`${value.toFixed(2)} NOK`, ""]}
+          formatter={(value: number | undefined) => {
+            if (value === undefined) return ["N/A", ""];
+            return [`${value.toFixed(2)} NOK`, ""];
+          }}
           cursor={{ stroke: lineColor, strokeWidth: 1, strokeDasharray: "5 5" }}
         />
 
