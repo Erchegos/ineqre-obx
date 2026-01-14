@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Intelligence Equity Research",
+  description: "Quantitative equity research platform",
+};
 
 export default function Home() {
   return (
