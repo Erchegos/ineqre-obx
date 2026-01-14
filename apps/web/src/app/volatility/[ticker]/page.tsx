@@ -262,7 +262,7 @@ export default function VolatilityPage() {
         </h2>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
           {Object.entries(data.current).map(([key, value]) => {
-            if (key === "date" || value === null) return null;
+            if (key === "date" || value === null || typeof value !== 'number') return null;
             const info = MEASURE_INFO[key as keyof typeof MEASURE_INFO];
             if (!info) return null;
             const percentile = data.percentiles[key as keyof typeof data.percentiles];
