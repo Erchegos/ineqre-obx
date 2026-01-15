@@ -107,7 +107,24 @@ export default async function StocksPage({
       `}} />
       
       <div style={{ maxWidth: 1400, margin: "0 auto" }}>
-        <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 8 }}>Stocks</h1>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <h1 style={{ fontSize: 32, fontWeight: 700, margin: 0 }}>Stocks</h1>
+          <Link 
+            href="/correlation" 
+            style={{ 
+              color: "var(--accent)", 
+              textDecoration: "none", 
+              fontSize: 14,
+              fontWeight: 500,
+              padding: "8px 16px",
+              borderRadius: 4,
+              border: "1px solid var(--accent)",
+              transition: "all 0.15s",
+            }}
+          >
+            → Correlation Matrix
+          </Link>
+        </div>
         <p style={{ color: "var(--muted)", marginBottom: 32, fontSize: 14 }}>
           Universe: {stocks.length} tickers
           <span style={{ marginLeft: 16, fontSize: 13 }}>Source: Interactive Brokers</span>
