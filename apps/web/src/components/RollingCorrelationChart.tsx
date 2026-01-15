@@ -74,14 +74,14 @@ export default function RollingCorrelationChart({ data }: Props) {
               borderRadius: 4,
               fontSize: 12,
             }}
-            formatter={(value: any, name: string) => {
+            formatter={(value: any, name: string | undefined) => {
               if (name === "correlation") {
                 return [value.toFixed(3), "Correlation"];
               }
               if (name === "volatility") {
                 return [(value * 100).toFixed(2) + "%", "Volatility"];
               }
-              return [value, name];
+              return [value, name || ""];
             }}
           />
           <Legend
