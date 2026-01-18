@@ -16,6 +16,10 @@ export const pool =
     max: 10,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 20000,
+    // FIX: Explicitly disable SSL certificate validation for Supabase pooler
+    ssl: {
+      rejectUnauthorized: false
+    }
   });
 
 // Log connection attempts in production for debugging
