@@ -40,8 +40,8 @@ export default async function HomePage() {
   return (
     <main style={{ 
       minHeight: "100vh",
-      background: "#0a0a0a",
-      color: "#e5e5e5",
+      background: "var(--background)",
+      color: "var(--foreground)",
       padding: "64px 32px"
     }}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
@@ -52,12 +52,12 @@ export default async function HomePage() {
             fontSize: 36, 
             fontWeight: 600, 
             marginBottom: 12,
-            color: "#fff",
+            color: "var(--foreground)",
             letterSpacing: "-0.02em"
           }}>
             Intelligence Equity Research
           </h1>
-          <p style={{ fontSize: 16, color: "#999", lineHeight: 1.6, maxWidth: 700 }}>
+          <p style={{ fontSize: 16, color: "var(--muted-foreground)", lineHeight: 1.6, maxWidth: 700 }}>
             Quantitative equity research platform for Oslo Børs. 
             Server-side analytics, historical volatility models, and cross-sectional factor analysis.
           </p>
@@ -80,7 +80,7 @@ export default async function HomePage() {
           <h2 style={{ 
             fontWeight: 600, 
             marginBottom: 24,
-            color: "#fff",
+            color: "var(--foreground)",
             textTransform: "uppercase",
             letterSpacing: "0.05em",
             fontSize: 14
@@ -105,12 +105,12 @@ export default async function HomePage() {
         {/* Capabilities */}
         <section style={{ marginBottom: 64 }}>
           <h2 style={{ 
-            fontSize: 14, 
             fontWeight: 600, 
             marginBottom: 24,
-            color: "#fff",
+            color: "var(--foreground)",
             textTransform: "uppercase",
-            letterSpacing: "0.05em"
+            letterSpacing: "0.05em",
+            fontSize: 14
           }}>
             Analytics Capabilities
           </h2>
@@ -138,15 +138,15 @@ export default async function HomePage() {
         {/* Tech Stack */}
         <footer style={{ 
           paddingTop: 32, 
-          borderTop: "1px solid #222",
+          borderTop: "1px solid var(--border)",
           fontSize: 13,
-          color: "#666"
+          color: "var(--muted-foreground)"
         }}>
           <p style={{ marginBottom: 8 }}>
-            <strong style={{ color: "#999" }}>Technology Stack:</strong> Next.js 16 · TypeScript · PostgreSQL · Drizzle ORM · Interactive Brokers API
+            <strong style={{ color: "var(--foreground)" }}>Technology Stack:</strong> Next.js 16 · TypeScript · PostgreSQL · Drizzle ORM · Interactive Brokers API
           </p>
           <p>
-            <strong style={{ color: "#999" }}>Architecture:</strong> Server-side compute · Connection pooling · Transaction pooler (Supabase) · Vercel edge deployment
+            <strong style={{ color: "var(--foreground)" }}>Architecture:</strong> Server-side compute · Connection pooling · Transaction pooler (Supabase) · Vercel edge deployment
           </p>
         </footer>
 
@@ -159,14 +159,14 @@ export default async function HomePage() {
 function StatBox({ label, value }: { label: string; value: string | number }) {
   return (
     <div style={{
-      background: "#111",
-      border: "1px solid #222",
+      background: "var(--card-bg)",
+      border: "1px solid var(--border)",
       borderRadius: 4,
       padding: 20
     }}>
       <div style={{ 
         fontSize: 11, 
-        color: "#666", 
+        color: "var(--muted-foreground)", 
         textTransform: "uppercase", 
         letterSpacing: "0.05em",
         marginBottom: 8,
@@ -177,7 +177,7 @@ function StatBox({ label, value }: { label: string; value: string | number }) {
       <div style={{ 
         fontSize: 24, 
         fontWeight: 600, 
-        color: "#fff",
+        color: "var(--foreground)",
         fontFamily: "system-ui, -apple-system, monospace"
       }}>
         {value}
@@ -192,8 +192,8 @@ function NavCard({ href, title, description }: { href: string; title: string; de
       href={href}
       style={{
         display: "block",
-        background: "#111",
-        border: "1px solid #222",
+        background: "var(--card-bg)",
+        border: "1px solid var(--border)",
         borderRadius: 4,
         padding: 20,
         textDecoration: "none",
@@ -205,11 +205,11 @@ function NavCard({ href, title, description }: { href: string; title: string; de
         fontSize: 16, 
         fontWeight: 600, 
         marginBottom: 8,
-        color: "#fff"
+        color: "var(--foreground)"
       }}>
         {title} →
       </h3>
-      <p style={{ fontSize: 14, color: "#999", lineHeight: 1.5 }}>
+      <p style={{ fontSize: 14, color: "var(--muted-foreground)", lineHeight: 1.5 }}>
         {description}
       </p>
     </Link>
@@ -219,8 +219,8 @@ function NavCard({ href, title, description }: { href: string; title: string; de
 function Capability({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{
-      background: "#0d0d0d",
-      border: "1px solid #1a1a1a",
+      background: "var(--card-bg)",
+      border: "1px solid var(--border)",
       borderRadius: 4,
       padding: 16
     }}>
@@ -228,11 +228,11 @@ function Capability({ title, children }: { title: string; children: React.ReactN
         fontSize: 14, 
         fontWeight: 600, 
         marginBottom: 8,
-        color: "#fff"
+        color: "var(--foreground)"
       }}>
         {title}
       </h4>
-      <p style={{ fontSize: 13, color: "#888", lineHeight: 1.6 }}>
+      <p style={{ fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.6 }}>
         {children}
       </p>
     </div>
