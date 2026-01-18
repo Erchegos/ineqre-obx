@@ -12,7 +12,6 @@ import {
   Legend,
 } from "recharts";
 
-// FIX: Explicitly allow 'null' for all numeric fields
 type PriceData = {
   date: string;
   value?: number | null; 
@@ -41,7 +40,6 @@ export default function PriceChart({
   }
 
   // Determine the primary key to render if not in explicit comparison mode
-  // We prioritize 'raw' (from new logic) -> 'value' -> 'price'
   const hasRaw = data.some(d => d.raw !== undefined && d.raw !== null);
   const primaryKey = hasRaw ? "raw" : (data[0].value !== undefined ? "value" : "price");
   
@@ -83,8 +81,8 @@ export default function PriceChart({
               fontSize: "13px",
             }}
             labelStyle={{ color: "var(--muted)", marginBottom: "5px" }}
-            // FIX: Changed 'number | null' to 'any' to satisfy Recharts strict typing
-            formatter={(value: any, name: string) => {
+            // FIX: Use 'any' for both arguments to completely bypass strict type mismatch
+            formatter={(value: any, name: any) => {
               if (value === null || value === undefined) return ["-", name];
               return [
                 typeof value === "number" ? value.toFixed(2) : value,
