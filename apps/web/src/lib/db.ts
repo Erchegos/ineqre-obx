@@ -1,4 +1,5 @@
 import { Pool } from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
 
 const globalForDb = globalThis as unknown as {
   pool: Pool | undefined;
@@ -19,3 +20,6 @@ export const pool =
 if (process.env.NODE_ENV !== "production") {
   globalForDb.pool = pool;
 }
+
+// --- THIS WAS MISSING ---
+export const db = drizzle(pool);
