@@ -127,8 +127,8 @@ export async function GET(
       rolling20: currentVolatilityPercentile(current.rolling20, volSeries.map(v => v.rolling20)),
       ewma94: currentVolatilityPercentile(current.ewma94, volSeries.map(v => v.ewma94)),
       // Add percentiles for our new favorite metrics
-      yangZhang: currentVolatilityPercentile(current.yangZhang, volSeries.map(v => v.yangZhang)),
-      rogersSatchell: currentVolatilityPercentile(current.rogersSatchell, volSeries.map(v => v.rogersSatchell)),
+      yangZhang: currentVolatilityPercentile(current.yangZhang ?? null, volSeries.map(v => v.yangZhang)),
+      rogersSatchell: currentVolatilityPercentile(current.rogersSatchell ?? null, volSeries.map(v => v.rogersSatchell)),
     };
 
     // Event Analysis
