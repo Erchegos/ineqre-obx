@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import VolatilityChart from "@/components/VolatilityChart";
-// --- Added Recharts Imports for Seasonality ---
 import {
   BarChart,
   Bar,
@@ -371,10 +370,14 @@ function StatBox({ label, value, sub, highlight, color }: { label: string; value
   );
 }
 
-// --- NEW SEASONALITY CHART (Styles matched to your inline system) ---
+// --- NEW SEASONALITY CHART (Fixed) ---
 function SeasonalityChart({ data }: { data: any[] }) {
   const seasonalData = useMemo(() => {
-    if (!data || data.length === 0) return [];
+    // FIX: Always return valid structure, even if empty
+    if (!data || data.length === 0) {
+        return { result: [], maxVol: 0, minVol: 0 };
+    }
+
     const months = Array.from({ length: 12 }, () => ({ sum: 0, count: 0 }));
     
     data.forEach((day) => {
@@ -410,8 +413,10 @@ function SeasonalityChart({ data }: { data: any[] }) {
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={Array.isArray(seasonalData) ? [] : seasonalData.result} 
-          margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
+      <BarChart 
+        data={seasonalData.result} 
+        margin={{ top: 10, right: 0, left: -25, bottom: 0 }}
+      >
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-subtle)" opacity={0.3} />
         <XAxis 
           dataKey="month" 
@@ -443,7 +448,7 @@ function SeasonalityChart({ data }: { data: any[] }) {
           }}
         />
         <Bar dataKey="avgVol" radius={[2, 2, 0, 0]}>
-          {seasonalData.result.map((entry, index) => (
+          {seasonalData.result.map((entry: any, index: number) => (
             <Cell 
               key={`cell-${index}`} 
               fill={getColor(entry.avgVol, seasonalData.minVol, seasonalData.maxVol)} 
