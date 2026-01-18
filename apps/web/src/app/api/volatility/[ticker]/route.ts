@@ -122,13 +122,20 @@ export async function GET(
     const current = volSeries[volSeries.length - 1];
 
     // Compute percentiles
-    // We need to map safely in case specific metrics are missing in older data
+    // FIX APPLIED HERE: Added '?? null' inside the .map() calls
     const percentiles = {
       rolling20: currentVolatilityPercentile(current.rolling20, volSeries.map(v => v.rolling20)),
       ewma94: currentVolatilityPercentile(current.ewma94, volSeries.map(v => v.ewma94)),
-      // Add percentiles for our new favorite metrics
-      yangZhang: currentVolatilityPercentile(current.yangZhang ?? null, volSeries.map(v => v.yangZhang)),
-      rogersSatchell: currentVolatilityPercentile(current.rogersSatchell ?? null, volSeries.map(v => v.rogersSatchell)),
+      
+      // FIX: Explicitly convert undefined -> null for the array elements
+      yangZhang: currentVolatilityPercentile(
+        current.yangZhang ?? null, 
+        volSeries.map(v => v.yangZhang ?? null)
+      ),
+      rogersSatchell: currentVolatilityPercentile(
+        current.rogersSatchell ?? null, 
+        volSeries.map(v => v.rogersSatchell ?? null)
+      ),
     };
 
     // Event Analysis
@@ -157,7 +164,6 @@ export async function GET(
         ewma97: sanitizeNumber(current.ewma97),
         parkinson: sanitizeNumber(current.parkinson),
         garmanKlass: sanitizeNumber(current.garmanKlass),
-        // ADDED MISSING METRICS HERE:
         rogersSatchell: sanitizeNumber(current.rogersSatchell),
         yangZhang: sanitizeNumber(current.yangZhang),
       },
@@ -165,7 +171,6 @@ export async function GET(
       percentiles: {
         rolling20: sanitizeNumber(percentiles.rolling20),
         ewma94: sanitizeNumber(percentiles.ewma94),
-        // ADDED MISSING PERCENTILES HERE:
         rogersSatchell: sanitizeNumber(percentiles.rogersSatchell),
         yangZhang: sanitizeNumber(percentiles.yangZhang),
       },
