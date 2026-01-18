@@ -12,13 +12,13 @@ import {
   Legend,
 } from "recharts";
 
+// FIX: Explicitly allow 'null' for all numeric fields
 type PriceData = {
   date: string;
-  // Support both naming conventions for compatibility
-  value?: number;  // Old generic key
-  price?: number;  // Old generic key
-  raw?: number;    // New specific key (Green line)
-  total?: number;  // New specific key (Blue line / Adjusted)
+  value?: number | null; 
+  price?: number | null; 
+  raw?: number | null;   
+  total?: number | null; 
   [key: string]: any;
 };
 
@@ -60,7 +60,6 @@ export default function PriceChart({
             stroke="var(--muted)"
             fontSize={12}
             tickFormatter={(val) => {
-                // Show "Jan 24" or "2024" depending on length
                 if (!val) return "";
                 return val.length > 7 ? val.slice(5) : val; 
             }}
@@ -72,11 +71,7 @@ export default function PriceChart({
             stroke="var(--muted)"
             fontSize={12}
             domain={["auto", "auto"]}
-            tickFormatter={(val) => {
-               // If values are small (< 2), assume percentage logic elsewhere or standard formatting
-               // But usually the parent scales it (e.g. 10.5 for 10.5%)
-               return val.toFixed(0);
-            }}
+            tickFormatter={(val) => val.toFixed(0)}
           />
           
           <Tooltip
@@ -88,7 +83,7 @@ export default function PriceChart({
               fontSize: "13px",
             }}
             labelStyle={{ color: "var(--muted)", marginBottom: "5px" }}
-            formatter={(value: number, name: string) => {
+            formatter={(value: number | null, name: string) => {
               if (value === null || value === undefined) return ["-", name];
               return [
                 typeof value === "number" ? value.toFixed(2) : value,
@@ -99,12 +94,11 @@ export default function PriceChart({
           
           {isComparisonActive && <Legend verticalAlign="top" height={36} />}
 
-          {/* PRIMARY LINE (Usually Raw Price or user selected mode) */}
+          {/* PRIMARY LINE */}
           <Line
             type="monotone"
             dataKey={primaryKey}
             name={isComparisonActive ? "Price Return" : "Value"}
-            // Green if comparing, otherwise standard blue/primary color
             stroke={isComparisonActive ? "#22c55e" : "#3b82f6"} 
             strokeWidth={2}
             dot={false}
@@ -113,13 +107,13 @@ export default function PriceChart({
             isAnimationActive={false} 
           />
 
-          {/* SECONDARY LINE (Total Return / Adjusted) - Only in comparison */}
+          {/* SECONDARY LINE */}
           {isComparisonActive && (
             <Line
               type="monotone"
               dataKey="total"
               name="Total Return"
-              stroke="#3b82f6" // Blue for Total Return
+              stroke="#3b82f6" 
               strokeWidth={2}
               dot={false}
               activeDot={{ r: 4 }}
@@ -128,7 +122,6 @@ export default function PriceChart({
             />
           )}
 
-          {/* Zero line for percentage charts */}
           {isComparisonActive && <ReferenceLine y={0} stroke="var(--border)" strokeDasharray="3 3" />}
 
         </LineChart>
