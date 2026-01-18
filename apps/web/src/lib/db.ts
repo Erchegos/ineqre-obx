@@ -9,15 +9,22 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL is not defined");
 }
 
-// Parse the connection URL manually
-const dbUrl = new URL(process.env.DATABASE_URL.split('?')[0]);
+// Clean the URL - remove quotes and query params
+let cleanUrl = process.env.DATABASE_URL.trim();
+// Remove surrounding quotes if present
+cleanUrl = cleanUrl.replace(/^["']|["']$/g, '');
+// Remove query params for manual parsing
+cleanUrl = cleanUrl.split('?')[0];
+
+// Parse manually to ensure SSL config is applied
+const dbUrl = new URL(cleanUrl);
 
 export const pool =
   globalForDb.pool ??
   new Pool({
     host: dbUrl.hostname,
     port: parseInt(dbUrl.port),
-    database: dbUrl.pathname.slice(1), // remove leading /
+    database: dbUrl.pathname.slice(1),
     user: dbUrl.username,
     password: dbUrl.password,
     max: 10,
