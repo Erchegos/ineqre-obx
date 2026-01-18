@@ -410,7 +410,8 @@ function SeasonalityChart({ data }: { data: any[] }) {
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={seasonalData.result} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
+      <BarChart data={Array.isArray(seasonalData) ? [] : seasonalData.result} 
+          margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-subtle)" opacity={0.3} />
         <XAxis 
           dataKey="month" 
