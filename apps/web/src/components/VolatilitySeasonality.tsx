@@ -24,7 +24,9 @@ export default function VolatilitySeasonality({ data }: SeasonalityProps) {
   
   // --- Data Processing: Aggregate Volatility by Month ---
   const seasonalData = useMemo(() => {
-    if (!data || data.length === 0) return [];
+    if (!data || data.length === 0) {
+      return { result: [], maxVol: 0, minVol: 0 };
+    }
 
     // 1. Buckets for each month (0 = Jan, 11 = Dec)
     const months = Array.from({ length: 12 }, () => ({ sum: 0, count: 0 }));
@@ -105,7 +107,7 @@ export default function VolatilitySeasonality({ data }: SeasonalityProps) {
             />
 
             <Bar dataKey="avgVol" radius={[4, 4, 0, 0]}>
-              {seasonalData.result.map((entry, index) => (
+              {seasonalData.result.map((entry: { month: string; avgVol: number }, index: number) => (
                 <Cell 
                   key={`cell-${index}`} 
                   fill={getColor(entry.avgVol, seasonalData.minVol, seasonalData.maxVol)} 
