@@ -78,7 +78,6 @@ export default async function HomePage() {
         {/* Navigation */}
         <section style={{ marginBottom: 64 }}>
           <h2 style={{ 
-            fontSize: 18, 
             fontWeight: 600, 
             marginBottom: 24,
             color: "#fff",
