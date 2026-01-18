@@ -124,9 +124,11 @@ export default function StockTickerPage() {
       setError(null);
 
       try {
+        // --- CRITICAL FIX: Always request adjusted=true ---
+        // This ensures the backend sends both Raw Price AND Total Return data
         const url = `/api/analytics/${encodeURIComponent(ticker)}?limit=${encodeURIComponent(
           String(limit)
-        )}`;
+        )}&adjusted=true`;
 
         const res = await fetch(url, {
           method: "GET",
@@ -172,8 +174,6 @@ export default function StockTickerPage() {
     };
   }, [ticker, limit]);
 
-  // Determine which stats to show
-  // (In Comparison mode, we usually show the Total Return stats as they are the 'true' performance)
   const activeStats = useMemo(() => {
     if (!data?.summary) return null;
     return chartMode === "price" ? data.summary.raw : data.summary.adjusted;
@@ -194,22 +194,26 @@ export default function StockTickerPage() {
     if (!data?.prices || data.prices.length === 0) return [];
     
     // 1. Comparison Mode: Normalize both to % change starting at 0
+    // Using keys 'raw' and 'total' so PriceChart can find them easily
     if (chartMode === "comparison") {
       const startPrice = data.prices[0].close;
       const startAdj = data.prices[0].adj_close ?? data.prices[0].close;
 
       return data.prices.map(p => ({
         date: p.date,
-        // (Current - Start) / Start * 100
-        value: ((p.close - startPrice) / startPrice) * 100, 
-        value2: (((p.adj_close ?? p.close) - startAdj) / startAdj) * 100,
+        // Green Line (Raw)
+        raw: ((p.close - startPrice) / startPrice) * 100, 
+        // Blue Line (Total Return)
+        total: (((p.adj_close ?? p.close) - startAdj) / startAdj) * 100,
       }));
     }
 
     // 2. Standard Modes: Just show the absolute value
+    // We map it to 'raw' so the chart draws the main line
     return data.prices.map((p) => ({
       date: p.date,
-      value: chartMode === "total_return" ? (p.adj_close ?? p.close) : p.close,
+      raw: chartMode === "total_return" ? (p.adj_close ?? p.close) : p.close,
+      total: null // No second line
     }));
   }, [data?.prices, chartMode]);
 
@@ -437,12 +441,9 @@ export default function StockTickerPage() {
             <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: "var(--foreground)" }}>
                History ({getModeLabel()})
             </h2>
-            {/* UPDATED CHART USAGE */}
             <PriceChart 
               data={chartData} 
               height={320} 
-              mode={chartMode === "comparison" ? "percentage" : "currency"}
-              showComparison={chartMode === "comparison"}
             />
           </div>
 
