@@ -7,9 +7,9 @@ import RollingCorrelationChart from "@/components/RollingCorrelationChart";
 
 const PRESET_GROUPS = {
   "Norwegian Equities": ["AKER", "DNB", "EQNR", "MOWI", "OBX"],
-  "Energy Giants": ["EQNR", "AKRBP", "VAR", "DNO"],
-  "Seafood": ["MOWI", "SALM", "LSG", "GSF"],
-  "Finance": ["DNB", "SRBNK", "MING", "STB"],
+  "Energy Giants": ["EQNR", "AKRBP", "VAR", "OBX"],
+  "Seafood": ["MOWI", "SALM", "LSG", "OBX"],
+  "Finance": ["DNB", "SB1NO", "MING", "STB"],
   "100B+ Club": ["DNB", "EQNR", "MOWI", "TEL", "YAR", "NHY", "AKRBP"],
 };
 
