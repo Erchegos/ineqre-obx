@@ -17,18 +17,12 @@ type PriceBar = {
   close: number;
 };
 
-/**
- * Sanitize a number for JSON serialization
- * Converts NaN and Infinity to null
- */
+// --- Helpers ---
 function sanitizeNumber(n: number | undefined): number | null {
   if (n === undefined || isNaN(n) || !isFinite(n)) return null;
   return n;
 }
 
-/**
- * Sanitize an object, converting all NaN/Infinity to null
- */
 function sanitizeData(data: any): any {
   if (typeof data === 'number') {
     return sanitizeNumber(data);
@@ -46,7 +40,8 @@ function sanitizeData(data: any): any {
   return data;
 }
 
-async function fetchBars(ticker: string, limit: number): Promise<PriceBar[]> {
+// --- Data Fetching ---
+async function fetchBars(ticker: string, limit: number, useAdjusted: boolean): Promise<PriceBar[]> {
   const tableName = await getPriceTable();
   
   const q = `
@@ -55,121 +50,102 @@ async function fetchBars(ticker: string, limit: number): Promise<PriceBar[]> {
       open, 
       high, 
       low, 
-      close
-    FROM public.${tableName}
-    WHERE upper(ticker) = upper($1)
-      AND open IS NOT NULL
-      AND high IS NOT NULL
-      AND low IS NOT NULL
+      close,
+      adj_close 
+    FROM ${tableName}
+    WHERE ticker = $1
       AND close IS NOT NULL
       AND close > 0
-      AND open > 0
-      AND high > 0
-      AND low > 0
     ORDER BY date DESC
     LIMIT $2
   `;
   
   const result = await pool.query(q, [ticker, limit]);
-  const mapped = result.rows.map(r => ({
-    date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date),
-    open: Number(r.open),
-    high: Number(r.high),
-    low: Number(r.low),
-    close: Number(r.close),
-  }));
-  return mapped.reverse();
+  
+  return result.rows.map((r) => {
+    // Logic: If useAdjusted is true, we swap 'close' with 'adj_close'
+    // We assume Open/High/Low are proportional or we just use raw for those 
+    // (Note: For precise Yang-Zhang on splits, you'd ideally adjust O/H/L too, 
+    // but swapping Close is the most important step for standard volatility).
+    const rawClose = Number(r.close);
+    const adjClose = r.adj_close ? Number(r.adj_close) : rawClose;
+    
+    // Calculate the adjustment factor if needed to scale O/H/L
+    // (Optional: simple version just swaps close. 
+    // More complex version scales O/H/L by (AdjClose / Close))
+    const ratio = useAdjusted && rawClose !== 0 ? adjClose / rawClose : 1;
+
+    return {
+      date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date),
+      open: Number(r.open) * ratio,
+      high: Number(r.high) * ratio,
+      low: Number(r.low) * ratio,
+      close: useAdjusted ? adjClose : rawClose,
+    };
+  }).reverse(); // Return oldest -> newest for calculation
 }
 
 export async function GET(
-  req: Request,
-  ctx: { params: Promise<{ ticker: string }> }
+  request: Request,
+  { params }: { params: Promise<{ ticker: string }> }
 ) {
+  const { ticker } = await params;
+  const { searchParams } = new URL(request.url);
+  
+  // 1. DYNAMIC LIMIT: Default to 1500 if not provided
+  const limitParam = searchParams.get("limit");
+  const limit = limitParam ? parseInt(limitParam, 10) : 1500;
+
+  // 2. ADJUSTED LOGIC: Check strictly for "false" to disable it
+  // Default to true (Total Return)
+  const adjustedParam = searchParams.get("adjusted");
+  const useAdjusted = adjustedParam !== "false"; 
+
+  if (!ticker) {
+    return NextResponse.json({ error: "Ticker is required" }, { status: 400 });
+  }
+
   try {
-    const { ticker } = await ctx.params;
-    const url = new URL(req.url);
-    const limitRaw = url.searchParams.get("limit");
-    const limit = Math.min(Math.max(Number(limitRaw || 500), 100), 2000);
-    
-    const eventDatesParam = url.searchParams.get("events");
-    const eventDates = eventDatesParam ? eventDatesParam.split(",") : [];
-    
-    console.log(`[Volatility API] Fetching data for ${ticker}...`);
-    
-    const bars = await fetchBars(ticker, limit);
-    
-    console.log(`[Volatility API] Found ${bars.length} bars with complete OHLC data`);
-    
-    if (bars.length === 0) {
-      return NextResponse.json({
-        ticker: ticker.toUpperCase(),
-        error: "No OHLC data found. This ticker might only have close prices.",
-      }, { status: 404 });
+    const bars = await fetchBars(ticker, limit, useAdjusted);
+
+    if (bars.length < 30) {
+      return NextResponse.json(
+        { error: "Insufficient data for volatility analysis" },
+        { status: 400 }
+      );
     }
-    
-    if (bars.length < 60) {
-      return NextResponse.json({
-        ticker: ticker.toUpperCase(),
-        error: `Insufficient data: only ${bars.length} days (minimum 60 required)`,
-      }, { status: 400 });
-    }
-    
-    console.log(`[Volatility API] Computing volatility measures...`);
-    
+
+    // Compute Volatility
     const volSeries = computeVolatilityMeasures(bars);
     
-    if (volSeries.length === 0) {
-      return NextResponse.json({
-        ticker: ticker.toUpperCase(),
-        error: "Failed to compute volatility measures",
-      }, { status: 500 });
-    }
-    
+    // Get latest values
     const current = volSeries[volSeries.length - 1];
-    
-    const rolling20Values = volSeries.map(v => v.rolling20).filter(v => !isNaN(v));
-    const ewma94Values = volSeries.map(v => v.ewma94).filter(v => !isNaN(v));
-    
+
+    // Compute percentiles
+    // We need to map safely in case specific metrics are missing in older data
     const percentiles = {
-      rolling20: currentVolatilityPercentile(current.rolling20, rolling20Values),
-      ewma94: currentVolatilityPercentile(current.ewma94, ewma94Values),
+      rolling20: currentVolatilityPercentile(current.rolling20, volSeries.map(v => v.rolling20)),
+      ewma94: currentVolatilityPercentile(current.ewma94, volSeries.map(v => v.ewma94)),
+      // Add percentiles for our new favorite metrics
+      yangZhang: currentVolatilityPercentile(current.yangZhang, volSeries.map(v => v.yangZhang)),
+      rogersSatchell: currentVolatilityPercentile(current.rogersSatchell, volSeries.map(v => v.rogersSatchell)),
     };
-    
-    console.log(`[Volatility API] Computing event analysis for ${eventDates.length} events...`);
-    
-    const eventAnalysis = eventDates.map(eventDate => {
-      try {
-        const dates = bars.map(b => b.date);
-        const closes = bars.map(b => b.close);
-        const returns: number[] = [];
-        for (let i = 1; i < closes.length; i++) {
-          returns.push(Math.log(closes[i] / closes[i - 1]));
-        }
-        
-        const comparison = compareVolatilityAroundEvent(returns, dates.slice(1), eventDate, 30);
-        
-        return {
-          date: eventDate,
-          ...comparison,
-        };
-      } catch (e) {
-        console.error(`Failed to analyze event ${eventDate}:`, e);
-        return {
-          date: eventDate,
-          before: 0,
-          after: 0,
-          change: 0,
-          changePercent: 0,
-        };
-      }
-    });
-    
-    console.log(`[Volatility API] Success! Returning ${volSeries.length} volatility points`);
-    
-    // Sanitize the response data to handle NaN/Infinity values
+
+    // Event Analysis
+    const largeMoves = bars.filter((b, i) => {
+      if (i === 0) return false;
+      const ret = Math.abs((b.close - bars[i-1].close) / bars[i-1].close);
+      return ret > 0.05; 
+    }).slice(-5); 
+
+    const eventAnalysis = largeMoves.map(event => {
+      return compareVolatilityAroundEvent(volSeries, event.date, 10);
+    }).filter(e => e !== null);
+
     const responseData = {
       ticker: ticker.toUpperCase(),
       count: volSeries.length,
+      adjusted: useAdjusted, // Echo back status
       
       current: {
         date: current.date,
@@ -181,11 +157,17 @@ export async function GET(
         ewma97: sanitizeNumber(current.ewma97),
         parkinson: sanitizeNumber(current.parkinson),
         garmanKlass: sanitizeNumber(current.garmanKlass),
+        // ADDED MISSING METRICS HERE:
+        rogersSatchell: sanitizeNumber(current.rogersSatchell),
+        yangZhang: sanitizeNumber(current.yangZhang),
       },
       
       percentiles: {
         rolling20: sanitizeNumber(percentiles.rolling20),
         ewma94: sanitizeNumber(percentiles.ewma94),
+        // ADDED MISSING PERCENTILES HERE:
+        rogersSatchell: sanitizeNumber(percentiles.rogersSatchell),
+        yangZhang: sanitizeNumber(percentiles.yangZhang),
       },
       
       series: sanitizeData(volSeries),
@@ -204,7 +186,6 @@ export async function GET(
       {
         error: "Volatility computation failed",
         message: e?.message ?? String(e),
-        stack: process.env.NODE_ENV === 'development' ? e?.stack : undefined,
       },
       { status: 500 }
     );

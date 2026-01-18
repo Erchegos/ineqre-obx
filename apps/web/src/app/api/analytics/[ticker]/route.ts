@@ -13,13 +13,69 @@ export const dynamic = "force-dynamic";
 type PriceRow = {
   date: string;
   close: number;
+  adj_close: number;
 };
+
+// Helper to calculate all metrics for a given series of prices
+function calculateMetrics(
+  prices: number[], 
+  marketReturns: number[] | null,
+  startPrice: number,
+  endPrice: number
+) {
+  const logReturns = computeReturns(prices);
+  
+  // 1. Total Return & Annualized
+  const totalReturn = (endPrice - startPrice) / startPrice;
+  const days = prices.length;
+  const years = days / 252;
+  const annualizedReturn = years > 0 ? Math.pow(1 + totalReturn, 1 / years) - 1 : 0;
+
+  // 2. Volatility
+  const mean = logReturns.reduce((a, b) => a + b, 0) / (logReturns.length || 1);
+  const variance = logReturns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / (logReturns.length - 1 || 1);
+  const volatility = Math.sqrt(variance * 252);
+
+  // 3. Drawdown
+  const drawdownSeries = computeDrawdownSeries(prices);
+  const maxDrawdown = Math.min(...drawdownSeries.map(d => d.drawdown));
+
+  // 4. VaR / CVaR
+  const sortedReturns = [...logReturns].sort((a, b) => a - b);
+  const var95Index = Math.floor(logReturns.length * 0.05);
+  const var95 = sortedReturns[var95Index] || 0;
+  const cvar95 =
+    sortedReturns.slice(0, var95Index + 1).reduce((a, b) => a + b, 0) / (var95Index + 1 || 1);
+
+  // 5. Beta
+  let beta = 0;
+  if (marketReturns && marketReturns.length === logReturns.length) {
+    beta = computeBeta(logReturns, marketReturns);
+  }
+
+  // 6. Sharpe
+  const sharpeRatio = computeSharpeRatio(logReturns, 0);
+
+  return {
+    metrics: {
+      totalReturn,
+      annualizedReturn,
+      volatility,
+      maxDrawdown,
+      var95,
+      cvar95,
+      beta,
+      sharpeRatio,
+    },
+    returns: logReturns,
+    drawdown: drawdownSeries,
+  };
+}
 
 async function fetchPrices(ticker: string, limit: number): Promise<PriceRow[]> {
   const tableName = await getPriceTable();
-  
   const q = `
-    SELECT date::date as date, close
+    SELECT date::date as date, close, adj_close
     FROM public.${tableName}
     WHERE upper(ticker) = upper($1)
       AND close IS NOT NULL
@@ -27,35 +83,24 @@ async function fetchPrices(ticker: string, limit: number): Promise<PriceRow[]> {
     ORDER BY date DESC
     LIMIT $2
   `;
-  
   const result = await pool.query(q, [ticker, limit]);
-  // Map first, then reverse to get chronological order (oldest → newest)
-  const mapped = result.rows.map(r => ({
+  return result.rows.map(r => ({
     date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date),
     close: Number(r.close),
-  }));
-  return mapped.reverse();
+    adj_close: r.adj_close ? Number(r.adj_close) : Number(r.close),
+  })).reverse();
 }
 
-async function fetchMarketPrices(limit: number): Promise<PriceRow[]> {
+async function fetchMarketPrices(limit: number): Promise<number[]> {
   const tableName = await getPriceTable();
-  
   const q = `
-    SELECT date::date as date, close
+    SELECT close
     FROM public.${tableName}
-    WHERE upper(ticker) = 'OBX'
-      AND close IS NOT NULL
-      AND close > 0
-    ORDER BY date DESC
-    LIMIT $1
+    WHERE upper(ticker) = 'OBX' AND close IS NOT NULL
+    ORDER BY date DESC LIMIT $1
   `;
-  
   const result = await pool.query(q, [limit]);
-  const mapped = result.rows.map(r => ({
-    date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date),
-    close: Number(r.close),
-  }));
-  return mapped.reverse();
+  return result.rows.map(r => Number(r.close)).reverse();
 }
 
 export async function GET(
@@ -65,116 +110,83 @@ export async function GET(
   try {
     const { ticker } = await ctx.params;
     const url = new URL(req.url);
-    const limitRaw = url.searchParams.get("limit");
-    const limit = Math.min(Math.max(Number(limitRaw || 1500), 20), 5000);
+    const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 1500), 20), 5000);
 
-    // Fetch prices for the ticker
     const prices = await fetchPrices(ticker, limit);
 
-    // Reduced minimum requirement from 252 to 20 days
     if (prices.length < 20) {
-      return NextResponse.json(
-        {
-          ticker: ticker.toUpperCase(),
-          error: `Insufficient data: only ${prices.length} days available (minimum 20 required)`,
-        },
-        { status: 400 }
-      );
+      return NextResponse.json({ ticker, error: "Insufficient data" }, { status: 400 });
     }
 
-    // Compute returns
-    const closes = prices.map(p => p.close);
+    // Prepare data arrays
     const dates = prices.map(p => p.date);
-    const logReturns = computeReturns(closes);
+    const closes = prices.map(p => p.close);
+    const adjCloses = prices.map(p => p.adj_close);
 
-    if (logReturns.length === 0) {
-      return NextResponse.json(
-        {
-          ticker: ticker.toUpperCase(),
-          error: "Unable to compute returns",
-        },
-        { status: 400 }
-      );
-    }
-
-    // Compute summary statistics
-    const totalReturn = (closes[closes.length - 1] - closes[0]) / closes[0];
-    
-    // Calculate number of years for annualization
-    const days = closes.length;
-    const years = days / 252;
-    const annualizedReturn = years > 0 ? Math.pow(1 + totalReturn, 1 / years) - 1 : 0;
-
-    // Volatility (annualized)
-    const mean = logReturns.reduce((a, b) => a + b, 0) / logReturns.length;
-    const variance = logReturns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / (logReturns.length - 1);
-    const volatility = Math.sqrt(variance * 252);
-
-    // Max drawdown
-    const drawdownSeries = computeDrawdownSeries(closes);
-    const maxDrawdown = Math.min(...drawdownSeries.map(d => d.drawdown));
-
-    // VaR and CVaR (95%)
-    const sortedReturns = [...logReturns].sort((a, b) => a - b);
-    const var95Index = Math.floor(logReturns.length * 0.05);
-    const var95 = sortedReturns[var95Index] || 0;
-    const cvar95 =
-      sortedReturns.slice(0, var95Index + 1).reduce((a, b) => a + b, 0) / (var95Index + 1 || 1);
-
-    // Compute beta vs OBX
-    let beta = 0;
+    // Fetch Market Data for Beta (align length roughly)
+    let marketReturns: number[] | null = null;
     try {
-      const marketPrices = await fetchMarketPrices(limit);
-      
-      // Only compute beta if we have sufficient overlapping data
-      if (marketPrices.length >= 20) {
-        const marketCloses = marketPrices.map(p => p.close);
-        const marketReturns = computeReturns(marketCloses);
-        beta = computeBeta(logReturns, marketReturns);
+      const marketCloses = await fetchMarketPrices(limit);
+      if (marketCloses.length >= closes.length) {
+         // Trim to match exactly if needed, or just use simpler alignment
+         const alignedMarket = marketCloses.slice(-closes.length);
+         marketReturns = computeReturns(alignedMarket);
       }
-    } catch (e) {
-      console.warn("Failed to compute beta:", e);
-      // Beta remains 0 if computation fails
-    }
+    } catch (e) { console.warn("Beta calc failed", e); }
 
-    // Sharpe ratio (assuming risk-free rate = 0)
-    const sharpeRatio = computeSharpeRatio(logReturns, 0);
+    // --- CALCULATE TWICE ---
+    // 1. Adjusted (Total Return) - The Default
+    const adjStats = calculateMetrics(
+        adjCloses, 
+        marketReturns, 
+        adjCloses[0], 
+        adjCloses[adjCloses.length - 1]
+    );
 
-    // Build return series
-    const returnSeries = logReturns.map((r, i) => ({
+    // 2. Raw (Price Return)
+    const rawStats = calculateMetrics(
+        closes, 
+        marketReturns, 
+        closes[0], 
+        closes[closes.length - 1]
+    );
+
+    // Helper to format returns series with dates
+    const formatReturns = (rets: number[]) => rets.map((r, i) => ({
       date: dates[i + 1],
-      return: r,
+      return: r
     }));
 
     return NextResponse.json({
       ticker: ticker.toUpperCase(),
       count: prices.length,
+      // Return BOTH sets of summaries
       summary: {
-        totalReturn,
-        annualizedReturn,
-        volatility,
-        maxDrawdown,
-        var95,
-        cvar95,
-        beta,
-        sharpeRatio,
+        adjusted: adjStats.metrics,
+        raw: rawStats.metrics
       },
-      prices: prices.map(p => ({ date: p.date, close: p.close })),
-      returns: returnSeries,
-      drawdown: drawdownSeries,
+      // Return BOTH sets of series
+      returns: {
+        adjusted: formatReturns(adjStats.returns),
+        raw: formatReturns(rawStats.returns)
+      },
+      drawdown: {
+        adjusted: adjStats.drawdown,
+        raw: rawStats.drawdown
+      },
+      prices: prices.map(p => ({ 
+        date: p.date, 
+        close: p.close, 
+        adj_close: p.adj_close 
+      })),
       dateRange: {
         start: dates[0],
         end: dates[dates.length - 1],
       },
     });
+
   } catch (e: any) {
     console.error("[Analytics API] Error:", e);
-    return NextResponse.json(
-      {
-        error: "Analytics computation failed",
-        message: e?.message ?? String(e),
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }

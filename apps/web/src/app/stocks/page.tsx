@@ -8,6 +8,7 @@ type StockData = {
   ticker: string;
   name: string;
   last_close: number;
+  last_adj_close: number;
   start_date: string;
   end_date: string;
   rows: number;
@@ -16,11 +17,16 @@ type StockData = {
 async function getStocksData(): Promise<StockData[]> {
   const tableName = await getPriceTable();
 
+  /* FIX EXPLAINED:
+    - Old: MAX(p.close) -> Gets the highest price ever (wrong for "current").
+    - New: (ARRAY_AGG(p.close ORDER BY p.date DESC))[1] -> Gets the price from the most recent date.
+  */
   const query = `
     SELECT 
       s.ticker,
       s.name,
-      MAX(p.close) as last_close,
+      (ARRAY_AGG(p.close ORDER BY p.date DESC))[1] as last_close,
+      (ARRAY_AGG(p.adj_close ORDER BY p.date DESC))[1] as last_adj_close,
       MIN(p.date) as start_date,
       MAX(p.date) as end_date,
       COUNT(*) as rows
@@ -41,6 +47,7 @@ async function getStocksData(): Promise<StockData[]> {
     ticker: row.ticker,
     name: row.name || row.ticker,
     last_close: Number(row.last_close),
+    last_adj_close: Number(row.last_adj_close || row.last_close),
     start_date: row.start_date instanceof Date 
       ? row.start_date.toISOString().slice(0, 10)
       : String(row.start_date),
@@ -197,6 +204,25 @@ export default async function StocksPage({
                 </th>
                 <th style={{ textAlign: "right", padding: "16px" }}>
                   <Link
+                    href={toggleSort("last_adj_close")}
+                    style={{ 
+                      color: "var(--foreground)", 
+                      textDecoration: "none", 
+                      display: "flex", 
+                      alignItems: "center", 
+                      justifyContent: "flex-end", 
+                      gap: 8,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    Adj Close <SortIcon column="last_adj_close" />
+                  </Link>
+                </th>
+                <th style={{ textAlign: "right", padding: "16px" }}>
+                  <Link
                     href={toggleSort("start_date")}
                     style={{ 
                       color: "var(--foreground)", 
@@ -281,6 +307,15 @@ export default async function StocksPage({
                     fontSize: 14,
                   }}>
                     {stock.last_close.toFixed(2)}
+                  </td>
+                  <td style={{ 
+                    padding: "16px", 
+                    textAlign: "right", 
+                    fontFamily: "monospace",
+                    color: "var(--muted)",
+                    fontSize: 14,
+                  }}>
+                    {stock.last_adj_close.toFixed(2)}
                   </td>
                   <td style={{ padding: "16px", textAlign: "right", color: "var(--muted)", fontSize: 13 }}>
                     {stock.start_date}

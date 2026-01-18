@@ -41,7 +41,8 @@ async function detectPriceTable(): Promise<string> {
     return cachedTableName;
   } catch (e) {
     console.error("Failed to detect price table:", e);
-    throw e;
+    // Fallback if detection fails (e.g. permission issues), usually safe to default to standard
+    return "prices_daily";
   }
 }
 
@@ -49,7 +50,7 @@ async function detectPriceTable(): Promise<string> {
  * Get the correct price table name for current environment
  */
 export async function getPriceTable(): Promise<string> {
-  return detectPriceTable();
+  return await detectPriceTable();
 }
 
 /**

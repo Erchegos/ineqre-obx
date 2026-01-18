@@ -1,36 +1,21 @@
-// apps/web/src/lib/db.ts
 import { Pool } from "pg";
-import { drizzle } from "drizzle-orm/node-postgres";
 
-const raw = process.env.DATABASE_URL;
+const globalForDb = globalThis as unknown as {
+  pool: Pool | undefined;
+};
 
-if (!raw) {
-  throw new Error("DATABASE_URL is missing");
+export const pool =
+  globalForDb.pool ??
+  new Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: 10,
+    idleTimeoutMillis: 30000,
+    // INCREASED: Give it 20s to connect (fixes "Connection terminated" on slow networks)
+    connectionTimeoutMillis: 20000, 
+    // OPTIONAL: Supabase sometimes requires SSL explicitly
+    ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
+  });
+
+if (process.env.NODE_ENV !== "production") {
+  globalForDb.pool = pool;
 }
-
-function stripSslMode(cs: string) {
-  try {
-    const u = new URL(cs);
-    u.searchParams.delete("sslmode");
-    return u.toString();
-  } catch {
-    return cs;
-  }
-}
-
-function isSupabase(cs: string) {
-  const s = cs.toLowerCase();
-  return s.includes("supabase.com") || s.includes("pooler.supabase.com");
-}
-
-const connectionString = stripSslMode(raw);
-
-export const pool = new Pool({
-  connectionString,
-  ssl: isSupabase(connectionString) ? { rejectUnauthorized: false } : undefined,
-  max: 5,
-  idleTimeoutMillis: 30_000,
-  connectionTimeoutMillis: 10_000,
-});
-
-export const db = drizzle(pool);

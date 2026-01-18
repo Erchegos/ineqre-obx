@@ -25,164 +25,211 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const tickersParam = searchParams.get("tickers");
-    const limit = parseInt(searchParams.get("limit") || "365");
-    const window = parseInt(searchParams.get("window") || "60");
+    const limitDays = parseInt(searchParams.get("limit") || "365");
+    const windowSize = parseInt(searchParams.get("window") || "60");
+    const mode = searchParams.get("mode") || "total_return"; 
 
     if (!tickersParam) {
-      return NextResponse.json({ error: "Missing tickers parameter" }, { status: 400 });
+      return NextResponse.json({ error: "No tickers provided" }, { status: 400 });
     }
 
     const tickers = tickersParam.split(",").map((t) => t.trim().toUpperCase());
-
     if (tickers.length < 2) {
-      return NextResponse.json({ error: "Need at least 2 tickers" }, { status: 400 });
+      return NextResponse.json({ error: "Select at least 2 tickers" }, { status: 400 });
     }
 
     const tableName = await getPriceTable();
 
-    // Fetch price data for all tickers
+    // 1. Fetch Data by Date Range (More robust than LIMIT)
+    // We add a buffer (windowSize * 2) to ensure we have enough prior data for the first rolling point
     const query = `
-      SELECT 
-        ticker,
-        date,
-        close,
-        (close - LAG(close) OVER (PARTITION BY ticker ORDER BY date)) / LAG(close) OVER (PARTITION BY ticker ORDER BY date) as return
+      SELECT ticker, date::text as date, close, adj_close
       FROM ${tableName}
       WHERE ticker = ANY($1)
-        AND source = 'ibkr'
+        AND date >= CURRENT_DATE - ($2 || ' days')::INTERVAL
         AND close IS NOT NULL
         AND close > 0
-        AND date >= CURRENT_DATE - INTERVAL '${limit} days'
-      ORDER BY ticker, date
+      ORDER BY date ASC
     `;
-
-    const result = await pool.query(query, [tickers]);
-
-    // Organize data by ticker
-    const dataByTicker: Record<string, { date: string; return: number }[]> = {};
     
-    for (const row of result.rows) {
-      if (row.return !== null) {
-        if (!dataByTicker[row.ticker]) {
-          dataByTicker[row.ticker] = [];
-        }
-        dataByTicker[row.ticker].push({
-          date: row.date instanceof Date ? row.date.toISOString().split('T')[0] : row.date,
-          return: parseFloat(row.return),
-        });
+    // Request slightly more history than the limit to account for market holidays vs calendar days
+    const lookbackBuffer = Math.floor(limitDays + (limitDays * 0.4) + windowSize); 
+    const result = await pool.query(query, [tickers, lookbackBuffer]);
+
+    // 2. Group by Ticker
+    const rawData: Record<string, { date: string; value: number }[]> = {};
+    const tickerCounts: Record<string, number> = {};
+
+    result.rows.forEach((row) => {
+      if (!rawData[row.ticker]) {
+        rawData[row.ticker] = [];
+        tickerCounts[row.ticker] = 0;
       }
-    }
-
-    // Find common dates across all tickers
-    const allDates = new Set<string>();
-    for (const ticker of tickers) {
-      if (dataByTicker[ticker]) {
-        dataByTicker[ticker].forEach((d) => allDates.add(d.date));
+      
+      let val = Number(row.close);
+      if (mode === "total_return") {
+        val = row.adj_close ? Number(row.adj_close) : val;
       }
-    }
 
-    const commonDates = Array.from(allDates).sort();
-
-    // Build aligned return series
-    const alignedReturns: Record<string, number[]> = {};
-    
-    for (const ticker of tickers) {
-      alignedReturns[ticker] = commonDates.map((date) => {
-        const entry = dataByTicker[ticker]?.find((d) => d.date === date);
-        return entry ? entry.return : 0;
+      rawData[row.ticker].push({
+        date: row.date,
+        value: val,
       });
+      tickerCounts[row.ticker]++;
+    });
+
+    // CHECK 1: Ensure we actually found data for the requested tickers
+    const missingTickers = tickers.filter(t => !rawData[t] || rawData[t].length === 0);
+    if (missingTickers.length > 0) {
+      return NextResponse.json({ 
+        error: `No data found for: ${missingTickers.join(", ")}` 
+      }, { status: 404 });
     }
 
-    // Check if we have enough data
-    if (commonDates.length < window) {
-      return NextResponse.json({
-        error: `Insufficient overlapping data. Need at least ${window} days, found ${commonDates.length}`,
+    // 3. Find Intersection (Dates where ALL tickers have data)
+    const dateCounts: Record<string, number> = {};
+    Object.values(rawData).forEach((series) => {
+      series.forEach((p) => {
+        dateCounts[p.date] = (dateCounts[p.date] || 0) + 1;
+      });
+    });
+
+    const commonDates = Object.keys(dateCounts)
+      .filter((d) => dateCounts[d] === tickers.length)
+      .sort(); // Oldest -> Newest
+
+    // CHECK 2: Insufficient Overlap
+    // If the intersection is too small to calculate even a basic correlation
+    if (commonDates.length < 5) {
+      // Find the bottleneck ticker to give a helpful error
+      const shortestTicker = Object.entries(tickerCounts)
+        .sort(([, a], [, b]) => a - b)[0];
+      
+      return NextResponse.json({ 
+        error: `Insufficient overlapping data. ${shortestTicker[0]} only has ${shortestTicker[1]} days of data in this period.` 
       }, { status: 400 });
     }
 
-    // Compute correlation matrix
-    const matrix: number[][] = [];
-    for (let i = 0; i < tickers.length; i++) {
-      matrix[i] = [];
-      for (let j = 0; j < tickers.length; j++) {
-        if (i === j) {
-          matrix[i][j] = 1;
-        } else {
-          matrix[i][j] = pearsonCorrelation(alignedReturns[tickers[i]], alignedReturns[tickers[j]]);
-        }
-      }
-    }
-
-    // Compute average correlations
-    const averageCorrelations = tickers.map((ticker, i) => {
-      const corrs = matrix[i].filter((_, j) => i !== j);
-      const avg = corrs.reduce((a, b) => a + b, 0) / corrs.length;
-      return { ticker, avgCorrelation: avg };
+    // 4. Create Aligned Price Series
+    const alignedPrices: Record<string, number[]> = {};
+    tickers.forEach((t) => {
+      const map = new Map(rawData[t].map((i) => [i.date, i.value]));
+      alignedPrices[t] = commonDates.map((d) => map.get(d) || 0);
     });
 
-    // Compute rolling correlations for first two tickers
+    // 5. Compute Log Returns
+    const returns: Record<string, number[]> = {};
+    const returnDates = commonDates.slice(1); 
+
+    tickers.forEach((t) => {
+      const prices = alignedPrices[t];
+      const rets = [];
+      for (let i = 1; i < prices.length; i++) {
+        const pCurrent = prices[i];
+        const pPrev = prices[i - 1];
+        if (pPrev > 0 && pCurrent > 0) {
+          rets.push(Math.log(pCurrent / pPrev));
+        } else {
+          rets.push(0);
+        }
+      }
+      returns[t] = rets;
+    });
+
+    // 6. Compute Matrix (Uses all available overlapping data)
+    const matrix: number[][] = [];
+    const averageCorrelations: any[] = [];
+
+    for (let i = 0; i < tickers.length; i++) {
+      const row: number[] = [];
+      let sumCorr = 0;
+      let count = 0;
+
+      for (let j = 0; j < tickers.length; j++) {
+        if (i === j) {
+          row.push(1);
+        } else {
+          const corr = pearsonCorrelation(returns[tickers[i]], returns[tickers[j]]);
+          row.push(corr);
+          sumCorr += corr;
+          count++;
+        }
+      }
+      matrix.push(row);
+      averageCorrelations.push({
+        ticker: tickers[i],
+        avgCorrelation: count > 0 ? sumCorr / count : 0
+      });
+    }
+
+    // 7. Compute Rolling Correlation (Graceful Fallback)
     const rollingCorrelations = [];
+    let regimeDistribution = {};
     
-    if (tickers.length >= 2 && commonDates.length >= window) {
-      for (let i = window - 1; i < commonDates.length; i++) {
-        const windowReturns1 = alignedReturns[tickers[0]].slice(i - window + 1, i + 1);
-        const windowReturns2 = alignedReturns[tickers[1]].slice(i - window + 1, i + 1);
-        const corr = pearsonCorrelation(windowReturns1, windowReturns2);
+    // Only compute rolling if we have enough data points (need at least window size)
+    if (tickers.length >= 2 && returnDates.length > windowSize) {
+      const r1 = returns[tickers[0]];
+      const r2 = returns[tickers[1]];
+      
+      for (let i = windowSize; i < r1.length; i++) {
+        const slice1 = r1.slice(i - windowSize, i);
+        const slice2 = r2.slice(i - windowSize, i);
         
-        // Compute volatility
-        const mean = windowReturns1.reduce((a, b) => a + b, 0) / windowReturns1.length;
-        const variance = windowReturns1.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / windowReturns1.length;
-        const vol = Math.sqrt(variance);
+        const corr = pearsonCorrelation(slice1, slice2);
         
+        // Volatility for regime detection
+        const mean = slice1.reduce((a, b) => a + b, 0) / slice1.length;
+        const variance = slice1.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / slice1.length;
+        const vol = Math.sqrt(variance * 252); 
+
         rollingCorrelations.push({
-          date: commonDates[i],
+          date: returnDates[i],
           correlation: corr,
           volatility: vol,
         });
       }
+
+      // Compute Regimes
+      if (rollingCorrelations.length > 0) {
+        const vols = rollingCorrelations.map((r) => r.volatility);
+        const meanVol = vols.reduce((a, b) => a + b, 0) / vols.length;
+        const stdVol = Math.sqrt(vols.reduce((sum, v) => sum + Math.pow(v - meanVol, 2), 0) / vols.length);
+
+        let highStress = 0, elevatedRisk = 0, normal = 0, lowVol = 0;
+
+        for (const vol of vols) {
+          if (vol > meanVol + 2 * stdVol) highStress++;
+          else if (vol > meanVol + 1.0 * stdVol) elevatedRisk++;
+          else if (vol > meanVol - 0.5 * stdVol) normal++;
+          else lowVol++;
+        }
+
+        const total = vols.length;
+        regimeDistribution = {
+          "High Stress": (highStress / total) * 100,
+          "Elevated Risk": (elevatedRisk / total) * 100,
+          "Normal": (normal / total) * 100,
+          "Low Volatility": (lowVol / total) * 100,
+        };
+      }
     }
-
-    // Compute regime distribution
-    const vols = rollingCorrelations.map((r) => r.volatility);
-    const meanVol = vols.reduce((a, b) => a + b, 0) / vols.length;
-    const stdVol = Math.sqrt(vols.reduce((sum, v) => sum + Math.pow(v - meanVol, 2), 0) / vols.length);
-
-    let highStress = 0;
-    let elevatedRisk = 0;
-    let normal = 0;
-    let lowVol = 0;
-
-    for (const vol of vols) {
-      if (vol > meanVol + 2 * stdVol) highStress++;
-      else if (vol > meanVol + stdVol) elevatedRisk++;
-      else if (vol > meanVol + 0.5 * stdVol) normal++;
-      else lowVol++;
-    }
-
-    const total = vols.length;
 
     return NextResponse.json({
       startDate: commonDates[0],
       endDate: commonDates[commonDates.length - 1],
       observations: commonDates.length,
+      warning: commonDates.length < windowSize ? "Not enough data for rolling chart" : null,
       matrix: {
         tickers,
         values: matrix,
       },
-      averageCorrelations,
-      rollingCorrelations,
-      regimeDistribution: {
-        "High Stress": (highStress / total) * 100,
-        "Elevated Risk": (elevatedRisk / total) * 100,
-        "Normal": (normal / total) * 100,
-        "Low Volatility": (lowVol / total) * 100,
-      },
+      averageCorrelations: averageCorrelations.sort((a, b) => b.avgCorrelation - a.avgCorrelation),
+      rollingCorrelations, // Might be empty if data is short, which is fine
+      regimeDistribution,
     });
+
   } catch (error: any) {
-    console.error("Correlation API error:", error);
-    return NextResponse.json(
-      { error: error.message || "Internal server error" },
-      { status: 500 }
-    );
+    console.error("Correlation API Error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
