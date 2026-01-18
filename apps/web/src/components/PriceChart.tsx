@@ -83,7 +83,8 @@ export default function PriceChart({
               fontSize: "13px",
             }}
             labelStyle={{ color: "var(--muted)", marginBottom: "5px" }}
-            formatter={(value: number | null, name: string) => {
+            // FIX: Changed 'number | null' to 'any' to satisfy Recharts strict typing
+            formatter={(value: any, name: string) => {
               if (value === null || value === undefined) return ["-", name];
               return [
                 typeof value === "number" ? value.toFixed(2) : value,
