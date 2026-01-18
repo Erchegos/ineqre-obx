@@ -11,86 +11,104 @@ import {
   Legend,
 } from "recharts";
 
-// Default colors for the lines
-const COLORS: Record<string, string> = {
-  rolling20: "#3b82f6", // Blue
-  rolling60: "#10b981", // Green
-  rolling120: "#f59e0b", // Amber
-  ewma94: "#8b5cf6",    // Purple
-  ewma97: "#ec4899",    // Pink
-  parkinson: "#ef4444", // Red
-  garmanKlass: "#06b6d4", // Cyan
+// Configuration for colors and labels
+const MEASURE_CONFIG: Record<string, { label: string; color: string }> = {
+  yangZhang: { label: "Yang-Zhang", color: "#f59e0b" },
+  rogersSatchell: { label: "Rogers-Satchell", color: "#22c55e" },
+  rolling20: { label: "20-Day Rolling", color: "#3b82f6" },
+  rolling60: { label: "60-Day Rolling", color: "#10b981" },
+  rolling120: { label: "120-Day Rolling", color: "#8b5cf6" },
+  ewma94: { label: "EWMA (0.94)", color: "#6366f1" },
+  parkinson: { label: "Parkinson", color: "#ef4444" },
+  garmanKlass: { label: "Garman-Klass", color: "#06b6d4" },
+};
+
+type VolatilityChartProps = {
+  data: any[];
+  selectedMeasures: string[];
+  height?: number;
 };
 
 export default function VolatilityChart({
   data,
+  selectedMeasures,
   height = 400,
-  selectedMeasures = [],
-}: {
-  data: any[];
-  height?: number;
-  selectedMeasures?: string[];
-}) {
+}: VolatilityChartProps) {
   if (!data || data.length === 0) {
     return (
       <div style={{ height, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted)" }}>
-        No data available for chart
+        No data available
       </div>
     );
   }
 
-  // Safe list of measures to render
-  const measuresToRender = selectedMeasures.length > 0 
-    ? selectedMeasures 
-    : ["rolling20", "rolling60", "ewma94"];
-
   return (
     <div style={{ width: "100%", height }}>
       <ResponsiveContainer>
-        <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
+        <LineChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} opacity={0.5} />
+          
           <XAxis
             dataKey="date"
             stroke="var(--muted)"
             fontSize={12}
-            tickFormatter={(val) => val.slice(0, 7)} // Show YYYY-MM
-            minTickGap={30}
+            tickFormatter={(val) => {
+              if (!val) return "";
+              // Show Year for Jan 1st, otherwise Month/Day? 
+              // Simple version: just return valid string
+              return val.length > 7 ? val.slice(0, 4) : val;
+            }}
+            minTickGap={50}
           />
+          
           <YAxis
             stroke="var(--muted)"
             fontSize={12}
             tickFormatter={(val) => `${(val * 100).toFixed(0)}%`}
             domain={["auto", "auto"]}
-            width={40}
           />
+          
           <Tooltip
             contentStyle={{
               backgroundColor: "var(--card-bg)",
               borderColor: "var(--card-border)",
               color: "var(--foreground)",
+              borderRadius: "4px",
+              fontSize: "12px",
             }}
-            itemStyle={{ fontSize: 13 }}
-            labelStyle={{ color: "var(--muted)", marginBottom: 5 }}
-            formatter={(val: number | undefined) => 
-              val !== undefined ? [`${(val * 100).toFixed(2)}%`, ""] : ["—", ""]
-            }
+            itemStyle={{ paddingBottom: 2 }}
+            labelStyle={{ color: "var(--muted)", marginBottom: 8 }}
+            // FIX: Use 'any' to avoid strict type errors with Recharts
+            formatter={(value: any, name: any) => {
+              if (value === null || value === undefined) return ["-", name];
+              return [`${(Number(value) * 100).toFixed(2)}%`, MEASURE_CONFIG[name]?.label || name];
+            }}
+            labelFormatter={(label) => new Date(label).toLocaleDateString("en-US", { 
+              weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' 
+            })}
           />
-          <Legend />
           
-          {measuresToRender.map((key) => (
-            <Line
-              key={key}
-              type="monotone"
-              dataKey={key}
-              stroke={COLORS[key] || "#8884d8"}
-              strokeWidth={1.5}
-              dot={false}
-              activeDot={{ r: 4 }}
-              // CRITICAL FIX: Connects lines across null/N/A values so the chart isn't blank
-              connectNulls={true} 
-              isAnimationActive={false}
-            />
-          ))}
+          <Legend wrapperStyle={{ paddingTop: "10px" }} />
+
+          {selectedMeasures.map((measureKey) => {
+            const config = MEASURE_CONFIG[measureKey];
+            if (!config) return null;
+            
+            return (
+              <Line
+                key={measureKey}
+                type="monotone"
+                dataKey={measureKey}
+                name={config.label}
+                stroke={config.color}
+                strokeWidth={1.5}
+                dot={false}
+                activeDot={{ r: 4 }}
+                connectNulls={true}
+                isAnimationActive={false}
+              />
+            );
+          })}
         </LineChart>
       </ResponsiveContainer>
     </div>

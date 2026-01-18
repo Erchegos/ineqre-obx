@@ -8,89 +8,121 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  ReferenceLine,
   Legend,
 } from "recharts";
 
-// Default colors for the lines
-const COLORS: Record<string, string> = {
-  rolling20: "#3b82f6", // Blue
-  rolling60: "#10b981", // Green
-  rolling120: "#f59e0b", // Amber
-  ewma94: "#8b5cf6",    // Purple
-  ewma97: "#ec4899",    // Pink
-  parkinson: "#ef4444", // Red
-  garmanKlass: "#06b6d4", // Cyan
+type PriceData = {
+  date: string;
+  value?: number | null; 
+  price?: number | null; 
+  raw?: number | null;   
+  total?: number | null; 
+  [key: string]: any;
 };
 
-export default function VolatilityChart({
+export default function PriceChart({
   data,
   height = 400,
-  selectedMeasures = [],
+  showComparison = false,
 }: {
-  data: any[];
+  data: PriceData[];
   height?: number;
-  selectedMeasures?: string[];
+  mode?: "currency" | "percentage";
+  showComparison?: boolean;
 }) {
   if (!data || data.length === 0) {
     return (
       <div style={{ height, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted)" }}>
-        No data available for chart
+        No data available
       </div>
     );
   }
 
-  // Safe list of measures to render
-  const measuresToRender = selectedMeasures.length > 0 
-    ? selectedMeasures 
-    : ["rolling20", "rolling60", "ewma94"];
+  // Determine the primary key to render if not in explicit comparison mode
+  const hasRaw = data.some(d => d.raw !== undefined && d.raw !== null);
+  const primaryKey = hasRaw ? "raw" : (data[0].value !== undefined ? "value" : "price");
+  
+  // Check if we actually have comparison data
+  const hasTotal = data.some(d => d.total !== undefined && d.total !== null);
+  const isComparisonActive = showComparison || (hasRaw && hasTotal);
 
   return (
     <div style={{ width: "100%", height }}>
       <ResponsiveContainer>
-        <LineChart data={data}>
+        <LineChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: -20 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
+          
           <XAxis
             dataKey="date"
             stroke="var(--muted)"
             fontSize={12}
-            tickFormatter={(val) => val.slice(0, 7)} // Show YYYY-MM
-            minTickGap={30}
+            tickFormatter={(val) => {
+                if (!val) return "";
+                return val.length > 7 ? val.slice(5) : val; 
+            }}
+            minTickGap={40}
+            tickMargin={10}
           />
+          
           <YAxis
             stroke="var(--muted)"
             fontSize={12}
-            tickFormatter={(val) => `${(val * 100).toFixed(0)}%`}
             domain={["auto", "auto"]}
-            width={40}
+            tickFormatter={(val) => val.toFixed(0)}
           />
+          
           <Tooltip
             contentStyle={{
               backgroundColor: "var(--card-bg)",
               borderColor: "var(--card-border)",
               color: "var(--foreground)",
+              borderRadius: "4px",
+              fontSize: "13px",
             }}
-            itemStyle={{ fontSize: 13 }}
-            labelStyle={{ color: "var(--muted)", marginBottom: 5 }}
-            formatter={(val: number | undefined) => 
-              val !== undefined ? [`${(val * 100).toFixed(2)}%`, ""] : ["—", ""]
-            }
+            labelStyle={{ color: "var(--muted)", marginBottom: "5px" }}
+            // FIX: Use 'any' for both arguments to completely bypass strict type mismatch
+            formatter={(value: any, name: any) => {
+              if (value === null || value === undefined) return ["-", name];
+              return [
+                typeof value === "number" ? value.toFixed(2) : value,
+                name === "raw" ? "Price Return" : name === "total" ? "Total Return" : "Value"
+              ];
+            }}
           />
-          <Legend />
           
-          {measuresToRender.map((key) => (
+          {isComparisonActive && <Legend verticalAlign="top" height={36} />}
+
+          {/* PRIMARY LINE */}
+          <Line
+            type="monotone"
+            dataKey={primaryKey}
+            name={isComparisonActive ? "Price Return" : "Value"}
+            stroke={isComparisonActive ? "#22c55e" : "#3b82f6"} 
+            strokeWidth={2}
+            dot={false}
+            activeDot={{ r: 4 }}
+            connectNulls={true}
+            isAnimationActive={false} 
+          />
+
+          {/* SECONDARY LINE */}
+          {isComparisonActive && (
             <Line
-              key={key}
               type="monotone"
-              dataKey={key}
-              stroke={COLORS[key] || "#8884d8"}
-              strokeWidth={1.5}
+              dataKey="total"
+              name="Total Return"
+              stroke="#3b82f6" 
+              strokeWidth={2}
               dot={false}
               activeDot={{ r: 4 }}
-              // CRITICAL FIX: Connects lines across null/N/A values so the chart isn't blank
-              connectNulls={true} 
+              connectNulls={true}
               isAnimationActive={false}
             />
-          ))}
+          )}
+
+          {isComparisonActive && <ReferenceLine y={0} stroke="var(--border)" strokeDasharray="3 3" />}
+
         </LineChart>
       </ResponsiveContainer>
     </div>

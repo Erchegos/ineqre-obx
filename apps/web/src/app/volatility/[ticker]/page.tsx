@@ -3,17 +3,10 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
+
+// --- Components ---
 import VolatilityChart from "@/components/VolatilityChart";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-  Cell,
-  CartesianGrid
-} from "recharts";
+import SeasonalityChart from "@/components/SeasonalityChart";
 
 // --- Types ---
 type VolatilityData = {
@@ -64,6 +57,7 @@ type VolatilityData = {
 };
 
 // --- Configuration ---
+// Kept here for the toggle buttons
 const MEASURE_CONFIG = [
   { key: "yangZhang", label: "Yang-Zhang", color: "#f59e0b", desc: "Gap-Adjusted (Best)" },
   { key: "rogersSatchell", label: "Rogers-Satchell", color: "#22c55e", desc: "Trend-Robust" },
@@ -338,7 +332,7 @@ export default function VolatilityPage() {
           </div>
         </div>
 
-        {/* Right: Seasonality (Replaced dummy input with this) */}
+        {/* Right: Seasonality */}
         <div>
           <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: "var(--foreground)" }}>Volatility Seasonality</h3>
            <div style={{ padding: 20, borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)", height: 260 }}>
@@ -350,7 +344,7 @@ export default function VolatilityPage() {
   );
 }
 
-// --- SUB-COMPONENTS ---
+// --- SUB-COMPONENTS (Helpers Only) ---
 
 function StatBox({ label, value, sub, highlight, color }: { label: string; value: string; sub: string; highlight?: boolean; color?: string }) {
   return (
@@ -367,95 +361,5 @@ function StatBox({ label, value, sub, highlight, color }: { label: string; value
       <div style={{ fontSize: 20, fontWeight: 600, color: color || "var(--foreground)", fontFamily: "monospace" }}>{value}</div>
       <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 4 }}>{sub}</div>
     </div>
-  );
-}
-
-// --- NEW SEASONALITY CHART (Fixed) ---
-function SeasonalityChart({ data }: { data: any[] }) {
-  const seasonalData = useMemo(() => {
-    // FIX: Always return valid structure, even if empty
-    if (!data || data.length === 0) {
-        return { result: [], maxVol: 0, minVol: 0 };
-    }
-
-    const months = Array.from({ length: 12 }, () => ({ sum: 0, count: 0 }));
-    
-    data.forEach((day) => {
-      // Use YangZhang, fallback to Rolling20
-      const val = day.yangZhang ?? day.rolling20;
-      if (val) {
-        const date = new Date(day.date);
-        const monthIndex = date.getMonth(); 
-        months[monthIndex].sum += val;
-        months[monthIndex].count += 1;
-      }
-    });
-
-    const result = months.map((m, i) => ({
-      month: new Date(2000, i, 1).toLocaleString("en-US", { month: "short" }),
-      avgVol: m.count > 0 ? m.sum / m.count : 0,
-    }));
-
-    const maxVol = Math.max(...result.map((r) => r.avgVol));
-    const minVol = Math.min(...result.map((r) => r.avgVol));
-    return { result, maxVol, minVol };
-  }, [data]);
-
-  const getColor = (val: number, min: number, max: number) => {
-    // Simple heatmap logic: Blue -> Orange -> Red
-    const ratio = (val - min) / (max - min || 1);
-    if (ratio > 0.8) return "#ef4444"; 
-    if (ratio > 0.5) return "#f59e0b"; 
-    return "#3b82f6"; 
-  };
-
-  if (!data || !data.length) return <div style={{color: "var(--muted)", fontSize: 13}}>No Data Available</div>;
-
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart 
-        data={seasonalData.result} 
-        margin={{ top: 10, right: 0, left: -25, bottom: 0 }}
-      >
-        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-subtle)" opacity={0.3} />
-        <XAxis 
-          dataKey="month" 
-          axisLine={false} 
-          tickLine={false} 
-          tick={{ fill: "var(--muted)", fontSize: 11 }} 
-          dy={10}
-        />
-        <YAxis 
-          axisLine={false} 
-          tickLine={false} 
-          tickFormatter={(val) => `${(val * 100).toFixed(0)}%`} 
-          tick={{ fill: "var(--muted)", fontSize: 11 }} 
-        />
-        <RechartsTooltip
-          cursor={{ fill: "var(--muted)", opacity: 0.1 }}
-          content={({ active, payload }) => {
-            if (active && payload && payload.length) {
-              return (
-                <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-subtle)", padding: "8px", borderRadius: "4px", fontSize: "12px" }}>
-                  <span style={{ fontWeight: 600 }}>{payload[0].payload.month}: </span>
-                  <span style={{ fontFamily: "monospace" }}>
-                    {(Number(payload[0].value) * 100).toFixed(2)}% Avg
-                  </span>
-                </div>
-              );
-            }
-            return null;
-          }}
-        />
-        <Bar dataKey="avgVol" radius={[2, 2, 0, 0]}>
-          {seasonalData.result.map((entry: any, index: number) => (
-            <Cell 
-              key={`cell-${index}`} 
-              fill={getColor(entry.avgVol, seasonalData.minVol, seasonalData.maxVol)} 
-            />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
   );
 }
