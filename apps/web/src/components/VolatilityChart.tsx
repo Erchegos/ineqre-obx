@@ -71,7 +71,9 @@ export default function VolatilityChart({
             }}
             itemStyle={{ fontSize: 13 }}
             labelStyle={{ color: "var(--muted)", marginBottom: 5 }}
-            formatter={(val: number) => [`${(val * 100).toFixed(2)}%`, ""]}
+            formatter={(val: number | undefined) => 
+              val !== undefined ? [`${(val * 100).toFixed(2)}%`, ""] : ["—", ""]
+            }
           />
           <Legend />
           
