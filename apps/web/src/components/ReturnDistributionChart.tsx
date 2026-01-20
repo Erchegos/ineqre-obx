@@ -384,15 +384,16 @@ export default function ReturnDistributionChart({
               key={threshold.value}
               x={threshold.value}
               stroke={threshold.value < 0 ? "#ef4444" : "#22c55e"}
-              strokeWidth={2}
-              strokeDasharray="4 4"
+              strokeWidth={3}
+              strokeDasharray="5 5"
+              strokeOpacity={0.8}
               label={{
                 value: threshold.label,
-                position: threshold.value < 0 ? "left" : "right",
+                position: "top",
                 fill: threshold.value < 0 ? "#ef4444" : "#22c55e",
-                fontSize: 10,
-                offset: 8,
-                fontWeight: 600,
+                fontSize: 11,
+                offset: 10,
+                fontWeight: 700,
               }}
             />
           ))}
