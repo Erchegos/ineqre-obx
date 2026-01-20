@@ -96,14 +96,17 @@ export default function SeasonalityChart({ data }: SeasonalityChartProps) {
         />
         
         <Tooltip
-          cursor={{ fill: "var(--muted)", opacity: 0.1 }}
+          cursor={{ fill: "#3b82f6", opacity: 0.2 }}
           contentStyle={{
             backgroundColor: "var(--card-bg)",
             borderColor: "var(--card-border)",
             color: "var(--foreground)",
             borderRadius: "4px",
             fontSize: "12px",
+            border: "1px solid var(--card-border)",
           }}
+          labelStyle={{ color: "var(--foreground)", marginBottom: 4, fontWeight: 500 }}
+          itemStyle={{ color: "var(--foreground)" }}
           // FIX: Use 'any' to satisfy Recharts Types
           formatter={(value: any) => [
             `${(Number(value) * 100).toFixed(2)}%`,
