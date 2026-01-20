@@ -393,9 +393,9 @@ export default function ReturnDistributionChart({
             const maxReturn = Math.max(...chartData.map(d => d.return));
             const range = maxReturn - minReturn;
 
-            // Calculate 0% position in the data range (0% = 0 return)
-            // This gives us where 0% sits within the min-max range as a 0-1 fraction
-            const zeroPosition = (0 - minReturn) / range;
+            // Calculate mean position in the data range (where most data is concentrated)
+            // 0σ should be at the mean (peak of distribution), not at 0% return
+            const meanPosition = (avgMean - minReturn) / range;
 
             // Recharts margins from AreaChart component
             // The Y-axis takes up space on the left side
@@ -405,33 +405,33 @@ export default function ReturnDistributionChart({
             // Calculate the actual plotting area width
             const plottingAreaWidth = containerWidth - yAxisWidth - marginRight;
 
-            // Calculate 0% position in pixels, then convert to percentage of container
-            const zeroXPixels = yAxisWidth + (zeroPosition * plottingAreaWidth);
-            const zeroXPercent = (zeroXPixels / containerWidth) * 100;
+            // Calculate mean position in pixels, then convert to percentage of container
+            const meanXPixels = yAxisWidth + (meanPosition * plottingAreaWidth);
+            const meanXPercent = (meanXPixels / containerWidth) * 100;
 
             return (
               <>
-                {/* 0σ line at 0% return */}
+                {/* 0σ line at mean (where most data is concentrated) */}
                 <g key="zero">
                   <line
-                    x1={`${zeroXPercent}%`}
+                    x1={`${meanXPercent}%`}
                     y1="10"
-                    x2={`${zeroXPercent}%`}
+                    x2={`${meanXPercent}%`}
                     y2={`calc(100% - 40px)`}
                     stroke="var(--foreground)"
                     strokeWidth="2"
                     strokeDasharray="5 5"
                     opacity="0.6"
                   />
-                  <text x={`${zeroXPercent}%`} y="20" fill="var(--foreground)" fontSize="10" opacity="0.8" textAnchor="middle" fontWeight="600">
+                  <text x={`${meanXPercent}%`} y="20" fill="var(--foreground)" fontSize="10" opacity="0.8" textAnchor="middle" fontWeight="600">
                     0σ
                   </text>
                 </g>
 
-                {/* Sigma lines - relative to 0% return */}
+                {/* Sigma lines - relative to mean */}
                 {sigmaLevels.map(({ sigma, opacity }) => {
-                  const negPosition = (0 - sigma * avgSigma - minReturn) / range;
-                  const posPosition = (0 + sigma * avgSigma - minReturn) / range;
+                  const negPosition = (avgMean - sigma * avgSigma - minReturn) / range;
+                  const posPosition = (avgMean + sigma * avgSigma - minReturn) / range;
 
                   const negXPixels = yAxisWidth + (negPosition * plottingAreaWidth);
                   const posXPixels = yAxisWidth + (posPosition * plottingAreaWidth);
