@@ -265,110 +265,174 @@ export default function CorrelationPage() {
               animation: "fadeIn 0.2s ease-in-out"
             }}
           >
-            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 20, color: "var(--foreground)" }}>
-              Correlation Analysis Guide
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: "var(--foreground)" }}>
+              How to Read This Analysis
             </h2>
+            <p style={{ fontSize: 13, color: "var(--muted-foreground)", marginBottom: 20, lineHeight: 1.6 }}>
+              Correlation measures how two stocks move together. Think of it like a dance: high correlation means they move in sync, low correlation means they dance independently.
+            </p>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 24 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 24 }}>
               <div>
-                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 16 }}>📊</span> Analysis Mode
+                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 16 }}>📊</span> What Are You Measuring?
                 </h3>
-                <ul style={{ margin: 0, paddingLeft: 20, color: "var(--muted-foreground)", fontSize: 12 }}>
-                  <li style={{ marginBottom: 8 }}>
-                    <strong style={{ color: "var(--accent)" }}>Total Return (Recommended):</strong> Dividend-adjusted prices provide true economic correlation. Essential for high-dividend stocks to avoid spurious breaks on ex-div dates.
-                  </li>
-                  <li style={{ marginBottom: 8 }}>
-                    <strong>Price (Raw):</strong> Unadjusted market prices. Useful for intraday correlation or when dividends are irrelevant. May show artificial correlation breaks.
-                  </li>
-                </ul>
+                <div style={{ background: "rgba(59, 130, 246, 0.05)", padding: 12, borderRadius: 6, marginBottom: 10, border: "1px solid rgba(59, 130, 246, 0.2)" }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "var(--accent)", marginBottom: 4 }}>✓ Total Return (Recommended)</div>
+                  <p style={{ fontSize: 11, color: "var(--muted-foreground)", margin: 0, lineHeight: 1.5 }}>
+                    Includes dividends. Shows the real relationship. Example: If EQUINOR pays a big dividend, the stock price drops artificially — Total Return fixes this.
+                  </p>
+                </div>
+                <div style={{ background: "var(--input-bg)", padding: 12, borderRadius: 6, border: "1px solid var(--border-subtle)" }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", marginBottom: 4 }}>Price (Raw)</div>
+                  <p style={{ fontSize: 11, color: "var(--muted-foreground)", margin: 0, lineHeight: 1.5 }}>
+                    Only stock price. Can show fake breaks on dividend dates. Use for short-term or non-dividend stocks.
+                  </p>
+                </div>
               </div>
 
               <div>
-                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 16 }}>🎯</span> Correlation Interpretation
+                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 16 }}>🎯</span> Reading the Numbers
                 </h3>
-                <ul style={{ margin: 0, paddingLeft: 20, color: "var(--muted-foreground)", fontSize: 12 }}>
-                  <li style={{ marginBottom: 8 }}><strong>+0.8 to +1.0:</strong> Very strong positive (move together)</li>
-                  <li style={{ marginBottom: 8 }}><strong>+0.5 to +0.8:</strong> Moderate positive (often related)</li>
-                  <li style={{ marginBottom: 8 }}><strong>-0.2 to +0.5:</strong> Weak/no relationship</li>
-                  <li style={{ marginBottom: 8 }}><strong>-0.5 to -0.2:</strong> Moderate negative</li>
-                  <li style={{ marginBottom: 8 }}><strong>-1.0 to -0.5:</strong> Strong negative (hedging potential)</li>
-                </ul>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <div style={{ padding: "8px 12px", background: "rgba(34, 197, 94, 0.1)", borderRadius: 4, border: "1px solid rgba(34, 197, 94, 0.3)" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#22c55e" }}>+0.8 to +1.0</div>
+                    <div style={{ fontSize: 10, color: "var(--muted-foreground)" }}>Move together like twins. One goes up → the other goes up.</div>
+                  </div>
+                  <div style={{ padding: "8px 12px", background: "rgba(59, 130, 246, 0.1)", borderRadius: 4, border: "1px solid rgba(59, 130, 246, 0.3)" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#3b82f6" }}>+0.5 to +0.8</div>
+                    <div style={{ fontSize: 10, color: "var(--muted-foreground)" }}>Often move together. Same sector stocks (e.g., all energy).</div>
+                  </div>
+                  <div style={{ padding: "8px 12px", background: "var(--input-bg)", borderRadius: 4, border: "1px solid var(--border-subtle)" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)" }}>-0.2 to +0.5</div>
+                    <div style={{ fontSize: 10, color: "var(--muted-foreground)" }}>No clear pattern. Independent businesses.</div>
+                  </div>
+                  <div style={{ padding: "8px 12px", background: "rgba(239, 68, 68, 0.1)", borderRadius: 4, border: "1px solid rgba(239, 68, 68, 0.3)" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#ef4444" }}>-1.0 to -0.5</div>
+                    <div style={{ fontSize: 10, color: "var(--muted-foreground)" }}>Move opposite. Great for hedging (when one falls, other rises).</div>
+                  </div>
+                </div>
               </div>
 
               <div>
-                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 16 }}>⏱️</span> Rolling Window
+                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 16 }}>⏱️</span> Time Windows
                 </h3>
-                <ul style={{ margin: 0, paddingLeft: 20, color: "var(--muted-foreground)", fontSize: 12 }}>
-                  <li style={{ marginBottom: 8 }}>
-                    <strong>Short (20d):</strong> Captures recent regime changes, high sensitivity. More noise, faster signal.
-                  </li>
-                  <li style={{ marginBottom: 8 }}>
-                    <strong>Medium (60d):</strong> Balanced view of structural shifts. Good for quarterly rebalancing.
-                  </li>
-                  <li style={{ marginBottom: 8 }}>
-                    <strong>Long (120-252d):</strong> Stable baseline correlation. Smooths volatility spikes, reveals long-term relationships.
-                  </li>
-                </ul>
+                <p style={{ fontSize: 11, color: "var(--muted-foreground)", marginBottom: 12 }}>
+                  Correlations change over time. The rolling window shows how stable the relationship is.
+                </p>
+                <div style={{ display: "grid", gap: 10 }}>
+                  <div style={{ borderLeft: "3px solid #f59e0b", paddingLeft: 10 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--foreground)" }}>20 Days</div>
+                    <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.4 }}>
+                      Catches recent changes fast. Jumpy. Good for short-term traders.
+                    </div>
+                  </div>
+                  <div style={{ borderLeft: "3px solid #3b82f6", paddingLeft: 10 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--foreground)" }}>60 Days</div>
+                    <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.4 }}>
+                      Balanced. Not too noisy. Best for most analyses.
+                    </div>
+                  </div>
+                  <div style={{ borderLeft: "3px solid #8b5cf6", paddingLeft: 10 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--foreground)" }}>120-252 Days</div>
+                    <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.4 }}>
+                      Smooth, long-term trend. Ignores short blips.
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div>
-                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 16 }}>📈</span> Practical Applications
+                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 16 }}>💡</span> Why This Matters
                 </h3>
-                <ul style={{ margin: 0, paddingLeft: 20, color: "var(--muted-foreground)", fontSize: 12 }}>
-                  <li style={{ marginBottom: 8 }}>
-                    <strong>Portfolio Diversification:</strong> Look for low/negative correlations to reduce overall portfolio risk.
-                  </li>
-                  <li style={{ marginBottom: 8 }}>
-                    <strong>Pairs Trading:</strong> High rolling correlation (0.8+) suggests cointegration potential.
-                  </li>
-                  <li style={{ marginBottom: 8 }}>
-                    <strong>Crisis Detection:</strong> Sudden correlation spikes indicate contagion or market stress.
-                  </li>
-                  <li style={{ marginBottom: 8 }}>
-                    <strong>Sector Analysis:</strong> Within-sector correlations typically 0.5-0.8 for mature markets.
-                  </li>
-                </ul>
+                <div style={{ display: "grid", gap: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--foreground)", marginBottom: 4 }}>Build a Better Portfolio</div>
+                    <p style={{ fontSize: 10, color: "var(--muted-foreground)", margin: 0, lineHeight: 1.4 }}>
+                      Want low risk? Pick stocks with low correlation. If one drops, the others won't necessarily follow.
+                    </p>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--foreground)", marginBottom: 4 }}>Spot Market Crashes</div>
+                    <p style={{ fontSize: 10, color: "var(--muted-foreground)", margin: 0, lineHeight: 1.4 }}>
+                      During crises, correlations spike to +1. Everything falls together. The rolling chart shows this.
+                    </p>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--foreground)", marginBottom: 4 }}>Find Trading Pairs</div>
+                    <p style={{ fontSize: 10, color: "var(--muted-foreground)", margin: 0, lineHeight: 1.4 }}>
+                      Two stocks with 0.8+ correlation usually move together. If they diverge, one might be mispriced.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div>
-                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 16 }}>⚠️</span> Statistical Notes
+                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 16 }}>🔥</span> Market Stress Levels
                 </h3>
-                <ul style={{ margin: 0, paddingLeft: 20, color: "var(--muted-foreground)", fontSize: 12 }}>
-                  <li style={{ marginBottom: 8 }}>
-                    <strong>Sample Size:</strong> Minimum 60 observations recommended for statistical significance (p &lt; 0.05).
-                  </li>
-                  <li style={{ marginBottom: 8 }}>
-                    <strong>Non-Stationarity:</strong> Correlations change over time. Use rolling windows to detect regime shifts.
-                  </li>
-                  <li style={{ marginBottom: 8 }}>
-                    <strong>Outliers:</strong> Extreme events can distort Pearson correlation. Consider rank correlation for robustness.
-                  </li>
-                </ul>
+                <p style={{ fontSize: 11, color: "var(--muted-foreground)", marginBottom: 12 }}>
+                  The background color on the rolling chart shows market stress (similar to VIX).
+                </p>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ width: 12, height: 12, background: "#22c55e", borderRadius: 2 }}></div>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: "#22c55e" }}>Low Volatility</div>
+                      <div style={{ fontSize: 9, color: "var(--muted-foreground)" }}>Calm market, stocks move independently</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ width: 12, height: 12, background: "#3b82f6", borderRadius: 2 }}></div>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: "#3b82f6" }}>Normal</div>
+                      <div style={{ fontSize: 9, color: "var(--muted-foreground)" }}>Business as usual</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ width: 12, height: 12, background: "#fb923c", borderRadius: 2 }}></div>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: "#fb923c" }}>Elevated Risk</div>
+                      <div style={{ fontSize: 9, color: "var(--muted-foreground)" }}>Market getting nervous</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ width: 12, height: 12, background: "#ef4444", borderRadius: 2 }}></div>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: "#ef4444" }}>High Stress</div>
+                      <div style={{ fontSize: 9, color: "var(--muted-foreground)" }}>Panic mode, everything moves together</div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div>
-                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 16 }}>🔥</span> Market Regimes
+                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 16 }}>⚠️</span> Things to Watch
                 </h3>
-                <ul style={{ margin: 0, paddingLeft: 20, color: "var(--muted-foreground)", fontSize: 12 }}>
-                  <li style={{ marginBottom: 8 }}>
-                    <strong style={{ color: "#ef4444" }}>High Stress:</strong> VIX-equivalent &gt; 30. Flight to quality, correlations converge to +1.
-                  </li>
-                  <li style={{ marginBottom: 8 }}>
-                    <strong style={{ color: "#fb923c" }}>Elevated Risk:</strong> VIX 20-30. Increased correlation, selective risk-off.
-                  </li>
-                  <li style={{ marginBottom: 8 }}>
-                    <strong style={{ color: "#3b82f6" }}>Normal:</strong> VIX 12-20. Idiosyncratic factors dominate.
-                  </li>
-                  <li style={{ marginBottom: 8 }}>
-                    <strong style={{ color: "#22c55e" }}>Low Volatility:</strong> VIX &lt; 12. Correlation compression, hunt for yield.
-                  </li>
-                </ul>
+                <div style={{ display: "grid", gap: 10 }}>
+                  <div style={{ background: "rgba(251, 146, 60, 0.1)", padding: 10, borderRadius: 6, border: "1px solid rgba(251, 146, 60, 0.3)" }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "#fb923c", marginBottom: 4 }}>Need Enough Data</div>
+                    <p style={{ fontSize: 10, color: "var(--muted-foreground)", margin: 0 }}>
+                      At least 60 trading days. Otherwise the numbers aren't trustworthy.
+                    </p>
+                  </div>
+                  <div style={{ background: "rgba(251, 146, 60, 0.1)", padding: 10, borderRadius: 6, border: "1px solid rgba(251, 146, 60, 0.3)" }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "#fb923c", marginBottom: 4 }}>Correlations Change</div>
+                    <p style={{ fontSize: 10, color: "var(--muted-foreground)", margin: 0 }}>
+                      What's true today might not be true next year. Check regularly.
+                    </p>
+                  </div>
+                  <div style={{ background: "rgba(251, 146, 60, 0.1)", padding: 10, borderRadius: 6, border: "1px solid rgba(251, 146, 60, 0.3)" }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "#fb923c", marginBottom: 4 }}>Crisis = Everything Correlates</div>
+                    <p style={{ fontSize: 10, color: "var(--muted-foreground)", margin: 0 }}>
+                      During market crashes, diversification often fails. Everything drops together.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -797,13 +861,17 @@ export default function CorrelationPage() {
 
             {/* Matrix & Stats Grid */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(500px, 1fr))", gap: 24, marginBottom: 24 }}>
-              
+
               {/* Correlation Matrix */}
               {correlationData.matrix && (
                 <div className="card-enhanced" style={{ padding: 24, borderRadius: 8 }}>
-                  <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 20 }}>
+                  <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
                     Correlation Matrix
                   </h2>
+                  <p style={{ fontSize: 12, color: "var(--muted-foreground)", marginBottom: 16, lineHeight: 1.5 }}>
+                    <strong>How to read:</strong> Each cell shows how two stocks move together. Darker blue = stronger correlation.
+                    Look for light colors (low correlation) to find good diversification pairs.
+                  </p>
                   <CorrelationHeatmap data={correlationData.matrix} />
                 </div>
               )}
@@ -811,11 +879,12 @@ export default function CorrelationPage() {
               {/* Average Correlations */}
               {correlationData.averageCorrelations && (
                 <div className="card-enhanced" style={{ padding: 24, borderRadius: 8 }}>
-                  <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 20 }}>
+                  <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
                     Average Correlations
                   </h2>
-                  <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 20 }}>
-                    How strongly does each asset correlate with the rest of the selected group?
+                  <p style={{ fontSize: 12, color: "var(--muted-foreground)", marginBottom: 16, lineHeight: 1.5 }}>
+                    <strong>What this shows:</strong> How strongly each stock correlates with all the others combined.
+                    High number = moves with the group. Low number = independent stock.
                   </p>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
                     {correlationData.averageCorrelations.map(
@@ -855,15 +924,23 @@ export default function CorrelationPage() {
               <div className="card-enhanced" style={{ padding: 24, borderRadius: 8, marginBottom: 24 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <h2 style={{ fontSize: 18, fontWeight: 600 }}>
-                    Rolling Correlation (First Pair)
+                    Rolling Correlation Over Time
                   </h2>
-                  <span style={{ fontSize: 13, padding: "4px 8px", background: "var(--input-bg)", borderRadius: 4 }}>
+                  <span style={{ fontSize: 13, padding: "4px 8px", background: "var(--input-bg)", borderRadius: 4, fontWeight: 600 }}>
                     {selectedTickers[0]} vs {selectedTickers[1]}
                   </span>
                 </div>
-                <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 24 }}>
-                  Observe how the relationship evolves over time. Spikes in the yellow area indicate high market stress.
+                <p style={{ fontSize: 12, color: "var(--muted-foreground)", marginBottom: 16, lineHeight: 1.5 }}>
+                  <strong>What this shows:</strong> How the correlation changes day by day.
+                  The <strong style={{ color: "#3b82f6" }}>blue line</strong> is correlation (left axis).
+                  The <strong style={{ color: "var(--muted)" }}>background shading</strong> shows market stress levels (right axis).
                 </p>
+                <div style={{ background: "rgba(59, 130, 246, 0.05)", padding: 12, borderRadius: 6, marginBottom: 20, border: "1px solid rgba(59, 130, 246, 0.2)" }}>
+                  <p style={{ fontSize: 11, color: "var(--muted-foreground)", margin: 0, lineHeight: 1.5 }}>
+                    💡 <strong>Look for:</strong> Sudden spikes to +1 during red/orange periods = crisis mode (everything falls together).
+                    Stable line in blue/green areas = normal market where stocks can move independently.
+                  </p>
+                </div>
                 <div style={{ height: 400 }}>
                   <RollingCorrelationChart data={correlationData.rollingCorrelations} />
                 </div>
@@ -873,9 +950,13 @@ export default function CorrelationPage() {
             {/* Market Regime Distribution */}
             {correlationData.regimeDistribution && (
               <div className="card-enhanced" style={{ padding: 24, borderRadius: 8 }}>
-                <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 20 }}>
+                <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
                   Market Regime Distribution
                 </h2>
+                <p style={{ fontSize: 12, color: "var(--muted-foreground)", marginBottom: 20, lineHeight: 1.5 }}>
+                  <strong>What this shows:</strong> What percentage of time the market was in each stress level during your selected period.
+                  High stress = correlations spike, diversification fails.
+                </p>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 16 }}>
                   {Object.entries(correlationData.regimeDistribution).map(
                     ([regime, pct]) => {
