@@ -21,10 +21,10 @@ const TIMEFRAMES = [
 ];
 
 const ROLLING_WINDOWS = [
-  { label: "20 Days (Short Term)", days: 20 },
-  { label: "60 Days (Medium Term)", days: 60 },
-  { label: "120 Days (Long Term)", days: 120 },
-  { label: "252 Days (1 Year)", days: 252 },
+  { label: "20 Days (1 Month)", days: 20, desc: "Captures short-term co-movement" },
+  { label: "60 Days (1 Quarter)", days: 60, desc: "Medium-term relationships" },
+  { label: "120 Days (6 Months)", days: 120, desc: "Longer-term structural correlation" },
+  { label: "252 Days (1 Year)", days: 252, desc: "Annual correlation cycle" },
 ];
 
 export default function CorrelationPage() {
@@ -37,11 +37,13 @@ export default function CorrelationPage() {
   const [availableTickers, setAvailableTickers] = useState<string[]>([]);
   const [tickerInput, setTickerInput] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
-  
+  const [showTickerPanel, setShowTickerPanel] = useState(false);
+  const [sortBy, setSortBy] = useState<"alpha" | "selected">("alpha");
+
   const [correlationData, setCorrelationData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Settings
   const [timeframe, setTimeframe] = useState(365);
   const [rollingWindow, setRollingWindow] = useState(60);
@@ -69,6 +71,16 @@ export default function CorrelationPage() {
       t.toLowerCase().includes(tickerInput.toLowerCase()) &&
       !selectedTickers.includes(t)
   );
+
+  const sortedTickers = [...availableTickers].sort((a, b) => {
+    if (sortBy === "selected") {
+      const aSelected = selectedTickers.includes(a);
+      const bSelected = selectedTickers.includes(b);
+      if (aSelected && !bSelected) return -1;
+      if (!aSelected && bSelected) return 1;
+    }
+    return a.localeCompare(b);
+  });
 
   function handlePresetGroup(group: keyof typeof PRESET_GROUPS) {
     setSelectedTickers(PRESET_GROUPS[group]);
@@ -247,30 +259,115 @@ export default function CorrelationPage() {
             style={{
               padding: 24,
               marginBottom: 32,
-              fontSize: 14,
-              lineHeight: 1.6,
+              fontSize: 13,
+              lineHeight: 1.7,
               borderRadius: 8,
               animation: "fadeIn 0.2s ease-in-out"
             }}
           >
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 24 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 20, color: "var(--foreground)" }}>
+              Correlation Analysis Guide
+            </h2>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 24 }}>
               <div>
-                <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--foreground)", marginBottom: 8 }}>Analysis Mode</h3>
-                <ul style={{ margin: 0, paddingLeft: 20, color: "var(--muted-foreground)" }}>
-                  <li style={{ marginBottom: 6 }}>
-                    <strong>Total Return (Recommended):</strong> Adjusts historical prices for dividends. This shows the true economic correlation between assets.
+                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 16 }}>📊</span> Analysis Mode
+                </h3>
+                <ul style={{ margin: 0, paddingLeft: 20, color: "var(--muted-foreground)", fontSize: 12 }}>
+                  <li style={{ marginBottom: 8 }}>
+                    <strong style={{ color: "var(--accent)" }}>Total Return (Recommended):</strong> Dividend-adjusted prices provide true economic correlation. Essential for high-dividend stocks to avoid spurious breaks on ex-div dates.
                   </li>
-                  <li>
-                    <strong>Price (Raw):</strong> Uses raw market prices. High-dividend stocks may appear less correlated on ex-dividend dates due to mechanical price drops.
+                  <li style={{ marginBottom: 8 }}>
+                    <strong>Price (Raw):</strong> Unadjusted market prices. Useful for intraday correlation or when dividends are irrelevant. May show artificial correlation breaks.
                   </li>
                 </ul>
               </div>
+
               <div>
-                <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--foreground)", marginBottom: 8 }}>Metrics Guide</h3>
-                <ul style={{ margin: 0, paddingLeft: 20, color: "var(--muted-foreground)" }}>
-                  <li style={{ marginBottom: 6 }}><strong>Correlation:</strong> +1 (Perfectly Sync), 0 (Unrelated), -1 (Opposite).</li>
-                  <li style={{ marginBottom: 6 }}><strong>Rolling Window:</strong> Shows how the relationship changes over time (e.g., during crises).</li>
-                  <li><strong>Regimes:</strong> Categorizes market periods by volatility stress levels.</li>
+                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 16 }}>🎯</span> Correlation Interpretation
+                </h3>
+                <ul style={{ margin: 0, paddingLeft: 20, color: "var(--muted-foreground)", fontSize: 12 }}>
+                  <li style={{ marginBottom: 8 }}><strong>+0.8 to +1.0:</strong> Very strong positive (move together)</li>
+                  <li style={{ marginBottom: 8 }}><strong>+0.5 to +0.8:</strong> Moderate positive (often related)</li>
+                  <li style={{ marginBottom: 8 }}><strong>-0.2 to +0.5:</strong> Weak/no relationship</li>
+                  <li style={{ marginBottom: 8 }}><strong>-0.5 to -0.2:</strong> Moderate negative</li>
+                  <li style={{ marginBottom: 8 }}><strong>-1.0 to -0.5:</strong> Strong negative (hedging potential)</li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 16 }}>⏱️</span> Rolling Window
+                </h3>
+                <ul style={{ margin: 0, paddingLeft: 20, color: "var(--muted-foreground)", fontSize: 12 }}>
+                  <li style={{ marginBottom: 8 }}>
+                    <strong>Short (20d):</strong> Captures recent regime changes, high sensitivity. More noise, faster signal.
+                  </li>
+                  <li style={{ marginBottom: 8 }}>
+                    <strong>Medium (60d):</strong> Balanced view of structural shifts. Good for quarterly rebalancing.
+                  </li>
+                  <li style={{ marginBottom: 8 }}>
+                    <strong>Long (120-252d):</strong> Stable baseline correlation. Smooths volatility spikes, reveals long-term relationships.
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 16 }}>📈</span> Practical Applications
+                </h3>
+                <ul style={{ margin: 0, paddingLeft: 20, color: "var(--muted-foreground)", fontSize: 12 }}>
+                  <li style={{ marginBottom: 8 }}>
+                    <strong>Portfolio Diversification:</strong> Look for low/negative correlations to reduce overall portfolio risk.
+                  </li>
+                  <li style={{ marginBottom: 8 }}>
+                    <strong>Pairs Trading:</strong> High rolling correlation (0.8+) suggests cointegration potential.
+                  </li>
+                  <li style={{ marginBottom: 8 }}>
+                    <strong>Crisis Detection:</strong> Sudden correlation spikes indicate contagion or market stress.
+                  </li>
+                  <li style={{ marginBottom: 8 }}>
+                    <strong>Sector Analysis:</strong> Within-sector correlations typically 0.5-0.8 for mature markets.
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 16 }}>⚠️</span> Statistical Notes
+                </h3>
+                <ul style={{ margin: 0, paddingLeft: 20, color: "var(--muted-foreground)", fontSize: 12 }}>
+                  <li style={{ marginBottom: 8 }}>
+                    <strong>Sample Size:</strong> Minimum 60 observations recommended for statistical significance (p &lt; 0.05).
+                  </li>
+                  <li style={{ marginBottom: 8 }}>
+                    <strong>Non-Stationarity:</strong> Correlations change over time. Use rolling windows to detect regime shifts.
+                  </li>
+                  <li style={{ marginBottom: 8 }}>
+                    <strong>Outliers:</strong> Extreme events can distort Pearson correlation. Consider rank correlation for robustness.
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 16 }}>🔥</span> Market Regimes
+                </h3>
+                <ul style={{ margin: 0, paddingLeft: 20, color: "var(--muted-foreground)", fontSize: 12 }}>
+                  <li style={{ marginBottom: 8 }}>
+                    <strong style={{ color: "#ef4444" }}>High Stress:</strong> VIX-equivalent &gt; 30. Flight to quality, correlations converge to +1.
+                  </li>
+                  <li style={{ marginBottom: 8 }}>
+                    <strong style={{ color: "#fb923c" }}>Elevated Risk:</strong> VIX 20-30. Increased correlation, selective risk-off.
+                  </li>
+                  <li style={{ marginBottom: 8 }}>
+                    <strong style={{ color: "#3b82f6" }}>Normal:</strong> VIX 12-20. Idiosyncratic factors dominate.
+                  </li>
+                  <li style={{ marginBottom: 8 }}>
+                    <strong style={{ color: "#22c55e" }}>Low Volatility:</strong> VIX &lt; 12. Correlation compression, hunt for yield.
+                  </li>
                 </ul>
               </div>
             </div>
@@ -322,16 +419,33 @@ export default function CorrelationPage() {
                <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted)", margin: 0 }}>
                 Selection ({selectedTickers.length})
               </h3>
-              {selectedTickers.length > 0 && (
-                <button 
-                  onClick={() => setSelectedTickers([])}
-                  style={{ background: "none", border: "none", fontSize: 11, color: "var(--danger)", cursor: "pointer", padding: 0 }}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => setShowTickerPanel(!showTickerPanel)}
+                  style={{
+                    background: "none",
+                    border: "1px solid var(--border)",
+                    fontSize: 11,
+                    color: "var(--accent)",
+                    cursor: "pointer",
+                    padding: "4px 8px",
+                    borderRadius: 4,
+                    fontWeight: 500
+                  }}
                 >
-                  Clear All
+                  {showTickerPanel ? "Hide" : "Show"} All Tickers
                 </button>
-              )}
+                {selectedTickers.length > 0 && (
+                  <button
+                    onClick={() => setSelectedTickers([])}
+                    style={{ background: "none", border: "none", fontSize: 11, color: "var(--danger)", cursor: "pointer", padding: 0 }}
+                  >
+                    Clear All
+                  </button>
+                )}
+              </div>
             </div>
-            
+
             <div style={{ position: "relative" }}>
               <input
                 type="text"
@@ -354,7 +468,7 @@ export default function CorrelationPage() {
                   outline: "none",
                 }}
               />
-              
+
               {showDropdown && tickerInput && filteredTickers.length > 0 && (
                 <div
                   style={{
@@ -396,12 +510,18 @@ export default function CorrelationPage() {
 
           {/* Configuration */}
           <div className="card-enhanced" style={{ padding: 20, borderRadius: 8 }}>
-            <h3 style={{ fontSize: 12, fontWeight: 600, marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted)" }}>
+            <h3 style={{ fontSize: 12, fontWeight: 600, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted)" }}>
               Settings
             </h3>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <p style={{ fontSize: 11, color: "var(--muted-foreground)", marginBottom: 16 }}>
+              Configure analysis parameters
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16 }}>
               <div>
-                <label style={{ display: "block", fontSize: 11, marginBottom: 6, color: "var(--muted)" }}>Lookback Period</label>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)" }}>Lookback Period</label>
+                  <span style={{ fontSize: 10, color: "var(--muted-foreground)" }}>Historical data range</span>
+                </div>
                 <select
                   value={timeframe}
                   onChange={(e) => setTimeframe(Number(e.target.value))}
@@ -423,7 +543,10 @@ export default function CorrelationPage() {
                 </select>
               </div>
               <div>
-                <label style={{ display: "block", fontSize: 11, marginBottom: 6, color: "var(--muted)" }}>Rolling Window</label>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)" }}>Rolling Window</label>
+                  <span style={{ fontSize: 10, color: "var(--muted-foreground)" }}>Correlation smoothing</span>
+                </div>
                 <select
                   value={rollingWindow}
                   onChange={(e) => setRollingWindow(Number(e.target.value))}
@@ -443,10 +566,111 @@ export default function CorrelationPage() {
                     </option>
                   ))}
                 </select>
+                <p style={{ fontSize: 10, color: "var(--muted-foreground)", marginTop: 4, fontStyle: "italic" }}>
+                  {ROLLING_WINDOWS.find(w => w.days === rollingWindow)?.desc}
+                </p>
               </div>
             </div>
           </div>
         </div>
+
+        {/* All Tickers Panel - Sortable Checklist */}
+        {showTickerPanel && (
+          <div
+            className="card-enhanced"
+            style={{
+              padding: 24,
+              marginBottom: 24,
+              borderRadius: 8,
+              maxHeight: 500,
+              overflowY: "auto"
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>
+                All Available Tickers ({availableTickers.length})
+              </h3>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span style={{ fontSize: 11, color: "var(--muted)" }}>Sort by:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as "alpha" | "selected")}
+                  style={{
+                    padding: "4px 8px",
+                    background: "var(--input-bg)",
+                    color: "var(--foreground)",
+                    border: "1px solid var(--input-border)",
+                    borderRadius: 4,
+                    fontSize: 11,
+                  }}
+                >
+                  <option value="alpha">Alphabetical</option>
+                  <option value="selected">Selected First</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
+              gap: 8
+            }}>
+              {sortedTickers.map((ticker) => {
+                const isSelected = selectedTickers.includes(ticker);
+                return (
+                  <label
+                    key={ticker}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "8px 10px",
+                      background: isSelected ? "rgba(59, 130, 246, 0.1)" : "var(--input-bg)",
+                      border: `1px solid ${isSelected ? "var(--accent)" : "var(--border-subtle)"}`,
+                      borderRadius: 6,
+                      cursor: "pointer",
+                      fontSize: 12,
+                      fontWeight: isSelected ? 600 : 400,
+                      color: isSelected ? "var(--accent)" : "var(--foreground)",
+                      transition: "all 0.15s"
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.borderColor = "var(--accent)";
+                        e.currentTarget.style.background = "rgba(59, 130, 246, 0.05)";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.borderColor = "var(--border-subtle)";
+                        e.currentTarget.style.background = "var(--input-bg)";
+                      }
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          addTicker(ticker);
+                        } else {
+                          removeTicker(ticker);
+                        }
+                      }}
+                      style={{
+                        width: 14,
+                        height: 14,
+                        cursor: "pointer",
+                        accentColor: "var(--accent)"
+                      }}
+                    />
+                    <span>{ticker}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Selected Tickers List */}
         <div
