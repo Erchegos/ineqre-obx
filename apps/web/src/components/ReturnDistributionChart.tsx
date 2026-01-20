@@ -178,11 +178,17 @@ export default function ReturnDistributionChart({
   const currentSpot = 0; // Current price (0% return)
   const timeframeKeys = Object.keys(distributionData).filter(label => visibleTimeframes.has(label));
 
-  // Calculate average sigma (standard deviation) across visible timeframes
+  // Calculate average sigma (standard deviation) and mean across visible timeframes
   const avgSigma = useMemo(() => {
     if (!distributionData || timeframeKeys.length === 0) return 0;
     const sigmas = timeframeKeys.map(label => distributionData[label].stats.stdDev);
     return sigmas.reduce((a, b) => a + b, 0) / sigmas.length;
+  }, [distributionData, timeframeKeys]);
+
+  const avgMean = useMemo(() => {
+    if (!distributionData || timeframeKeys.length === 0) return 0;
+    const means = timeframeKeys.map(label => distributionData[label].stats.mean);
+    return means.reduce((a, b) => a + b, 0) / means.length;
   }, [distributionData, timeframeKeys]);
 
   // Generate sigma levels (1σ, 2σ, 3σ, 4σ)
@@ -380,8 +386,8 @@ export default function ReturnDistributionChart({
             const marginRight = 10;
             const chartWidth = 100 - ((marginLeft + marginRight) / window.innerWidth) * 100;
 
-            // Calculate 0σ (center) position
-            const zeroX = ((0 - minReturn) / range) * 100;
+            // Calculate 0σ (center) position - at the mean of the distributions
+            const zeroX = ((avgMean - minReturn) / range) * 100;
             const adjustedZeroX = marginLeft + (zeroX * chartWidth / 100);
 
             return (
@@ -403,10 +409,10 @@ export default function ReturnDistributionChart({
                   </text>
                 </g>
 
-                {/* Sigma lines */}
+                {/* Sigma lines - relative to mean */}
                 {sigmaLevels.map(({ sigma, opacity }) => {
-                  const negX = ((-sigma * avgSigma - minReturn) / range) * 100;
-                  const posX = ((sigma * avgSigma - minReturn) / range) * 100;
+                  const negX = ((avgMean - sigma * avgSigma - minReturn) / range) * 100;
+                  const posX = ((avgMean + sigma * avgSigma - minReturn) / range) * 100;
 
                   const adjustedNegX = marginLeft + (negX * chartWidth / 100);
                   const adjustedPosX = marginLeft + (posX * chartWidth / 100);
