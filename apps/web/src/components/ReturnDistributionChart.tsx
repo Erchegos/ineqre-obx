@@ -171,7 +171,7 @@ export default function ReturnDistributionChart({
 
   const timeframeKeys = distributionData ? Object.keys(distributionData).filter(label => visibleTimeframes.has(label)) : [];
 
-  if (!distributionData || chartData.length === 0 || timeframeKeys.length === 0) {
+  if (!distributionData) {
     return (
       <div
         style={{
@@ -182,7 +182,7 @@ export default function ReturnDistributionChart({
           color: "var(--muted)",
         }}
       >
-        {timeframeKeys.length === 0 && distributionData ? "Select at least one timeframe" : "No data available"}
+        No data available
       </div>
     );
   }
@@ -202,12 +202,12 @@ export default function ReturnDistributionChart({
     return means.reduce((a, b) => a + b, 0) / means.length;
   }, [distributionData, timeframeKeys]);
 
-  // Generate sigma levels (1σ, 2σ, 3σ, 4σ)
+  // Generate sigma levels (1σ, 2σ, 3σ, 4σ) with probabilities
   const sigmaLevels = [
-    { sigma: 1, opacity: 0.15 },
-    { sigma: 2, opacity: 0.25 },
-    { sigma: 3, opacity: 0.35 },
-    { sigma: 4, opacity: 0.45 },
+    { sigma: 1, opacity: 0.15, probability: 68.27 },
+    { sigma: 2, opacity: 0.25, probability: 95.45 },
+    { sigma: 3, opacity: 0.35, probability: 99.73 },
+    { sigma: 4, opacity: 0.45, probability: 99.99 },
   ];
 
   return (
@@ -430,7 +430,7 @@ export default function ReturnDistributionChart({
                 </g>
 
                 {/* Sigma lines - relative to mean */}
-                {sigmaLevels.map(({ sigma, opacity }) => {
+                {sigmaLevels.map(({ sigma, opacity, probability }) => {
                   const negPosition = (avgMean - sigma * avgSigma - minReturn) / range;
                   const posPosition = (avgMean + sigma * avgSigma - minReturn) / range;
 
@@ -464,12 +464,19 @@ export default function ReturnDistributionChart({
                         strokeDasharray="3 6"
                         opacity={opacity * 2}
                       />
-                      {/* Labels */}
+                      {/* Sigma Labels */}
                       <text x={`${negXPercent}%`} y="20" fill="#ef4444" fontSize="9" opacity="0.6" textAnchor="middle">
                         -{sigma}σ
                       </text>
                       <text x={`${posXPercent}%`} y="20" fill="#22c55e" fontSize="9" opacity="0.6" textAnchor="middle">
                         +{sigma}σ
+                      </text>
+                      {/* Probability Labels */}
+                      <text x={`${negXPercent}%`} y="32" fill="#ef4444" fontSize="8" opacity="0.5" textAnchor="middle">
+                        {probability}%
+                      </text>
+                      <text x={`${posXPercent}%`} y="32" fill="#22c55e" fontSize="8" opacity="0.5" textAnchor="middle">
+                        {probability}%
                       </text>
                     </g>
                   );
