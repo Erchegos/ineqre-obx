@@ -337,54 +337,37 @@ export default function ReturnDistributionChart({
             iconType="circle"
           />
 
-          {/* Render areas in reverse order so shortest timeframe is on top */}
-          {[...timeframeKeys].reverse().map((label) => {
-            const dist = distributionData[label];
-            return (
-              <Area
-                key={label}
-                type="monotone"
-                dataKey={label}
-                stroke={dist.color}
-                fill={dist.color}
-                fillOpacity={0.4}
-                strokeWidth={1.5}
-                isAnimationActive={false}
-              />
-            );
-          })}
-
-          {/* Sigma lines - weak dotted lines at ±1σ, ±2σ, ±3σ, ±4σ */}
+          {/* Sigma lines - render BEFORE areas (in background) */}
           {sigmaLevels.flatMap(({ sigma, opacity }) => [
             <ReferenceLine
               key={`sigma-neg-${sigma}`}
               x={-sigma * avgSigma}
               stroke="#ef4444"
-              strokeWidth={1}
-              strokeDasharray="2 4"
-              strokeOpacity={opacity}
+              strokeWidth={2}
+              strokeDasharray="3 6"
               label={{
                 value: `-${sigma}σ`,
-                position: "top",
+                position: "insideTopLeft",
                 fill: "#ef4444",
                 fontSize: 9,
-                opacity: opacity + 0.2,
+                opacity: 0.6,
               }}
+              ifOverflow="extendDomain"
             />,
             <ReferenceLine
               key={`sigma-pos-${sigma}`}
               x={sigma * avgSigma}
               stroke="#22c55e"
-              strokeWidth={1}
-              strokeDasharray="2 4"
-              strokeOpacity={opacity}
+              strokeWidth={2}
+              strokeDasharray="3 6"
               label={{
                 value: `+${sigma}σ`,
-                position: "top",
+                position: "insideTopRight",
                 fill: "#22c55e",
                 fontSize: 9,
-                opacity: opacity + 0.2,
+                opacity: 0.6,
               }}
+              ifOverflow="extendDomain"
             />
           ])}
 
@@ -400,7 +383,25 @@ export default function ReturnDistributionChart({
               fill: "var(--foreground)",
               fontSize: 10,
             }}
+            ifOverflow="extendDomain"
           />
+
+          {/* Render areas in reverse order so shortest timeframe is on top */}
+          {[...timeframeKeys].reverse().map((label) => {
+            const dist = distributionData[label];
+            return (
+              <Area
+                key={label}
+                type="monotone"
+                dataKey={label}
+                stroke={dist.color}
+                fill={dist.color}
+                fillOpacity={0.3}
+                strokeWidth={1.5}
+                isAnimationActive={false}
+              />
+            );
+          })}
         </AreaChart>
       </ResponsiveContainer>
 
