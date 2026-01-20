@@ -348,6 +348,23 @@ export default function ReturnDistributionChart({
             iconType="circle"
           />
 
+          {/* Render areas in reverse order so shortest timeframe is on top */}
+          {[...timeframeKeys].reverse().map((label) => {
+            const dist = distributionData[label];
+            return (
+              <Area
+                key={label}
+                type="monotone"
+                dataKey={label}
+                stroke={dist.color}
+                fill={dist.color}
+                fillOpacity={0.4}
+                strokeWidth={1.5}
+                isAnimationActive={false}
+              />
+            );
+          })}
+
           <ReferenceLine
             x={currentSpot}
             stroke="var(--foreground)"
@@ -361,7 +378,7 @@ export default function ReturnDistributionChart({
             }}
           />
 
-          {/* Probability Threshold Lines - render on top */}
+          {/* Probability Threshold Lines - render AFTER areas so they appear on top */}
           {showThresholds && thresholdLevels.map((threshold) => (
             <ReferenceLine
               key={threshold.value}
@@ -379,23 +396,6 @@ export default function ReturnDistributionChart({
               }}
             />
           ))}
-
-          {/* Render areas in reverse order so shortest timeframe is on top */}
-          {[...timeframeKeys].reverse().map((label) => {
-            const dist = distributionData[label];
-            return (
-              <Area
-                key={label}
-                type="monotone"
-                dataKey={label}
-                stroke={dist.color}
-                fill={dist.color}
-                fillOpacity={0.4}
-                strokeWidth={1.5}
-                isAnimationActive={false}
-              />
-            );
-          })}
         </AreaChart>
       </ResponsiveContainer>
 
