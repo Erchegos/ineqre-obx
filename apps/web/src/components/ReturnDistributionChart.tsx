@@ -117,6 +117,9 @@ export default function ReturnDistributionChart({
     new Set(["4 days", "7 days", "14 days", "21 days", "28 days", "42 days"])
   );
 
+  // State for probability threshold lines
+  const [showThresholds, setShowThresholds] = useState<boolean>(false);
+
   const toggleTimeframe = (label: string) => {
     setVisibleTimeframes((prev) => {
       const next = new Set(prev);
@@ -177,8 +180,50 @@ export default function ReturnDistributionChart({
   const currentSpot = 0; // Current price (0% return)
   const timeframeKeys = Object.keys(distributionData).filter(label => visibleTimeframes.has(label));
 
+  // Probability threshold levels
+  const thresholdLevels = [
+    { value: -0.20, label: "-20%" },
+    { value: -0.10, label: "-10%" },
+    { value: -0.05, label: "-5%" },
+    { value: 0.05, label: "+5%" },
+    { value: 0.10, label: "+10%" },
+    { value: 0.20, label: "+20%" },
+  ];
+
   return (
     <div style={{ width: "100%" }}>
+      {/* Control Bar */}
+      <div style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 16,
+        padding: "8px 12px",
+        background: "var(--card-bg)",
+        border: "1px solid var(--border-subtle)",
+        borderRadius: 6,
+      }}>
+        <div style={{ fontSize: 13, color: "var(--muted-foreground)" }}>
+          Click boxes below to toggle timeframes
+        </div>
+        <button
+          onClick={() => setShowThresholds(!showThresholds)}
+          style={{
+            padding: "6px 12px",
+            fontSize: 12,
+            fontWeight: 500,
+            borderRadius: 4,
+            border: `1px solid ${showThresholds ? "var(--accent)" : "var(--border-subtle)"}`,
+            background: showThresholds ? "var(--accent)" : "transparent",
+            color: showThresholds ? "#fff" : "var(--muted)",
+            cursor: "pointer",
+            transition: "all 0.2s",
+          }}
+        >
+          {showThresholds ? "✓ " : ""}Probability Thresholds
+        </button>
+      </div>
+
       {/* Stats Grid - Clickable */}
       <div
         style={{
@@ -316,6 +361,25 @@ export default function ReturnDistributionChart({
             }}
           />
 
+          {/* Probability Threshold Lines */}
+          {showThresholds && thresholdLevels.map((threshold) => (
+            <ReferenceLine
+              key={threshold.value}
+              x={threshold.value}
+              stroke={threshold.value < 0 ? "#ef4444" : "#22c55e"}
+              strokeWidth={1}
+              strokeDasharray="3 3"
+              opacity={0.5}
+              label={{
+                value: threshold.label,
+                position: threshold.value < 0 ? "left" : "right",
+                fill: threshold.value < 0 ? "#ef4444" : "#22c55e",
+                fontSize: 9,
+                offset: 5,
+              }}
+            />
+          ))}
+
           {/* Render areas in reverse order so shortest timeframe is on top */}
           {[...timeframeKeys].reverse().map((label) => {
             const dist = distributionData[label];
@@ -357,6 +421,9 @@ export default function ReturnDistributionChart({
           </div>
           <div>
             <strong>Wider curves</strong> = Higher uncertainty (longer timeframes)
+          </div>
+          <div>
+            <strong>Probability thresholds</strong> = Dotted lines at ±5%, ±10%, ±20% show likelihood of reaching those levels
           </div>
           <div>
             <strong>Negative skew</strong> = Fat tail on left (big losses more likely)
