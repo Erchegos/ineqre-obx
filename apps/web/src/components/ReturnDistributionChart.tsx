@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import {
   AreaChart,
   Area,
@@ -117,6 +117,16 @@ export default function ReturnDistributionChart({
   const [visibleTimeframes, setVisibleTimeframes] = useState<Set<string>>(
     new Set(["4 days", "7 days", "14 days", "21 days", "28 days", "42 days"])
   );
+
+  // Ref to get the chart container dimensions
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      setContainerWidth(containerRef.current.offsetWidth);
+    }
+  }, []);
 
   const toggleTimeframe = (label: string) => {
     setVisibleTimeframes((prev) => {
@@ -296,7 +306,7 @@ export default function ReturnDistributionChart({
       </div>
 
       {/* Chart */}
-      <div style={{ position: "relative", width: "100%", height }}>
+      <div ref={containerRef} style={{ position: "relative", width: "100%", height }}>
         <ResponsiveContainer width="100%" height={height}>
           <AreaChart
             data={chartData}
@@ -376,54 +386,66 @@ export default function ReturnDistributionChart({
           }}
         >
           {(() => {
-            // Calculate x position as percentage
+            if (containerWidth === 0) return null;
+
+            // Calculate x position as percentage of data range
             const minReturn = Math.min(...chartData.map(d => d.return));
             const maxReturn = Math.max(...chartData.map(d => d.return));
             const range = maxReturn - minReturn;
 
-            // Account for chart margins
-            const marginLeft = 40; // Approximate y-axis width
-            const marginRight = 10;
-            const chartWidth = 100 - ((marginLeft + marginRight) / window.innerWidth) * 100;
+            // Calculate 0% position in the data range (0% = 0 return)
+            // This gives us where 0% sits within the min-max range as a 0-1 fraction
+            const zeroPosition = (0 - minReturn) / range;
 
-            // Calculate 0σ position at 0% return
-            const zeroX = ((0 - minReturn) / range) * 100;
-            const adjustedZeroX = marginLeft + (zeroX * chartWidth / 100);
+            // Recharts margins from AreaChart component
+            // The Y-axis takes up space on the left side
+            const yAxisWidth = 60; // Approximate width of Y-axis
+            const marginRight = 10; // From margin prop
+
+            // Calculate the actual plotting area width
+            const plottingAreaWidth = containerWidth - yAxisWidth - marginRight;
+
+            // Calculate 0% position in pixels, then convert to percentage of container
+            const zeroXPixels = yAxisWidth + (zeroPosition * plottingAreaWidth);
+            const zeroXPercent = (zeroXPixels / containerWidth) * 100;
 
             return (
               <>
-                {/* 0σ line at 0% */}
+                {/* 0σ line at 0% return */}
                 <g key="zero">
                   <line
-                    x1={`${adjustedZeroX}%`}
+                    x1={`${zeroXPercent}%`}
                     y1="10"
-                    x2={`${adjustedZeroX}%`}
+                    x2={`${zeroXPercent}%`}
                     y2={`calc(100% - 40px)`}
                     stroke="var(--foreground)"
                     strokeWidth="2"
                     strokeDasharray="5 5"
                     opacity="0.6"
                   />
-                  <text x={`${adjustedZeroX}%`} y="20" fill="var(--foreground)" fontSize="10" opacity="0.8" textAnchor="middle" fontWeight="600">
+                  <text x={`${zeroXPercent}%`} y="20" fill="var(--foreground)" fontSize="10" opacity="0.8" textAnchor="middle" fontWeight="600">
                     0σ
                   </text>
                 </g>
 
-                {/* Sigma lines - relative to 0% */}
+                {/* Sigma lines - relative to 0% return */}
                 {sigmaLevels.map(({ sigma, opacity }) => {
-                  const negX = ((0 - sigma * avgSigma - minReturn) / range) * 100;
-                  const posX = ((0 + sigma * avgSigma - minReturn) / range) * 100;
+                  const negPosition = (0 - sigma * avgSigma - minReturn) / range;
+                  const posPosition = (0 + sigma * avgSigma - minReturn) / range;
 
-                  const adjustedNegX = marginLeft + (negX * chartWidth / 100);
-                  const adjustedPosX = marginLeft + (posX * chartWidth / 100);
+                  const negXPixels = yAxisWidth + (negPosition * plottingAreaWidth);
+                  const posXPixels = yAxisWidth + (posPosition * plottingAreaWidth);
+
+                  const negXPercent = (negXPixels / containerWidth) * 100;
+                  const posXPercent = (posXPixels / containerWidth) * 100;
 
                   return (
                     <g key={sigma}>
                       {/* Negative sigma line */}
                       <line
-                        x1={`${adjustedNegX}%`}
+                        x1={`${negXPercent}%`}
                         y1="10"
-                        x2={`${adjustedNegX}%`}
+                        x2={`${negXPercent}%`}
                         y2={`calc(100% - 40px)`}
                         stroke="#ef4444"
                         strokeWidth="1"
@@ -432,9 +454,9 @@ export default function ReturnDistributionChart({
                       />
                       {/* Positive sigma line */}
                       <line
-                        x1={`${adjustedPosX}%`}
+                        x1={`${posXPercent}%`}
                         y1="10"
-                        x2={`${adjustedPosX}%`}
+                        x2={`${posXPercent}%`}
                         y2={`calc(100% - 40px)`}
                         stroke="#22c55e"
                         strokeWidth="1"
@@ -442,10 +464,10 @@ export default function ReturnDistributionChart({
                         opacity={opacity * 2}
                       />
                       {/* Labels */}
-                      <text x={`${adjustedNegX}%`} y="20" fill="#ef4444" fontSize="9" opacity="0.6" textAnchor="middle">
+                      <text x={`${negXPercent}%`} y="20" fill="#ef4444" fontSize="9" opacity="0.6" textAnchor="middle">
                         -{sigma}σ
                       </text>
-                      <text x={`${adjustedPosX}%`} y="20" fill="#22c55e" fontSize="9" opacity="0.6" textAnchor="middle">
+                      <text x={`${posXPercent}%`} y="20" fill="#22c55e" fontSize="9" opacity="0.6" textAnchor="middle">
                         +{sigma}σ
                       </text>
                     </g>
