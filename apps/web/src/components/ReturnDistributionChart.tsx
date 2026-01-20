@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
   Legend,
+  Line,
 } from "recharts";
 
 type ReturnDistributionChartProps = {
@@ -289,11 +290,12 @@ export default function ReturnDistributionChart({
       </div>
 
       {/* Chart */}
-      <ResponsiveContainer width="100%" height={height}>
-        <AreaChart
-          data={chartData}
-          margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-        >
+      <div style={{ position: "relative", width: "100%", height }}>
+        <ResponsiveContainer width="100%" height={height}>
+          <AreaChart
+            data={chartData}
+            margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+          >
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" opacity={0.3} />
 
           <XAxis
@@ -337,55 +339,6 @@ export default function ReturnDistributionChart({
             iconType="circle"
           />
 
-          {/* Sigma lines - render BEFORE areas (in background) */}
-          {sigmaLevels.flatMap(({ sigma, opacity }) => [
-            <ReferenceLine
-              key={`sigma-neg-${sigma}`}
-              x={-sigma * avgSigma}
-              stroke="#ef4444"
-              strokeWidth={2}
-              strokeDasharray="3 6"
-              label={{
-                value: `-${sigma}σ`,
-                position: "insideTopLeft",
-                fill: "#ef4444",
-                fontSize: 9,
-                opacity: 0.6,
-              }}
-              ifOverflow="extendDomain"
-            />,
-            <ReferenceLine
-              key={`sigma-pos-${sigma}`}
-              x={sigma * avgSigma}
-              stroke="#22c55e"
-              strokeWidth={2}
-              strokeDasharray="3 6"
-              label={{
-                value: `+${sigma}σ`,
-                position: "insideTopRight",
-                fill: "#22c55e",
-                fontSize: 9,
-                opacity: 0.6,
-              }}
-              ifOverflow="extendDomain"
-            />
-          ])}
-
-          {/* Current spot line */}
-          <ReferenceLine
-            x={currentSpot}
-            stroke="var(--foreground)"
-            strokeWidth={2}
-            strokeDasharray="5 5"
-            label={{
-              value: "Current (0%)",
-              position: "top",
-              fill: "var(--foreground)",
-              fontSize: 10,
-            }}
-            ifOverflow="extendDomain"
-          />
-
           {/* Render areas in reverse order so shortest timeframe is on top */}
           {[...timeframeKeys].reverse().map((label) => {
             const dist = distributionData[label];
@@ -402,8 +355,73 @@ export default function ReturnDistributionChart({
               />
             );
           })}
-        </AreaChart>
-      </ResponsiveContainer>
+          </AreaChart>
+        </ResponsiveContainer>
+
+        {/* SVG Overlay for sigma lines */}
+        <svg
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            pointerEvents: "none",
+          }}
+        >
+          {sigmaLevels.map(({ sigma, opacity }) => {
+            // Calculate x position as percentage
+            const minReturn = Math.min(...chartData.map(d => d.return));
+            const maxReturn = Math.max(...chartData.map(d => d.return));
+            const range = maxReturn - minReturn;
+
+            const negX = ((-sigma * avgSigma - minReturn) / range) * 100;
+            const posX = ((sigma * avgSigma - minReturn) / range) * 100;
+
+            // Account for chart margins (left margin is 0, right is 10)
+            const marginLeft = 40; // Approximate y-axis width
+            const marginRight = 10;
+            const chartWidth = 100 - ((marginLeft + marginRight) / window.innerWidth) * 100;
+
+            const adjustedNegX = marginLeft + (negX * chartWidth / 100);
+            const adjustedPosX = marginLeft + (posX * chartWidth / 100);
+
+            return (
+              <g key={sigma}>
+                {/* Negative sigma line */}
+                <line
+                  x1={`${adjustedNegX}%`}
+                  y1="10"
+                  x2={`${adjustedNegX}%`}
+                  y2={`calc(100% - 40px)`}
+                  stroke="#ef4444"
+                  strokeWidth="1"
+                  strokeDasharray="3 6"
+                  opacity={opacity * 2}
+                />
+                {/* Positive sigma line */}
+                <line
+                  x1={`${adjustedPosX}%`}
+                  y1="10"
+                  x2={`${adjustedPosX}%`}
+                  y2={`calc(100% - 40px)`}
+                  stroke="#22c55e"
+                  strokeWidth="1"
+                  strokeDasharray="3 6"
+                  opacity={opacity * 2}
+                />
+                {/* Labels */}
+                <text x={`${adjustedNegX}%`} y="20" fill="#ef4444" fontSize="9" opacity="0.6" textAnchor="middle">
+                  -{sigma}σ
+                </text>
+                <text x={`${adjustedPosX}%`} y="20" fill="#22c55e" fontSize="9" opacity="0.6" textAnchor="middle">
+                  +{sigma}σ
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
 
       {/* Interpretation Guide */}
       <div
