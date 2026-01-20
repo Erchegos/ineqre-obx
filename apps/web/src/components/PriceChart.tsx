@@ -42,10 +42,13 @@ export default function PriceChart({
   // Determine the primary key to render if not in explicit comparison mode
   const hasRaw = data.some(d => d.raw !== undefined && d.raw !== null);
   const primaryKey = hasRaw ? "raw" : (data[0].value !== undefined ? "value" : "price");
-  
+
   // Check if we actually have comparison data
   const hasTotal = data.some(d => d.total !== undefined && d.total !== null);
   const isComparisonActive = showComparison || (hasRaw && hasTotal);
+
+  // Detect if data is in percentage format (comparison mode typically uses percentages)
+  const isPercentageMode = isComparisonActive;
 
   return (
     <div style={{ width: "100%", height }}>
@@ -69,7 +72,7 @@ export default function PriceChart({
             stroke="var(--muted)"
             fontSize={12}
             domain={["auto", "auto"]}
-            tickFormatter={(val) => val.toFixed(0)}
+            tickFormatter={(val) => isPercentageMode ? `${val.toFixed(0)}%` : val.toFixed(2)}
           />
           
           <Tooltip
@@ -79,15 +82,79 @@ export default function PriceChart({
               color: "var(--foreground)",
               borderRadius: "4px",
               fontSize: "13px",
+              padding: "10px 12px",
             }}
-            labelStyle={{ color: "var(--muted)", marginBottom: "5px" }}
-            // FIX: Use 'any' for both arguments to completely bypass strict type mismatch
+            labelStyle={{ color: "var(--muted)", marginBottom: "8px", fontWeight: 600 }}
             formatter={(value: any, name: any) => {
               if (value === null || value === undefined) return ["-", name];
-              return [
-                typeof value === "number" ? value.toFixed(2) : value,
-                name === "raw" ? "Price Return" : name === "total" ? "Total Return" : "Value"
-              ];
+              const formattedValue = typeof value === "number"
+                ? (isPercentageMode ? `${value.toFixed(2)}%` : value.toFixed(2))
+                : value;
+              const label = name === "raw" ? "Price Return" : name === "total" ? "Total Return" : "Value";
+              return [formattedValue, label];
+            }}
+            content={(props: any) => {
+              const { active, payload, label } = props;
+              if (!active || !payload || !payload.length) return null;
+
+              const priceReturn = payload.find((p: any) => p.dataKey === "raw")?.value;
+              const totalReturn = payload.find((p: any) => p.dataKey === "total")?.value;
+              const difference = priceReturn !== undefined && totalReturn !== undefined
+                ? totalReturn - priceReturn
+                : null;
+
+              return (
+                <div style={{
+                  backgroundColor: "var(--card-bg)",
+                  border: "1px solid var(--card-border)",
+                  borderRadius: "4px",
+                  padding: "10px 12px",
+                  fontSize: "13px",
+                }}>
+                  <div style={{ color: "var(--muted)", marginBottom: "8px", fontWeight: 600 }}>
+                    {label}
+                  </div>
+                  {payload.map((entry: any, index: number) => (
+                    <div key={index} style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: "16px",
+                      marginBottom: "4px",
+                      color: entry.color
+                    }}>
+                      <span>{entry.name}:</span>
+                      <span style={{ fontWeight: 600, fontFamily: "monospace" }}>
+                        {isPercentageMode ? `${entry.value.toFixed(2)}%` : entry.value.toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                  {difference !== null && isPercentageMode && (
+                    <>
+                      <div style={{
+                        borderTop: "1px solid var(--border-subtle)",
+                        marginTop: "8px",
+                        paddingTop: "6px"
+                      }} />
+                      <div style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: "16px",
+                        color: "var(--muted-foreground)",
+                        fontSize: "12px"
+                      }}>
+                        <span>Dividend Impact:</span>
+                        <span style={{
+                          fontWeight: 600,
+                          fontFamily: "monospace",
+                          color: difference >= 0 ? "#22c55e" : "#ef4444"
+                        }}>
+                          {difference >= 0 ? "+" : ""}{difference.toFixed(2)}%
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
             }}
           />
           
