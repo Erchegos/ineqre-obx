@@ -1,8 +1,7 @@
-import Link from "next/link";
-import { pool } from "@/lib/db";
-import { getPriceTable } from "@/lib/price-data-adapter";
+"use client";
 
-export const dynamic = "force-dynamic";
+import Link from "next/link";
+import { useEffect, useState, useMemo } from "react";
 
 type StockData = {
   ticker: string;
@@ -14,94 +13,124 @@ type StockData = {
   rows: number;
 };
 
-async function getStocksData(): Promise<StockData[]> {
-  const tableName = await getPriceTable();
+export default function StocksPage() {
+  const [stocks, setStocks] = useState<StockData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<keyof StockData>("ticker");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
-  /* FIX EXPLAINED:
-    - Old: MAX(p.close) -> Gets the highest price ever (wrong for "current").
-    - New: (ARRAY_AGG(p.close ORDER BY p.date DESC))[1] -> Gets the price from the most recent date.
-  */
-  const query = `
-    SELECT
-      s.ticker,
-      s.name,
-      (ARRAY_AGG(p.close ORDER BY p.date DESC))[1] as last_close,
-      (ARRAY_AGG(p.adj_close ORDER BY p.date DESC))[1] as last_adj_close,
-      MIN(p.date) as start_date,
-      MAX(p.date) as end_date,
-      COUNT(*) as rows
-    FROM stocks s
-    INNER JOIN ${tableName} p ON s.ticker = p.ticker
-    WHERE p.source = 'ibkr'
-      AND p.close IS NOT NULL
-      AND p.close > 0
-    GROUP BY s.ticker, s.name
-    HAVING COUNT(*) >= 510
-      AND MAX(p.date) >= CURRENT_DATE - INTERVAL '30 days'
-    ORDER BY s.ticker
-  `;
+  useEffect(() => {
+    async function fetchStocks() {
+      try {
+        const res = await fetch("/api/stocks", {
+          method: "GET",
+          headers: { accept: "application/json" },
+          cache: "no-store",
+        });
 
-  const result = await pool.query(query);
+        if (!res.ok) {
+          throw new Error(`Failed to fetch stocks: ${res.statusText}`);
+        }
 
-  return result.rows.map((row) => ({
-    ticker: row.ticker,
-    name: row.name || row.ticker,
-    last_close: Number(row.last_close),
-    last_adj_close: Number(row.last_adj_close || row.last_close),
-    start_date: row.start_date instanceof Date 
-      ? row.start_date.toISOString().slice(0, 10)
-      : String(row.start_date),
-    end_date: row.end_date instanceof Date
-      ? row.end_date.toISOString().slice(0, 10)
-      : String(row.end_date),
-    rows: Number(row.rows),
-  }));
-}
-
-export default async function StocksPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ sort?: string; order?: string }>;
-}) {
-  const params = await searchParams;
-  const sortBy = params.sort || "ticker";
-  const sortOrder = params.order || "asc";
-
-  let stocks = await getStocksData();
-
-  stocks.sort((a, b) => {
-    let aVal: any = a[sortBy as keyof StockData];
-    let bVal: any = b[sortBy as keyof StockData];
-
-    if (typeof aVal === "string") {
-      aVal = aVal.toLowerCase();
-      bVal = (bVal as string).toLowerCase();
+        const data = await res.json();
+        setStocks(data);
+        setLoading(false);
+      } catch (e: any) {
+        setError(e?.message ?? String(e));
+        setLoading(false);
+      }
     }
 
-    if (sortOrder === "asc") {
-      return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+    fetchStocks();
+  }, []);
+
+  const filteredAndSortedStocks = useMemo(() => {
+    let filtered = stocks;
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = stocks.filter(
+        (stock) =>
+          stock.ticker.toLowerCase().includes(query) ||
+          stock.name.toLowerCase().includes(query)
+      );
+    }
+
+    // Sort
+    const sorted = [...filtered].sort((a, b) => {
+      let aVal: any = a[sortBy];
+      let bVal: any = b[sortBy];
+
+      if (typeof aVal === "string") {
+        aVal = aVal.toLowerCase();
+        bVal = (bVal as string).toLowerCase();
+      }
+
+      if (sortOrder === "asc") {
+        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+      } else {
+        return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+      }
+    });
+
+    return sorted;
+  }, [stocks, searchQuery, sortBy, sortOrder]);
+
+  const toggleSort = (column: keyof StockData) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
-      return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+      setSortBy(column);
+      setSortOrder("asc");
     }
-  });
-
-  const toggleSort = (column: string) => {
-    const newOrder =
-      sortBy === column && sortOrder === "asc" ? "desc" : "asc";
-    return `?sort=${column}&order=${newOrder}`;
   };
 
-  const SortIcon = ({ column }: { column: string }) => {
+  const SortIcon = ({ column }: { column: keyof StockData }) => {
     if (sortBy !== column) return <span style={{ opacity: 0.4 }}>↕</span>;
     return sortOrder === "asc" ? <span>↑</span> : <span>↓</span>;
   };
 
+  if (loading) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        background: "var(--background)",
+        color: "var(--foreground)",
+        padding: 32,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
+      }}>
+        <div>Loading stocks...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        background: "var(--background)",
+        color: "var(--foreground)",
+        padding: 32
+      }}>
+        <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+          <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 16 }}>Error</h1>
+          <p style={{ color: "var(--danger)" }}>{error}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ 
-      minHeight: "100vh", 
-      background: "var(--background)", 
-      color: "var(--foreground)", 
-      padding: 32 
+    <div style={{
+      minHeight: "100vh",
+      background: "var(--background)",
+      color: "var(--foreground)",
+      padding: 32
     }}>
       <style dangerouslySetInnerHTML={{ __html: `
         .stock-table tbody tr {
@@ -111,16 +140,33 @@ export default async function StocksPage({
         .stock-table tbody tr:hover {
           background: var(--hover-bg) !important;
         }
+        .search-input {
+          width: 100%;
+          padding: 12px 16px;
+          font-size: 14px;
+          border: 1px solid var(--border);
+          border-radius: 4px;
+          background: var(--card-bg);
+          color: var(--foreground);
+          outline: none;
+          transition: border-color 0.2s;
+        }
+        .search-input:focus {
+          border-color: var(--accent);
+        }
+        .search-input::placeholder {
+          color: var(--muted);
+        }
       `}} />
-      
+
       <div style={{ maxWidth: 1400, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
           <h1 style={{ fontSize: 32, fontWeight: 700, margin: 0 }}>Stocks</h1>
-          <Link 
-            href="/correlation" 
-            style={{ 
-              color: "var(--accent)", 
-              textDecoration: "none", 
+          <Link
+            href="/correlation"
+            style={{
+              color: "var(--accent)",
+              textDecoration: "none",
               fontSize: 14,
               fontWeight: 500,
               padding: "8px 16px",
@@ -132,14 +178,30 @@ export default async function StocksPage({
             → Correlation Matrix
           </Link>
         </div>
-        <p style={{ color: "var(--muted)", marginBottom: 32, fontSize: 14 }}>
-          Universe: {stocks.length} tickers
+        <p style={{ color: "var(--muted)", marginBottom: 24, fontSize: 14 }}>
+          Universe: {stocks.length} tickers <span style={{ color: "var(--muted-foreground)" }}>(coming more)</span>
           <span style={{ marginLeft: 16, fontSize: 13 }}>Source: Interactive Brokers</span>
         </p>
 
+        {/* Search Bar */}
+        <div style={{ marginBottom: 24 }}>
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Search by ticker or name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <div style={{ marginTop: 8, fontSize: 13, color: "var(--muted)" }}>
+              Found {filteredAndSortedStocks.length} result{filteredAndSortedStocks.length !== 1 ? 's' : ''}
+            </div>
+          )}
+        </div>
+
         <div style={{ overflowX: "auto" }}>
-          <table className="stock-table" style={{ 
-            width: "100%", 
+          <table className="stock-table" style={{
+            width: "100%",
             borderCollapse: "collapse",
             background: "var(--card-bg)",
             border: "1px solid var(--card-border)",
@@ -148,147 +210,173 @@ export default async function StocksPage({
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border)" }}>
                 <th style={{ textAlign: "left", padding: "16px" }}>
-                  <Link
-                    href={toggleSort("ticker")}
-                    style={{ 
-                      color: "var(--foreground)", 
-                      textDecoration: "none", 
-                      display: "flex", 
-                      alignItems: "center", 
+                  <button
+                    onClick={() => toggleSort("ticker")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--foreground)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
                       gap: 8,
                       fontSize: 13,
                       fontWeight: 600,
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
+                      padding: 0,
                     }}
                   >
                     Ticker <SortIcon column="ticker" />
-                  </Link>
+                  </button>
                 </th>
                 <th style={{ textAlign: "left", padding: "16px" }}>
-                  <Link
-                    href={toggleSort("name")}
-                    style={{ 
-                      color: "var(--foreground)", 
-                      textDecoration: "none", 
-                      display: "flex", 
-                      alignItems: "center", 
+                  <button
+                    onClick={() => toggleSort("name")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--foreground)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
                       gap: 8,
                       fontSize: 13,
                       fontWeight: 600,
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
+                      padding: 0,
                     }}
                   >
                     Name <SortIcon column="name" />
-                  </Link>
+                  </button>
                 </th>
                 <th style={{ textAlign: "right", padding: "16px" }}>
-                  <Link
-                    href={toggleSort("last_close")}
-                    style={{ 
-                      color: "var(--foreground)", 
-                      textDecoration: "none", 
-                      display: "flex", 
-                      alignItems: "center", 
-                      justifyContent: "flex-end", 
+                  <button
+                    onClick={() => toggleSort("last_close")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--foreground)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "flex-end",
                       gap: 8,
                       fontSize: 13,
                       fontWeight: 600,
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
+                      padding: 0,
+                      marginLeft: "auto",
                     }}
                   >
                     Last Close <SortIcon column="last_close" />
-                  </Link>
+                  </button>
                 </th>
                 <th style={{ textAlign: "right", padding: "16px" }}>
-                  <Link
-                    href={toggleSort("last_adj_close")}
-                    style={{ 
-                      color: "var(--foreground)", 
-                      textDecoration: "none", 
-                      display: "flex", 
-                      alignItems: "center", 
-                      justifyContent: "flex-end", 
+                  <button
+                    onClick={() => toggleSort("last_adj_close")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--foreground)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "flex-end",
                       gap: 8,
                       fontSize: 13,
                       fontWeight: 600,
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
+                      padding: 0,
+                      marginLeft: "auto",
                     }}
                   >
                     Adj Close <SortIcon column="last_adj_close" />
-                  </Link>
+                  </button>
                 </th>
                 <th style={{ textAlign: "right", padding: "16px" }}>
-                  <Link
-                    href={toggleSort("start_date")}
-                    style={{ 
-                      color: "var(--foreground)", 
-                      textDecoration: "none", 
-                      display: "flex", 
-                      alignItems: "center", 
-                      justifyContent: "flex-end", 
+                  <button
+                    onClick={() => toggleSort("start_date")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--foreground)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "flex-end",
                       gap: 8,
                       fontSize: 13,
                       fontWeight: 600,
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
+                      padding: 0,
+                      marginLeft: "auto",
                     }}
                   >
                     Start Date <SortIcon column="start_date" />
-                  </Link>
+                  </button>
                 </th>
                 <th style={{ textAlign: "right", padding: "16px" }}>
-                  <Link
-                    href={toggleSort("end_date")}
-                    style={{ 
-                      color: "var(--foreground)", 
-                      textDecoration: "none", 
-                      display: "flex", 
-                      alignItems: "center", 
-                      justifyContent: "flex-end", 
+                  <button
+                    onClick={() => toggleSort("end_date")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--foreground)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "flex-end",
                       gap: 8,
                       fontSize: 13,
                       fontWeight: 600,
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
+                      padding: 0,
+                      marginLeft: "auto",
                     }}
                   >
                     End Date <SortIcon column="end_date" />
-                  </Link>
+                  </button>
                 </th>
                 <th style={{ textAlign: "right", padding: "16px" }}>
-                  <Link
-                    href={toggleSort("rows")}
-                    style={{ 
-                      color: "var(--foreground)", 
-                      textDecoration: "none", 
-                      display: "flex", 
-                      alignItems: "center", 
-                      justifyContent: "flex-end", 
+                  <button
+                    onClick={() => toggleSort("rows")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--foreground)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "flex-end",
                       gap: 8,
                       fontSize: 13,
                       fontWeight: 600,
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
+                      padding: 0,
+                      marginLeft: "auto",
                     }}
                   >
                     Rows <SortIcon column="rows" />
-                  </Link>
+                  </button>
                 </th>
               </tr>
             </thead>
             <tbody>
-              {stocks.map((stock) => (
+              {filteredAndSortedStocks.map((stock) => (
                 <tr key={stock.ticker}>
                   <td style={{ padding: "16px" }}>
                     <Link
                       href={`/stocks/${stock.ticker}`}
-                      style={{ 
-                        color: "var(--accent)", 
-                        textDecoration: "none", 
+                      style={{
+                        color: "var(--accent)",
+                        textDecoration: "none",
                         fontWeight: 600,
                         fontSize: 14,
                       }}
@@ -299,18 +387,18 @@ export default async function StocksPage({
                   <td style={{ padding: "16px", color: "var(--foreground)", fontSize: 14 }}>
                     {stock.name}
                   </td>
-                  <td style={{ 
-                    padding: "16px", 
-                    textAlign: "right", 
+                  <td style={{
+                    padding: "16px",
+                    textAlign: "right",
                     fontFamily: "monospace",
                     color: "var(--foreground)",
                     fontSize: 14,
                   }}>
                     {stock.last_close.toFixed(2)}
                   </td>
-                  <td style={{ 
-                    padding: "16px", 
-                    textAlign: "right", 
+                  <td style={{
+                    padding: "16px",
+                    textAlign: "right",
                     fontFamily: "monospace",
                     color: "var(--muted)",
                     fontSize: 14,
@@ -332,13 +420,13 @@ export default async function StocksPage({
           </table>
         </div>
 
-        {stocks.length === 0 && (
-          <div style={{ 
-            textAlign: "center", 
-            padding: 48, 
-            color: "var(--muted)" 
+        {filteredAndSortedStocks.length === 0 && (
+          <div style={{
+            textAlign: "center",
+            padding: 48,
+            color: "var(--muted)"
           }}>
-            No stocks found with sufficient IBKR data
+            {searchQuery ? `No stocks found matching "${searchQuery}"` : "No stocks found with sufficient IBKR data"}
           </div>
         )}
       </div>
