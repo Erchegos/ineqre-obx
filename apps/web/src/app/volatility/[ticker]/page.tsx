@@ -99,9 +99,9 @@ export default function VolatilityPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [selectedMeasures, setSelectedMeasures] = useState<string[]>([
-    "yangZhang",
-    "rogersSatchell",
-    "rolling20"
+    "rolling20",
+    "rolling60",
+    "ewma94"
   ]);
 
   useEffect(() => {
@@ -186,6 +186,14 @@ export default function VolatilityPage() {
 
   return (
     <main style={{ padding: 24, maxWidth: 1400, margin: "0 auto" }}>
+      {/* Back Button */}
+      <div style={{ marginBottom: 16 }}>
+        <Link href="/" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 4, border: "1px solid var(--border-subtle)", background: "var(--card-bg)", color: "var(--foreground)", fontSize: 13, fontWeight: 500, textDecoration: "none", transition: "all 0.2s" }}>
+          <span>←</span>
+          <span>Back to stock analyses</span>
+        </Link>
+      </div>
+
       {/* Header with Price Toggle */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
@@ -234,7 +242,7 @@ export default function VolatilityPage() {
 
             {/* Timeframe Selector */}
             <div style={{ display: "flex", gap: 4 }}>
-            {[ { l: "6M", v: 126 }, { l: "1Y", v: 252 }, { l: "2Y", v: 504 }, { l: "Max", v: 2000 } ].map((tf) => (
+            {[ { l: "3M", v: 63 }, { l: "6M", v: 126 }, { l: "1Y", v: 252 }, { l: "2Y", v: 504 }, { l: "5Y", v: 1260 }, { l: "All", v: 2000 } ].map((tf) => (
                 <button
                 key={tf.v}
                 onClick={() => setLimit(tf.v)}

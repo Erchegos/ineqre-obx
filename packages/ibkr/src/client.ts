@@ -1,14 +1,20 @@
 // packages/ibkr/src/client.ts
+import https from "https";
 import type { IBKRConfig, Contract, HistoricalDataResponse, PriceData } from "./types";
 import { ContractSchema, HistoricalDataResponseSchema } from "./types";
 
 export class IBKRClient {
   private baseUrl: string;
   private timeout: number;
+  private httpsAgent: https.Agent;
 
   constructor(config: IBKRConfig) {
     this.baseUrl = config.baseUrl;
     this.timeout = config.timeout ?? 30000;
+    // Create HTTPS agent that accepts self-signed certificates
+    this.httpsAgent = new https.Agent({
+      rejectUnauthorized: false,
+    });
   }
 
   /**
@@ -22,6 +28,8 @@ export class IBKRClient {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symbol, name: true }),
         signal: AbortSignal.timeout(this.timeout),
+        // @ts-ignore - Node.js fetch supports agent
+        agent: this.httpsAgent,
       });
 
       if (!response.ok) {
@@ -70,6 +78,8 @@ export class IBKRClient {
       const response = await fetch(`${url}?${params}`, {
         method: "GET",
         signal: AbortSignal.timeout(this.timeout),
+        // @ts-ignore - Node.js fetch supports agent
+        agent: this.httpsAgent,
       });
 
       if (!response.ok) {
@@ -115,6 +125,8 @@ export class IBKRClient {
       const response = await fetch(url, {
         method: "POST",
         signal: AbortSignal.timeout(5000),
+        // @ts-ignore - Node.js fetch supports agent
+        agent: this.httpsAgent,
       });
       return response.ok;
     } catch {
