@@ -160,8 +160,21 @@ export default function StocksPage() {
       `}} />
 
       <div style={{ maxWidth: 1400, margin: "0 auto" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <h1 style={{ fontSize: 32, fontWeight: 700, margin: 0 }}>Stocks</h1>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <h1 style={{ fontSize: 32, fontWeight: 700, margin: 0 }}>Stocks</h1>
+            <Link
+              href="/"
+              style={{
+                color: "var(--muted)",
+                textDecoration: "none",
+                fontSize: 14,
+                fontWeight: 500,
+              }}
+            >
+              ← Home
+            </Link>
+          </div>
           <Link
             href="/correlation"
             style={{
@@ -370,19 +383,19 @@ export default function StocksPage() {
             </thead>
             <tbody>
               {filteredAndSortedStocks.map((stock) => (
-                <tr key={stock.ticker}>
+                <tr
+                  key={stock.ticker}
+                  onClick={() => window.location.href = `/stocks/${stock.ticker}`}
+                  style={{ cursor: "pointer" }}
+                >
                   <td style={{ padding: "16px" }}>
-                    <Link
-                      href={`/stocks/${stock.ticker}`}
-                      style={{
-                        color: "var(--accent)",
-                        textDecoration: "none",
-                        fontWeight: 600,
-                        fontSize: 14,
-                      }}
-                    >
+                    <span style={{
+                      color: "var(--accent)",
+                      fontWeight: 600,
+                      fontSize: 14,
+                    }}>
                       {stock.ticker}
-                    </Link>
+                    </span>
                   </td>
                   <td style={{ padding: "16px", color: "var(--foreground)", fontSize: 14 }}>
                     {stock.name}

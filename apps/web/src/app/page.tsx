@@ -7,17 +7,32 @@ export const dynamic = "force-dynamic";
 async function getSystemStats() {
   try {
     const tableName = await getPriceTable();
-    
+
+    // Count securities that meet the same criteria as stocks list page:
+    // - At least 510 data points (2 years of trading data)
+    // - Updated within last 30 days
     const query = `
+      WITH stock_stats AS (
+        SELECT
+          s.ticker,
+          COUNT(*) as row_count,
+          MAX(p.date) as last_date
+        FROM stocks s
+        INNER JOIN ${tableName} p ON s.ticker = p.ticker
+        WHERE p.source = 'ibkr'
+          AND p.close IS NOT NULL
+          AND p.close > 0
+        GROUP BY s.ticker
+        HAVING COUNT(*) >= 510
+          AND MAX(p.date) >= CURRENT_DATE - INTERVAL '30 days'
+      )
       SELECT
-        COUNT(DISTINCT s.ticker) as securities,
-        MAX(p.date) as last_updated,
-        COUNT(*) as data_points
-      FROM stocks s
-      INNER JOIN ${tableName} p ON s.ticker = p.ticker
-      WHERE p.source = 'ibkr' AND p.close IS NOT NULL
+        COUNT(*) as securities,
+        MAX(last_date) as last_updated,
+        (SELECT COUNT(*) FROM ${tableName} WHERE source = 'ibkr' AND close IS NOT NULL) as data_points
+      FROM stock_stats
     `;
-    
+
     const result = await pool.query(query);
     return result.rows[0];
   } catch (error) {
