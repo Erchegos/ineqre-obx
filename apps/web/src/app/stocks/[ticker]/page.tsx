@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import PriceChart from "@/components/PriceChart";
-import PriceDrawdownChart from "@/components/price-drawdown-chart";
+import ReturnDistributionChart from "@/components/ReturnDistributionChart";
 import TimeframeSelector from "@/components/TimeframeSelector";
 
 type Stats = {
@@ -448,10 +448,14 @@ export default function StockTickerPage() {
           </div>
 
           <div style={{ marginBottom: 24, padding: 20, borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)" }}>
-            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: "var(--foreground)" }}>
-              Drawdown Analysis
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "var(--foreground)" }}>
+              Return Distribution Analysis
             </h2>
-            <PriceDrawdownChart data={activeDrawdown} height={280} />
+            <p style={{ fontSize: 12, color: "var(--muted-foreground)", marginBottom: 16, lineHeight: 1.5 }}>
+              <strong>Probability density at different timeframes.</strong> Shows how likely different returns are over various holding periods.
+              Wider curves = more uncertainty. Skewness and kurtosis reveal tail risk.
+            </p>
+            <ReturnDistributionChart returns={activeReturns} height={320} />
           </div>
 
           <div style={{ padding: 20, borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)" }}>
