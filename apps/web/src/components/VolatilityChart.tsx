@@ -78,13 +78,14 @@ export default function VolatilityChart({
             }}
             itemStyle={{ paddingBottom: 2 }}
             labelStyle={{ color: "var(--muted)", marginBottom: 8 }}
+            cursor={{ stroke: "#3b82f6", strokeWidth: 2, strokeDasharray: "5 5" }}
             // FIX: Use 'any' to avoid strict type errors with Recharts
             formatter={(value: any, name: any) => {
               if (value === null || value === undefined) return ["-", name];
               return [`${(Number(value) * 100).toFixed(2)}%`, MEASURE_CONFIG[name]?.label || name];
             }}
-            labelFormatter={(label) => new Date(label).toLocaleDateString("en-US", { 
-              weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' 
+            labelFormatter={(label) => new Date(label).toLocaleDateString("en-US", {
+              weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
             })}
           />
           
@@ -103,7 +104,7 @@ export default function VolatilityChart({
                 stroke={config.color}
                 strokeWidth={1.5}
                 dot={false}
-                activeDot={{ r: 4 }}
+                activeDot={{ r: 6, fill: config.color, stroke: "#fff", strokeWidth: 2 }}
                 connectNulls={true}
                 isAnimationActive={false}
               />
