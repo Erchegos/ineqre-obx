@@ -36,7 +36,7 @@ async function getStocksData(): Promise<StockData[]> {
       AND p.close IS NOT NULL
       AND p.close > 0
     GROUP BY s.ticker, s.name
-    HAVING COUNT(*) >= 1000
+    HAVING COUNT(*) >= 510
       AND MAX(p.date) >= CURRENT_DATE - INTERVAL '30 days'
     ORDER BY s.ticker
   `;

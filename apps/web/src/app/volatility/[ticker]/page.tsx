@@ -188,7 +188,7 @@ export default function VolatilityPage() {
     <main style={{ padding: 24, maxWidth: 1400, margin: "0 auto" }}>
       {/* Back Button */}
       <div style={{ marginBottom: 16 }}>
-        <Link href="/" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 4, border: "1px solid var(--border-subtle)", background: "var(--card-bg)", color: "var(--foreground)", fontSize: 13, fontWeight: 500, textDecoration: "none", transition: "all 0.2s" }}>
+        <Link href={`/stocks/${ticker}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 4, border: "1px solid var(--border-subtle)", background: "var(--card-bg)", color: "var(--foreground)", fontSize: 13, fontWeight: 500, textDecoration: "none", transition: "all 0.2s" }}>
           <span>←</span>
           <span>Back to stock analyses</span>
         </Link>
