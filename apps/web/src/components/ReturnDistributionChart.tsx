@@ -386,8 +386,8 @@ export default function ReturnDistributionChart({
             const marginRight = 10;
             const chartWidth = 100 - ((marginLeft + marginRight) / window.innerWidth) * 100;
 
-            // Calculate 0σ (center) position - at the mean of the distributions
-            const zeroX = ((avgMean - minReturn) / range) * 100;
+            // Calculate 0σ position at 0% return
+            const zeroX = ((0 - minReturn) / range) * 100;
             const adjustedZeroX = marginLeft + (zeroX * chartWidth / 100);
 
             return (
@@ -409,10 +409,10 @@ export default function ReturnDistributionChart({
                   </text>
                 </g>
 
-                {/* Sigma lines - relative to mean */}
+                {/* Sigma lines - relative to 0% */}
                 {sigmaLevels.map(({ sigma, opacity }) => {
-                  const negX = ((avgMean - sigma * avgSigma - minReturn) / range) * 100;
-                  const posX = ((avgMean + sigma * avgSigma - minReturn) / range) * 100;
+                  const negX = ((0 - sigma * avgSigma - minReturn) / range) * 100;
+                  const posX = ((0 + sigma * avgSigma - minReturn) / range) * 100;
 
                   const adjustedNegX = marginLeft + (negX * chartWidth / 100);
                   const adjustedPosX = marginLeft + (posX * chartWidth / 100);
