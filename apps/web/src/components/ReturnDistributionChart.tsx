@@ -117,9 +117,6 @@ export default function ReturnDistributionChart({
     new Set(["4 days", "7 days", "14 days", "21 days", "28 days", "42 days"])
   );
 
-  // State for probability threshold lines
-  const [showThresholds, setShowThresholds] = useState<boolean>(false);
-
   const toggleTimeframe = (label: string) => {
     setVisibleTimeframes((prev) => {
       const next = new Set(prev);
@@ -180,14 +177,19 @@ export default function ReturnDistributionChart({
   const currentSpot = 0; // Current price (0% return)
   const timeframeKeys = Object.keys(distributionData).filter(label => visibleTimeframes.has(label));
 
-  // Probability threshold levels
-  const thresholdLevels = [
-    { value: -0.20, label: "-20%" },
-    { value: -0.10, label: "-10%" },
-    { value: -0.05, label: "-5%" },
-    { value: 0.05, label: "+5%" },
-    { value: 0.10, label: "+10%" },
-    { value: 0.20, label: "+20%" },
+  // Calculate average sigma (standard deviation) across visible timeframes
+  const avgSigma = useMemo(() => {
+    if (!distributionData || timeframeKeys.length === 0) return 0;
+    const sigmas = timeframeKeys.map(label => distributionData[label].stats.stdDev);
+    return sigmas.reduce((a, b) => a + b, 0) / sigmas.length;
+  }, [distributionData, timeframeKeys]);
+
+  // Generate sigma levels (1σ, 2σ, 3σ, 4σ)
+  const sigmaLevels = [
+    { sigma: 1, opacity: 0.15 },
+    { sigma: 2, opacity: 0.25 },
+    { sigma: 3, opacity: 0.35 },
+    { sigma: 4, opacity: 0.45 },
   ];
 
   return (
@@ -206,22 +208,9 @@ export default function ReturnDistributionChart({
         <div style={{ fontSize: 13, color: "var(--muted-foreground)" }}>
           Click boxes below to toggle timeframes
         </div>
-        <button
-          onClick={() => setShowThresholds(!showThresholds)}
-          style={{
-            padding: "6px 12px",
-            fontSize: 12,
-            fontWeight: 500,
-            borderRadius: 4,
-            border: `1px solid ${showThresholds ? "var(--accent)" : "var(--border-subtle)"}`,
-            background: showThresholds ? "var(--accent)" : "transparent",
-            color: showThresholds ? "#fff" : "var(--muted)",
-            cursor: "pointer",
-            transition: "all 0.2s",
-          }}
-        >
-          {showThresholds ? "✓ " : ""}Probability Thresholds
-        </button>
+        <div style={{ fontSize: 12, color: "var(--muted)", fontFamily: "monospace" }}>
+          σ = {(avgSigma * 100).toFixed(2)}%
+        </div>
       </div>
 
       {/* Stats Grid - Clickable */}
@@ -365,6 +354,41 @@ export default function ReturnDistributionChart({
             );
           })}
 
+          {/* Sigma lines - weak dotted lines at ±1σ, ±2σ, ±3σ, ±4σ */}
+          {sigmaLevels.flatMap(({ sigma, opacity }) => [
+            <ReferenceLine
+              key={`sigma-neg-${sigma}`}
+              x={-sigma * avgSigma}
+              stroke="#ef4444"
+              strokeWidth={1}
+              strokeDasharray="2 4"
+              strokeOpacity={opacity}
+              label={{
+                value: `-${sigma}σ`,
+                position: "top",
+                fill: "#ef4444",
+                fontSize: 9,
+                opacity: opacity + 0.2,
+              }}
+            />,
+            <ReferenceLine
+              key={`sigma-pos-${sigma}`}
+              x={sigma * avgSigma}
+              stroke="#22c55e"
+              strokeWidth={1}
+              strokeDasharray="2 4"
+              strokeOpacity={opacity}
+              label={{
+                value: `+${sigma}σ`,
+                position: "top",
+                fill: "#22c55e",
+                fontSize: 9,
+                opacity: opacity + 0.2,
+              }}
+            />
+          ])}
+
+          {/* Current spot line */}
           <ReferenceLine
             x={currentSpot}
             stroke="var(--foreground)"
@@ -377,26 +401,6 @@ export default function ReturnDistributionChart({
               fontSize: 10,
             }}
           />
-
-          {/* Probability Threshold Lines - render AFTER areas so they appear on top */}
-          {showThresholds && thresholdLevels.map((threshold) => (
-            <ReferenceLine
-              key={threshold.value}
-              x={threshold.value}
-              stroke={threshold.value < 0 ? "#ef4444" : "#22c55e"}
-              strokeWidth={3}
-              strokeDasharray="5 5"
-              strokeOpacity={0.8}
-              label={{
-                value: threshold.label,
-                position: "top",
-                fill: threshold.value < 0 ? "#ef4444" : "#22c55e",
-                fontSize: 11,
-                offset: 10,
-                fontWeight: 700,
-              }}
-            />
-          ))}
         </AreaChart>
       </ResponsiveContainer>
 
@@ -424,16 +428,13 @@ export default function ReturnDistributionChart({
             <strong>Wider curves</strong> = Higher uncertainty (longer timeframes)
           </div>
           <div>
-            <strong>Probability thresholds</strong> = Dotted lines at ±5%, ±10%, ±20% show likelihood of reaching those levels
+            <strong>σ lines</strong> = Standard deviation bands (±1σ, ±2σ, ±3σ, ±4σ)
           </div>
           <div>
             <strong>Negative skew</strong> = Fat tail on left (big losses more likely)
           </div>
           <div>
             <strong>High kurtosis</strong> = Fat tails (extreme events more common)
-          </div>
-          <div>
-            <strong>σ (sigma)</strong> = Standard deviation (volatility)
           </div>
         </div>
       </div>
