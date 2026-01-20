@@ -169,7 +169,9 @@ export default function ReturnDistributionChart({
     });
   }, [distributionData, visibleTimeframes]);
 
-  if (!distributionData || chartData.length === 0) {
+  const timeframeKeys = distributionData ? Object.keys(distributionData).filter(label => visibleTimeframes.has(label)) : [];
+
+  if (!distributionData || chartData.length === 0 || timeframeKeys.length === 0) {
     return (
       <div
         style={{
@@ -180,13 +182,12 @@ export default function ReturnDistributionChart({
           color: "var(--muted)",
         }}
       >
-        No data available
+        {timeframeKeys.length === 0 && distributionData ? "Select at least one timeframe" : "No data available"}
       </div>
     );
   }
 
   const currentSpot = 0; // Current price (0% return)
-  const timeframeKeys = Object.keys(distributionData).filter(label => visibleTimeframes.has(label));
 
   // Calculate average sigma (standard deviation) and mean across visible timeframes
   const avgSigma = useMemo(() => {
