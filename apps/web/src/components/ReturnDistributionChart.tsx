@@ -369,57 +369,85 @@ export default function ReturnDistributionChart({
             pointerEvents: "none",
           }}
         >
-          {sigmaLevels.map(({ sigma, opacity }) => {
+          {(() => {
             // Calculate x position as percentage
             const minReturn = Math.min(...chartData.map(d => d.return));
             const maxReturn = Math.max(...chartData.map(d => d.return));
             const range = maxReturn - minReturn;
 
-            const negX = ((-sigma * avgSigma - minReturn) / range) * 100;
-            const posX = ((sigma * avgSigma - minReturn) / range) * 100;
-
-            // Account for chart margins (left margin is 0, right is 10)
+            // Account for chart margins
             const marginLeft = 40; // Approximate y-axis width
             const marginRight = 10;
             const chartWidth = 100 - ((marginLeft + marginRight) / window.innerWidth) * 100;
 
-            const adjustedNegX = marginLeft + (negX * chartWidth / 100);
-            const adjustedPosX = marginLeft + (posX * chartWidth / 100);
+            // Calculate 0σ (center) position
+            const zeroX = ((0 - minReturn) / range) * 100;
+            const adjustedZeroX = marginLeft + (zeroX * chartWidth / 100);
 
             return (
-              <g key={sigma}>
-                {/* Negative sigma line */}
-                <line
-                  x1={`${adjustedNegX}%`}
-                  y1="10"
-                  x2={`${adjustedNegX}%`}
-                  y2={`calc(100% - 40px)`}
-                  stroke="#ef4444"
-                  strokeWidth="1"
-                  strokeDasharray="3 6"
-                  opacity={opacity * 2}
-                />
-                {/* Positive sigma line */}
-                <line
-                  x1={`${adjustedPosX}%`}
-                  y1="10"
-                  x2={`${adjustedPosX}%`}
-                  y2={`calc(100% - 40px)`}
-                  stroke="#22c55e"
-                  strokeWidth="1"
-                  strokeDasharray="3 6"
-                  opacity={opacity * 2}
-                />
-                {/* Labels */}
-                <text x={`${adjustedNegX}%`} y="20" fill="#ef4444" fontSize="9" opacity="0.6" textAnchor="middle">
-                  -{sigma}σ
-                </text>
-                <text x={`${adjustedPosX}%`} y="20" fill="#22c55e" fontSize="9" opacity="0.6" textAnchor="middle">
-                  +{sigma}σ
-                </text>
-              </g>
+              <>
+                {/* 0σ line at 0% */}
+                <g key="zero">
+                  <line
+                    x1={`${adjustedZeroX}%`}
+                    y1="10"
+                    x2={`${adjustedZeroX}%`}
+                    y2={`calc(100% - 40px)`}
+                    stroke="var(--foreground)"
+                    strokeWidth="2"
+                    strokeDasharray="5 5"
+                    opacity="0.6"
+                  />
+                  <text x={`${adjustedZeroX}%`} y="20" fill="var(--foreground)" fontSize="10" opacity="0.8" textAnchor="middle" fontWeight="600">
+                    0σ
+                  </text>
+                </g>
+
+                {/* Sigma lines */}
+                {sigmaLevels.map(({ sigma, opacity }) => {
+                  const negX = ((-sigma * avgSigma - minReturn) / range) * 100;
+                  const posX = ((sigma * avgSigma - minReturn) / range) * 100;
+
+                  const adjustedNegX = marginLeft + (negX * chartWidth / 100);
+                  const adjustedPosX = marginLeft + (posX * chartWidth / 100);
+
+                  return (
+                    <g key={sigma}>
+                      {/* Negative sigma line */}
+                      <line
+                        x1={`${adjustedNegX}%`}
+                        y1="10"
+                        x2={`${adjustedNegX}%`}
+                        y2={`calc(100% - 40px)`}
+                        stroke="#ef4444"
+                        strokeWidth="1"
+                        strokeDasharray="3 6"
+                        opacity={opacity * 2}
+                      />
+                      {/* Positive sigma line */}
+                      <line
+                        x1={`${adjustedPosX}%`}
+                        y1="10"
+                        x2={`${adjustedPosX}%`}
+                        y2={`calc(100% - 40px)`}
+                        stroke="#22c55e"
+                        strokeWidth="1"
+                        strokeDasharray="3 6"
+                        opacity={opacity * 2}
+                      />
+                      {/* Labels */}
+                      <text x={`${adjustedNegX}%`} y="20" fill="#ef4444" fontSize="9" opacity="0.6" textAnchor="middle">
+                        -{sigma}σ
+                      </text>
+                      <text x={`${adjustedPosX}%`} y="20" fill="#22c55e" fontSize="9" opacity="0.6" textAnchor="middle">
+                        +{sigma}σ
+                      </text>
+                    </g>
+                  );
+                })}
+              </>
             );
-          })}
+          })()}
         </svg>
       </div>
 
