@@ -361,21 +361,21 @@ export default function ReturnDistributionChart({
             }}
           />
 
-          {/* Probability Threshold Lines */}
+          {/* Probability Threshold Lines - render on top */}
           {showThresholds && thresholdLevels.map((threshold) => (
             <ReferenceLine
               key={threshold.value}
               x={threshold.value}
               stroke={threshold.value < 0 ? "#ef4444" : "#22c55e"}
-              strokeWidth={1}
-              strokeDasharray="3 3"
-              opacity={0.5}
+              strokeWidth={2}
+              strokeDasharray="4 4"
               label={{
                 value: threshold.label,
                 position: threshold.value < 0 ? "left" : "right",
                 fill: threshold.value < 0 ? "#ef4444" : "#22c55e",
-                fontSize: 9,
-                offset: 5,
+                fontSize: 10,
+                offset: 8,
+                fontWeight: 600,
               }}
             />
           ))}
