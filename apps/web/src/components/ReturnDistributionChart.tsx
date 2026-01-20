@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   AreaChart,
   Area,
@@ -112,13 +112,32 @@ export default function ReturnDistributionChart({
     return generateTimeframeDistributions(returns);
   }, [returns]);
 
+  // State to track which timeframes are visible
+  const [visibleTimeframes, setVisibleTimeframes] = useState<Set<string>>(
+    new Set(["4 days", "7 days", "14 days", "21 days", "28 days", "42 days"])
+  );
+
+  const toggleTimeframe = (label: string) => {
+    setVisibleTimeframes((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) {
+        next.delete(label);
+      } else {
+        next.add(label);
+      }
+      return next;
+    });
+  };
+
   // Combine all density data into one chart data structure
   const chartData = useMemo(() => {
     if (!distributionData) return [];
 
     const allPoints = new Set<number>();
-    Object.values(distributionData).forEach((dist: any) => {
-      dist.densityData.forEach((d: any) => allPoints.add(d.return));
+    Object.entries(distributionData).forEach(([label, dist]: [string, any]) => {
+      if (visibleTimeframes.has(label)) {
+        dist.densityData.forEach((d: any) => allPoints.add(d.return));
+      }
     });
 
     const sortedPoints = Array.from(allPoints).sort((a, b) => a - b);
@@ -127,15 +146,17 @@ export default function ReturnDistributionChart({
       const point: any = { return: returnValue };
 
       Object.entries(distributionData).forEach(([label, dist]: [string, any]) => {
-        const closest = dist.densityData.reduce((prev: any, curr: any) =>
-          Math.abs(curr.return - returnValue) < Math.abs(prev.return - returnValue) ? curr : prev
-        );
-        point[label] = closest.density;
+        if (visibleTimeframes.has(label)) {
+          const closest = dist.densityData.reduce((prev: any, curr: any) =>
+            Math.abs(curr.return - returnValue) < Math.abs(prev.return - returnValue) ? curr : prev
+          );
+          point[label] = closest.density;
+        }
       });
 
       return point;
     });
-  }, [distributionData]);
+  }, [distributionData, visibleTimeframes]);
 
   if (!distributionData || chartData.length === 0) {
     return (
@@ -154,11 +175,11 @@ export default function ReturnDistributionChart({
   }
 
   const currentSpot = 0; // Current price (0% return)
-  const timeframeKeys = Object.keys(distributionData);
+  const timeframeKeys = Object.keys(distributionData).filter(label => visibleTimeframes.has(label));
 
   return (
     <div style={{ width: "100%" }}>
-      {/* Stats Grid */}
+      {/* Stats Grid - Clickable */}
       <div
         style={{
           display: "grid",
@@ -167,50 +188,70 @@ export default function ReturnDistributionChart({
           marginBottom: 20,
         }}
       >
-        {Object.entries(distributionData).map(([label, dist]: [string, any]) => (
-          <div
-            key={label}
-            style={{
-              padding: 12,
-              background: "var(--input-bg)",
-              border: `1px solid ${dist.color}30`,
-              borderRadius: 6,
-            }}
-          >
-            <div
+        {Object.entries(distributionData).map(([label, dist]: [string, any]) => {
+          const isVisible = visibleTimeframes.has(label);
+          return (
+            <button
+              key={label}
+              onClick={() => toggleTimeframe(label)}
               style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: dist.color,
-                marginBottom: 6,
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
+                padding: 12,
+                background: isVisible ? "var(--input-bg)" : "transparent",
+                border: `1px solid ${isVisible ? dist.color : "var(--border-subtle)"}`,
+                borderRadius: 6,
+                cursor: "pointer",
+                textAlign: "left",
+                opacity: isVisible ? 1 : 0.5,
+                transition: "all 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                if (!isVisible) {
+                  e.currentTarget.style.opacity = "0.7";
+                  e.currentTarget.style.borderColor = dist.color;
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isVisible) {
+                  e.currentTarget.style.opacity = "0.5";
+                  e.currentTarget.style.borderColor = "var(--border-subtle)";
+                }
               }}
             >
               <div
                 style={{
-                  width: 8,
-                  height: 8,
-                  background: dist.color,
-                  borderRadius: "50%",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: isVisible ? dist.color : "var(--muted)",
+                  marginBottom: 6,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
                 }}
-              />
-              {label}
-            </div>
-            <div style={{ fontSize: 9, color: "var(--muted-foreground)", display: "grid", gap: 2 }}>
-              <div>
-                <strong>Skew:</strong> {dist.stats.skewness.toFixed(2)}
+              >
+                <div
+                  style={{
+                    width: 8,
+                    height: 8,
+                    background: isVisible ? dist.color : "var(--muted)",
+                    borderRadius: "50%",
+                  }}
+                />
+                {label}
               </div>
-              <div>
-                <strong>Kurt:</strong> {dist.stats.kurtosis.toFixed(2)}
+              <div style={{ fontSize: 9, color: "var(--muted-foreground)", display: "grid", gap: 2 }}>
+                <div>
+                  <strong>Skew:</strong> {dist.stats.skewness.toFixed(2)}
+                </div>
+                <div>
+                  <strong>Kurt:</strong> {dist.stats.kurtosis.toFixed(2)}
+                </div>
+                <div>
+                  <strong>σ:</strong> {(dist.stats.stdDev * 100).toFixed(2)}%
+                </div>
               </div>
-              <div>
-                <strong>σ:</strong> {(dist.stats.stdDev * 100).toFixed(2)}%
-              </div>
-            </div>
-          </div>
-        ))}
+            </button>
+          );
+        })}
       </div>
 
       {/* Chart */}
@@ -307,21 +348,24 @@ export default function ReturnDistributionChart({
           lineHeight: 1.5,
         }}
       >
-        <div style={{ fontWeight: 600, marginBottom: 4, color: "var(--foreground)" }}>
-          📊 How to Read This Chart
+        <div style={{ fontWeight: 600, marginBottom: 6, color: "var(--foreground)" }}>
+          How to Read This Chart
         </div>
         <div style={{ display: "grid", gap: 4 }}>
           <div>
-            <strong>Wider curves</strong> = Higher uncertainty (longer timeframes have more time for things to happen)
+            <strong>Click boxes above</strong> to show/hide timeframes
           </div>
           <div>
-            <strong>Negative skew</strong> = Fat tail on the left (big losses more likely than big gains)
+            <strong>Wider curves</strong> = Higher uncertainty (longer timeframes)
           </div>
           <div>
-            <strong>High kurtosis</strong> = Fat tails on both ends (extreme events more common)
+            <strong>Negative skew</strong> = Fat tail on left (big losses more likely)
           </div>
           <div>
-            <strong>σ (sigma)</strong> = Standard deviation (volatility) for that timeframe
+            <strong>High kurtosis</strong> = Fat tails (extreme events more common)
+          </div>
+          <div>
+            <strong>σ (sigma)</strong> = Standard deviation (volatility)
           </div>
         </div>
       </div>
