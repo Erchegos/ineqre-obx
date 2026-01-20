@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { getPriceTable } from "@/lib/price-data-adapter";
-import { 
-  computeVolatilityMeasures, 
-  compareVolatilityAroundEvent, 
-  currentVolatilityPercentile 
+import {
+  computeVolatilityMeasures,
+  compareVolatilityAroundEvent,
+  currentVolatilityPercentile
 } from "@/lib/volatility";
+import { computeReturns, computeBeta } from "@/lib/metrics";
 
 export const dynamic = "force-dynamic";
 
@@ -43,15 +44,15 @@ function sanitizeData(data: any): any {
 // --- Data Fetching ---
 async function fetchBars(ticker: string, limit: number, useAdjusted: boolean): Promise<PriceBar[]> {
   const tableName = await getPriceTable();
-  
+
   const q = `
-    SELECT 
-      date::date as date, 
-      open, 
-      high, 
-      low, 
+    SELECT
+      date::date as date,
+      open,
+      high,
+      low,
       close,
-      adj_close 
+      adj_close
     FROM ${tableName}
     WHERE ticker = $1
       AND close IS NOT NULL
@@ -59,19 +60,19 @@ async function fetchBars(ticker: string, limit: number, useAdjusted: boolean): P
     ORDER BY date DESC
     LIMIT $2
   `;
-  
+
   const result = await pool.query(q, [ticker, limit]);
-  
+
   return result.rows.map((r) => {
     // Logic: If useAdjusted is true, we swap 'close' with 'adj_close'
-    // We assume Open/High/Low are proportional or we just use raw for those 
-    // (Note: For precise Yang-Zhang on splits, you'd ideally adjust O/H/L too, 
+    // We assume Open/High/Low are proportional or we just use raw for those
+    // (Note: For precise Yang-Zhang on splits, you'd ideally adjust O/H/L too,
     // but swapping Close is the most important step for standard volatility).
     const rawClose = Number(r.close);
     const adjClose = r.adj_close ? Number(r.adj_close) : rawClose;
-    
+
     // Calculate the adjustment factor if needed to scale O/H/L
-    // (Optional: simple version just swaps close. 
+    // (Optional: simple version just swaps close.
     // More complex version scales O/H/L by (AdjClose / Close))
     const ratio = useAdjusted && rawClose !== 0 ? adjClose / rawClose : 1;
 
@@ -83,6 +84,29 @@ async function fetchBars(ticker: string, limit: number, useAdjusted: boolean): P
       close: useAdjusted ? adjClose : rawClose,
     };
   }).reverse(); // Return oldest -> newest for calculation
+}
+
+// Fetch market (OBX) prices for beta calculation
+async function fetchMarketBars(limit: number, useAdjusted: boolean): Promise<number[]> {
+  const tableName = await getPriceTable();
+
+  const q = `
+    SELECT close, adj_close
+    FROM ${tableName}
+    WHERE upper(ticker) = 'OBX'
+      AND close IS NOT NULL
+      AND close > 0
+    ORDER BY date DESC
+    LIMIT $1
+  `;
+
+  const result = await pool.query(q, [limit]);
+
+  return result.rows.map((r) => {
+    const rawClose = Number(r.close);
+    const adjClose = r.adj_close ? Number(r.adj_close) : rawClose;
+    return useAdjusted ? adjClose : rawClose;
+  }).reverse(); // Return oldest -> newest
 }
 
 export async function GET(
@@ -117,9 +141,24 @@ export async function GET(
 
     // Compute Volatility
     const volSeries = computeVolatilityMeasures(bars);
-    
+
     // Get latest values
     const current = volSeries[volSeries.length - 1];
+
+    // Calculate Beta (vs OBX)
+    let beta = 0;
+    try {
+      const marketPrices = await fetchMarketBars(limit, useAdjusted);
+      if (marketPrices.length > 0) {
+        const stockPrices = bars.map(b => b.close);
+        const stockReturns = computeReturns(stockPrices);
+        const marketReturns = computeReturns(marketPrices);
+        beta = computeBeta(stockReturns, marketReturns);
+      }
+    } catch (e) {
+      console.warn('[Volatility API] Beta calculation failed:', e);
+      // Beta will remain 0
+    }
 
     // Compute percentiles
     // FIX APPLIED HERE: Added '?? null' inside the .map() calls
@@ -153,7 +192,8 @@ export async function GET(
       ticker: ticker.toUpperCase(),
       count: volSeries.length,
       adjusted: useAdjusted, // Echo back status
-      
+      beta: sanitizeNumber(beta), // Beta vs OBX
+
       current: {
         date: current.date,
         historical: sanitizeNumber(current.historical),

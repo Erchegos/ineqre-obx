@@ -12,6 +12,7 @@ import SeasonalityChart from "@/components/SeasonalityChart";
 type VolatilityData = {
   ticker: string;
   count: number;
+  beta: number | null; // Beta vs OBX
   current: {
     date: string;
     historical: number | null;
@@ -48,7 +49,7 @@ type VolatilityData = {
     garmanKlass?: number;
     rogersSatchell?: number;
     yangZhang?: number;
-    close?: number; 
+    close?: number;
   }>;
   dateRange: {
     start: string;
@@ -263,12 +264,13 @@ export default function VolatilityPage() {
         </div>
       </div>
 
-      {/* --- 8 QUANT STATS DASHBOARD --- */}
+      {/* --- 9 QUANT STATS DASHBOARD --- */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 32 }}>
         <StatBox label="Current Vol (YZ)" value={fmtPct(stats.primaryVol)} sub="Gap-Adjusted" highlight />
         <StatBox label="Vol Percentile" value={`${stats.percentile.toFixed(0)}th`} sub="vs. History" />
         <StatBox label="Vol Regime" value={stats.regime} sub="Condition" color={stats.regimeColor} />
         <StatBox label="Vol Trend" value={stats.trend} sub="Short vs Long" color={stats.trend === "Expanding" ? "#ef4444" : "#22c55e"} />
+        <StatBox label="Beta (vs OBX)" value={data.beta !== null ? data.beta.toFixed(3) : "—"} sub={`${limit}d Period`} />
         <StatBox label="Implied Move (1D)" value={`±${(stats.impliedDay * 100).toFixed(2)}%`} sub="Expected Daily" />
         <StatBox label="Implied Move (1W)" value={`±${(stats.impliedWeek * 100).toFixed(2)}%`} sub="Expected Weekly" />
         <StatBox label={`High Vol (${limit}d)`} value={fmtPct(stats.maxVol)} sub="Period Max" />
