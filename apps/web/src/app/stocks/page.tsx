@@ -22,7 +22,7 @@ async function getStocksData(): Promise<StockData[]> {
     - New: (ARRAY_AGG(p.close ORDER BY p.date DESC))[1] -> Gets the price from the most recent date.
   */
   const query = `
-    SELECT 
+    SELECT
       s.ticker,
       s.name,
       (ARRAY_AGG(p.close ORDER BY p.date DESC))[1] as last_close,
@@ -32,8 +32,7 @@ async function getStocksData(): Promise<StockData[]> {
       COUNT(*) as rows
     FROM stocks s
     INNER JOIN ${tableName} p ON s.ticker = p.ticker
-    WHERE p.source = 'ibkr'
-      AND p.close IS NOT NULL
+    WHERE p.close IS NOT NULL
       AND p.close > 0
     GROUP BY s.ticker, s.name
     HAVING COUNT(*) >= 1000

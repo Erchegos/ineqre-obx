@@ -9,13 +9,13 @@ async function getSystemStats() {
     const tableName = await getPriceTable();
     
     const query = `
-      SELECT 
+      SELECT
         COUNT(DISTINCT s.ticker) as securities,
         MAX(p.date) as last_updated,
         COUNT(*) as data_points
       FROM stocks s
       INNER JOIN ${tableName} p ON s.ticker = p.ticker
-      WHERE p.source = 'ibkr' AND p.close IS NOT NULL
+      WHERE p.close IS NOT NULL
     `;
     
     const result = await pool.query(query);
