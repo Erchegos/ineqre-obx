@@ -15,7 +15,7 @@ async function getSystemStats() {
         COUNT(*) as data_points
       FROM stocks s
       INNER JOIN ${tableName} p ON s.ticker = p.ticker
-      WHERE p.close IS NOT NULL
+      WHERE p.source = 'ibkr' AND p.close IS NOT NULL
     `;
     
     const result = await pool.query(query);

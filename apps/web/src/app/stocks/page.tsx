@@ -32,7 +32,8 @@ async function getStocksData(): Promise<StockData[]> {
       COUNT(*) as rows
     FROM stocks s
     INNER JOIN ${tableName} p ON s.ticker = p.ticker
-    WHERE p.close IS NOT NULL
+    WHERE p.source = 'ibkr'
+      AND p.close IS NOT NULL
       AND p.close > 0
     GROUP BY s.ticker, s.name
     HAVING COUNT(*) >= 1000
