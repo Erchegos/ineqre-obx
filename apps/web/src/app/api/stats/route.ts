@@ -45,8 +45,7 @@ export async function GET() {
         COUNT(*) as data_points
       FROM stocks s
       INNER JOIN ${table} p ON s.ticker = p.ticker
-      WHERE p.source = 'ibkr'
-        AND p.close IS NOT NULL
+      WHERE p.close IS NOT NULL
         AND p.close > 0
     `;
 

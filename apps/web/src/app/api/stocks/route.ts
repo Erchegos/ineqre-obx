@@ -40,12 +40,10 @@ export async function GET() {
         COUNT(*) as rows
       FROM stocks s
       INNER JOIN ${table} p ON s.ticker = p.ticker
-      WHERE p.source = 'ibkr'
-        AND p.close IS NOT NULL
+      WHERE p.close IS NOT NULL
         AND p.close > 0
       GROUP BY s.ticker, s.name
-      HAVING COUNT(*) >= 510
-        AND MAX(p.date) >= CURRENT_DATE - INTERVAL '30 days'
+      HAVING COUNT(*) >= 100
       ORDER BY s.ticker
     `;
 
@@ -71,14 +69,14 @@ export async function GET() {
     const stocks = result.rows.map((row) => ({
       ticker: row.ticker,
       name: row.name || row.ticker,
-      last_close: Number(row.last_close),
-      last_adj_close: Number(row.last_adj_close || row.last_close),
+      last_close: Number(row.last_close || 0),
+      last_adj_close: row.last_adj_close ? Number(row.last_adj_close) : Number(row.last_close || 0),
       start_date: row.start_date instanceof Date
         ? row.start_date.toISOString().slice(0, 10)
-        : String(row.start_date),
+        : String(row.start_date).slice(0, 10),
       end_date: row.end_date instanceof Date
         ? row.end_date.toISOString().slice(0, 10)
-        : String(row.end_date),
+        : String(row.end_date).slice(0, 10),
       rows: Number(row.rows),
     }));
 
