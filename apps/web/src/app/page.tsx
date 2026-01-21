@@ -3,6 +3,7 @@ import { pool } from "@/lib/db";
 import { getPriceTable } from "@/lib/price-data-adapter";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 async function getSystemStats() {
   try {

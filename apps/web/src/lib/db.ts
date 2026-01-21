@@ -5,55 +5,51 @@ const globalForDb = globalThis as unknown as {
   pool: Pool | undefined;
 };
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL is not defined");
-}
-
 function createPool() {
   try {
-    // Clean the URL - remove quotes and query params
-    let cleanUrl = process.env.DATABASE_URL!.trim();
-    // Remove surrounding quotes if present
-    cleanUrl = cleanUrl.replace(/^["']|["']$/g, '');
-    // Remove query params for manual parsing
-    cleanUrl = cleanUrl.split('?')[0];
+    if (!process.env.DATABASE_URL) {
+      throw new Error("DATABASE_URL is not defined");
+    }
 
-    // Parse manually to ensure SSL config is applied
-    const dbUrl = new URL(cleanUrl);
+    // Use connection string directly for better compatibility with Vercel
+    const connectionString = process.env.DATABASE_URL.trim().replace(/^["']|["']$/g, '');
 
-    return new Pool({
-      host: dbUrl.hostname,
-      port: parseInt(dbUrl.port),
-      database: dbUrl.pathname.slice(1),
-      user: dbUrl.username,
-      password: dbUrl.password,
+    const newPool = new Pool({
+      connectionString,
       max: 10,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
       ssl: {
         rejectUnauthorized: false
       },
-      // Add query timeout for serverless
       query_timeout: 10000
     });
+
+    newPool.on('error', (err) => {
+      console.error('[DB POOL ERROR]', err);
+    });
+
+    newPool.on('connect', () => {
+      console.log('[DB POOL] Client connected');
+    });
+
+    return newPool;
   } catch (error) {
     console.error("Failed to create database pool:", error);
     throw error;
   }
 }
 
-export const pool = globalForDb.pool ?? createPool();
-
-pool.on('error', (err) => {
-  console.error('[DB POOL ERROR]', err);
-});
-
-pool.on('connect', () => {
-  console.log('[DB POOL] Client connected');
-});
-
-if (process.env.NODE_ENV !== "production") {
-  globalForDb.pool = pool;
+function getPool(): Pool {
+  if (!globalForDb.pool) {
+    globalForDb.pool = createPool();
+    if (process.env.NODE_ENV !== "production") {
+      // Cache in development only
+    }
+  }
+  return globalForDb.pool;
 }
+
+export const pool = getPool();
 
 export const db = drizzle(pool);
