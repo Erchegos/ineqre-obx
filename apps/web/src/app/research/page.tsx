@@ -40,46 +40,16 @@ export default function ResearchPortalPage() {
     });
   };
 
-  // Clean body text for display
+  // Clean body text for display - just remove disclaimer
   const cleanBodyText = (text: string): string => {
     if (!text) return '';
 
-    // First, remove the Pareto Securities disclaimer (everything from "Source: Pareto Securities" onwards)
+    // Remove the Pareto Securities disclaimer
     let cleaned = text.split(/Source:\s*Pareto Securities/i)[0];
-
-    // Remove "Full Report:" section and everything after it
     cleaned = cleaned.split(/\n*Full Report:/i)[0];
-
-    // Remove "CLICK HERE FOR THE FULL REPORT" and similar patterns
     cleaned = cleaned.replace(/CLICK HERE FOR THE FULL REPORT/gi, '');
 
-    // Comprehensive fix for Windows-1252 to UTF-8 double-encoding (mojibake)
-    // Using split/join for maximum compatibility
-    const fixes = {
-      'â€™': "'", 'â€˜': "'", 'â€œ': '"', 'â€': '"',
-      'â€˛': "'", 'â€³': '"', ''': "'", ''': "'", '"': '"', '"': '"',
-      'â€"': '–', 'â€"': '—', 'â€'': '-',
-      'â€¦': '...', 'â€¢': '•', 'â€‹': '',
-      'Â ': ' ', 'Â': '',
-      'Ã¥': 'å', 'Ã¸': 'ø', 'Ã¦': 'æ', 'Ã…': 'Å', 'Ã˜': 'Ø', 'Ã†': 'Æ',
-      'Ã©': 'é', 'Ã¨': 'è', 'Ãª': 'ê', 'Ã«': 'ë',
-      'Ã¡': 'á', 'Ã ': 'à', 'Ã¢': 'â', 'Ã¤': 'ä', 'Ã£': 'ã',
-      'Ã¶': 'ö', 'Ã´': 'ô', 'Ã²': 'ò', 'Ã³': 'ó',
-      'Ã¼': 'ü', 'Ã»': 'û', 'Ã¹': 'ù', 'Ãº': 'ú',
-      'Ã±': 'ñ', 'Ã§': 'ç', 'Ã': 'Ø',
-      'Â°': '°', 'Â±': '±', 'Ã—': '×', 'Ã·': '÷',
-      'Â£': '£', 'â‚¬': '€', 'Â¥': '¥', 'Â¢': '¢',
-      'Â©': '©', 'Â®': '®', 'â„¢': '™', 'Â§': '§', 'Âµ': 'µ',
-    };
-
-    for (const [bad, good] of Object.entries(fixes)) {
-      cleaned = cleaned.split(bad).join(good);
-    }
-
-    // Clean up extra whitespace
-    cleaned = cleaned.trim().replace(/\s+/g, ' ');
-
-    return cleaned;
+    return cleaned.trim();
   };
 
   // Clean filename for display
