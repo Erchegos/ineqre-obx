@@ -10,12 +10,7 @@ type SystemStats = {
 };
 
 export default function HomePage() {
-  const [stats, setStats] = useState<SystemStats>({
-    securities: 25,
-    last_updated: new Date().toISOString(),
-    data_points: 1250000
-  });
-  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<SystemStats | null>(null);
 
   useEffect(() => {
     async function fetchStats() {
@@ -31,22 +26,19 @@ export default function HomePage() {
         }
       } catch (e) {
         console.error("Failed to fetch stats:", e);
-        // Keep using default stats on error
-      } finally {
-        setLoading(false);
       }
     }
 
     fetchStats();
   }, []);
 
-  const lastUpdate = stats.last_updated
+  const lastUpdate = stats?.last_updated
     ? new Date(stats.last_updated).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
       })
-    : 'N/A';
+    : '...';
 
   return (
     <main style={{
@@ -92,8 +84,8 @@ export default function HomePage() {
           gap: 16,
           marginBottom: 56
         }}>
-          <StatBox label="Securities Covered" value={stats.securities} suffix="" />
-          <StatBox label="OHLCV Data Points" value={Number(stats.data_points).toLocaleString()} suffix="pts" />
+          <StatBox label="Securities Covered" value={stats?.securities || '...'} suffix="" />
+          <StatBox label="OHLCV Data Points" value={stats ? Number(stats.data_points).toLocaleString() : '...'} suffix={stats ? "pts" : ""} />
           <StatBox label="Last Updated" value={lastUpdate} suffix="" />
         </div>
 

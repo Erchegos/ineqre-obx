@@ -59,7 +59,9 @@ export default function CorrelationPage() {
       const res = await fetch("/api/stocks");
       if (res.ok) {
         const stocks = await res.json();
-        setAvailableTickers(stocks);
+        // Extract just the ticker strings from the stock objects
+        const tickers = stocks.map((stock: any) => stock.ticker);
+        setAvailableTickers(tickers);
       }
     } catch (e) {
       console.error("Failed to fetch tickers:", e);
