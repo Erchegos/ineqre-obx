@@ -119,6 +119,9 @@ export default function ReturnDistributionChart({
   // State to track guide visibility
   const [showGuide, setShowGuide] = useState<boolean>(false);
 
+  // State to track smoothing
+  const [smoothed, setSmoothed] = useState<boolean>(false);
+
   const toggleTimeframe = (label: string) => {
     setVisibleTimeframes((prev) => {
       const next = new Set(prev);
@@ -201,8 +204,26 @@ export default function ReturnDistributionChart({
         <div style={{ fontSize: 13, color: "var(--muted-foreground)" }}>
           Click boxes below to toggle timeframes
         </div>
-        <div style={{ fontSize: 12, color: "var(--muted)", fontFamily: "monospace" }}>
-          σ = {(avgSigma * 100).toFixed(2)}%
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button
+            onClick={() => setSmoothed(!smoothed)}
+            style={{
+              padding: "4px 10px",
+              fontSize: 11,
+              fontWeight: 500,
+              border: "1px solid var(--border)",
+              borderRadius: 4,
+              background: smoothed ? "var(--primary)" : "transparent",
+              color: smoothed ? "#fff" : "var(--foreground)",
+              cursor: "pointer",
+              transition: "all 0.15s",
+            }}
+          >
+            {smoothed ? "Smoothed" : "Stepped"}
+          </button>
+          <div style={{ fontSize: 12, color: "var(--muted)", fontFamily: "monospace" }}>
+            σ = {(avgSigma * 100).toFixed(2)}%
+          </div>
         </div>
       </div>
 
@@ -361,7 +382,7 @@ export default function ReturnDistributionChart({
             return (
               <Area
                 key={label}
-                type="monotone"
+                type={smoothed ? "monotone" : "stepAfter"}
                 dataKey={label}
                 stroke={dist.color}
                 fill={dist.color}
