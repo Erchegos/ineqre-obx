@@ -17,8 +17,8 @@ const pool = new Pool({
 function fixEncoding(text) {
   if (!text) return text;
 
-  return text
-    // Fix smart quotes and apostrophes
+  let fixed = text
+    // Fix smart quotes and apostrophes (mojibake patterns)
     .replace(/â€™/g, "'")
     .replace(/â€˜/g, "'")
     .replace(/â€œ/g, '"')
@@ -27,7 +27,7 @@ function fixEncoding(text) {
     .replace(/â€"/g, '—')
     .replace(/â€¦/g, '...')
 
-    // Fix common patterns
+    // Fix common day possessives
     .replace(/Mondayâs/g, "Monday's")
     .replace(/Tuesdayâs/g, "Tuesday's")
     .replace(/Wednesdayâs/g, "Wednesday's")
@@ -36,7 +36,7 @@ function fixEncoding(text) {
     .replace(/Saturdayâs/g, "Saturday's")
     .replace(/Sundayâs/g, "Sunday's")
 
-    // Fix possessives and contractions
+    // Fix possessives and contractions with â
     .replace(/(\w)âs\b/g, "$1's")
     .replace(/(\w)ât\b/g, "$1't")
     .replace(/(\w)âre\b/g, "$1're")
@@ -44,7 +44,7 @@ function fixEncoding(text) {
     .replace(/(\w)âll\b/g, "$1'll")
     .replace(/(\w)âd\b/g, "$1'd")
 
-    // Fix quotes around phrases
+    // Fix quotes around phrases (â...â becomes "...")
     .replace(/â([A-Z][^â]*?)â/g, '"$1"')
     .replace(/â([a-z][^â]*?)â/g, '"$1"')
 
@@ -65,6 +65,11 @@ function fixEncoding(text) {
 
     // Clean up any remaining stray â characters
     .replace(/â/g, '');
+
+  // Clean up multiple spaces to single space
+  fixed = fixed.replace(/  +/g, ' ');
+
+  return fixed;
 }
 
 async function fixAllDocuments() {
