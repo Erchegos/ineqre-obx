@@ -140,12 +140,12 @@ async function processEmail(message, imap) {
 
     // Extract body text from raw email source (much more reliable!)
     let bodyText = '';
+    let reportUrl = '';
     try {
       if (message.source) {
         const rawEmail = message.source.toString('utf-8');
 
         // Extract report link - try multiple patterns
-        let reportUrl = '';
 
         // Method 1: FactSet hosting link (quoted-printable encoded)
         const factsetMatch = rawEmail.match(/href=3D["']([^"']*parp\.hosting\.factset\.com[^"']*)["']/i);
@@ -274,6 +274,92 @@ async function processEmail(message, imap) {
         console.log(`  Saved attachment: ${att.filename}`);
       } catch (err) {
         console.error(`  Error processing attachment ${att.filename}:`, err.message);
+      }
+    }
+
+    // Download PDF from report URL if available
+    if (reportUrl) {
+      try {
+        console.log(`  Downloading PDF from: ${reportUrl.substring(0, 60)}...`);
+
+        const https = require('https');
+        const http = require('http');
+
+        // Use node-fetch or native fetch to download the PDF
+        const response = await (async () => {
+          try {
+            // Try using node-fetch if available
+            const nodeFetch = require('node-fetch');
+            return await nodeFetch(reportUrl, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+              },
+              timeout: 30000,
+            });
+          } catch (e) {
+            // Fallback: manual HTTPS request
+            return new Promise((resolve, reject) => {
+              const url = new URL(reportUrl);
+              const options = {
+                hostname: url.hostname,
+                path: url.pathname + url.search,
+                method: 'GET',
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+                },
+              };
+
+              const req = (url.protocol === 'https:' ? https : http).request(options, (res) => {
+                const chunks = [];
+                res.on('data', (chunk) => chunks.push(chunk));
+                res.on('end', () => {
+                  resolve({
+                    ok: res.statusCode >= 200 && res.statusCode < 300,
+                    statusCode: res.statusCode,
+                    buffer: () => Promise.resolve(Buffer.concat(chunks)),
+                  });
+                });
+              });
+              req.on('error', reject);
+              req.setTimeout(30000, () => {
+                req.destroy();
+                reject(new Error('Timeout'));
+              });
+              req.end();
+            });
+          }
+        })();
+
+        if (response.ok || response.statusCode === 200) {
+          const pdfBuffer = await response.buffer();
+
+          // Generate filename
+          const cleanSubject = subject.replace(/[^a-z0-9]/gi, '_').substring(0, 50);
+          const filename = `${ticker || 'report'}_${cleanSubject}.pdf`;
+
+          // Generate file path
+          const now = new Date();
+          const relativePath = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${documentId}/${filename}`;
+
+          // Save to local storage
+          await saveToLocalStorage(pdfBuffer, relativePath);
+
+          // Save as attachment record
+          await pool.query(
+            `INSERT INTO research_attachments (
+              document_id, filename, content_type, file_size, file_path
+            ) VALUES ($1, $2, $3, $4, $5)`,
+            [documentId, filename, 'application/pdf', pdfBuffer.length, relativePath]
+          );
+
+          attachmentCount++;
+          console.log(`  ✓ Downloaded and saved PDF: ${filename} (${Math.round(pdfBuffer.length / 1024)}KB)`);
+        } else {
+          console.log(`  ⚠ PDF download failed: HTTP ${response.statusCode || response.status}`);
+        }
+      } catch (pdfError) {
+        console.log(`  ⚠ PDF download error: ${pdfError.message}`);
+        // Continue processing - PDF download is optional
       }
     }
 

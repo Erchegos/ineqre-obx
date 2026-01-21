@@ -117,29 +117,40 @@ export default function ResearchPortalPage() {
     }
   };
 
-  const handleViewPDF = async (bodyText: string, subject: string) => {
-    const pdfLink = extractPdfLink(bodyText);
+  const handleViewPDF = async (doc: ResearchDocument) => {
+    // First, check if there's a PDF attachment
+    const pdfAttachment = doc.attachments?.find(att =>
+      att.content_type === 'application/pdf' ||
+      att.filename.toLowerCase().endsWith('.pdf')
+    );
 
-    if (!pdfLink) {
-      alert('No PDF report link found in this email.');
+    if (pdfAttachment) {
+      // Download the stored PDF
+      await handleDownload(doc.id, pdfAttachment.id, pdfAttachment.filename);
       return;
     }
 
-    // Copy link to clipboard
+    // Fallback: try to extract and copy the report link
+    const pdfLink = extractPdfLink(doc.body_text);
+
+    if (!pdfLink) {
+      alert('No PDF report available for this document.');
+      return;
+    }
+
+    // Copy link to clipboard as fallback
     try {
       await navigator.clipboard.writeText(pdfLink);
       alert(
-        'PDF link copied to clipboard!\n\n' +
-        'Note: These Pareto report links require authentication and may not work directly. ' +
-        'Please paste the link in your browser or find the original email to access the report.\n\n' +
-        'The link has been copied for you.'
+        'No PDF file stored. Report link copied to clipboard!\n\n' +
+        'Note: This link may require authentication. ' +
+        'Paste it in your browser to access the report.'
       );
     } catch (err) {
-      // Fallback if clipboard API fails
       alert(
         'Could not copy to clipboard. Here is the link:\n\n' +
         pdfLink +
-        '\n\nNote: This link requires authentication through your email.'
+        '\n\nNote: This link may require authentication.'
       );
     }
   };
@@ -480,7 +491,7 @@ export default function ResearchPortalPage() {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                 {/* View PDF Report button */}
                 <button
-                  onClick={() => handleViewPDF(doc.body_text, doc.subject)}
+                  onClick={() => handleViewPDF(doc)}
                   style={{
                     padding: '10px 16px',
                     background: '#10b981',
@@ -499,8 +510,8 @@ export default function ResearchPortalPage() {
                   onMouseOver={(e) => e.currentTarget.style.background = '#059669'}
                   onMouseOut={(e) => e.currentTarget.style.background = '#10b981'}
                 >
-                  <span>🔗</span>
-                  <span>Copy Report Link</span>
+                  <span>📄</span>
+                  <span>View Report</span>
                 </button>
 
                 {/* Attachments */}
