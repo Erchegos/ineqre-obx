@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, Fragment } from "react";
+import { useMemo, useState } from "react";
 import {
   AreaChart,
   Area,
@@ -9,7 +9,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  ReferenceLine,
   Legend,
 } from "recharts";
 
@@ -185,17 +184,13 @@ export default function ReturnDistributionChart({
   const avgSigma = useMemo(() => {
     if (!distributionData || timeframeKeys.length === 0) return 0;
     const sigmas = timeframeKeys.map(label => distributionData[label].stats.stdDev);
-    const result = sigmas.reduce((a, b) => a + b, 0) / sigmas.length;
-    console.log('avgSigma:', result);
-    return result;
+    return sigmas.reduce((a, b) => a + b, 0) / sigmas.length;
   }, [distributionData, timeframeKeys]);
 
   const avgMean = useMemo(() => {
     if (!distributionData || timeframeKeys.length === 0) return 0;
     const means = timeframeKeys.map(label => distributionData[label].stats.mean);
-    const result = means.reduce((a, b) => a + b, 0) / means.length;
-    console.log('avgMean:', result);
-    return result;
+    return means.reduce((a, b) => a + b, 0) / means.length;
   }, [distributionData, timeframeKeys]);
 
   // Generate sigma levels (1σ, 2σ, 3σ, 4σ) with probabilities
@@ -393,64 +388,113 @@ export default function ReturnDistributionChart({
             );
           })}
 
-          {/* 0σ line at mean - rendered after areas to appear on top */}
-          {Number.isFinite(avgMean) && avgMean !== 0 && (
-            <ReferenceLine
-              x={avgMean}
-              stroke="var(--foreground)"
-              strokeWidth={2}
-              strokeDasharray="5 5"
-              ifOverflow="extendDomain"
-              label={{
-                value: "0σ",
-                position: "top",
-                fill: "var(--foreground)",
-                fontSize: 10,
-                fontWeight: 600,
-              }}
-            />
-          )}
-
-          {/* Sigma lines - rendered after areas to appear on top */}
-          {Number.isFinite(avgMean) && Number.isFinite(avgSigma) && avgSigma > 0 && sigmaLevels.map(({ sigma }) => {
-            const negValue = avgMean - sigma * avgSigma;
-            const posValue = avgMean + sigma * avgSigma;
-            console.log(`Sigma ${sigma}: neg=${negValue}, pos=${posValue}`);
-            return (
-              <Fragment key={`sigma-${sigma}`}>
-                {/* Negative sigma */}
-                <ReferenceLine
-                  x={negValue}
-                  stroke="#ef4444"
-                  strokeWidth={1}
-                  strokeDasharray="3 6"
-                  ifOverflow="extendDomain"
-                  label={{
-                    value: `-${sigma}σ`,
-                    position: "top",
-                    fill: "#ef4444",
-                    fontSize: 9,
-                  }}
-                />
-                {/* Positive sigma */}
-                <ReferenceLine
-                  x={posValue}
-                  stroke="#22c55e"
-                  strokeWidth={1}
-                  strokeDasharray="3 6"
-                  ifOverflow="extendDomain"
-                  label={{
-                    value: `+${sigma}σ`,
-                    position: "top",
-                    fill: "#22c55e",
-                    fontSize: 9,
-                  }}
-                />
-              </Fragment>
-            );
-          })}
           </AreaChart>
         </ResponsiveContainer>
+
+        {/* SVG overlay for sigma lines - positioned absolutely */}
+        <svg
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            pointerEvents: "none",
+          }}
+          viewBox={`0 0 ${height} ${height}`}
+          preserveAspectRatio="none"
+        >
+          {Number.isFinite(avgMean) && Number.isFinite(avgSigma) && avgSigma > 0 && chartData.length > 0 && (() => {
+            const minReturn = Math.min(...chartData.map(d => d.return));
+            const maxReturn = Math.max(...chartData.map(d => d.return));
+            const returnRange = maxReturn - minReturn;
+
+            // Calculate x position as percentage for each sigma line
+            const getXPercent = (value: number) => {
+              return ((value - minReturn) / returnRange) * 100;
+            };
+
+            const meanXPercent = getXPercent(avgMean);
+
+            return (
+              <g>
+                {/* 0σ line */}
+                <line
+                  x1={`${meanXPercent}%`}
+                  y1="5%"
+                  x2={`${meanXPercent}%`}
+                  y2="85%"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeDasharray="5,5"
+                  opacity="0.6"
+                />
+                <text
+                  x={`${meanXPercent}%`}
+                  y="8%"
+                  fill="currentColor"
+                  fontSize="10"
+                  textAnchor="middle"
+                  fontWeight="600"
+                >
+                  0σ
+                </text>
+
+                {/* Sigma bands */}
+                {sigmaLevels.map(({ sigma }) => {
+                  const negXPercent = getXPercent(avgMean - sigma * avgSigma);
+                  const posXPercent = getXPercent(avgMean + sigma * avgSigma);
+
+                  return (
+                    <g key={sigma}>
+                      {/* Negative */}
+                      <line
+                        x1={`${negXPercent}%`}
+                        y1="5%"
+                        x2={`${negXPercent}%`}
+                        y2="85%"
+                        stroke="#ef4444"
+                        strokeWidth="1"
+                        strokeDasharray="3,6"
+                        opacity="0.5"
+                      />
+                      <text
+                        x={`${negXPercent}%`}
+                        y="8%"
+                        fill="#ef4444"
+                        fontSize="9"
+                        textAnchor="middle"
+                      >
+                        -{sigma}σ
+                      </text>
+
+                      {/* Positive */}
+                      <line
+                        x1={`${posXPercent}%`}
+                        y1="5%"
+                        x2={`${posXPercent}%`}
+                        y2="85%"
+                        stroke="#22c55e"
+                        strokeWidth="1"
+                        strokeDasharray="3,6"
+                        opacity="0.5"
+                      />
+                      <text
+                        x={`${posXPercent}%`}
+                        y="8%"
+                        fill="#22c55e"
+                        fontSize="9"
+                        textAnchor="middle"
+                      >
+                        +{sigma}σ
+                      </text>
+                    </g>
+                  );
+                })}
+              </g>
+            );
+          })()}
+        </svg>
       </div>
 
       {/* Explanation text below chart */}
@@ -462,9 +506,10 @@ export default function ReturnDistributionChart({
       <div
         style={{
           marginTop: 16,
-          border: "1px solid rgba(59, 130, 246, 0.2)",
+          border: "1px solid var(--border)",
           borderRadius: 6,
           overflow: "hidden",
+          background: "var(--card-bg)",
         }}
       >
         <button
@@ -472,7 +517,7 @@ export default function ReturnDistributionChart({
           style={{
             width: "100%",
             padding: "10px 12px",
-            background: "rgba(59, 130, 246, 0.05)",
+            background: "transparent",
             border: "none",
             cursor: "pointer",
             display: "flex",
@@ -484,10 +529,10 @@ export default function ReturnDistributionChart({
             transition: "background 0.15s",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(59, 130, 246, 0.08)";
+            e.currentTarget.style.background = "var(--hover-bg)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(59, 130, 246, 0.05)";
+            e.currentTarget.style.background = "transparent";
           }}
         >
           <span>How to Read This Chart</span>
@@ -497,10 +542,11 @@ export default function ReturnDistributionChart({
           <div
             style={{
               padding: 12,
-              background: "rgba(59, 130, 246, 0.05)",
+              background: "var(--hover-bg)",
               fontSize: 11,
               color: "var(--muted-foreground)",
               lineHeight: 1.5,
+              borderTop: "1px solid var(--border)",
             }}
           >
             <div style={{ display: "grid", gap: 4 }}>
