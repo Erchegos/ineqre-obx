@@ -439,26 +439,28 @@ export default function ReturnDistributionChart({
 
             return (
               <g>
-                {/* 0σ line */}
+                {/* μ (mean/peak) line */}
                 <line
                   x1={`${meanXPercent}%`}
-                  y1="5%"
+                  y1="10%"
                   x2={`${meanXPercent}%`}
                   y2="85%"
                   stroke="currentColor"
-                  strokeWidth="0.5"
-                  strokeDasharray="5,5"
-                  opacity="0.15"
+                  strokeWidth="1"
+                  strokeDasharray="4,4"
+                  opacity="0.3"
                 />
                 <text
                   x={`${meanXPercent}%`}
-                  y="8%"
+                  y="7%"
                   fill="currentColor"
-                  fontSize="9"
+                  fontSize="11"
+                  fontWeight="500"
                   textAnchor="middle"
-                  opacity="0.4"
+                  opacity="0.6"
+                  fontFamily="serif"
                 >
-                  0σ
+                  μ
                 </text>
 
                 {/* Sigma bands */}
@@ -468,46 +470,48 @@ export default function ReturnDistributionChart({
 
                   return (
                     <g key={sigma}>
-                      {/* Negative */}
+                      {/* Negative sigma */}
                       <line
                         x1={`${negXPercent}%`}
-                        y1="5%"
+                        y1="10%"
                         x2={`${negXPercent}%`}
                         y2="85%"
                         stroke="#ef4444"
-                        strokeWidth="0.5"
-                        strokeDasharray="3,6"
-                        opacity="0.2"
+                        strokeWidth="0.8"
+                        strokeDasharray="2,4"
+                        opacity="0.25"
                       />
                       <text
                         x={`${negXPercent}%`}
-                        y="8%"
+                        y="7%"
                         fill="#ef4444"
-                        fontSize="8"
+                        fontSize="10"
+                        fontWeight="500"
                         textAnchor="middle"
-                        opacity="0.35"
+                        opacity="0.5"
                       >
-                        -{sigma}σ
+                        −{sigma}σ
                       </text>
 
-                      {/* Positive */}
+                      {/* Positive sigma */}
                       <line
                         x1={`${posXPercent}%`}
-                        y1="5%"
+                        y1="10%"
                         x2={`${posXPercent}%`}
                         y2="85%"
                         stroke="#22c55e"
-                        strokeWidth="0.5"
-                        strokeDasharray="3,6"
-                        opacity="0.2"
+                        strokeWidth="0.8"
+                        strokeDasharray="2,4"
+                        opacity="0.25"
                       />
                       <text
                         x={`${posXPercent}%`}
-                        y="8%"
+                        y="7%"
                         fill="#22c55e"
-                        fontSize="8"
+                        fontSize="10"
+                        fontWeight="500"
                         textAnchor="middle"
-                        opacity="0.35"
+                        opacity="0.5"
                       >
                         +{sigma}σ
                       </text>
