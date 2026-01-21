@@ -66,6 +66,15 @@ function fixEncoding(text) {
     // Clean up any remaining stray â characters
     .replace(/â/g, '');
 
+  // Fix specific known issues from my earlier cleanup
+  fixed = fixed
+    .replace(/Mondays tariff/g, "Monday's tariff")
+    .replace(/Taco Wednesday/g, '"Taco Wednesday"')
+    .replace(/ones hardest/g, "one's hardest");
+
+  // Remove empty quotes ""
+  fixed = fixed.replace(/""/g, '');
+
   // Clean up multiple spaces to single space
   fixed = fixed.replace(/  +/g, ' ');
 
