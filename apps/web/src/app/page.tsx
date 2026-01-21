@@ -6,6 +6,16 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 async function getSystemStats() {
+  // Temporarily return mock data to test if DB connection is the issue
+  console.log("[getSystemStats] Returning mock data");
+  return {
+    securities: 0,
+    last_updated: null,
+    data_points: 0
+  };
+
+  /*
+  // TODO: Re-enable after fixing DB connection
   try {
     // Check if DATABASE_URL is configured
     if (!process.env.DATABASE_URL) {
@@ -47,6 +57,7 @@ async function getSystemStats() {
     // Return empty stats instead of throwing
     return { securities: 0, last_updated: null, data_points: 0 };
   }
+  */
 }
 
 export default async function HomePage() {
