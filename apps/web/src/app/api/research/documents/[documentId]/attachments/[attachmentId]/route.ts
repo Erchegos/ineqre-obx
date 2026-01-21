@@ -5,10 +5,18 @@ import { pool } from '@/lib/db';
 
 // Create Supabase client lazily
 function getSupabaseClient() {
-  return createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) {
+    console.error('[Supabase] Missing environment variables:', {
+      hasUrl: !!url,
+      hasKey: !!key
+    });
+    throw new Error('Supabase configuration missing');
+  }
+
+  return createClient(url, key);
 }
 
 // Verify JWT token from request
@@ -75,13 +83,27 @@ export async function GET(
     // Download from Supabase Storage
     console.log('[PDF Download] Downloading from Supabase Storage:', attachment.file_path);
 
-    const supabase = getSupabaseClient();
+    let supabase;
+    try {
+      supabase = getSupabaseClient();
+    } catch (error) {
+      console.error('[PDF Download] Failed to create Supabase client:', error);
+      return NextResponse.json(
+        { error: 'Storage configuration error' },
+        { status: 500 }
+      );
+    }
+
     const { data: supabaseData, error: supabaseError } = await supabase.storage
       .from('research-pdfs')
       .download(attachment.file_path);
 
     if (supabaseError || !supabaseData) {
-      console.error('[PDF Download] Failed to download from Supabase:', supabaseError);
+      console.error('[PDF Download] Failed to download from Supabase:', {
+        error: supabaseError,
+        path: attachment.file_path,
+        bucket: 'research-pdfs'
+      });
       return NextResponse.json(
         { error: 'File not found', details: supabaseError?.message },
         { status: 404 }
