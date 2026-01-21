@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { createClient } from '@supabase/supabase-js';
-import fs from 'fs';
-import path from 'path';
 import { pool } from '@/lib/db';
 
 // Supabase client
@@ -72,39 +70,23 @@ export async function GET(
 
     const attachment = result.rows[0];
 
-    // Try to download from Supabase Storage first
-    console.log('[PDF Download] Attempting Supabase Storage:', attachment.file_path);
+    // Download from Supabase Storage
+    console.log('[PDF Download] Downloading from Supabase Storage:', attachment.file_path);
 
     const { data: supabaseData, error: supabaseError } = await supabase.storage
       .from('research-pdfs')
       .download(attachment.file_path);
 
-    let fileBuffer: Buffer;
-
-    if (supabaseData && !supabaseError) {
-      // Successfully downloaded from Supabase
-      console.log('[PDF Download] Downloaded from Supabase Storage');
-      fileBuffer = Buffer.from(await supabaseData.arrayBuffer());
-    } else {
-      // Fallback to local storage (for development)
-      console.log('[PDF Download] Supabase failed, trying local storage');
-      const storageDir = process.env.STORAGE_DIR || '/Users/olaslettebak/Documents/Intelligence_Equity_Research/code/InEqRe_OBX/storage/research';
-      const filePath = path.join(storageDir, attachment.file_path);
-
-      console.log('[PDF Download] Local path:', filePath);
-      console.log('[PDF Download] File exists:', fs.existsSync(filePath));
-
-      if (!fs.existsSync(filePath)) {
-        console.error('[PDF Download] File not found in Supabase or local storage');
-        return NextResponse.json(
-          { error: 'File not found', supabaseError: supabaseError?.message },
-          { status: 404 }
-        );
-      }
-
-      fileBuffer = fs.readFileSync(filePath);
-      console.log('[PDF Download] Downloaded from local storage');
+    if (supabaseError || !supabaseData) {
+      console.error('[PDF Download] Failed to download from Supabase:', supabaseError);
+      return NextResponse.json(
+        { error: 'File not found', details: supabaseError?.message },
+        { status: 404 }
+      );
     }
+
+    console.log('[PDF Download] Successfully downloaded from Supabase Storage');
+    const fileBuffer = Buffer.from(await supabaseData.arrayBuffer());
 
     // Log access
     await pool.query(
