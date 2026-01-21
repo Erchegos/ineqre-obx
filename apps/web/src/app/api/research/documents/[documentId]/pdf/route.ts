@@ -17,7 +17,7 @@ function verifyToken(request: NextRequest): boolean {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { documentId: string } }
+  { params }: { params: Promise<{ documentId: string }> }
 ) {
   // Verify authentication
   if (!verifyToken(request)) {
@@ -25,11 +25,14 @@ export async function GET(
   }
 
   try {
+    // Await params in Next.js 16
+    const { documentId } = await params;
+
     // Fetch document
     const { data: doc, error } = await supabase
       .from('research_documents')
       .select('*')
-      .eq('id', params.documentId)
+      .eq('id', documentId)
       .single();
 
     if (error || !doc) {
