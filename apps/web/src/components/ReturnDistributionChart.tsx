@@ -424,15 +424,15 @@ export default function ReturnDistributionChart({
                   y1="5%"
                   x2={`${meanXPercent}%`}
                   y2="85%"
-                  stroke="currentColor"
+                  stroke="#000"
                   strokeWidth="2"
                   strokeDasharray="5,5"
-                  opacity="0.6"
+                  opacity="0.8"
                 />
                 <text
                   x={`${meanXPercent}%`}
                   y="8%"
-                  fill="currentColor"
+                  fill="#000"
                   fontSize="10"
                   textAnchor="middle"
                   fontWeight="600"
@@ -453,17 +453,18 @@ export default function ReturnDistributionChart({
                         y1="5%"
                         x2={`${negXPercent}%`}
                         y2="85%"
-                        stroke="#ef4444"
-                        strokeWidth="1"
+                        stroke="#dc2626"
+                        strokeWidth="1.5"
                         strokeDasharray="3,6"
-                        opacity="0.5"
+                        opacity="0.7"
                       />
                       <text
                         x={`${negXPercent}%`}
                         y="8%"
-                        fill="#ef4444"
+                        fill="#dc2626"
                         fontSize="9"
                         textAnchor="middle"
+                        fontWeight="600"
                       >
                         -{sigma}σ
                       </text>
@@ -474,17 +475,18 @@ export default function ReturnDistributionChart({
                         y1="5%"
                         x2={`${posXPercent}%`}
                         y2="85%"
-                        stroke="#22c55e"
-                        strokeWidth="1"
+                        stroke="#16a34a"
+                        strokeWidth="1.5"
                         strokeDasharray="3,6"
-                        opacity="0.5"
+                        opacity="0.7"
                       />
                       <text
                         x={`${posXPercent}%`}
                         y="8%"
-                        fill="#22c55e"
+                        fill="#16a34a"
                         fontSize="9"
                         textAnchor="middle"
+                        fontWeight="600"
                       >
                         +{sigma}σ
                       </text>
