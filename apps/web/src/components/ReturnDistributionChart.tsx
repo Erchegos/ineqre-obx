@@ -409,12 +409,33 @@ export default function ReturnDistributionChart({
             const maxReturn = Math.max(...chartData.map(d => d.return));
             const returnRange = maxReturn - minReturn;
 
+            // Find the return value where average probability density is highest (the peak)
+            let peakReturn = avgMean; // fallback to avgMean
+            let maxAvgDensity = 0;
+
+            chartData.forEach(point => {
+              let sumDensity = 0;
+              let count = 0;
+              timeframeKeys.forEach((key: string) => {
+                const val = point[key];
+                if (typeof val === 'number' && Number.isFinite(val)) {
+                  sumDensity += val;
+                  count++;
+                }
+              });
+              const avgDensity = count > 0 ? sumDensity / count : 0;
+              if (avgDensity > maxAvgDensity) {
+                maxAvgDensity = avgDensity;
+                peakReturn = point.return;
+              }
+            });
+
             // Calculate x position as percentage for each sigma line
             const getXPercent = (value: number) => {
               return ((value - minReturn) / returnRange) * 100;
             };
 
-            const meanXPercent = getXPercent(avgMean);
+            const meanXPercent = getXPercent(peakReturn);
 
             return (
               <g>
@@ -424,26 +445,26 @@ export default function ReturnDistributionChart({
                   y1="5%"
                   x2={`${meanXPercent}%`}
                   y2="85%"
-                  stroke="#000"
-                  strokeWidth="2"
+                  stroke="currentColor"
+                  strokeWidth="0.5"
                   strokeDasharray="5,5"
-                  opacity="0.8"
+                  opacity="0.15"
                 />
                 <text
                   x={`${meanXPercent}%`}
                   y="8%"
-                  fill="#000"
-                  fontSize="10"
+                  fill="currentColor"
+                  fontSize="9"
                   textAnchor="middle"
-                  fontWeight="600"
+                  opacity="0.4"
                 >
                   0σ
                 </text>
 
                 {/* Sigma bands */}
                 {sigmaLevels.map(({ sigma }) => {
-                  const negXPercent = getXPercent(avgMean - sigma * avgSigma);
-                  const posXPercent = getXPercent(avgMean + sigma * avgSigma);
+                  const negXPercent = getXPercent(peakReturn - sigma * avgSigma);
+                  const posXPercent = getXPercent(peakReturn + sigma * avgSigma);
 
                   return (
                     <g key={sigma}>
@@ -453,18 +474,18 @@ export default function ReturnDistributionChart({
                         y1="5%"
                         x2={`${negXPercent}%`}
                         y2="85%"
-                        stroke="#dc2626"
-                        strokeWidth="1.5"
+                        stroke="#ef4444"
+                        strokeWidth="0.5"
                         strokeDasharray="3,6"
-                        opacity="0.7"
+                        opacity="0.2"
                       />
                       <text
                         x={`${negXPercent}%`}
                         y="8%"
-                        fill="#dc2626"
-                        fontSize="9"
+                        fill="#ef4444"
+                        fontSize="8"
                         textAnchor="middle"
-                        fontWeight="600"
+                        opacity="0.35"
                       >
                         -{sigma}σ
                       </text>
@@ -475,18 +496,18 @@ export default function ReturnDistributionChart({
                         y1="5%"
                         x2={`${posXPercent}%`}
                         y2="85%"
-                        stroke="#16a34a"
-                        strokeWidth="1.5"
+                        stroke="#22c55e"
+                        strokeWidth="0.5"
                         strokeDasharray="3,6"
-                        opacity="0.7"
+                        opacity="0.2"
                       />
                       <text
                         x={`${posXPercent}%`}
                         y="8%"
-                        fill="#16a34a"
-                        fontSize="9"
+                        fill="#22c55e"
+                        fontSize="8"
                         textAnchor="middle"
-                        fontWeight="600"
+                        opacity="0.35"
                       >
                         +{sigma}σ
                       </text>
