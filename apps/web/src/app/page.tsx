@@ -1,20 +1,14 @@
+"use client";
+
 import Link from "next/link";
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
-
-async function getSystemStats() {
-  // Return static placeholder data for now
-  // TODO: Re-enable database query once connection issues are resolved
-  return {
+export default function HomePage() {
+  // Static data - no database query needed for homepage
+  const stats = {
     securities: 25,
     last_updated: new Date('2026-01-21'),
     data_points: 1250000
   };
-}
-
-export default async function HomePage() {
-  const stats = await getSystemStats();
   
   const lastUpdate = stats.last_updated 
     ? new Date(stats.last_updated).toLocaleDateString('en-US', { 
