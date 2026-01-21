@@ -16,13 +16,13 @@ async function detectPriceTable(): Promise<string> {
     // Check if prices_daily exists
     const result = await pool.query(`
       SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public'
         AND table_name = 'prices_daily'
       ) as has_prices_daily,
       EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public'
         AND table_name = 'obx_equities'
       ) as has_obx_equities
     `);
@@ -34,6 +34,7 @@ async function detectPriceTable(): Promise<string> {
     } else if (has_obx_equities) {
       cachedTableName = "obx_equities";
     } else {
+      console.error("No price data table found in database");
       throw new Error("No price data table found (prices_daily or obx_equities)");
     }
 
@@ -41,7 +42,9 @@ async function detectPriceTable(): Promise<string> {
     return cachedTableName;
   } catch (e) {
     console.error("Failed to detect price table:", e);
+    console.error("Error details:", e instanceof Error ? e.message : String(e));
     // Fallback if detection fails (e.g. permission issues), usually safe to default to standard
+    console.log("[Price Data Adapter] Falling back to prices_daily");
     return "prices_daily";
   }
 }
