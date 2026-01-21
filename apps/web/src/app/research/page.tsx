@@ -54,28 +54,24 @@ export default function ResearchPortalPage() {
     cleaned = cleaned.replace(/CLICK HERE FOR THE FULL REPORT/gi, '');
 
     // Comprehensive fix for Windows-1252 to UTF-8 double-encoding (mojibake)
-    const replacements: ReadonlyArray<readonly [string, string]> = [
-      ['â€™', "'"], ['â€˜', "'"], ['â€œ', '"'], ['â€', '"'],
-      ['â€˛', "'"], ['â€³', '"'], [''', "'"], [''', "'"], ['"', '"'], ['"', '"'],
-      ['â€"', '–'], ['â€"', '—'], ['â€'', '-'],
-      ['â€¦', '...'], ['â€¢', '•'], ['â€‹', ''],
-      ['Â ', ' '], ['Â', ''],
-      ['Ã¥', 'å'], ['Ã¸', 'ø'], ['Ã¦', 'æ'], ['Ã…', 'Å'], ['Ã˜', 'Ø'], ['Ã†', 'Æ'],
-      ['Ã©', 'é'], ['Ã¨', 'è'], ['Ãª', 'ê'], ['Ã«', 'ë'],
-      ['Ã¡', 'á'], ['Ã ', 'à'], ['Ã¢', 'â'], ['Ã¤', 'ä'], ['Ã£', 'ã'],
-      ['Ã¶', 'ö'], ['Ã´', 'ô'], ['Ã²', 'ò'], ['Ã³', 'ó'],
-      ['Ã¼', 'ü'], ['Ã»', 'û'], ['Ã¹', 'ù'], ['Ãº', 'ú'],
-      ['Ã±', 'ñ'], ['Ã§', 'ç'], ['Ã', 'Ø'],
-      ['Â°', '°'], ['Â±', '±'], ['Ã—', '×'], ['Ã·', '÷'],
-      ['Â£', '£'], ['â‚¬', '€'], ['Â¥', '¥'], ['Â¢', '¢'],
-      ['Â©', '©'], ['Â®', '®'], ['â„¢', '™'], ['Â§', '§'], ['Âµ', 'µ'],
-    ];
-
-    for (const [bad, good] of replacements) {
-      while (cleaned.includes(bad)) {
-        cleaned = cleaned.replace(bad, good);
-      }
-    }
+    // Using replaceAll for better performance
+    cleaned = cleaned
+      .replaceAll('â€™', "'").replaceAll('â€˜', "'").replaceAll('â€œ', '"').replaceAll('â€', '"')
+      .replaceAll('â€˛', "'").replaceAll('â€³', '"').replaceAll(''', "'").replaceAll(''', "'")
+      .replaceAll('"', '"').replaceAll('"', '"')
+      .replaceAll('â€"', '–').replaceAll('â€"', '—').replaceAll('â€'', '-')
+      .replaceAll('â€¦', '...').replaceAll('â€¢', '•').replaceAll('â€‹', '')
+      .replaceAll('Â ', ' ').replaceAll('Â', '')
+      .replaceAll('Ã¥', 'å').replaceAll('Ã¸', 'ø').replaceAll('Ã¦', 'æ')
+      .replaceAll('Ã…', 'Å').replaceAll('Ã˜', 'Ø').replaceAll('Ã†', 'Æ')
+      .replaceAll('Ã©', 'é').replaceAll('Ã¨', 'è').replaceAll('Ãª', 'ê').replaceAll('Ã«', 'ë')
+      .replaceAll('Ã¡', 'á').replaceAll('Ã ', 'à').replaceAll('Ã¢', 'â').replaceAll('Ã¤', 'ä').replaceAll('Ã£', 'ã')
+      .replaceAll('Ã¶', 'ö').replaceAll('Ã´', 'ô').replaceAll('Ã²', 'ò').replaceAll('Ã³', 'ó')
+      .replaceAll('Ã¼', 'ü').replaceAll('Ã»', 'û').replaceAll('Ã¹', 'ù').replaceAll('Ãº', 'ú')
+      .replaceAll('Ã±', 'ñ').replaceAll('Ã§', 'ç').replaceAll('Ã', 'Ø')
+      .replaceAll('Â°', '°').replaceAll('Â±', '±').replaceAll('Ã—', '×').replaceAll('Ã·', '÷')
+      .replaceAll('Â£', '£').replaceAll('â‚¬', '€').replaceAll('Â¥', '¥').replaceAll('Â¢', '¢')
+      .replaceAll('Â©', '©').replaceAll('Â®', '®').replaceAll('â„¢', '™').replaceAll('Â§', '§').replaceAll('Âµ', 'µ');
 
     // Clean up extra whitespace
     cleaned = cleaned.trim().replace(/\s+/g, ' ');
