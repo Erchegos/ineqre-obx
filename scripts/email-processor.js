@@ -17,8 +17,12 @@ const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
+// Strip sslmode parameter from connection string to avoid conflicts
+let connectionString = process.env.DATABASE_URL.trim().replace(/^["']|["']$/g, '');
+connectionString = connectionString.replace(/[?&]sslmode=\w+/g, '');
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString,
   ssl: {
     rejectUnauthorized: false
   }
@@ -48,7 +52,7 @@ const CONFIG = {
   storageDir: process.env.STORAGE_DIR || path.join(__dirname, '..', 'storage', 'research'),
 
   // Processing limits
-  batchSize: 50, // Process max 50 emails per run
+  batchSize: 500, // Process max 500 emails per run
   maxAttachmentSize: 50 * 1024 * 1024, // 50 MB
 };
 
@@ -134,15 +138,94 @@ async function processEmail(message, imap) {
 
     console.log(`Processing: ${subject} from ${sender}`);
 
-    // Get email body
-    const bodyPart = bodyStructure.childNodes?.find(
-      (node) => node.type === 'text/plain' || node.type === 'text/html'
-    );
-
+    // Extract body text from raw email source (much more reliable!)
     let bodyText = '';
-    if (bodyPart) {
-      const bodyContent = await imap.download(uid, bodyPart.part);
-      bodyText = bodyContent.toString('utf-8').substring(0, 10000); // Limit to 10KB
+    try {
+      if (message.source) {
+        const rawEmail = message.source.toString('utf-8');
+
+        // Extract report link - try multiple patterns
+        let reportUrl = '';
+
+        // Method 1: FactSet hosting link (quoted-printable encoded)
+        const factsetMatch = rawEmail.match(/href=3D["']([^"']*parp\.hosting\.factset\.com[^"']*)["']/i);
+        if (factsetMatch) {
+          // Decode the quoted-printable URL
+          reportUrl = factsetMatch[1]
+            .replace(/=\r?\n/g, '')  // Remove soft line breaks
+            .replace(/=3D/gi, '=')
+            .replace(/=([0-9A-F]{2})/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16)));
+        }
+
+        // Method 2: Direct research.paretosec.com link
+        if (!reportUrl) {
+          const directMatch = rawEmail.match(/href=["']([^"']*research\.paretosec\.com[^"']*)["']/i);
+          if (directMatch) reportUrl = directMatch[1];
+        }
+
+        // Find actual HTML content - look for <!DOCTYPE or <html or <table (Pareto emails)
+        let htmlContent = rawEmail;
+        const htmlStart = rawEmail.search(/(?:<!DOCTYPE|<html|<table[^>]*cellspacing)/i);
+        if (htmlStart > 0) {
+          htmlContent = rawEmail.substring(htmlStart);
+        }
+
+        // Try to extract body tags if they exist
+        const bodyMatch = htmlContent.match(/<body[^>]*>(.*?)<\/body>/is);
+        if (bodyMatch) {
+          htmlContent = bodyMatch[1];
+        }
+
+        // Decode quoted-printable encoding (=20 -> space, =3D -> =, etc.)
+        htmlContent = htmlContent
+          .replace(/=\r?\n/g, '')  // Remove soft line breaks
+          .replace(/=3D/gi, '=')
+          .replace(/=20/g, ' ')
+          .replace(/=09/g, '\t')
+          .replace(/=([0-9A-F]{2})/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16)));
+
+        // Extract text from HTML
+        let text = htmlContent
+          .replace(/<style[^>]*>.*?<\/style>/gis, '')
+          .replace(/<script[^>]*>.*?<\/script>/gis, '')
+          .replace(/<head[^>]*>.*?<\/head>/gis, '')
+          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/<\/p>/gi, '\n\n')
+          .replace(/<\/div>/gi, '\n')
+          .replace(/<\/tr>/gi, '\n')
+          .replace(/<\/td>/gi, ' ')
+          .replace(/<[^>]+>/g, '')
+          .replace(/&#xa0;/gi, ' ')
+          .replace(/&#160;/g, ' ')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(parseInt(dec, 10)))
+          .replace(/&#x([0-9A-F]+);/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16)))
+          .replace(/\s\s+/g, ' ')
+          .replace(/\n\s+/g, '\n')
+          .replace(/\n\n\n+/g, '\n\n')
+          .trim();
+
+        // Truncate text first to leave room for link
+        text = text.substring(0, 1850);
+
+        // Append report URL (max ~150 chars for link)
+        if (reportUrl) {
+          text += `\n\nFull Report: ${reportUrl}`;
+          console.log(`  Report: ${reportUrl.substring(0, 50)}...`);
+        }
+
+        bodyText = text;
+
+        if (bodyText.length > 100) {
+          console.log(`  Body: ${bodyText.length} chars`);
+        }
+      }
+    } catch (err) {
+      console.log(`  Body extraction failed: ${err.message}`);
     }
 
     // Insert document record
@@ -241,15 +324,18 @@ async function main() {
     // Select inbox
     await imap.mailboxOpen('INBOX');
 
-    // Search for unseen emails (we'll filter by sender after)
+    // Search for Pareto emails from 2026 (one-time backfill)
     const searchCriteria = {
-      unseen: true,
+      since: new Date('2026-01-01'),
+      before: new Date('2027-01-01'),
+      from: 'noreply@research.paretosec.com'
     };
 
-    console.log('Searching for new Pareto research emails...');
+    console.log('Searching for Pareto research emails from 2026...');
     const messages = imap.fetch(searchCriteria, {
       envelope: true,
       bodyStructure: true,
+      source: true,  // Fetch raw email source for reliable body extraction
       uid: true,
     });
 
@@ -278,9 +364,9 @@ async function main() {
     }
 
     if (processed === 0) {
-      console.log(`No new Pareto emails found (checked ${count} unread messages)`);
+      console.log(`No Pareto emails found from 2026 (checked ${count} messages)`);
     } else {
-      console.log(`\n✓ Processed ${processed} Pareto emails (out of ${count} unread messages)`);
+      console.log(`\n✓ Processed ${processed} Pareto emails from 2026 (out of ${count} total messages)`);
     }
 
   } catch (error) {
