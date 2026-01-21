@@ -432,7 +432,7 @@ export default function ResearchPortalPage() {
                     {doc.ticker && (
                       <span style={{
                         padding: '4px 10px',
-                        background: '#3b82f6',
+                        background: '#0066CC',
                         color: '#fff',
                         fontSize: 12,
                         fontWeight: 700,
@@ -473,7 +473,7 @@ export default function ResearchPortalPage() {
                 <div style={{
                   padding: 16,
                   background: 'var(--hover-bg)',
-                  borderLeft: '3px solid #3b82f6',
+                  borderLeft: '3px solid #0066CC',
                   borderRadius: 6,
                   marginBottom: 16,
                 }}>
@@ -498,7 +498,7 @@ export default function ResearchPortalPage() {
                         background: 'transparent',
                         border: '1px solid var(--border)',
                         borderRadius: 6,
-                        color: '#3b82f6',
+                        color: '#0066CC',
                         fontSize: 13,
                         fontWeight: 500,
                         cursor: 'pointer',
@@ -510,61 +510,27 @@ export default function ResearchPortalPage() {
                 </div>
               )}
 
-              {/* Action buttons */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                {/* View PDF Report button */}
+              {/* Action button */}
+              {doc.attachments && doc.attachments.length > 0 && (
                 <button
-                  onClick={() => handleViewPDF(doc)}
+                  onClick={() => handleDownload(doc.id, doc.attachments[0].id, doc.attachments[0].filename)}
                   style={{
-                    padding: '10px 16px',
-                    background: '#10b981',
+                    padding: '12px 24px',
+                    background: '#0066CC',
                     color: '#fff',
                     border: 'none',
-                    borderRadius: 8,
+                    borderRadius: 6,
                     fontSize: 14,
                     fontWeight: 600,
                     cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)',
                     transition: 'all 0.2s',
                   }}
-                  onMouseOver={(e) => e.currentTarget.style.background = '#059669'}
-                  onMouseOut={(e) => e.currentTarget.style.background = '#10b981'}
+                  onMouseOver={(e) => e.currentTarget.style.background = '#0052A3'}
+                  onMouseOut={(e) => e.currentTarget.style.background = '#0066CC'}
                 >
-                  <span>View Report</span>
+                  Open Report
                 </button>
-
-                {/* Attachments */}
-                {doc.attachments && doc.attachments.length > 0 && doc.attachments.map(att => (
-                  <button
-                    key={att.id}
-                    onClick={() => handleDownload(doc.id, att.id, att.filename)}
-                    style={{
-                      padding: '10px 16px',
-                      background: '#6366f1',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: 8,
-                      fontSize: 14,
-                      fontWeight: 500,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      transition: 'all 0.2s',
-                    }}
-                    onMouseOver={(e) => e.currentTarget.style.background = '#4f46e5'}
-                    onMouseOut={(e) => e.currentTarget.style.background = '#6366f1'}
-                  >
-                    <span>{cleanFilename(att.filename)}</span>
-                    <span style={{ opacity: 0.8, fontSize: 12 }}>
-                      ({(att.file_size / 1024 / 1024).toFixed(1)} MB)
-                    </span>
-                  </button>
-                ))}
-              </div>
+              )}
             </div>
           ))}
         </div>
