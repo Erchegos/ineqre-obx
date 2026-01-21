@@ -355,51 +355,47 @@ export default function ReturnDistributionChart({
             stroke="var(--foreground)"
             strokeWidth={2}
             strokeDasharray="5 5"
-            opacity={0.6}
             label={{
               value: "0σ",
               position: "top",
               fill: "var(--foreground)",
               fontSize: 10,
               fontWeight: 600,
-              opacity: 0.8,
             }}
           />
 
           {/* Sigma lines */}
-          {sigmaLevels.map(({ sigma, opacity }) => (
-            <g key={sigma}>
+          {sigmaLevels.map(({ sigma }) => (
+            <>
               {/* Negative sigma */}
               <ReferenceLine
+                key={`neg-${sigma}`}
                 x={avgMean - sigma * avgSigma}
                 stroke="#ef4444"
                 strokeWidth={1}
                 strokeDasharray="3 6"
-                opacity={opacity * 2}
                 label={{
                   value: `-${sigma}σ`,
                   position: "top",
                   fill: "#ef4444",
                   fontSize: 9,
-                  opacity: 0.6,
                 }}
               />
               {/* Positive sigma */}
               <ReferenceLine
+                key={`pos-${sigma}`}
                 x={avgMean + sigma * avgSigma}
                 stroke="#22c55e"
                 strokeWidth={1}
                 strokeDasharray="3 6"
-                opacity={opacity * 2}
                 label={{
                   value: `+${sigma}σ`,
                   position: "top",
                   fill: "#22c55e",
                   fontSize: 9,
-                  opacity: 0.6,
                 }}
               />
-            </g>
+            </>
           ))}
 
           {/* Render areas in reverse order so shortest timeframe is on top */}
