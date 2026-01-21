@@ -115,23 +115,30 @@ export async function GET(
 
     console.log(`[Residuals API] ${ticker}: Fetched ${marketPrices.length} OBX market prices`);
 
-    if (marketPrices.length < stockPrices.length) {
-      console.warn(`[Residuals API] ${ticker}: Insufficient market data (${marketPrices.length} vs ${stockPrices.length} stock prices)`);
+    // Align both series to the minimum available length
+    const minLength = Math.min(stockPrices.length, marketPrices.length);
+
+    if (minLength < 2) {
+      console.warn(`[Residuals API] ${ticker}: Insufficient overlapping data (${minLength} data points)`);
       return NextResponse.json(
-        { error: `Insufficient market data for beta calculation. Found ${marketPrices.length} OBX prices vs ${stockPrices.length} stock prices.` },
+        { error: `Insufficient overlapping data. Found ${stockPrices.length} stock prices and ${marketPrices.length} OBX prices. Need at least 2 overlapping points.` },
         { status: 400 }
       );
     }
 
-    // Align market data to match stock data length
-    const alignedMarket = marketPrices.slice(-stockPrices.length);
+    console.log(`[Residuals API] ${ticker}: Using ${minLength} overlapping data points`);
+
+    // Align both to the same length (take last N points)
+    const alignedStock = stockPrices.slice(-minLength);
+    const alignedMarket = marketPrices.slice(-minLength);
+    const alignedDates = dates.slice(-minLength);
 
     // Compute returns (log returns)
-    const stockReturns = computeReturns(stockPrices);
+    const stockReturns = computeReturns(alignedStock);
     const marketReturns = computeReturns(alignedMarket);
 
     // Align dates (returns start from index 1)
-    const returnDates = dates.slice(1);
+    const returnDates = alignedDates.slice(1);
 
     // Compute residual squares
     const residualSquares = computeResidualSquares(
