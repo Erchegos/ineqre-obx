@@ -49,26 +49,6 @@ export default function ResearchPortalPage() {
     cleaned = cleaned.split(/\n*Full Report:/i)[0];
     cleaned = cleaned.replace(/CLICK HERE FOR THE FULL REPORT/gi, '');
 
-    // Fix mojibake - must do specific patterns before generic ones
-    cleaned = cleaned
-      .replace(/â€™/g, "'")
-      .replace(/â€˜/g, "'")
-      .replace(/â€œ/g, '"')
-      .replace(/â€/g, '"')
-      .replace(/â€"/g, '–')
-      .replace(/â€"/g, '—')
-      .replace(/â€¦/g, '...')
-      .replace(/–s\b/g, "'s")
-      .replace(/–([A-Z])/g, '"$1')
-      .replace(/([a-z])–\s/g, '$1" ')
-      .replace(/\s–\s/g, ' – ')
-      .replace(/–/g, '')
-      .replace(/Â /g, ' ')
-      .replace(/Â/g, '')
-      .replace(/Ã¥/g, 'å')
-      .replace(/Ã¸/g, 'ø')
-      .replace(/Ã¦/g, 'æ');
-
     return cleaned.trim();
   };
 
