@@ -397,7 +397,7 @@ export default function ResearchPortalPage() {
               </div>
 
               {/* Expanded email body */}
-              {expandedDocs.has(doc.id) && doc.body_text && (
+              {expandedDocs.has(doc.id) && (
                 <div style={{
                   marginTop: 12,
                   padding: 16,
@@ -411,7 +411,7 @@ export default function ResearchPortalPage() {
                   maxHeight: 400,
                   overflowY: 'auto',
                 }}>
-                  {doc.body_text}
+                  {doc.body_text || '(Email body is empty or not available)'}
                 </div>
               )}
 
