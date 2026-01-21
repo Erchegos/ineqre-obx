@@ -40,6 +40,69 @@ export default function ResearchPortalPage() {
     });
   };
 
+  // Clean body text for display
+  const cleanBodyText = (text: string): string => {
+    if (!text) return '';
+
+    // First, remove the Pareto Securities disclaimer (everything from "Source: Pareto Securities" onwards)
+    let cleaned = text.split(/Source:\s*Pareto Securities/i)[0];
+
+    // Remove "Full Report:" section and everything after it
+    cleaned = cleaned.split(/\n*Full Report:/i)[0];
+
+    // Remove "CLICK HERE FOR THE FULL REPORT" and similar patterns
+    cleaned = cleaned.replace(/CLICK HERE FOR THE FULL REPORT/gi, '');
+
+    // Comprehensive fix for UTF-8 mojibake (most common first for performance)
+    const fixes: Array<[string, string]> = [
+      ['–s', "'s"],           // Possessive
+      ['–', "'"],             // Generic apostrophe/single quote
+      ['—', '"'],             // Generic double quote
+      ['â€™', "'"],
+      ['â€˜', "'"],
+      ['â€œ', '"'],
+      ['â€', '"'],
+      ['â€"', '–'],
+      ['â€"', '—'],
+      ['â€¦', '...'],
+      ['â€‹', ''],
+      ['Â ', ' '],
+      ['Â', ''],
+      ['Ã¥', 'å'],
+      ['Ã¸', 'ø'],
+      ['Ã¦', 'æ'],
+      ['Ã…', 'Å'],
+      ['Ã˜', 'Ø'],
+      ['Ã†', 'Æ'],
+      ['Ã©', 'é'],
+      ['Ã¤', 'ä'],
+      ['Ã¶', 'ö'],
+      ['Ã¼', 'ü'],
+      ['Ã±', 'ñ'],
+      ['Ã§', 'ç'],
+      ['Ã', 'Ø'],
+    ];
+
+    for (const [bad, good] of fixes) {
+      cleaned = cleaned.split(bad).join(good);
+    }
+
+    // Clean up extra whitespace
+    cleaned = cleaned.trim().replace(/\s+/g, ' ');
+
+    return cleaned;
+  };
+
+  // Clean filename for display
+  const cleanFilename = (filename: string): string => {
+    return filename
+      .replace(/^report_/i, '')
+      .replace(/___+/g, ' - ')
+      .replace(/__+/g, ' ')
+      .replace(/_/g, ' ')
+      .replace(/\.pdf$/i, '');
+  };
+
   // Extract PDF report link from body text
   const extractPdfLink = (text: string): string | null => {
     // Look for "Full Report:" followed by URL
@@ -191,7 +254,8 @@ export default function ResearchPortalPage() {
     const matchesSource = selectedSource === 'all' || doc.source === selectedSource;
     const matchesSearch = !searchTerm ||
       doc.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (doc.ticker && doc.ticker.toLowerCase().includes(searchTerm.toLowerCase()));
+      (doc.ticker && doc.ticker.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (doc.body_text && doc.body_text.toLowerCase().includes(searchTerm.toLowerCase()));
     return matchesSource && matchesSearch;
   });
 
@@ -464,7 +528,7 @@ export default function ResearchPortalPage() {
                     WebkitBoxOrient: 'vertical',
                     overflow: 'hidden',
                   }}>
-                    {doc.body_text.split('\n\nFull Report:')[0]}
+                    {cleanBodyText(doc.body_text)}
                   </p>
                   {doc.body_text.length > 300 && (
                     <button
@@ -510,7 +574,6 @@ export default function ResearchPortalPage() {
                   onMouseOver={(e) => e.currentTarget.style.background = '#059669'}
                   onMouseOut={(e) => e.currentTarget.style.background = '#10b981'}
                 >
-                  <span>📄</span>
                   <span>View Report</span>
                 </button>
 
@@ -536,8 +599,7 @@ export default function ResearchPortalPage() {
                     onMouseOver={(e) => e.currentTarget.style.background = '#4f46e5'}
                     onMouseOut={(e) => e.currentTarget.style.background = '#6366f1'}
                   >
-                    <span>📎</span>
-                    <span>{att.filename}</span>
+                    <span>{cleanFilename(att.filename)}</span>
                     <span style={{ opacity: 0.8, fontSize: 12 }}>
                       ({(att.file_size / 1024 / 1024).toFixed(1)} MB)
                     </span>
