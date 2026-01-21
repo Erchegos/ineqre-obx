@@ -104,31 +104,6 @@ export default function ResearchPortalPage() {
     }
   };
 
-  const handleDownloadPDF = async (documentId: string, subject: string) => {
-    const token = sessionStorage.getItem('research_token');
-    if (!token) return;
-
-    try {
-      const res = await fetch(`/api/research/documents/${documentId}/pdf`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-
-      if (!res.ok) throw new Error('PDF generation failed');
-
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${subject.substring(0, 50).replace(/[^a-z0-9]/gi, '_')}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-    } catch (err: any) {
-      alert(`Failed to generate PDF: ${err.message}`);
-    }
-  };
-
   const handleDownload = async (documentId: string, attachmentId: string, filename: string) => {
     const token = sessionStorage.getItem('research_token');
     if (!token) return;
@@ -140,7 +115,10 @@ export default function ResearchPortalPage() {
 
       if (!res.ok) throw new Error('Download failed');
 
+      // Get file as blob
       const blob = await res.blob();
+
+      // Create download link
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -188,7 +166,6 @@ export default function ResearchPortalPage() {
           border: '1px solid var(--border)',
           borderRadius: 12,
           background: 'var(--card-bg)',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
         }}>
           <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, textAlign: 'center' }}>
             Research Portal
@@ -246,7 +223,7 @@ export default function ResearchPortalPage() {
               style={{
                 width: '100%',
                 padding: '10px 16px',
-                background: '#3b82f6',
+                background: 'var(--primary)',
                 color: '#fff',
                 border: 'none',
                 borderRadius: 6,
@@ -265,7 +242,7 @@ export default function ResearchPortalPage() {
   }
 
   return (
-    <main style={{ maxWidth: 1400, margin: '0 auto', padding: 20, background: 'var(--background)', minHeight: '100vh' }}>
+    <main style={{ maxWidth: 1400, margin: '0 auto', padding: 20 }}>
       {/* Header */}
       <div style={{
         display: 'flex',
@@ -273,14 +250,14 @@ export default function ResearchPortalPage() {
         alignItems: 'center',
         marginBottom: 32,
         paddingBottom: 16,
-        borderBottom: '2px solid var(--border)'
+        borderBottom: '1px solid var(--border)'
       }}>
         <div>
-          <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 4, color: 'var(--foreground)' }}>
+          <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>
             Research Portal
           </h1>
           <p style={{ fontSize: 14, color: 'var(--muted-foreground)' }}>
-            {documents.length} documents • {filteredDocuments.length} shown
+            {documents.length} documents available
           </p>
         </div>
         <button
@@ -293,10 +270,7 @@ export default function ResearchPortalPage() {
             color: 'var(--foreground)',
             fontSize: 14,
             cursor: 'pointer',
-            transition: 'all 0.2s',
           }}
-          onMouseOver={(e) => e.currentTarget.style.background = 'var(--hover-bg)'}
-          onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
         >
           Logout
         </button>
@@ -311,15 +285,15 @@ export default function ResearchPortalPage() {
       }}>
         <input
           type="text"
-          placeholder="🔍 Search by ticker or subject..."
+          placeholder="Search by ticker or subject..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           style={{
             flex: 1,
             minWidth: 300,
-            padding: '10px 14px',
+            padding: '8px 12px',
             border: '1px solid var(--input-border)',
-            borderRadius: 8,
+            borderRadius: 6,
             background: 'var(--input-bg)',
             color: 'var(--foreground)',
             fontSize: 14,
@@ -330,14 +304,13 @@ export default function ResearchPortalPage() {
           value={selectedSource}
           onChange={(e) => setSelectedSource(e.target.value)}
           style={{
-            padding: '10px 14px',
+            padding: '8px 12px',
             border: '1px solid var(--input-border)',
-            borderRadius: 8,
+            borderRadius: 6,
             background: 'var(--input-bg)',
             color: 'var(--foreground)',
             fontSize: 14,
             cursor: 'pointer',
-            minWidth: 180,
           }}
         >
           <option value="all">All Sources</option>
@@ -353,140 +326,121 @@ export default function ResearchPortalPage() {
           padding: 60,
           textAlign: 'center',
           color: 'var(--muted)',
-          border: '1px dashed var(--border)',
-          borderRadius: 12,
-          background: 'var(--card-bg)',
+          border: '1px solid var(--border)',
+          borderRadius: 8,
         }}>
-          <p style={{ fontSize: 18, marginBottom: 8, fontWeight: 500 }}>No documents found</p>
+          <p style={{ fontSize: 16, marginBottom: 8 }}>No documents found</p>
           <p style={{ fontSize: 14 }}>
             {searchTerm ? 'Try adjusting your search' : 'Documents will appear here when received'}
           </p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gap: 20 }}>
+        <div style={{ display: 'grid', gap: 16 }}>
           {filteredDocuments.map(doc => (
             <div
               key={doc.id}
               style={{
-                padding: 24,
+                padding: 20,
                 border: '1px solid var(--border)',
-                borderRadius: 12,
+                borderRadius: 8,
                 background: 'var(--card-bg)',
-                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-                transition: 'all 0.2s',
               }}
             >
-              {/* Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 12 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                     {doc.ticker && (
                       <span style={{
-                        padding: '4px 10px',
-                        background: '#3b82f6',
-                        color: '#fff',
-                        fontSize: 12,
-                        fontWeight: 700,
-                        borderRadius: 6,
-                        letterSpacing: '0.5px',
+                        padding: '2px 8px',
+                        background: 'var(--primary-bg)',
+                        color: 'var(--primary)',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        borderRadius: 4,
                       }}>
                         {doc.ticker}
                       </span>
                     )}
-                    <span style={{
-                      fontSize: 12,
-                      color: 'var(--muted-foreground)',
-                      padding: '4px 10px',
-                      background: 'var(--hover-bg)',
-                      borderRadius: 6,
-                    }}>
+                    <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>
                       {doc.source}
                     </span>
-                    <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>
-                      {new Date(doc.received_date).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                      })} • {new Date(doc.received_date).toLocaleTimeString('en-US', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
                   </div>
-                  <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 0, color: 'var(--foreground)', lineHeight: 1.4 }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4, color: 'var(--foreground)' }}>
                     {doc.subject}
                   </h3>
+                  <p style={{ fontSize: 13, color: 'var(--muted-foreground)' }}>
+                    {new Date(doc.received_date).toLocaleString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </p>
                 </div>
+
+                {/* Expand button */}
+                <button
+                  onClick={() => toggleExpanded(doc.id)}
+                  style={{
+                    padding: '6px 12px',
+                    background: 'transparent',
+                    border: '1px solid var(--border)',
+                    borderRadius: 6,
+                    color: 'var(--foreground)',
+                    fontSize: 13,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {expandedDocs.has(doc.id) ? '▼ Collapse' : '▶ Show Email'}
+                </button>
               </div>
 
-              {/* Preview text */}
-              {doc.body_text && (
+              {/* Expanded email body */}
+              {expandedDocs.has(doc.id) && (
                 <div style={{
+                  marginTop: 12,
                   padding: 16,
-                  background: 'var(--hover-bg)',
-                  borderLeft: '3px solid #3b82f6',
+                  background: 'var(--code-bg)',
+                  border: '1px solid var(--border)',
                   borderRadius: 6,
-                  marginBottom: 16,
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                  color: 'var(--muted-foreground)',
+                  whiteSpace: 'pre-wrap',
+                  maxHeight: 400,
+                  overflowY: 'auto',
                 }}>
-                  <p style={{
-                    fontSize: 14,
-                    lineHeight: 1.6,
-                    color: 'var(--foreground)',
-                    margin: 0,
-                    display: '-webkit-box',
-                    WebkitLineClamp: expandedDocs.has(doc.id) ? 'unset' : 3,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                  }}>
-                    {doc.body_text.split('\n\nFull Report:')[0]}
-                  </p>
-                  {doc.body_text.length > 300 && (
-                    <button
-                      onClick={() => toggleExpanded(doc.id)}
-                      style={{
-                        marginTop: 12,
-                        padding: '6px 12px',
-                        background: 'transparent',
-                        border: '1px solid var(--border)',
-                        borderRadius: 6,
-                        color: '#3b82f6',
-                        fontSize: 13,
-                        fontWeight: 500,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {expandedDocs.has(doc.id) ? 'Show less ▲' : 'Read more ▼'}
-                    </button>
-                  )}
+                  {doc.body_text || '(Email body is empty or not available)'}
                 </div>
               )}
 
               {/* Action buttons */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                {/* PDF Download button - ALWAYS SHOW */}
-                <button
-                  onClick={() => handleDownloadPDF(doc.id, doc.subject)}
-                  style={{
-                    padding: '10px 16px',
-                    background: '#10b981',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: 8,
-                    fontSize: 14,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)',
-                    transition: 'all 0.2s',
-                  }}
-                  onMouseOver={(e) => e.currentTarget.style.background = '#059669'}
-                  onMouseOut={(e) => e.currentTarget.style.background = '#10b981'}
-                >
-                  <span>📄</span>
-                  <span>Download PDF</span>
-                </button>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+                {/* Report link */}
+                {doc.body_text && extractLink(doc.body_text) && (
+                  <a
+                    href={extractLink(doc.body_text)!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      padding: '6px 12px',
+                      background: 'var(--accent)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 6,
+                      fontSize: 13,
+                      fontWeight: 500,
+                      textDecoration: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <span>🔗</span>
+                    <span>View Full Report</span>
+                  </a>
+                )}
 
                 {/* Attachments */}
                 {doc.attachments && doc.attachments.length > 0 && doc.attachments.map(att => (
@@ -494,25 +448,22 @@ export default function ResearchPortalPage() {
                     key={att.id}
                     onClick={() => handleDownload(doc.id, att.id, att.filename)}
                     style={{
-                      padding: '10px 16px',
-                      background: '#6366f1',
+                      padding: '6px 12px',
+                      background: 'var(--primary)',
                       color: '#fff',
                       border: 'none',
-                      borderRadius: 8,
-                      fontSize: 14,
+                      borderRadius: 6,
+                      fontSize: 13,
                       fontWeight: 500,
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 8,
-                      transition: 'all 0.2s',
+                      gap: 6,
                     }}
-                    onMouseOver={(e) => e.currentTarget.style.background = '#4f46e5'}
-                    onMouseOut={(e) => e.currentTarget.style.background = '#6366f1'}
                   >
-                    <span>📎</span>
+                    <span>📄</span>
                     <span>{att.filename}</span>
-                    <span style={{ opacity: 0.8, fontSize: 12 }}>
+                    <span style={{ opacity: 0.7, fontSize: 11 }}>
                       ({(att.file_size / 1024 / 1024).toFixed(1)} MB)
                     </span>
                   </button>
