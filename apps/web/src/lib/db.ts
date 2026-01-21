@@ -29,10 +29,12 @@ function createPool() {
       password: dbUrl.password,
       max: 10,
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 20000,
+      connectionTimeoutMillis: 10000,
       ssl: {
         rejectUnauthorized: false
-      }
+      },
+      // Add query timeout for serverless
+      query_timeout: 10000
     });
   } catch (error) {
     console.error("Failed to create database pool:", error);
