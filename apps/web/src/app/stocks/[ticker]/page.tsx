@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import PriceChart from "@/components/PriceChart";
 import ReturnDistributionChart from "@/components/ReturnDistributionChart";
+import ResidualSquaresChart from "@/components/ResidualSquaresChart";
 import TimeframeSelector from "@/components/TimeframeSelector";
 
 type Stats = {
@@ -101,13 +102,17 @@ export default function StockTickerPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  
+
   // UI State: 'comparison' is the new mode
-  const [chartMode, setChartMode] = useState<"price" | "total_return" | "comparison">("comparison"); 
+  const [chartMode, setChartMode] = useState<"price" | "total_return" | "comparison">("comparison");
   const [showInfo, setShowInfo] = useState<boolean>(false);
 
   const [returnsStartDate, setReturnsStartDate] = useState<string>("");
   const [returnsEndDate, setReturnsEndDate] = useState<string>("");
+
+  // Residuals data
+  const [residualsData, setResidualsData] = useState<Array<{ date: string; residualSquare: number; residual: number }> | null>(null);
+  const [residualsLoading, setResidualsLoading] = useState<boolean>(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -173,6 +178,59 @@ export default function StockTickerPage() {
       cancelled = true;
     };
   }, [ticker, limit]);
+
+  // Fetch residuals data
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchResiduals() {
+      if (!ticker) {
+        setResidualsData(null);
+        return;
+      }
+
+      setResidualsLoading(true);
+
+      try {
+        const url = `/api/residuals/${encodeURIComponent(ticker)}?limit=${encodeURIComponent(
+          String(limit)
+        )}&adjusted=${chartMode !== "price"}`;
+
+        const res = await fetch(url, {
+          method: "GET",
+          headers: { accept: "application/json" },
+          cache: "no-store",
+        });
+
+        if (!res.ok) {
+          console.warn("Residuals API failed:", res.statusText);
+          if (!cancelled) {
+            setResidualsData(null);
+            setResidualsLoading(false);
+          }
+          return;
+        }
+
+        const json = await res.json();
+
+        if (!cancelled) {
+          setResidualsData(json.data || []);
+          setResidualsLoading(false);
+        }
+      } catch (e: any) {
+        console.warn("Residuals fetch error:", e);
+        if (!cancelled) {
+          setResidualsData(null);
+          setResidualsLoading(false);
+        }
+      }
+    }
+
+    fetchResiduals();
+    return () => {
+      cancelled = true;
+    };
+  }, [ticker, limit, chartMode]);
 
   const activeStats = useMemo(() => {
     if (!data?.summary) return null;
@@ -456,6 +514,29 @@ export default function StockTickerPage() {
               Wider curves = more uncertainty. Skewness and kurtosis reveal tail risk.
             </p>
             <ReturnDistributionChart returns={activeReturns} height={320} />
+          </div>
+
+          <div style={{ marginBottom: 24, padding: 20, borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)" }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "var(--foreground)" }}>
+              Residual Squares Analysis
+            </h2>
+            <p style={{ fontSize: 12, color: "var(--muted-foreground)", marginBottom: 16, lineHeight: 1.5 }}>
+              <strong>Unexplained variance from OBX beta model.</strong> Measures idiosyncratic risk not explained by market movements.
+              Lower residuals = stock moves with market. Higher residuals = stock has unique drivers.
+            </p>
+            {residualsLoading && (
+              <div style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>
+                Loading residuals data...
+              </div>
+            )}
+            {!residualsLoading && residualsData && residualsData.length > 0 && (
+              <ResidualSquaresChart data={residualsData} height={320} />
+            )}
+            {!residualsLoading && (!residualsData || residualsData.length === 0) && (
+              <div style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>
+                No residuals data available
+              </div>
+            )}
           </div>
 
           <div style={{ padding: 20, borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)" }}>

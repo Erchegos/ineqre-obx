@@ -146,3 +146,83 @@ export function computeMaxDrawdown(prices: number[]): number {
 
   return maxDD;
 }
+
+/**
+ * Compute OLS regression: y = alpha + beta * x
+ * Returns { alpha, beta, residuals, rSquared }
+ */
+export function computeOLSRegression(
+  yReturns: number[],
+  xReturns: number[]
+): {
+  alpha: number;
+  beta: number;
+  residuals: number[];
+  rSquared: number;
+} {
+  const n = Math.min(yReturns.length, xReturns.length);
+  if (n < 2) {
+    return {
+      alpha: 0,
+      beta: 0,
+      residuals: [],
+      rSquared: 0,
+    };
+  }
+
+  // Calculate means
+  const yMean = yReturns.slice(0, n).reduce((a, b) => a + b, 0) / n;
+  const xMean = xReturns.slice(0, n).reduce((a, b) => a + b, 0) / n;
+
+  // Calculate beta (slope)
+  let covariance = 0;
+  let xVariance = 0;
+
+  for (let i = 0; i < n; i++) {
+    const xDiff = xReturns[i] - xMean;
+    const yDiff = yReturns[i] - yMean;
+    covariance += xDiff * yDiff;
+    xVariance += xDiff * xDiff;
+  }
+
+  const beta = xVariance > 0 ? covariance / xVariance : 0;
+
+  // Calculate alpha (intercept)
+  const alpha = yMean - beta * xMean;
+
+  // Calculate residuals and R-squared
+  const residuals: number[] = [];
+  let totalSS = 0; // Total sum of squares
+  let residualSS = 0; // Residual sum of squares
+
+  for (let i = 0; i < n; i++) {
+    const predicted = alpha + beta * xReturns[i];
+    const residual = yReturns[i] - predicted;
+    residuals.push(residual);
+
+    totalSS += Math.pow(yReturns[i] - yMean, 2);
+    residualSS += Math.pow(residual, 2);
+  }
+
+  const rSquared = totalSS > 0 ? 1 - residualSS / totalSS : 0;
+
+  return { alpha, beta, residuals, rSquared };
+}
+
+/**
+ * Compute residual squares from OBX beta model
+ * Returns array of { date, residualSquare, residual }
+ */
+export function computeResidualSquares(
+  assetReturns: number[],
+  marketReturns: number[],
+  dates: string[]
+): Array<{ date: string; residualSquare: number; residual: number }> {
+  const regression = computeOLSRegression(assetReturns, marketReturns);
+
+  return regression.residuals.map((residual, i) => ({
+    date: dates[i] || "",
+    residualSquare: residual * residual,
+    residual: residual,
+  }));
+}
