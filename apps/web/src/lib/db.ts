@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 
 const globalForDb = globalThis as unknown as {
   pool: Pool | undefined;
+  db: ReturnType<typeof drizzle> | undefined;
 };
 
 function createPool() {
@@ -40,16 +41,30 @@ function createPool() {
   }
 }
 
-function getPool(): Pool {
+// Export a getter function instead of calling it at module load time
+export function getPool(): Pool {
   if (!globalForDb.pool) {
     globalForDb.pool = createPool();
-    if (process.env.NODE_ENV !== "production") {
-      // Cache in development only
-    }
   }
   return globalForDb.pool;
 }
 
-export const pool = getPool();
+// Lazy getter for pool - don't initialize until accessed
+export const pool = new Proxy({} as Pool, {
+  get(target, prop) {
+    const actualPool = getPool();
+    const value = (actualPool as any)[prop];
+    return typeof value === 'function' ? value.bind(actualPool) : value;
+  }
+});
 
-export const db = drizzle(pool);
+// Lazy getter for db
+export const db = new Proxy({} as ReturnType<typeof drizzle>, {
+  get(target, prop) {
+    if (!globalForDb.db) {
+      globalForDb.db = drizzle(getPool());
+    }
+    const value = (globalForDb.db as any)[prop];
+    return typeof value === 'function' ? value.bind(globalForDb.db) : value;
+  }
+});
