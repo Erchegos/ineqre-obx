@@ -178,28 +178,12 @@ export default function ReturnDistributionChart({
     );
   }
 
-  const currentSpot = 0; // Current price (0% return)
-
-  // Calculate average sigma (standard deviation) and mean across visible timeframes
+  // Calculate average sigma (standard deviation) across visible timeframes
   const avgSigma = useMemo(() => {
     if (!distributionData || timeframeKeys.length === 0) return 0;
     const sigmas = timeframeKeys.map(label => distributionData[label].stats.stdDev);
     return sigmas.reduce((a, b) => a + b, 0) / sigmas.length;
   }, [distributionData, timeframeKeys]);
-
-  const avgMean = useMemo(() => {
-    if (!distributionData || timeframeKeys.length === 0) return 0;
-    const means = timeframeKeys.map(label => distributionData[label].stats.mean);
-    return means.reduce((a, b) => a + b, 0) / means.length;
-  }, [distributionData, timeframeKeys]);
-
-  // Generate sigma levels (1σ, 2σ, 3σ, 4σ) with probabilities
-  const sigmaLevels = [
-    { sigma: 1, opacity: 0.15, probability: 68.27 },
-    { sigma: 2, opacity: 0.25, probability: 95.45 },
-    { sigma: 3, opacity: 0.35, probability: 99.73 },
-    { sigma: 4, opacity: 0.45, probability: 99.99 },
-  ];
 
   return (
     <div style={{ width: "100%" }}>
@@ -390,138 +374,6 @@ export default function ReturnDistributionChart({
 
           </AreaChart>
         </ResponsiveContainer>
-
-        {/* SVG overlay for sigma lines - positioned absolutely */}
-        <svg
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            pointerEvents: "none",
-          }}
-          viewBox={`0 0 ${height} ${height}`}
-          preserveAspectRatio="none"
-        >
-          {Number.isFinite(avgMean) && Number.isFinite(avgSigma) && avgSigma > 0 && chartData.length > 0 && (() => {
-            const minReturn = Math.min(...chartData.map(d => d.return));
-            const maxReturn = Math.max(...chartData.map(d => d.return));
-            const returnRange = maxReturn - minReturn;
-
-            // Find the return value where average probability density is highest (the peak)
-            let peakReturn = avgMean; // fallback to avgMean
-            let maxAvgDensity = 0;
-
-            chartData.forEach(point => {
-              let sumDensity = 0;
-              let count = 0;
-              timeframeKeys.forEach((key: string) => {
-                const val = point[key];
-                if (typeof val === 'number' && Number.isFinite(val)) {
-                  sumDensity += val;
-                  count++;
-                }
-              });
-              const avgDensity = count > 0 ? sumDensity / count : 0;
-              if (avgDensity > maxAvgDensity) {
-                maxAvgDensity = avgDensity;
-                peakReturn = point.return;
-              }
-            });
-
-            // Calculate x position as percentage for each sigma line
-            const getXPercent = (value: number) => {
-              return ((value - minReturn) / returnRange) * 100;
-            };
-
-            const meanXPercent = getXPercent(peakReturn);
-
-            return (
-              <g>
-                {/* μ (mean/peak) line */}
-                <line
-                  x1={`${meanXPercent}%`}
-                  y1="10%"
-                  x2={`${meanXPercent}%`}
-                  y2="85%"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  strokeDasharray="4,4"
-                  opacity="0.3"
-                />
-                <text
-                  x={`${meanXPercent}%`}
-                  y="7%"
-                  fill="currentColor"
-                  fontSize="11"
-                  fontWeight="500"
-                  textAnchor="middle"
-                  opacity="0.6"
-                  fontFamily="serif"
-                >
-                  μ
-                </text>
-
-                {/* Sigma bands */}
-                {sigmaLevels.map(({ sigma }) => {
-                  const negXPercent = getXPercent(peakReturn - sigma * avgSigma);
-                  const posXPercent = getXPercent(peakReturn + sigma * avgSigma);
-
-                  return (
-                    <g key={sigma}>
-                      {/* Negative sigma */}
-                      <line
-                        x1={`${negXPercent}%`}
-                        y1="10%"
-                        x2={`${negXPercent}%`}
-                        y2="85%"
-                        stroke="#ef4444"
-                        strokeWidth="0.8"
-                        strokeDasharray="2,4"
-                        opacity="0.25"
-                      />
-                      <text
-                        x={`${negXPercent}%`}
-                        y="7%"
-                        fill="#ef4444"
-                        fontSize="10"
-                        fontWeight="500"
-                        textAnchor="middle"
-                        opacity="0.5"
-                      >
-                        −{sigma}σ
-                      </text>
-
-                      {/* Positive sigma */}
-                      <line
-                        x1={`${posXPercent}%`}
-                        y1="10%"
-                        x2={`${posXPercent}%`}
-                        y2="85%"
-                        stroke="#22c55e"
-                        strokeWidth="0.8"
-                        strokeDasharray="2,4"
-                        opacity="0.25"
-                      />
-                      <text
-                        x={`${posXPercent}%`}
-                        y="7%"
-                        fill="#22c55e"
-                        fontSize="10"
-                        fontWeight="500"
-                        textAnchor="middle"
-                        opacity="0.5"
-                      >
-                        +{sigma}σ
-                      </text>
-                    </g>
-                  );
-                })}
-              </g>
-            );
-          })()}
-        </svg>
       </div>
 
       {/* Explanation text below chart */}
