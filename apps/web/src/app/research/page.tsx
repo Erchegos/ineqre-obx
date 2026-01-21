@@ -53,38 +53,35 @@ export default function ResearchPortalPage() {
     // Remove "CLICK HERE FOR THE FULL REPORT" and similar patterns
     cleaned = cleaned.replace(/CLICK HERE FOR THE FULL REPORT/gi, '');
 
-    // Comprehensive fix for UTF-8 mojibake (most common first for performance)
-    const fixes: Array<[string, string]> = [
-      ['–s', "'s"],           // Possessive
-      ['–', "'"],             // Generic apostrophe/single quote
-      ['—', '"'],             // Generic double quote
-      ['â€™', "'"],
-      ['â€˜', "'"],
-      ['â€œ', '"'],
-      ['â€', '"'],
-      ['â€"', '–'],
-      ['â€"', '—'],
-      ['â€¦', '...'],
-      ['â€‹', ''],
-      ['Â ', ' '],
-      ['Â', ''],
-      ['Ã¥', 'å'],
-      ['Ã¸', 'ø'],
-      ['Ã¦', 'æ'],
-      ['Ã…', 'Å'],
-      ['Ã˜', 'Ø'],
-      ['Ã†', 'Æ'],
-      ['Ã©', 'é'],
-      ['Ã¤', 'ä'],
-      ['Ã¶', 'ö'],
-      ['Ã¼', 'ü'],
-      ['Ã±', 'ñ'],
-      ['Ã§', 'ç'],
-      ['Ã', 'Ø'],
+    // Comprehensive fix for Windows-1252 to UTF-8 double-encoding (mojibake)
+    const mojibakeFixes: Array<[string, string]> = [
+      // Quotes and apostrophes (most common)
+      ['â€™', "'"], ['â€˜', "'"], ['â€œ', '"'], ['â€', '"'],
+      ['â€˛', "'"], ['â€³', '"'], [''', "'"], [''', "'"], ['"', '"'], ['"', '"'],
+      // Dashes
+      ['â€"', '–'], ['â€"', '—'], ['â€'', '-'],
+      // Special chars
+      ['â€¦', '...'], ['â€¢', '•'], ['â€‹', ''],
+      // Spaces
+      ['Â ', ' '], ['Â', ''],
+      // Norwegian
+      ['Ã¥', 'å'], ['Ã¸', 'ø'], ['Ã¦', 'æ'], ['Ã…', 'Å'], ['Ã˜', 'Ø'], ['Ã†', 'Æ'],
+      // European chars
+      ['Ã©', 'é'], ['Ã¨', 'è'], ['Ãª', 'ê'], ['Ã«', 'ë'],
+      ['Ã¡', 'á'], ['Ã ', 'à'], ['Ã¢', 'â'], ['Ã¤', 'ä'], ['Ã£', 'ã'],
+      ['Ã¶', 'ö'], ['Ã´', 'ô'], ['Ã²', 'ò'], ['Ã³', 'ó'],
+      ['Ã¼', 'ü'], ['Ã»', 'û'], ['Ã¹', 'ù'], ['Ãº', 'ú'],
+      ['Ã±', 'ñ'], ['Ã§', 'ç'], ['Ã', 'Ø'],
+      // Symbols
+      ['Â°', '°'], ['Â±', '±'], ['Ã—', '×'], ['Ã·', '÷'],
+      ['Â£', '£'], ['â‚¬', '€'], ['Â¥', '¥'], ['Â¢', '¢'],
+      ['Â©', '©'], ['Â®', '®'], ['â„¢', '™'], ['Â§', '§'], ['Âµ', 'µ'],
     ];
 
-    for (const [bad, good] of fixes) {
-      cleaned = cleaned.split(bad).join(good);
+    for (const [bad, good] of mojibakeFixes) {
+      while (cleaned.includes(bad)) {
+        cleaned = cleaned.replace(bad, good);
+      }
     }
 
     // Clean up extra whitespace
@@ -401,7 +398,7 @@ export default function ResearchPortalPage() {
       }}>
         <input
           type="text"
-          placeholder="🔍 Search by ticker or subject..."
+          placeholder="Search by ticker or subject..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           style={{
