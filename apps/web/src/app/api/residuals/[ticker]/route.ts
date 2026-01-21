@@ -100,9 +100,12 @@ export async function GET(
       useAdjusted
     );
 
+    console.log(`[Residuals API] ${ticker}: Fetched ${stockPrices.length} stock prices`);
+
     if (stockPrices.length < 2) {
+      console.warn(`[Residuals API] ${ticker}: Insufficient data (${stockPrices.length} prices)`);
       return NextResponse.json(
-        { error: "Insufficient data for residuals analysis" },
+        { error: `Insufficient data for residuals analysis. Found ${stockPrices.length} prices, need at least 2.` },
         { status: 400 }
       );
     }
@@ -110,9 +113,12 @@ export async function GET(
     // Fetch market (OBX) prices
     const marketPrices = await fetchMarketPrices(limit, useAdjusted);
 
+    console.log(`[Residuals API] ${ticker}: Fetched ${marketPrices.length} OBX market prices`);
+
     if (marketPrices.length < stockPrices.length) {
+      console.warn(`[Residuals API] ${ticker}: Insufficient market data (${marketPrices.length} vs ${stockPrices.length} stock prices)`);
       return NextResponse.json(
-        { error: "Insufficient market data for beta calculation" },
+        { error: `Insufficient market data for beta calculation. Found ${marketPrices.length} OBX prices vs ${stockPrices.length} stock prices.` },
         { status: 400 }
       );
     }

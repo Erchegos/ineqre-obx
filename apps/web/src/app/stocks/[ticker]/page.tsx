@@ -113,6 +113,7 @@ export default function StockTickerPage() {
   // Residuals data
   const [residualsData, setResidualsData] = useState<Array<{ date: string; residualSquare: number; residual: number }> | null>(null);
   const [residualsLoading, setResidualsLoading] = useState<boolean>(false);
+  const [residualsError, setResidualsError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -190,6 +191,7 @@ export default function StockTickerPage() {
       }
 
       setResidualsLoading(true);
+      setResidualsError(null);
 
       try {
         const url = `/api/residuals/${encodeURIComponent(ticker)}?limit=${encodeURIComponent(
@@ -203,8 +205,11 @@ export default function StockTickerPage() {
         });
 
         if (!res.ok) {
-          console.warn("Residuals API failed:", res.statusText);
+          const errorData = await res.json().catch(() => ({ error: res.statusText }));
+          const errorMsg = errorData.error || res.statusText;
+          console.warn("Residuals API failed:", errorMsg);
           if (!cancelled) {
+            setResidualsError(errorMsg);
             setResidualsData(null);
             setResidualsLoading(false);
           }
@@ -220,6 +225,7 @@ export default function StockTickerPage() {
       } catch (e: any) {
         console.warn("Residuals fetch error:", e);
         if (!cancelled) {
+          setResidualsError(e?.message || "Failed to fetch residuals data");
           setResidualsData(null);
           setResidualsLoading(false);
         }
@@ -529,10 +535,18 @@ export default function StockTickerPage() {
                 Loading residuals data...
               </div>
             )}
-            {!residualsLoading && residualsData && residualsData.length > 0 && (
+            {!residualsLoading && residualsError && (
+              <div style={{ padding: 20, borderRadius: 4, border: "1px solid var(--danger)", background: "rgba(239, 68, 68, 0.05)" }}>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6, color: "var(--danger)" }}>
+                  Unable to load residuals data
+                </div>
+                <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>{residualsError}</div>
+              </div>
+            )}
+            {!residualsLoading && !residualsError && residualsData && residualsData.length > 0 && (
               <ResidualSquaresChart data={residualsData} height={320} />
             )}
-            {!residualsLoading && (!residualsData || residualsData.length === 0) && (
+            {!residualsLoading && !residualsError && (!residualsData || residualsData.length === 0) && (
               <div style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>
                 No residuals data available
               </div>
