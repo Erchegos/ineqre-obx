@@ -185,13 +185,17 @@ export default function ReturnDistributionChart({
   const avgSigma = useMemo(() => {
     if (!distributionData || timeframeKeys.length === 0) return 0;
     const sigmas = timeframeKeys.map(label => distributionData[label].stats.stdDev);
-    return sigmas.reduce((a, b) => a + b, 0) / sigmas.length;
+    const result = sigmas.reduce((a, b) => a + b, 0) / sigmas.length;
+    console.log('avgSigma:', result);
+    return result;
   }, [distributionData, timeframeKeys]);
 
   const avgMean = useMemo(() => {
     if (!distributionData || timeframeKeys.length === 0) return 0;
     const means = timeframeKeys.map(label => distributionData[label].stats.mean);
-    return means.reduce((a, b) => a + b, 0) / means.length;
+    const result = means.reduce((a, b) => a + b, 0) / means.length;
+    console.log('avgMean:', result);
+    return result;
   }, [distributionData, timeframeKeys]);
 
   // Generate sigma levels (1σ, 2σ, 3σ, 4σ) with probabilities
@@ -346,24 +350,22 @@ export default function ReturnDistributionChart({
               return (
                 <div
                   style={{
-                    backgroundColor: "var(--card-bg)",
-                    border: "1px solid var(--card-border)",
+                    backgroundColor: "rgba(0, 0, 0, 0.85)",
+                    border: "1px solid rgba(255, 255, 255, 0.2)",
                     borderRadius: "4px",
-                    padding: "8px 10px",
+                    padding: "6px 8px",
                     fontSize: "11px",
+                    color: "#fff",
                   }}
                 >
-                  <div style={{ marginBottom: 6, fontWeight: 600, color: "var(--foreground)" }}>
+                  <div style={{ marginBottom: 4, fontWeight: 600 }}>
                     Return: {(Number(label) * 100).toFixed(2)}%
                   </div>
                   {payload.map((entry: any, index: number) => (
-                    <div key={index} style={{ color: entry.color, marginBottom: 2 }}>
+                    <div key={index} style={{ color: entry.color, marginBottom: 1, fontSize: 10 }}>
                       <strong>{entry.name}:</strong> {Number(entry.value).toFixed(4)}
                     </div>
                   ))}
-                  <div style={{ marginTop: 6, fontSize: 10, color: "var(--muted-foreground)", fontStyle: "italic" }}>
-                    Higher value = more likely this return occurs over that holding period
-                  </div>
                 </div>
               );
             }}
@@ -392,7 +394,7 @@ export default function ReturnDistributionChart({
           })}
 
           {/* 0σ line at mean - rendered after areas to appear on top */}
-          {avgMean !== 0 && (
+          {Number.isFinite(avgMean) && avgMean !== 0 && (
             <ReferenceLine
               x={avgMean}
               stroke="var(--foreground)"
@@ -410,12 +412,15 @@ export default function ReturnDistributionChart({
           )}
 
           {/* Sigma lines - rendered after areas to appear on top */}
-          {sigmaLevels.map(({ sigma }) => (
-            <Fragment key={`sigma-${sigma}`}>
-              {/* Negative sigma */}
-              {avgMean - sigma * avgSigma !== 0 && (
+          {Number.isFinite(avgMean) && Number.isFinite(avgSigma) && avgSigma > 0 && sigmaLevels.map(({ sigma }) => {
+            const negValue = avgMean - sigma * avgSigma;
+            const posValue = avgMean + sigma * avgSigma;
+            console.log(`Sigma ${sigma}: neg=${negValue}, pos=${posValue}`);
+            return (
+              <Fragment key={`sigma-${sigma}`}>
+                {/* Negative sigma */}
                 <ReferenceLine
-                  x={avgMean - sigma * avgSigma}
+                  x={negValue}
                   stroke="#ef4444"
                   strokeWidth={1}
                   strokeDasharray="3 6"
@@ -427,11 +432,9 @@ export default function ReturnDistributionChart({
                     fontSize: 9,
                   }}
                 />
-              )}
-              {/* Positive sigma */}
-              {avgMean + sigma * avgSigma !== 0 && (
+                {/* Positive sigma */}
                 <ReferenceLine
-                  x={avgMean + sigma * avgSigma}
+                  x={posValue}
                   stroke="#22c55e"
                   strokeWidth={1}
                   strokeDasharray="3 6"
@@ -443,11 +446,16 @@ export default function ReturnDistributionChart({
                     fontSize: 9,
                   }}
                 />
-              )}
-            </Fragment>
-          ))}
+              </Fragment>
+            );
+          })}
           </AreaChart>
         </ResponsiveContainer>
+      </div>
+
+      {/* Explanation text below chart */}
+      <div style={{ marginTop: 12, fontSize: 11, color: "var(--muted-foreground)", fontStyle: "italic", lineHeight: 1.5 }}>
+        <strong>Hover over the chart:</strong> Higher probability density values indicate that return is more likely to occur over that specific holding period.
       </div>
 
       {/* Interpretation Guide - Collapsible */}
