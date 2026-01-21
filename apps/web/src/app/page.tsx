@@ -1,27 +1,19 @@
 import Link from "next/link";
-import { pool } from "@/lib/db";
-import { getPriceTable } from "@/lib/price-data-adapter";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 async function getSystemStats() {
-  // Temporarily return mock data to test if DB connection is the issue
-  console.log("[getSystemStats] Returning mock data");
-  return {
-    securities: 0,
-    last_updated: null,
-    data_points: 0
-  };
-
-  /*
-  // TODO: Re-enable after fixing DB connection
   try {
     // Check if DATABASE_URL is configured
     if (!process.env.DATABASE_URL) {
-      console.error("DATABASE_URL not configured");
+      console.log("[getSystemStats] DATABASE_URL not configured, returning empty stats");
       return { securities: 0, last_updated: null, data_points: 0 };
     }
+
+    // Lazy load database modules to avoid initialization errors
+    const { pool } = await import("@/lib/db");
+    const { getPriceTable } = await import("@/lib/price-data-adapter");
 
     const tableName = await getPriceTable();
 
@@ -53,11 +45,10 @@ async function getSystemStats() {
     const result = await pool.query(query);
     return result.rows[0];
   } catch (error) {
-    console.error("Failed to load stats:", error);
+    console.error("[getSystemStats] Failed to load stats:", error);
     // Return empty stats instead of throwing
     return { securities: 0, last_updated: null, data_points: 0 };
   }
-  */
 }
 
 export default async function HomePage() {
