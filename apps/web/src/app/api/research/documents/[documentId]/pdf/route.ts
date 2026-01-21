@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { verify } from 'jsonwebtoken';
 
 // Lazy initialization to avoid build-time errors when env vars aren't available
 function getSupabaseClient() {
@@ -9,12 +10,23 @@ function getSupabaseClient() {
   );
 }
 
-function verifyToken(request: NextRequest): boolean {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader?.startsWith('Bearer ')) return false;
+// Verify JWT token from request
+function verifyToken(req: NextRequest): string | null {
+  const authHeader = req.headers.get('authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
 
   const token = authHeader.substring(7);
-  return token === process.env.RESEARCH_TOKEN;
+  try {
+    const decoded = verify(
+      token,
+      process.env.JWT_SECRET || 'your-secret-key-change-this'
+    ) as { tokenId: string };
+    return decoded.tokenId;
+  } catch (error) {
+    return null;
+  }
 }
 
 export async function GET(
@@ -22,7 +34,8 @@ export async function GET(
   { params }: { params: Promise<{ documentId: string }> }
 ) {
   // Verify authentication
-  if (!verifyToken(request)) {
+  const tokenId = verifyToken(request);
+  if (!tokenId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
