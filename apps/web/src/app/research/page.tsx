@@ -95,8 +95,18 @@ export default function ResearchPortalPage() {
 
       if (!res.ok) throw new Error('Download failed');
 
-      const { url } = await res.json();
-      window.open(url, '_blank');
+      // Get file as blob
+      const blob = await res.blob();
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
     } catch (err: any) {
       alert(`Failed to download: ${err.message}`);
     }

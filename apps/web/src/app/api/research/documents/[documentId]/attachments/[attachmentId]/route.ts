@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 import { verify } from 'jsonwebtoken';
-import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import fs from 'fs';
+import path from 'path';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-});
-
-const s3Client = new S3Client({
-  region: process.env.AWS_REGION || 'eu-north-1',
 });
 
 // Verify JWT token from request
@@ -72,15 +68,20 @@ export async function GET(
 
     const attachment = result.rows[0];
 
-    // Generate presigned URL for S3 download (valid for 1 hour)
-    const command = new GetObjectCommand({
-      Bucket: process.env.S3_BUCKET || 'ineqre-research',
-      Key: attachment.file_path,
-    });
+    // Get storage directory (same as email processor)
+    const storageDir = process.env.STORAGE_DIR || path.join(process.cwd(), 'storage', 'research');
+    const filePath = path.join(storageDir, attachment.file_path);
 
-    const presignedUrl = await getSignedUrl(s3Client, command, {
-      expiresIn: 3600, // 1 hour
-    });
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      return NextResponse.json(
+        { error: 'File not found on disk' },
+        { status: 404 }
+      );
+    }
+
+    // Read file
+    const fileBuffer = fs.readFileSync(filePath);
 
     // Log access
     await pool.query(
@@ -89,15 +90,18 @@ export async function GET(
       [tokenId, documentId]
     );
 
-    return NextResponse.json({
-      url: presignedUrl,
-      filename: attachment.filename,
-      content_type: attachment.content_type,
+    // Return file with appropriate headers
+    return new NextResponse(fileBuffer, {
+      headers: {
+        'Content-Type': attachment.content_type || 'application/octet-stream',
+        'Content-Disposition': `attachment; filename="${attachment.filename}"`,
+        'Content-Length': attachment.file_size.toString(),
+      },
     });
   } catch (error) {
-    console.error('Error generating download URL:', error);
+    console.error('Error serving file:', error);
     return NextResponse.json(
-      { error: 'Failed to generate download link' },
+      { error: 'Failed to download file' },
       { status: 500 }
     );
   }

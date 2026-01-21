@@ -58,13 +58,14 @@ Add these to your `.env` file:
 DATABASE_URL=postgresql://user:password@host:port/database
 
 # JWT Secret for session tokens
-JWT_SECRET=your-long-random-secret-change-this
+JWT_SECRET=d93458e8a1de8bfba653505d4b5a488312d4895596dd5d05d1001fde33680c6a
 
 # Email Configuration
 EMAIL_IMAP_HOST=imap.gmail.com
 EMAIL_IMAP_PORT=993
-EMAIL_USER=your.email@gmail.com
-EMAIL_PASSWORD=your-app-specific-password
+EMAIL_USER=Slettebakola@gmail.com
+EMAIL_PASSWORD=cblvhbrnkksuxgbu
+
 
 # AWS S3
 AWS_REGION=eu-north-1

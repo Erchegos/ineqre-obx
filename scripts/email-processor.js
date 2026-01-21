@@ -5,26 +5,20 @@
  * automatically imports them into the research portal database.
  *
  * Setup:
- * 1. npm install imapflow @aws-sdk/client-s3 pdf-parse pg dotenv
- * 2. Create .env file with EMAIL_USER, EMAIL_PASSWORD, DATABASE_URL, AWS credentials
+ * 1. npm install imapflow pg dotenv
+ * 2. Create .env file with EMAIL_USER, EMAIL_PASSWORD, DATABASE_URL
  * 3. Run: node scripts/email-processor.js
- * 4. Or schedule with cron: */10 * * * * node /path/to/email-processor.js
+ * 4. Or schedule with cron for automatic processing
  */
 
 require('dotenv').config();
 const { ImapFlow } = require('imapflow');
-const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { Pool } = require('pg');
-const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-});
-
-const s3Client = new S3Client({
-  region: process.env.AWS_REGION || 'eu-north-1',
 });
 
 // Configuration
@@ -47,13 +41,18 @@ const CONFIG = {
     // Add more senders as needed
   ],
 
-  // S3 bucket for storing documents
-  s3Bucket: process.env.S3_BUCKET || 'ineqre-research',
+  // Local storage directory (relative to project root)
+  storageDir: process.env.STORAGE_DIR || path.join(__dirname, '..', 'storage', 'research'),
 
   // Processing limits
   batchSize: 50, // Process max 50 emails per run
   maxAttachmentSize: 50 * 1024 * 1024, // 50 MB
 };
+
+// Ensure storage directory exists
+if (!fs.existsSync(CONFIG.storageDir)) {
+  fs.mkdirSync(CONFIG.storageDir, { recursive: true });
+}
 
 /**
  * Extract ticker from email subject
@@ -88,18 +87,20 @@ function identifySource(email) {
 }
 
 /**
- * Upload file to S3
+ * Save file to local storage
  */
-async function uploadToS3(content, key) {
-  const command = new PutObjectCommand({
-    Bucket: CONFIG.s3Bucket,
-    Key: key,
-    Body: content,
-    ServerSideEncryption: 'AES256',
-  });
+async function saveToLocalStorage(content, relativePath) {
+  const fullPath = path.join(CONFIG.storageDir, relativePath);
+  const dir = path.dirname(fullPath);
 
-  await s3Client.send(command);
-  return key;
+  // Create directory if it doesn't exist
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  // Write file
+  fs.writeFileSync(fullPath, content);
+  return relativePath;
 }
 
 /**
@@ -168,23 +169,23 @@ async function processEmail(message, imap) {
           continue;
         }
 
-        // Generate S3 key
+        // Generate file path
         const now = new Date();
-        const s3Key = `research/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${documentId}/${att.filename}`;
+        const relativePath = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${documentId}/${att.filename}`;
 
-        // Upload to S3
-        await uploadToS3(content, s3Key);
+        // Save to local storage
+        await saveToLocalStorage(content, relativePath);
 
         // Save attachment record
         await pool.query(
           `INSERT INTO research_attachments (
             document_id, filename, content_type, file_size, file_path
           ) VALUES ($1, $2, $3, $4, $5)`,
-          [documentId, att.filename, att.contentType, content.length, s3Key]
+          [documentId, att.filename, att.contentType, content.length, relativePath]
         );
 
         attachmentCount++;
-        console.log(`  Uploaded attachment: ${att.filename}`);
+        console.log(`  Saved attachment: ${att.filename}`);
       } catch (err) {
         console.error(`  Error processing attachment ${att.filename}:`, err.message);
       }
