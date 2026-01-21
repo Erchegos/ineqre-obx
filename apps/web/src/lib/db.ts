@@ -13,21 +13,19 @@ function createPool() {
     }
 
     // Use connection string directly for better compatibility with Vercel
-    const connectionString = process.env.DATABASE_URL.trim().replace(/^["']|["']$/g, '');
+    let connectionString = process.env.DATABASE_URL.trim().replace(/^["']|["']$/g, '');
 
-    // Configure SSL - disable certificate verification for Supabase pooler
-    const sslConfig = {
-      rejectUnauthorized: false,
-      // Skip server identity check for self-signed certs
-      checkServerIdentity: () => undefined,
-    };
+    // Remove sslmode parameter if present - we'll handle SSL in config
+    connectionString = connectionString.replace(/[?&]sslmode=\w+/g, '');
 
     const newPool = new Pool({
       connectionString,
       max: 10,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
-      ssl: sslConfig,
+      ssl: {
+        rejectUnauthorized: false
+      },
       query_timeout: 10000
     });
 
