@@ -68,9 +68,8 @@ function fixEncoding(text) {
 
   // Fix specific known issues from my earlier cleanup
   fixed = fixed
-    .replace(/Mondays tariff/g, "Monday's tariff")
-    .replace(/Taco Wednesday/g, '"Taco Wednesday"')
-    .replace(/ones hardest/g, "one's hardest");
+    .replace(/\bMondays\b/g, "Monday's")
+    .replace(/\bones\b(?= hardest)/g, "one's");
 
   // Remove empty quotes ""
   fixed = fixed.replace(/""/g, '');
@@ -101,6 +100,10 @@ async function fixAllDocuments() {
 
       // Only update if something changed
       if (fixedSubject !== doc.subject || fixedBody !== doc.body_text) {
+        if (updatedCount < 3) {
+          console.log('Updating doc:', doc.subject.substring(0, 50));
+          console.log('Body changed:', doc.body_text !== fixedBody);
+        }
         await pool.query(
           'UPDATE research_documents SET subject = $1, body_text = $2 WHERE id = $3',
           [fixedSubject, fixedBody, doc.id]
