@@ -40,8 +40,21 @@ export default function ResearchPortalPage() {
     });
   };
 
-  // Extract link from body text
-  const extractLink = (text: string): string | null => {
+  // Extract PDF report link from body text
+  const extractPdfLink = (text: string): string | null => {
+    // Look for "Full Report:" followed by URL
+    const fullReportMatch = text.match(/Full Report:\s*(https?:\/\/[^\s]+)/i);
+    if (fullReportMatch) {
+      return fullReportMatch[1];
+    }
+
+    // Fallback to FactSet hosting links
+    const factsetMatch = text.match(/https:\/\/parp\.hosting\.factset\.com[^\s]+/);
+    if (factsetMatch) {
+      return factsetMatch[0];
+    }
+
+    // Last resort: any https link
     const urlMatch = text.match(/https?:\/\/[^\s\)]+/);
     return urlMatch ? urlMatch[0] : null;
   };
@@ -104,37 +117,16 @@ export default function ResearchPortalPage() {
     }
   };
 
-  const handleDownloadPDF = async (documentId: string, subject: string) => {
-    const token = sessionStorage.getItem('research_token');
-    if (!token) {
-      alert('Not authenticated. Please refresh and log in again.');
+  const handleViewPDF = (bodyText: string, subject: string) => {
+    const pdfLink = extractPdfLink(bodyText);
+
+    if (!pdfLink) {
+      alert('No PDF report link found in this email.');
       return;
     }
 
-    try {
-      const res = await fetch(`/api/research/documents/${documentId}/pdf`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('PDF generation error:', errorData);
-        throw new Error(errorData.error || `HTTP ${res.status}: ${res.statusText}`);
-      }
-
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${subject.substring(0, 50).replace(/[^a-z0-9]/gi, '_')}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-    } catch (err: any) {
-      console.error('PDF download error:', err);
-      alert(`Failed to generate PDF: ${err.message}`);
-    }
+    // Open the PDF link in a new tab
+    window.open(pdfLink, '_blank', 'noopener,noreferrer');
   };
 
   const handleDownload = async (documentId: string, attachmentId: string, filename: string) => {
@@ -471,9 +463,9 @@ export default function ResearchPortalPage() {
 
               {/* Action buttons */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                {/* PDF Download button - ALWAYS SHOW */}
+                {/* View PDF Report button */}
                 <button
-                  onClick={() => handleDownloadPDF(doc.id, doc.subject)}
+                  onClick={() => handleViewPDF(doc.body_text, doc.subject)}
                   style={{
                     padding: '10px 16px',
                     background: '#10b981',
@@ -492,8 +484,8 @@ export default function ResearchPortalPage() {
                   onMouseOver={(e) => e.currentTarget.style.background = '#059669'}
                   onMouseOut={(e) => e.currentTarget.style.background = '#10b981'}
                 >
-                  <span>📄</span>
-                  <span>Download PDF</span>
+                  <span>📊</span>
+                  <span>View Full Report</span>
                 </button>
 
                 {/* Attachments */}
