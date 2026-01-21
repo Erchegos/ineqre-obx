@@ -117,7 +117,7 @@ export default function ResearchPortalPage() {
     }
   };
 
-  const handleViewPDF = (bodyText: string, subject: string) => {
+  const handleViewPDF = async (bodyText: string, subject: string) => {
     const pdfLink = extractPdfLink(bodyText);
 
     if (!pdfLink) {
@@ -125,8 +125,23 @@ export default function ResearchPortalPage() {
       return;
     }
 
-    // Open the PDF link in a new tab
-    window.open(pdfLink, '_blank', 'noopener,noreferrer');
+    // Copy link to clipboard
+    try {
+      await navigator.clipboard.writeText(pdfLink);
+      alert(
+        'PDF link copied to clipboard!\n\n' +
+        'Note: These Pareto report links require authentication and may not work directly. ' +
+        'Please paste the link in your browser or find the original email to access the report.\n\n' +
+        'The link has been copied for you.'
+      );
+    } catch (err) {
+      // Fallback if clipboard API fails
+      alert(
+        'Could not copy to clipboard. Here is the link:\n\n' +
+        pdfLink +
+        '\n\nNote: This link requires authentication through your email.'
+      );
+    }
   };
 
   const handleDownload = async (documentId: string, attachmentId: string, filename: string) => {
@@ -484,8 +499,8 @@ export default function ResearchPortalPage() {
                   onMouseOver={(e) => e.currentTarget.style.background = '#059669'}
                   onMouseOut={(e) => e.currentTarget.style.background = '#10b981'}
                 >
-                  <span>📊</span>
-                  <span>View Full Report</span>
+                  <span>🔗</span>
+                  <span>Copy Report Link</span>
                 </button>
 
                 {/* Attachments */}
