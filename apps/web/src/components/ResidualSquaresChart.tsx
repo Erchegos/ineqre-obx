@@ -61,12 +61,14 @@ export default function ResidualSquaresChart({
     }));
   }, [data, period]);
 
-  // Calculate mean residual square
-  const meanResidualSquare = useMemo(() => {
-    if (filteredData.length === 0) return 0;
-    return (
-      filteredData.reduce((sum, d) => sum + d.y, 0) / filteredData.length
-    );
+  // Calculate mean residual square and RSS
+  const { meanResidualSquare, rss } = useMemo(() => {
+    if (filteredData.length === 0) return { meanResidualSquare: 0, rss: 0 };
+    const totalRSS = filteredData.reduce((sum, d) => sum + d.y, 0);
+    return {
+      meanResidualSquare: totalRSS / filteredData.length,
+      rss: totalRSS,
+    };
   }, [filteredData]);
 
   return (
@@ -108,12 +110,23 @@ export default function ResidualSquaresChart({
         </div>
         <div
           style={{
+            display: "flex",
+            gap: 16,
             fontSize: 12,
             color: "var(--muted)",
             fontFamily: "monospace",
           }}
         >
-          Mean ε² = {meanResidualSquare.toFixed(4)} bps²
+          <div>
+            <span style={{ color: "var(--muted-foreground)" }}>RSS:</span>{" "}
+            <strong style={{ color: "var(--foreground)" }}>
+              {rss.toFixed(2)}
+            </strong>
+          </div>
+          <div>
+            <span style={{ color: "var(--muted-foreground)" }}>Mean ε²:</span>{" "}
+            {meanResidualSquare.toFixed(4)} bps²
+          </div>
         </div>
       </div>
 
@@ -141,6 +154,7 @@ export default function ResidualSquaresChart({
                 return "";
               }}
               domain={["dataMin", "dataMax"]}
+              minTickGap={50}
             />
 
             <YAxis
@@ -276,19 +290,24 @@ export default function ResidualSquaresChart({
       >
         <div style={{ display: "grid", gap: 4 }}>
           <div>
-            <strong>Each dot</strong> = Daily residual² from OBX beta model
+            <strong>RSS (Residual Sum of Squares)</strong> = Total unexplained
+            variance. Measures independence from OBX market movements.
           </div>
           <div>
-            <strong>Residual (ε)</strong> = Return not explained by market beta
+            <strong>Lower RSS</strong> = Better model fit, stock moves closely
+            with market (high R²)
           </div>
           <div>
-            <strong>Lower values</strong> = Stock moves with market (high R²)
+            <strong>Higher RSS</strong> = Poorer model fit, stock has
+            idiosyncratic drivers (low R²)
           </div>
           <div>
-            <strong>Higher values</strong> = Idiosyncratic risk (low R²)
+            <strong>RSS = 0</strong> = Perfect fit, stock perfectly explained by
+            market beta
           </div>
           <div>
-            <strong>Mean line</strong> = Average unexplained variance for period
+            <strong>Each dot</strong> = Daily residual² contributing to total
+            RSS
           </div>
         </div>
       </div>
