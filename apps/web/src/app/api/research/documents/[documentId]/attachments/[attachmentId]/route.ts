@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
 import { verify } from 'jsonwebtoken';
 import fs from 'fs';
 import path from 'path';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+import { pool } from '@/lib/db';
 
 // Verify JWT token from request
 function verifyToken(req: NextRequest): string | null {

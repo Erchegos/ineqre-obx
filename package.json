@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "dotenv": "^17.2.3",
+    "imapflow": "^1.2.6",
     "pg": "^8.17.1"
   }
 }
