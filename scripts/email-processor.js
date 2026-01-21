@@ -19,6 +19,9 @@ const path = require('path');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 // Configuration
@@ -238,10 +241,9 @@ async function main() {
     // Select inbox
     await imap.mailboxOpen('INBOX');
 
-    // Build search criteria for Pareto emails
+    // Search for unseen emails (we'll filter by sender after)
     const searchCriteria = {
       unseen: true,
-      from: CONFIG.senderFilters,
     };
 
     console.log('Searching for new Pareto research emails...');
@@ -252,21 +254,35 @@ async function main() {
     });
 
     let count = 0;
+    let processed = 0;
     for await (const message of messages) {
-      await processEmail(message, imap);
       count++;
 
-      if (count >= CONFIG.batchSize) {
+      // Filter by sender
+      const sender = message.envelope.from[0].address;
+      const isPareto = CONFIG.senderFilters.some(filter =>
+        sender.toLowerCase().includes(filter.toLowerCase())
+      );
+
+      if (!isPareto) {
+        continue; // Skip non-Pareto emails
+      }
+
+      await processEmail(message, imap);
+      processed++;
+
+      if (processed >= CONFIG.batchSize) {
         console.log(`Reached batch limit of ${CONFIG.batchSize}`);
         break;
       }
     }
 
-    if (count === 0) {
-      console.log('No new emails found');
+    if (processed === 0) {
+      console.log(`No new Pareto emails found (checked ${count} unread messages)`);
     } else {
-      console.log(`\n✓ Processed ${count} emails`);
+      console.log(`\n✓ Processed ${processed} Pareto emails (out of ${count} unread messages)`);
     }
+
   } catch (error) {
     console.error('Error:', error);
     process.exit(1);
