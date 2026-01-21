@@ -29,6 +29,25 @@ function verifyToken(req: NextRequest): string | null {
   }
 }
 
+// Extract PDF link from email body text
+function extractPdfLink(bodyText: string): string | null {
+  // Look for the "Click to open report" link pattern
+  const linkMatch = bodyText.match(/https:\/\/parp\.hosting\.factset\.com\/[^\s\)]+/);
+  if (linkMatch) {
+    return linkMatch[0];
+  }
+
+  // Fallback to any factset link
+  const factsetMatch = bodyText.match(/https:\/\/[^\s]*factset[^\s]*/i);
+  if (factsetMatch) {
+    return factsetMatch[0];
+  }
+
+  // Last resort: any https link in the text
+  const anyLinkMatch = bodyText.match(/https?:\/\/[^\s\)]+/);
+  return anyLinkMatch ? anyLinkMatch[0] : null;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ documentId: string }> }
@@ -40,9 +59,6 @@ export async function GET(
   }
 
   try {
-    // Dynamic import of jsPDF to avoid build-time issues
-    const { jsPDF } = await import('jspdf');
-
     // Await params in Next.js 16
     const { documentId } = await params;
 
@@ -60,141 +76,44 @@ export async function GET(
       return NextResponse.json({ error: 'Document not found' }, { status: 404 });
     }
 
-    // Create PDF
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4',
+    // Extract the PDF link from the email body
+    const pdfLink = extractPdfLink(doc.body_text);
+
+    if (!pdfLink) {
+      return NextResponse.json({
+        error: 'No PDF link found in email'
+      }, { status: 404 });
+    }
+
+    // Fetch the PDF from the Pareto/FactSet server
+    const pdfResponse = await fetch(pdfLink, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+      },
     });
 
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 20;
-    const maxWidth = pageWidth - (margin * 2);
-    let y = margin;
-
-    // Helper to add text with wrapping
-    const addText = (text: string, fontSize: number, isBold: boolean = false, color: [number, number, number] = [0, 0, 0]) => {
-      pdf.setFontSize(fontSize);
-      pdf.setFont('helvetica', isBold ? 'bold' : 'normal');
-      pdf.setTextColor(...color);
-
-      const lines = pdf.splitTextToSize(text, maxWidth);
-
-      for (const line of lines) {
-        if (y > pageHeight - margin) {
-          pdf.addPage();
-          y = margin;
-        }
-        pdf.text(line, margin, y);
-        y += fontSize * 0.5;
-      }
-      y += 3;
-    };
-
-    // Add header
-    addText('RESEARCH REPORT', 10, true, [100, 100, 100]);
-    y += 2;
-
-    // Add metadata
-    if (doc.ticker) {
-      pdf.setFillColor(59, 130, 246);
-      pdf.roundedRect(margin, y - 4, 30, 8, 2, 2, 'F');
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(doc.ticker, margin + 15, y + 1, { align: 'center' });
-      y += 10;
+    if (!pdfResponse.ok) {
+      throw new Error(`Failed to fetch PDF: ${pdfResponse.status} ${pdfResponse.statusText}`);
     }
 
-    // Source and date
-    pdf.setTextColor(100, 100, 100);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(9);
-    pdf.text(`${doc.source} • ${new Date(doc.received_date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })}`, margin, y);
-    y += 10;
+    // Get the PDF content
+    const pdfBuffer = await pdfResponse.arrayBuffer();
 
-    // Subject
-    addText(doc.subject, 16, true, [0, 0, 0]);
-    y += 5;
+    // Generate a clean filename
+    const filename = `${doc.ticker || 'report'}_${doc.subject.substring(0, 50).replace(/[^a-z0-9]/gi, '_')}.pdf`;
 
-    // Divider
-    pdf.setDrawColor(200, 200, 200);
-    pdf.line(margin, y, pageWidth - margin, y);
-    y += 8;
-
-    // Body text
-    if (doc.body_text) {
-      const bodyText = doc.body_text.trim();
-
-      // Check for report link in body
-      const linkMatch = bodyText.match(/Full Report:\s*(https?:\/\/[^\s]+)/);
-      let mainText = bodyText;
-      let reportLink = null;
-
-      if (linkMatch) {
-        reportLink = linkMatch[1];
-        mainText = bodyText.substring(0, linkMatch.index).trim();
-      }
-
-      // Add main body text
-      addText(mainText, 10, false, [40, 40, 40]);
-      y += 5;
-
-      // Add clickable link if available
-      if (reportLink) {
-        pdf.setDrawColor(200, 200, 200);
-        pdf.line(margin, y, pageWidth - margin, y);
-        y += 8;
-
-        pdf.setTextColor(59, 130, 246);
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(11);
-        pdf.text('View Full Report Online', margin, y);
-        y += 7;
-
-        pdf.setTextColor(30, 100, 200);
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(9);
-
-        // Wrap long URL
-        const urlLines = pdf.splitTextToSize(reportLink, maxWidth);
-        for (const line of urlLines) {
-          pdf.textWithLink(line, margin, y, { url: reportLink });
-          pdf.setDrawColor(30, 100, 200);
-          const textWidth = pdf.getTextWidth(line);
-          pdf.line(margin, y + 0.5, margin + textWidth, y + 0.5);
-          y += 5;
-        }
-      }
-    } else {
-      addText('(Email body content is not available)', 10, false, [150, 150, 150]);
-    }
-
-    // Footer
-    const footerY = pageHeight - 15;
-    pdf.setFontSize(8);
-    pdf.setTextColor(150, 150, 150);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text(`Generated from InEqRe Research Portal • ${new Date().toLocaleDateString()}`, pageWidth / 2, footerY, { align: 'center' });
-
-    // Return PDF as buffer
-    const pdfBuffer = Buffer.from(pdf.output('arraybuffer'));
-
-    return new NextResponse(pdfBuffer, {
+    // Return the PDF
+    return new NextResponse(Buffer.from(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${doc.ticker || 'report'}_${doc.subject.substring(0, 50).replace(/[^a-z0-9]/gi, '_')}.pdf"`,
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Cache-Control': 'private, max-age=3600',
       },
     });
   } catch (error: any) {
-    console.error('PDF generation error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('PDF download error:', error);
+    return NextResponse.json({
+      error: error.message || 'Failed to download PDF'
+    }, { status: 500 });
   }
 }
