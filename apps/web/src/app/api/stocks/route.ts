@@ -19,17 +19,11 @@ function errShape(e: unknown) {
 
 export async function GET() {
   try {
-    // Try to detect table, but with better error handling
-    let tableName: string;
-    try {
-      tableName = await getPriceTable();
-    } catch (detectError) {
-      console.error("Failed to detect price table, trying both:", detectError);
-      // If detection fails, try prices_daily first, then obx_equities
-      tableName = "prices_daily";
-    }
+    console.log('[STOCKS API] Starting query...');
+    console.log('[STOCKS API] DATABASE_URL set:', !!process.env.DATABASE_URL);
 
-    const buildQuery = (table: string) => `
+    // Just use prices_daily directly - we know that's the table name
+    const query = `
       SELECT
         s.ticker,
         s.name,
@@ -39,7 +33,7 @@ export async function GET() {
         MAX(p.date) as end_date,
         COUNT(*) as rows
       FROM stocks s
-      INNER JOIN ${table} p ON s.ticker = p.ticker
+      INNER JOIN prices_daily p ON s.ticker = p.ticker
       WHERE p.close IS NOT NULL
         AND p.close > 0
       GROUP BY s.ticker, s.name
@@ -47,24 +41,9 @@ export async function GET() {
       ORDER BY s.ticker
     `;
 
-    let result;
-    try {
-      result = await pool.query(buildQuery(tableName));
-    } catch (firstError) {
-      console.error(`Query failed with ${tableName}, trying alternative:`, firstError);
-      // Try the other table name
-      const altTable = tableName === "prices_daily" ? "obx_equities" : "prices_daily";
-      try {
-        result = await pool.query(buildQuery(altTable));
-        tableName = altTable;
-        console.log(`Successfully queried ${altTable}`);
-      } catch (secondError) {
-        console.error(`Both table queries failed:`, secondError);
-        throw firstError; // Throw the original error
-      }
-    }
-
-    console.log(`Successfully fetched ${result.rows.length} stocks from ${tableName}`);
+    console.log('[STOCKS API] Executing query...');
+    const result = await pool.query(query);
+    console.log(`[STOCKS API] Successfully fetched ${result.rows.length} stocks from prices_daily`);
 
     const stocks = result.rows.map((row) => ({
       ticker: row.ticker,

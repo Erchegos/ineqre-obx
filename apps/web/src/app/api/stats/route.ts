@@ -15,49 +15,19 @@ function errShape(e: unknown) {
 
 export async function GET() {
   try {
-    // Try to detect which price table exists
-    let tableName = "prices_daily";
-    try {
-      const tableCheck = await pool.query(`
-        SELECT EXISTS (
-          SELECT FROM information_schema.tables
-          WHERE table_schema = 'public'
-          AND table_name = 'prices_daily'
-        ) as has_prices_daily,
-        EXISTS (
-          SELECT FROM information_schema.tables
-          WHERE table_schema = 'public'
-          AND table_name = 'obx_equities'
-        ) as has_obx_equities
-      `);
-
-      if (tableCheck.rows[0].has_obx_equities && !tableCheck.rows[0].has_prices_daily) {
-        tableName = "obx_equities";
-      }
-    } catch (e) {
-      console.error("Failed to detect table, using prices_daily:", e);
-    }
-
-    const buildStatsQuery = (table: string) => `
+    // Just use prices_daily directly
+    const query = `
       SELECT
         COUNT(DISTINCT s.ticker) as securities,
         MAX(p.date) as last_updated,
         COUNT(*) as data_points
       FROM stocks s
-      INNER JOIN ${table} p ON s.ticker = p.ticker
+      INNER JOIN prices_daily p ON s.ticker = p.ticker
       WHERE p.close IS NOT NULL
         AND p.close > 0
     `;
 
-    let result;
-    try {
-      result = await pool.query(buildStatsQuery(tableName));
-    } catch (firstError) {
-      console.error(`Stats query failed with ${tableName}, trying alternative:`, firstError);
-      // Try the other table
-      const altTable = tableName === "prices_daily" ? "obx_equities" : "prices_daily";
-      result = await pool.query(buildStatsQuery(altTable));
-    }
+    const result = await pool.query(query);
 
     const stats = {
       securities: Number(result.rows[0].securities || 0),
