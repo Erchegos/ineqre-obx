@@ -134,6 +134,33 @@ export default function ReturnDistributionChart({
     });
   };
 
+  // Apply moving average smoothing to data
+  const applySmoothing = (data: any[], keys: string[], windowSize: number = 5) => {
+    if (data.length === 0) return data;
+
+    const smoothed = data.map((point, idx) => {
+      const newPoint: any = { return: point.return };
+
+      keys.forEach(key => {
+        let sum = 0;
+        let count = 0;
+
+        for (let i = Math.max(0, idx - windowSize); i <= Math.min(data.length - 1, idx + windowSize); i++) {
+          if (data[i][key] !== undefined) {
+            sum += data[i][key];
+            count++;
+          }
+        }
+
+        newPoint[key] = count > 0 ? sum / count : point[key];
+      });
+
+      return newPoint;
+    });
+
+    return smoothed;
+  };
+
   // Combine all density data into one chart data structure
   const chartData = useMemo(() => {
     if (!distributionData) return [];
@@ -147,7 +174,7 @@ export default function ReturnDistributionChart({
 
     const sortedPoints = Array.from(allPoints).sort((a, b) => a - b);
 
-    return sortedPoints.map((returnValue) => {
+    const rawData = sortedPoints.map((returnValue) => {
       const point: any = { return: returnValue };
 
       Object.entries(distributionData).forEach(([label, dist]: [string, any]) => {
@@ -161,7 +188,15 @@ export default function ReturnDistributionChart({
 
       return point;
     });
-  }, [distributionData, visibleTimeframes]);
+
+    // Apply smoothing if enabled
+    if (smoothed) {
+      const visibleKeys = Object.keys(distributionData).filter(label => visibleTimeframes.has(label));
+      return applySmoothing(rawData, visibleKeys, 8);
+    }
+
+    return rawData;
+  }, [distributionData, visibleTimeframes, smoothed]);
 
   const timeframeKeys = distributionData ? Object.keys(distributionData).filter(label => visibleTimeframes.has(label)) : [];
 
@@ -382,7 +417,7 @@ export default function ReturnDistributionChart({
             return (
               <Area
                 key={label}
-                type={smoothed ? "monotone" : "stepAfter"}
+                type={smoothed ? "basis" : "stepAfter"}
                 dataKey={label}
                 stroke={dist.color}
                 fill={dist.color}
