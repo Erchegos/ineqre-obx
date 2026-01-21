@@ -6,6 +6,12 @@ export const dynamic = "force-dynamic";
 
 async function getSystemStats() {
   try {
+    // Check if DATABASE_URL is configured
+    if (!process.env.DATABASE_URL) {
+      console.error("DATABASE_URL not configured");
+      return { securities: 0, last_updated: null, data_points: 0 };
+    }
+
     const tableName = await getPriceTable();
 
     // Count securities that meet the same criteria as stocks list page:
@@ -37,6 +43,7 @@ async function getSystemStats() {
     return result.rows[0];
   } catch (error) {
     console.error("Failed to load stats:", error);
+    // Return empty stats instead of throwing
     return { securities: 0, last_updated: null, data_points: 0 };
   }
 }
