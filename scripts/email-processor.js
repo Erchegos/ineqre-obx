@@ -410,7 +410,7 @@ async function main() {
     // Select inbox
     await imap.mailboxOpen('INBOX');
 
-    // Search for Pareto emails from 2026 (one-time backfill)
+    // Search for Pareto emails from 2026
     const searchCriteria = {
       since: new Date('2026-01-01'),
       before: new Date('2027-01-01'),
