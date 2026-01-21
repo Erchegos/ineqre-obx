@@ -10,18 +10,31 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
+  Line,
 } from "recharts";
 
 type ResidualSquaresChartProps = {
-  data: Array<{ date: string; residualSquare: number; residual: number }>;
+  data: Array<{
+    date: string;
+    stockReturn: number;
+    marketReturn: number;
+    residual: number;
+    residualSquare: number;
+  }>;
+  alpha?: number;
+  beta?: number;
+  rSquared?: number;
   height?: number;
 };
 
 export default function ResidualSquaresChart({
   data,
+  alpha = 0,
+  beta = 0,
+  rSquared = 0,
   height = 400,
 }: ResidualSquaresChartProps) {
-  const [period, setPeriod] = useState<string>("1Y");
+  const [period, setPeriod] = useState<string>("All");
 
   if (!data || data.length === 0) {
     return (
@@ -50,26 +63,41 @@ export default function ResidualSquaresChart({
       "All": data.length,
     };
 
-    const days = periodDays[period] || 252;
+    const days = periodDays[period] || data.length;
     const startIdx = Math.max(0, data.length - days);
 
-    return data.slice(startIdx).map((d, idx) => ({
-      x: startIdx + idx, // Use index for x-axis
-      y: d.residualSquare * 10000, // Convert to basis points squared
+    // Now x = market return, y = stock return (CAPM regression plot)
+    return data.slice(startIdx).map((d) => ({
+      x: d.marketReturn * 100, // Market return as percentage for x-axis
+      y: d.stockReturn * 100, // Stock return as percentage for y-axis
       date: d.date,
       residual: d.residual,
+      residualSquare: d.residualSquare,
     }));
   }, [data, period]);
 
-  // Calculate mean residual square and RSS
-  const { meanResidualSquare, rss } = useMemo(() => {
-    if (filteredData.length === 0) return { meanResidualSquare: 0, rss: 0 };
-    const totalRSS = filteredData.reduce((sum, d) => sum + d.y, 0);
+  // Calculate RSS and regression line using beta and alpha
+  const { rss, regressionLine } = useMemo(() => {
+    if (filteredData.length === 0) return { rss: 0, regressionLine: [] };
+
+    const totalRSS = filteredData.reduce((sum, d) => sum + d.residualSquare * 10000, 0);
+
+    // Generate regression line: y = alpha + beta * x (already in percentage)
+    const minX = Math.min(...filteredData.map(d => d.x));
+    const maxX = Math.max(...filteredData.map(d => d.x));
+
+    // Convert alpha and beta from decimal to percentage for display
+    const alphaPercent = alpha * 100;
+    const regressionLineData = [
+      { x: minX, y: alphaPercent + beta * minX },
+      { x: maxX, y: alphaPercent + beta * maxX },
+    ];
+
     return {
-      meanResidualSquare: totalRSS / filteredData.length,
       rss: totalRSS,
+      regressionLine: regressionLineData,
     };
-  }, [filteredData]);
+  }, [filteredData, alpha, beta]);
 
   return (
     <div style={{ width: "100%" }}>
@@ -118,55 +146,57 @@ export default function ResidualSquaresChart({
           }}
         >
           <div>
-            <span style={{ color: "var(--muted-foreground)" }}>RSS:</span>{" "}
+            <span style={{ color: "var(--muted-foreground)" }}>β:</span>{" "}
             <strong style={{ color: "var(--foreground)" }}>
-              {rss.toFixed(2)}
+              {beta.toFixed(3)}
             </strong>
           </div>
           <div>
-            <span style={{ color: "var(--muted-foreground)" }}>Mean ε²:</span>{" "}
-            {meanResidualSquare.toFixed(4)} bps²
+            <span style={{ color: "var(--muted-foreground)" }}>α:</span>{" "}
+            {(alpha * 100).toFixed(4)}%
+          </div>
+          <div>
+            <span style={{ color: "var(--muted-foreground)" }}>R²:</span>{" "}
+            {rSquared.toFixed(3)}
           </div>
         </div>
       </div>
 
       {/* Chart */}
-      <div style={{ position: "relative", width: "100%", height }}>
+      <div style={{ position: "relative", width: "100%", height, background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: 8 }}>
         <ResponsiveContainer width="100%" height={height}>
-          <ScatterChart margin={{ top: 10, right: 20, left: 10, bottom: 20 }}>
+          <ScatterChart margin={{ top: 20, right: 30, left: 20, bottom: 30 }}>
             <CartesianGrid
               strokeDasharray="3 3"
               stroke="var(--border-subtle)"
-              opacity={0.3}
+              opacity={0.2}
             />
 
             <XAxis
               dataKey="x"
               type="number"
               stroke="var(--muted)"
-              fontSize={11}
-              tickFormatter={(val) => {
-                const idx = Math.floor(val);
-                if (idx >= 0 && idx < data.length) {
-                  const date = data[idx].date;
-                  return date.length > 7 ? date.slice(5) : date;
-                }
-                return "";
+              fontSize={12}
+              tickFormatter={(val) => `${val.toFixed(1)}%`}
+              domain={["auto", "auto"]}
+              label={{
+                value: "Market Daily Return (OBX)",
+                position: "insideBottom",
+                offset: -10,
+                style: { fontSize: 12, fill: "var(--foreground)", fontWeight: 500 },
               }}
-              domain={["dataMin", "dataMax"]}
-              minTickGap={50}
             />
 
             <YAxis
               dataKey="y"
               stroke="var(--muted)"
-              fontSize={11}
-              tickFormatter={(val) => val.toFixed(1)}
+              fontSize={12}
+              tickFormatter={(val) => `${val.toFixed(1)}%`}
               label={{
-                value: "Residual² (bps²)",
+                value: "Portfolio Daily Return",
                 angle: -90,
                 position: "insideLeft",
-                style: { fontSize: 11, fill: "var(--muted)" },
+                style: { fontSize: 12, fill: "var(--foreground)", fontWeight: 500 },
               }}
             />
 
@@ -216,11 +246,26 @@ export default function ResidualSquaresChart({
                         marginBottom: "2px",
                       }}
                     >
-                      <span>Residual²:</span>
+                      <span>Market Return:</span>
                       <span
                         style={{ fontWeight: 600, fontFamily: "monospace" }}
                       >
-                        {point.y.toFixed(4)} bps²
+                        {point.x.toFixed(3)}%
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: "12px",
+                        marginBottom: "2px",
+                      }}
+                    >
+                      <span>Stock Return:</span>
+                      <span
+                        style={{ fontWeight: 600, fontFamily: "monospace" }}
+                      >
+                        {point.y.toFixed(3)}%
                       </span>
                     </div>
                     <div
@@ -230,7 +275,7 @@ export default function ResidualSquaresChart({
                         gap: "12px",
                       }}
                     >
-                      <span>Residual:</span>
+                      <span>Residual (ε):</span>
                       <span
                         style={{
                           fontWeight: 600,
@@ -247,29 +292,22 @@ export default function ResidualSquaresChart({
               }}
             />
 
-            {/* Mean line */}
-            <ReferenceLine
-              y={meanResidualSquare}
-              stroke="var(--foreground)"
-              strokeDasharray="5 5"
-              strokeWidth={1.5}
-              opacity={0.4}
-              label={{
-                value: "Mean",
-                position: "insideTopRight",
-                style: {
-                  fontSize: 10,
-                  fill: "var(--muted-foreground)",
-                  fontWeight: 600,
-                },
-              }}
+            {/* Regression line */}
+            <Line
+              data={regressionLine}
+              type="monotone"
+              dataKey="y"
+              stroke="#f59e0b"
+              strokeWidth={2.5}
+              dot={false}
+              isAnimationActive={false}
             />
 
             {/* Scatter dots */}
             <Scatter
               data={filteredData}
               fill="#3b82f6"
-              fillOpacity={0.6}
+              fillOpacity={0.5}
               strokeWidth={0}
             />
           </ScatterChart>
@@ -290,24 +328,19 @@ export default function ResidualSquaresChart({
       >
         <div style={{ display: "grid", gap: 4 }}>
           <div>
-            <strong>RSS (Residual Sum of Squares)</strong> = Total unexplained
-            variance. Measures independence from OBX market movements.
+            <strong>CAPM Regression:</strong> R<sub>stock</sub> = α + β × R<sub>market</sub> + ε
           </div>
           <div>
-            <strong>Lower RSS</strong> = Better model fit, stock moves closely
-            with market (high R²)
+            <strong>Beta (β):</strong> Market sensitivity. β = 1 means stock moves with market, β &gt; 1 means more volatile
           </div>
           <div>
-            <strong>Higher RSS</strong> = Poorer model fit, stock has
-            idiosyncratic drivers (low R²)
+            <strong>Alpha (α):</strong> Excess return above market. Positive α indicates outperformance
           </div>
           <div>
-            <strong>RSS = 0</strong> = Perfect fit, stock perfectly explained by
-            market beta
+            <strong>R²:</strong> How much variance is explained by market. High R² = stock follows market closely
           </div>
           <div>
-            <strong>Each dot</strong> = Daily residual² contributing to total
-            RSS
+            <strong>Orange line:</strong> Regression fit. Points far from line = high idiosyncratic risk
           </div>
         </div>
       </div>

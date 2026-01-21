@@ -111,7 +111,18 @@ export default function StockTickerPage() {
   const [returnsEndDate, setReturnsEndDate] = useState<string>("");
 
   // Residuals data
-  const [residualsData, setResidualsData] = useState<Array<{ date: string; residualSquare: number; residual: number }> | null>(null);
+  const [residualsData, setResidualsData] = useState<Array<{
+    date: string;
+    stockReturn: number;
+    marketReturn: number;
+    residual: number;
+    residualSquare: number;
+  }> | null>(null);
+  const [residualsRegression, setResidualsRegression] = useState<{
+    alpha: number;
+    beta: number;
+    rSquared: number;
+  } | null>(null);
   const [residualsLoading, setResidualsLoading] = useState<boolean>(false);
   const [residualsError, setResidualsError] = useState<string | null>(null);
 
@@ -219,7 +230,8 @@ export default function StockTickerPage() {
         const json = await res.json();
 
         if (!cancelled) {
-          setResidualsData(json.data || []);
+          setResidualsData(json.returnsData || json.data || []);
+          setResidualsRegression(json.regression || { alpha: 0, beta: 0, rSquared: 0 });
           setResidualsLoading(false);
         }
       } catch (e: any) {
@@ -544,7 +556,13 @@ export default function StockTickerPage() {
               </div>
             )}
             {!residualsLoading && !residualsError && residualsData && residualsData.length > 0 && (
-              <ResidualSquaresChart data={residualsData} height={320} />
+              <ResidualSquaresChart
+                data={residualsData}
+                alpha={residualsRegression?.alpha || 0}
+                beta={residualsRegression?.beta || 0}
+                rSquared={residualsRegression?.rSquared || 0}
+                height={320}
+              />
             )}
             {!residualsLoading && !residualsError && (!residualsData || residualsData.length === 0) && (
               <div style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>

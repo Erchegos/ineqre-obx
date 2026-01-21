@@ -4,6 +4,7 @@ import { getPriceTable } from "@/lib/price-data-adapter";
 import {
   computeReturns,
   computeResidualSquares,
+  computeOLSRegression,
 } from "@/lib/metrics";
 
 export const dynamic = "force-dynamic";
@@ -140,6 +141,9 @@ export async function GET(
     // Align dates (returns start from index 1)
     const returnDates = alignedDates.slice(1);
 
+    // Compute OLS regression to get alpha, beta, R²
+    const regression = computeOLSRegression(stockReturns, marketReturns);
+
     // Compute residual squares
     const residualSquares = computeResidualSquares(
       stockReturns,
@@ -152,6 +156,15 @@ export async function GET(
       residualSquares.reduce((sum, r) => sum + r.residualSquare, 0) /
       residualSquares.length;
 
+    // Prepare returns data for scatter plot (stock return vs market return)
+    const returnsData = stockReturns.map((stockReturn, i) => ({
+      date: returnDates[i] || "",
+      stockReturn: stockReturn,
+      marketReturn: marketReturns[i] || 0,
+      residual: regression.residuals[i] || 0,
+      residualSquare: residualSquares[i]?.residualSquare || 0,
+    }));
+
     return NextResponse.json({
       ticker: ticker.toUpperCase(),
       count: residualSquares.length,
@@ -161,7 +174,13 @@ export async function GET(
         start: returnDates[0] || "",
         end: returnDates[returnDates.length - 1] || "",
       },
-      data: residualSquares,
+      regression: {
+        alpha: regression.alpha,
+        beta: regression.beta,
+        rSquared: regression.rSquared,
+      },
+      data: residualSquares, // Keep for backwards compatibility
+      returnsData: returnsData, // New: actual returns for scatter plot
     });
   } catch (error: any) {
     console.error("[Residuals API] Error:", error);
