@@ -35,6 +35,7 @@ export default function ResidualSquaresChart({
   height = 400,
 }: ResidualSquaresChartProps) {
   const [period, setPeriod] = useState<string>("All");
+  const [showGuide, setShowGuide] = useState<boolean>(false);
 
   if (!data || data.length === 0) {
     return (
@@ -314,35 +315,69 @@ export default function ResidualSquaresChart({
         </ResponsiveContainer>
       </div>
 
-      {/* Interpretation Guide */}
+      {/* Interpretation Guide - Collapsible */}
       <div
         style={{
           marginTop: 16,
-          padding: 12,
-          background: "rgba(59, 130, 246, 0.05)",
           border: "1px solid rgba(59, 130, 246, 0.2)",
           borderRadius: 6,
-          fontSize: 13,
-          color: "var(--muted-foreground)",
+          overflow: "hidden",
         }}
       >
-        <div style={{ display: "grid", gap: 4 }}>
-          <div>
-            <strong>CAPM Regression:</strong> R<sub>stock</sub> = α + β × R<sub>market</sub> + ε
+        <button
+          onClick={() => setShowGuide(!showGuide)}
+          style={{
+            width: "100%",
+            padding: "10px 12px",
+            background: "rgba(59, 130, 246, 0.05)",
+            border: "none",
+            cursor: "pointer",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            fontSize: 13,
+            fontWeight: 600,
+            color: "var(--foreground)",
+            transition: "background 0.15s",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(59, 130, 246, 0.1)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "rgba(59, 130, 246, 0.05)";
+          }}
+        >
+          <span>How to Read This Chart</span>
+          <span style={{ fontSize: 16 }}>{showGuide ? "▼" : "▶"}</span>
+        </button>
+        {showGuide && (
+          <div
+            style={{
+              padding: 12,
+              background: "rgba(59, 130, 246, 0.05)",
+              fontSize: 13,
+              color: "var(--muted-foreground)",
+            }}
+          >
+            <div style={{ display: "grid", gap: 4 }}>
+              <div>
+                <strong>CAPM Regression:</strong> R<sub>stock</sub> = α + β × R<sub>market</sub> + ε
+              </div>
+              <div>
+                <strong>Beta (β):</strong> Market sensitivity. β = 1 means stock moves with market, β &gt; 1 means more volatile
+              </div>
+              <div>
+                <strong>Alpha (α):</strong> Excess return above market. Positive α indicates outperformance
+              </div>
+              <div>
+                <strong>R²:</strong> How much variance is explained by market. High R² = stock follows market closely
+              </div>
+              <div>
+                <strong>Orange line:</strong> Regression fit. Points far from line = high idiosyncratic risk
+              </div>
+            </div>
           </div>
-          <div>
-            <strong>Beta (β):</strong> Market sensitivity. β = 1 means stock moves with market, β &gt; 1 means more volatile
-          </div>
-          <div>
-            <strong>Alpha (α):</strong> Excess return above market. Positive α indicates outperformance
-          </div>
-          <div>
-            <strong>R²:</strong> How much variance is explained by market. High R² = stock follows market closely
-          </div>
-          <div>
-            <strong>Orange line:</strong> Regression fit. Points far from line = high idiosyncratic risk
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

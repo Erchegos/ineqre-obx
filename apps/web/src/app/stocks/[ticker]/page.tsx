@@ -572,10 +572,15 @@ export default function StockTickerPage() {
           </div>
 
           <div style={{ padding: 20, borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)" }}>
-            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 20, color: "var(--foreground)" }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "var(--foreground)" }}>
               Daily Returns Analysis
             </h2>
-            
+            <p style={{ fontSize: 12, color: "var(--muted-foreground)", marginBottom: 16, lineHeight: 1.5 }}>
+              <strong>Daily return time series with statistical measures.</strong> Each row shows the log return for that day,
+              with cumulative return calculated from the oldest date in the selected range. Use timeframe controls to analyze
+              different periods. Win rate, skewness, and kurtosis reveal return distribution characteristics.
+            </p>
+
             {/* Date Controls */}
             <div style={{ marginBottom: 24, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -621,7 +626,7 @@ export default function StockTickerPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredReturns.slice(-50).reverse().map((r, idx, arr) => {
+                  {filteredReturns.slice().reverse().map((r, idx, arr) => {
                       const cumulativeReturn = arr.slice(idx).reduce((cum, ret) => cum * (1 + ret.return), 1) - 1;
                       const priceData = priceMap[r.date] || { close: 0, adj_close: 0 };
                       return (
@@ -638,7 +643,7 @@ export default function StockTickerPage() {
               </table>
             </div>
             <div style={{ marginTop: 12, fontSize: 11, color: "var(--muted-foreground)", textAlign: "right" }}>
-              Showing last 50 days of {filteredReturns.length} total
+              Showing all {filteredReturns.length} days
             </div>
           </div>
         </>
