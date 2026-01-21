@@ -106,14 +106,21 @@ export default function ResearchPortalPage() {
 
   const handleDownloadPDF = async (documentId: string, subject: string) => {
     const token = sessionStorage.getItem('research_token');
-    if (!token) return;
+    if (!token) {
+      alert('Not authenticated. Please refresh and log in again.');
+      return;
+    }
 
     try {
       const res = await fetch(`/api/research/documents/${documentId}/pdf`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
-      if (!res.ok) throw new Error('PDF generation failed');
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('PDF generation error:', errorData);
+        throw new Error(errorData.error || `HTTP ${res.status}: ${res.statusText}`);
+      }
 
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
@@ -125,6 +132,7 @@ export default function ResearchPortalPage() {
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (err: any) {
+      console.error('PDF download error:', err);
       alert(`Failed to generate PDF: ${err.message}`);
     }
   };
