@@ -349,7 +349,24 @@ export default function ReturnDistributionChart({
             iconType="circle"
           />
 
-          {/* 0σ line at mean */}
+          {/* Render areas in reverse order so shortest timeframe is on top */}
+          {[...timeframeKeys].reverse().map((label) => {
+            const dist = distributionData[label];
+            return (
+              <Area
+                key={label}
+                type="monotone"
+                dataKey={label}
+                stroke={dist.color}
+                fill={dist.color}
+                fillOpacity={0.3}
+                strokeWidth={1.5}
+                isAnimationActive={false}
+              />
+            );
+          })}
+
+          {/* 0σ line at mean - rendered after areas to appear on top */}
           <ReferenceLine
             x={avgMean}
             stroke="var(--foreground)"
@@ -364,7 +381,7 @@ export default function ReturnDistributionChart({
             }}
           />
 
-          {/* Sigma lines */}
+          {/* Sigma lines - rendered after areas to appear on top */}
           {sigmaLevels.map(({ sigma }) => (
             <>
               {/* Negative sigma */}
@@ -397,23 +414,6 @@ export default function ReturnDistributionChart({
               />
             </>
           ))}
-
-          {/* Render areas in reverse order so shortest timeframe is on top */}
-          {[...timeframeKeys].reverse().map((label) => {
-            const dist = distributionData[label];
-            return (
-              <Area
-                key={label}
-                type="monotone"
-                dataKey={label}
-                stroke={dist.color}
-                fill={dist.color}
-                fillOpacity={0.3}
-                strokeWidth={1.5}
-                isAnimationActive={false}
-              />
-            );
-          })}
           </AreaChart>
         </ResponsiveContainer>
       </div>
