@@ -7,6 +7,7 @@ type ResearchDocument = {
   ticker: string | null;
   source: string;
   subject: string;
+  body_text: string;
   received_date: string;
   attachment_count: number;
   attachments: {
@@ -25,6 +26,25 @@ export default function ResearchPortalPage() {
   const [documents, setDocuments] = useState<ResearchDocument[]>([]);
   const [selectedSource, setSelectedSource] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [expandedDocs, setExpandedDocs] = useState<Set<string>>(new Set());
+
+  const toggleExpanded = (docId: string) => {
+    setExpandedDocs(prev => {
+      const next = new Set(prev);
+      if (next.has(docId)) {
+        next.delete(docId);
+      } else {
+        next.add(docId);
+      }
+      return next;
+    });
+  };
+
+  // Extract link from body text
+  const extractLink = (text: string): string | null => {
+    const urlMatch = text.match(/https?:\/\/[^\s\)]+/);
+    return urlMatch ? urlMatch[0] : null;
+  };
 
   // Check if already authenticated
   useEffect(() => {
@@ -358,38 +378,97 @@ export default function ResearchPortalPage() {
                     })}
                   </p>
                 </div>
+
+                {/* Expand button */}
+                <button
+                  onClick={() => toggleExpanded(doc.id)}
+                  style={{
+                    padding: '6px 12px',
+                    background: 'transparent',
+                    border: '1px solid var(--border)',
+                    borderRadius: 6,
+                    color: 'var(--foreground)',
+                    fontSize: 13,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {expandedDocs.has(doc.id) ? '▼ Collapse' : '▶ Show Email'}
+                </button>
               </div>
 
-              {/* Attachments */}
-              {doc.attachments && doc.attachments.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
-                  {doc.attachments.map(att => (
-                    <button
-                      key={att.id}
-                      onClick={() => handleDownload(doc.id, att.id, att.filename)}
-                      style={{
-                        padding: '6px 12px',
-                        background: 'var(--primary)',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: 6,
-                        fontSize: 13,
-                        fontWeight: 500,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 6,
-                      }}
-                    >
-                      <span>📄</span>
-                      <span>{att.filename}</span>
-                      <span style={{ opacity: 0.7, fontSize: 11 }}>
-                        ({(att.file_size / 1024 / 1024).toFixed(1)} MB)
-                      </span>
-                    </button>
-                  ))}
+              {/* Expanded email body */}
+              {expandedDocs.has(doc.id) && doc.body_text && (
+                <div style={{
+                  marginTop: 12,
+                  padding: 16,
+                  background: 'var(--code-bg)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 6,
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                  color: 'var(--muted-foreground)',
+                  whiteSpace: 'pre-wrap',
+                  maxHeight: 400,
+                  overflowY: 'auto',
+                }}>
+                  {doc.body_text}
                 </div>
               )}
+
+              {/* Action buttons */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+                {/* Report link */}
+                {doc.body_text && extractLink(doc.body_text) && (
+                  <a
+                    href={extractLink(doc.body_text)!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      padding: '6px 12px',
+                      background: 'var(--accent)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 6,
+                      fontSize: 13,
+                      fontWeight: 500,
+                      textDecoration: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <span>🔗</span>
+                    <span>View Full Report</span>
+                  </a>
+                )}
+
+                {/* Attachments */}
+                {doc.attachments && doc.attachments.length > 0 && doc.attachments.map(att => (
+                  <button
+                    key={att.id}
+                    onClick={() => handleDownload(doc.id, att.id, att.filename)}
+                    style={{
+                      padding: '6px 12px',
+                      background: 'var(--primary)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 6,
+                      fontSize: 13,
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <span>📄</span>
+                    <span>{att.filename}</span>
+                    <span style={{ opacity: 0.7, fontSize: 11 }}>
+                      ({(att.file_size / 1024 / 1024).toFixed(1)} MB)
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           ))}
         </div>
