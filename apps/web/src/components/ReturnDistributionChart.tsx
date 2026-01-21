@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, Fragment } from "react";
 import {
   AreaChart,
   Area,
@@ -340,8 +340,34 @@ export default function ReturnDistributionChart({
             labelFormatter={(val) => `Return: ${(Number(val) * 100).toFixed(2)}%`}
             formatter={(value: any, name: any) => [
               Number(value).toFixed(4),
-              name,
+              `${name} (probability density)`,
             ]}
+            content={({ active, payload, label }) => {
+              if (!active || !payload || payload.length === 0) return null;
+              return (
+                <div
+                  style={{
+                    backgroundColor: "var(--card-bg)",
+                    border: "1px solid var(--card-border)",
+                    borderRadius: "4px",
+                    padding: "8px 10px",
+                    fontSize: "11px",
+                  }}
+                >
+                  <div style={{ marginBottom: 6, fontWeight: 600, color: "var(--foreground)" }}>
+                    Return: {(Number(label) * 100).toFixed(2)}%
+                  </div>
+                  {payload.map((entry: any, index: number) => (
+                    <div key={index} style={{ color: entry.color, marginBottom: 2 }}>
+                      <strong>{entry.name}:</strong> {Number(entry.value).toFixed(4)}
+                    </div>
+                  ))}
+                  <div style={{ marginTop: 6, fontSize: 10, color: "var(--muted-foreground)", fontStyle: "italic" }}>
+                    Higher value = more likely this return occurs over that holding period
+                  </div>
+                </div>
+              );
+            }}
           />
 
           <Legend
@@ -383,10 +409,9 @@ export default function ReturnDistributionChart({
 
           {/* Sigma lines - rendered after areas to appear on top */}
           {sigmaLevels.map(({ sigma }) => (
-            <>
+            <Fragment key={`sigma-${sigma}`}>
               {/* Negative sigma */}
               <ReferenceLine
-                key={`neg-${sigma}`}
                 x={avgMean - sigma * avgSigma}
                 stroke="#ef4444"
                 strokeWidth={1}
@@ -400,7 +425,6 @@ export default function ReturnDistributionChart({
               />
               {/* Positive sigma */}
               <ReferenceLine
-                key={`pos-${sigma}`}
                 x={avgMean + sigma * avgSigma}
                 stroke="#22c55e"
                 strokeWidth={1}
@@ -412,7 +436,7 @@ export default function ReturnDistributionChart({
                   fontSize: 9,
                 }}
               />
-            </>
+            </Fragment>
           ))}
           </AreaChart>
         </ResponsiveContainer>
