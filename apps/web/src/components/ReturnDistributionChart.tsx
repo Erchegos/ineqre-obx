@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useRef, useEffect } from "react";
+import { useMemo, useState } from "react";
 import {
   AreaChart,
   Area,
@@ -118,15 +118,8 @@ export default function ReturnDistributionChart({
     new Set(["4 days", "7 days", "14 days", "21 days", "28 days", "42 days"])
   );
 
-  // Ref to get the chart container dimensions
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
-
-  useEffect(() => {
-    if (containerRef.current) {
-      setContainerWidth(containerRef.current.offsetWidth);
-    }
-  }, []);
+  // State to track guide visibility
+  const [showGuide, setShowGuide] = useState<boolean>(false);
 
   const toggleTimeframe = (label: string) => {
     setVisibleTimeframes((prev) => {
@@ -307,7 +300,7 @@ export default function ReturnDistributionChart({
       </div>
 
       {/* Chart */}
-      <div ref={containerRef} style={{ position: "relative", width: "100%", height }}>
+      <div style={{ position: "relative", width: "100%", height }}>
         <ResponsiveContainer width="100%" height={height}>
           <AreaChart
             data={chartData}
@@ -356,6 +349,59 @@ export default function ReturnDistributionChart({
             iconType="circle"
           />
 
+          {/* 0σ line at mean */}
+          <ReferenceLine
+            x={avgMean}
+            stroke="var(--foreground)"
+            strokeWidth={2}
+            strokeDasharray="5 5"
+            opacity={0.6}
+            label={{
+              value: "0σ",
+              position: "top",
+              fill: "var(--foreground)",
+              fontSize: 10,
+              fontWeight: 600,
+              opacity: 0.8,
+            }}
+          />
+
+          {/* Sigma lines */}
+          {sigmaLevels.map(({ sigma, opacity }) => (
+            <g key={sigma}>
+              {/* Negative sigma */}
+              <ReferenceLine
+                x={avgMean - sigma * avgSigma}
+                stroke="#ef4444"
+                strokeWidth={1}
+                strokeDasharray="3 6"
+                opacity={opacity * 2}
+                label={{
+                  value: `-${sigma}σ`,
+                  position: "top",
+                  fill: "#ef4444",
+                  fontSize: 9,
+                  opacity: 0.6,
+                }}
+              />
+              {/* Positive sigma */}
+              <ReferenceLine
+                x={avgMean + sigma * avgSigma}
+                stroke="#22c55e"
+                strokeWidth={1}
+                strokeDasharray="3 6"
+                opacity={opacity * 2}
+                label={{
+                  value: `+${sigma}σ`,
+                  position: "top",
+                  fill: "#22c55e",
+                  fontSize: 9,
+                  opacity: 0.6,
+                }}
+              />
+            </g>
+          ))}
+
           {/* Render areas in reverse order so shortest timeframe is on top */}
           {[...timeframeKeys].reverse().map((label) => {
             const dist = distributionData[label];
@@ -374,152 +420,72 @@ export default function ReturnDistributionChart({
           })}
           </AreaChart>
         </ResponsiveContainer>
-
-        {/* SVG Overlay for sigma lines */}
-        <svg
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            pointerEvents: "none",
-          }}
-        >
-          {(() => {
-            if (containerWidth === 0) return null;
-
-            // Calculate x position as percentage of data range
-            const minReturn = Math.min(...chartData.map(d => d.return));
-            const maxReturn = Math.max(...chartData.map(d => d.return));
-            const range = maxReturn - minReturn;
-
-            // Calculate mean position in the data range (where most data is concentrated)
-            // 0σ should be at the mean (peak of distribution), not at 0% return
-            const meanPosition = (avgMean - minReturn) / range;
-
-            // Recharts margins from AreaChart component
-            // The Y-axis takes up space on the left side
-            const yAxisWidth = 60; // Approximate width of Y-axis
-            const marginRight = 10; // From margin prop
-
-            // Calculate the actual plotting area width
-            const plottingAreaWidth = containerWidth - yAxisWidth - marginRight;
-
-            // Calculate mean position in pixels, then convert to percentage of container
-            const meanXPixels = yAxisWidth + (meanPosition * plottingAreaWidth);
-            const meanXPercent = (meanXPixels / containerWidth) * 100;
-
-            return (
-              <>
-                {/* 0σ line at mean (where most data is concentrated) */}
-                <g key="zero">
-                  <line
-                    x1={`${meanXPercent}%`}
-                    y1="10"
-                    x2={`${meanXPercent}%`}
-                    y2={`calc(100% - 40px)`}
-                    stroke="var(--foreground)"
-                    strokeWidth="2"
-                    strokeDasharray="5 5"
-                    opacity="0.6"
-                  />
-                  <text x={`${meanXPercent}%`} y="20" fill="var(--foreground)" fontSize="10" opacity="0.8" textAnchor="middle" fontWeight="600">
-                    0σ
-                  </text>
-                </g>
-
-                {/* Sigma lines - relative to mean */}
-                {sigmaLevels.map(({ sigma, opacity, probability }) => {
-                  const negPosition = (avgMean - sigma * avgSigma - minReturn) / range;
-                  const posPosition = (avgMean + sigma * avgSigma - minReturn) / range;
-
-                  const negXPixels = yAxisWidth + (negPosition * plottingAreaWidth);
-                  const posXPixels = yAxisWidth + (posPosition * plottingAreaWidth);
-
-                  const negXPercent = (negXPixels / containerWidth) * 100;
-                  const posXPercent = (posXPixels / containerWidth) * 100;
-
-                  return (
-                    <g key={sigma}>
-                      {/* Negative sigma line */}
-                      <line
-                        x1={`${negXPercent}%`}
-                        y1="10"
-                        x2={`${negXPercent}%`}
-                        y2={`calc(100% - 40px)`}
-                        stroke="#ef4444"
-                        strokeWidth="1"
-                        strokeDasharray="3 6"
-                        opacity={opacity * 2}
-                      />
-                      {/* Positive sigma line */}
-                      <line
-                        x1={`${posXPercent}%`}
-                        y1="10"
-                        x2={`${posXPercent}%`}
-                        y2={`calc(100% - 40px)`}
-                        stroke="#22c55e"
-                        strokeWidth="1"
-                        strokeDasharray="3 6"
-                        opacity={opacity * 2}
-                      />
-                      {/* Sigma Labels */}
-                      <text x={`${negXPercent}%`} y="20" fill="#ef4444" fontSize="9" opacity="0.6" textAnchor="middle">
-                        -{sigma}σ
-                      </text>
-                      <text x={`${posXPercent}%`} y="20" fill="#22c55e" fontSize="9" opacity="0.6" textAnchor="middle">
-                        +{sigma}σ
-                      </text>
-                      {/* Probability Labels */}
-                      <text x={`${negXPercent}%`} y="32" fill="#ef4444" fontSize="8" opacity="0.5" textAnchor="middle">
-                        {probability}%
-                      </text>
-                      <text x={`${posXPercent}%`} y="32" fill="#22c55e" fontSize="8" opacity="0.5" textAnchor="middle">
-                        {probability}%
-                      </text>
-                    </g>
-                  );
-                })}
-              </>
-            );
-          })()}
-        </svg>
       </div>
 
-      {/* Interpretation Guide */}
+      {/* Interpretation Guide - Collapsible */}
       <div
         style={{
           marginTop: 16,
-          padding: 12,
-          background: "rgba(59, 130, 246, 0.05)",
           border: "1px solid rgba(59, 130, 246, 0.2)",
           borderRadius: 6,
-          fontSize: 11,
-          color: "var(--muted-foreground)",
-          lineHeight: 1.5,
+          overflow: "hidden",
         }}
       >
-        <div style={{ fontWeight: 600, marginBottom: 6, color: "var(--foreground)" }}>
-          How to Read This Chart
-        </div>
-        <div style={{ display: "grid", gap: 4 }}>
-          <div>
-            <strong>Click boxes above</strong> to show/hide timeframes
+        <button
+          onClick={() => setShowGuide(!showGuide)}
+          style={{
+            width: "100%",
+            padding: "10px 12px",
+            background: "rgba(59, 130, 246, 0.05)",
+            border: "none",
+            cursor: "pointer",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            fontSize: 13,
+            fontWeight: 600,
+            color: "var(--foreground)",
+            transition: "background 0.15s",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(59, 130, 246, 0.08)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "rgba(59, 130, 246, 0.05)";
+          }}
+        >
+          <span>How to Read This Chart</span>
+          <span style={{ fontSize: 16 }}>{showGuide ? "▼" : "▶"}</span>
+        </button>
+        {showGuide && (
+          <div
+            style={{
+              padding: 12,
+              background: "rgba(59, 130, 246, 0.05)",
+              fontSize: 11,
+              color: "var(--muted-foreground)",
+              lineHeight: 1.5,
+            }}
+          >
+            <div style={{ display: "grid", gap: 4 }}>
+              <div>
+                <strong>Click boxes above</strong> to show/hide timeframes
+              </div>
+              <div>
+                <strong>Wider curves</strong> = Higher uncertainty (longer timeframes)
+              </div>
+              <div>
+                <strong>σ lines</strong> = Standard deviation bands (±1σ, ±2σ, ±3σ, ±4σ)
+              </div>
+              <div>
+                <strong>Negative skew</strong> = Fat tail on left (big losses more likely)
+              </div>
+              <div>
+                <strong>High kurtosis</strong> = Fat tails (extreme events more common)
+              </div>
+            </div>
           </div>
-          <div>
-            <strong>Wider curves</strong> = Higher uncertainty (longer timeframes)
-          </div>
-          <div>
-            <strong>σ lines</strong> = Standard deviation bands (±1σ, ±2σ, ±3σ, ±4σ)
-          </div>
-          <div>
-            <strong>Negative skew</strong> = Fat tail on left (big losses more likely)
-          </div>
-          <div>
-            <strong>High kurtosis</strong> = Fat tails (extreme events more common)
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
