@@ -298,7 +298,7 @@ export default function ResidualSquaresChart({
               data={regressionLine}
               type="monotone"
               dataKey="y"
-              stroke="#f59e0b"
+              stroke="#d97706"
               strokeWidth={2.5}
               dot={false}
               isAnimationActive={false}

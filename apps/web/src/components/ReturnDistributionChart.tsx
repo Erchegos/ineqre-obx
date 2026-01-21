@@ -11,7 +11,6 @@ import {
   ResponsiveContainer,
   ReferenceLine,
   Legend,
-  Line,
 } from "recharts";
 
 type ReturnDistributionChartProps = {
@@ -393,49 +392,58 @@ export default function ReturnDistributionChart({
           })}
 
           {/* 0σ line at mean - rendered after areas to appear on top */}
-          <ReferenceLine
-            x={avgMean}
-            stroke="var(--foreground)"
-            strokeWidth={2}
-            strokeDasharray="5 5"
-            label={{
-              value: "0σ",
-              position: "top",
-              fill: "var(--foreground)",
-              fontSize: 10,
-              fontWeight: 600,
-            }}
-          />
+          {avgMean !== 0 && (
+            <ReferenceLine
+              x={avgMean}
+              stroke="var(--foreground)"
+              strokeWidth={2}
+              strokeDasharray="5 5"
+              ifOverflow="extendDomain"
+              label={{
+                value: "0σ",
+                position: "top",
+                fill: "var(--foreground)",
+                fontSize: 10,
+                fontWeight: 600,
+              }}
+            />
+          )}
 
           {/* Sigma lines - rendered after areas to appear on top */}
           {sigmaLevels.map(({ sigma }) => (
             <Fragment key={`sigma-${sigma}`}>
               {/* Negative sigma */}
-              <ReferenceLine
-                x={avgMean - sigma * avgSigma}
-                stroke="#ef4444"
-                strokeWidth={1}
-                strokeDasharray="3 6"
-                label={{
-                  value: `-${sigma}σ`,
-                  position: "top",
-                  fill: "#ef4444",
-                  fontSize: 9,
-                }}
-              />
+              {avgMean - sigma * avgSigma !== 0 && (
+                <ReferenceLine
+                  x={avgMean - sigma * avgSigma}
+                  stroke="#ef4444"
+                  strokeWidth={1}
+                  strokeDasharray="3 6"
+                  ifOverflow="extendDomain"
+                  label={{
+                    value: `-${sigma}σ`,
+                    position: "top",
+                    fill: "#ef4444",
+                    fontSize: 9,
+                  }}
+                />
+              )}
               {/* Positive sigma */}
-              <ReferenceLine
-                x={avgMean + sigma * avgSigma}
-                stroke="#22c55e"
-                strokeWidth={1}
-                strokeDasharray="3 6"
-                label={{
-                  value: `+${sigma}σ`,
-                  position: "top",
-                  fill: "#22c55e",
-                  fontSize: 9,
-                }}
-              />
+              {avgMean + sigma * avgSigma !== 0 && (
+                <ReferenceLine
+                  x={avgMean + sigma * avgSigma}
+                  stroke="#22c55e"
+                  strokeWidth={1}
+                  strokeDasharray="3 6"
+                  ifOverflow="extendDomain"
+                  label={{
+                    value: `+${sigma}σ`,
+                    position: "top",
+                    fill: "#22c55e",
+                    fontSize: 9,
+                  }}
+                />
+              )}
             </Fragment>
           ))}
           </AreaChart>
