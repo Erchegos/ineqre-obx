@@ -1,20 +1,50 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
+
+type SystemStats = {
+  securities: number;
+  last_updated: string | null;
+  data_points: number;
+};
 
 export default function HomePage() {
-  // Static data - no database query needed for homepage
-  const stats = {
+  const [stats, setStats] = useState<SystemStats>({
     securities: 25,
-    last_updated: new Date('2026-01-21'),
+    last_updated: new Date().toISOString(),
     data_points: 1250000
-  };
-  
-  const lastUpdate = stats.last_updated 
-    ? new Date(stats.last_updated).toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        const res = await fetch("/api/stats", {
+          method: "GET",
+          cache: "no-store",
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setStats(data);
+        }
+      } catch (e) {
+        console.error("Failed to fetch stats:", e);
+        // Keep using default stats on error
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchStats();
+  }, []);
+
+  const lastUpdate = stats.last_updated
+    ? new Date(stats.last_updated).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
       })
     : 'N/A';
 

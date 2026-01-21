@@ -19,9 +19,17 @@ function errShape(e: unknown) {
 
 export async function GET() {
   try {
-    const tableName = await getPriceTable();
+    // Try to detect table, but with better error handling
+    let tableName: string;
+    try {
+      tableName = await getPriceTable();
+    } catch (detectError) {
+      console.error("Failed to detect price table, trying both:", detectError);
+      // If detection fails, try prices_daily first, then obx_equities
+      tableName = "prices_daily";
+    }
 
-    const query = `
+    const buildQuery = (table: string) => `
       SELECT
         s.ticker,
         s.name,
@@ -31,7 +39,7 @@ export async function GET() {
         MAX(p.date) as end_date,
         COUNT(*) as rows
       FROM stocks s
-      INNER JOIN ${tableName} p ON s.ticker = p.ticker
+      INNER JOIN ${table} p ON s.ticker = p.ticker
       WHERE p.source = 'ibkr'
         AND p.close IS NOT NULL
         AND p.close > 0
@@ -41,7 +49,24 @@ export async function GET() {
       ORDER BY s.ticker
     `;
 
-    const result = await pool.query(query);
+    let result;
+    try {
+      result = await pool.query(buildQuery(tableName));
+    } catch (firstError) {
+      console.error(`Query failed with ${tableName}, trying alternative:`, firstError);
+      // Try the other table name
+      const altTable = tableName === "prices_daily" ? "obx_equities" : "prices_daily";
+      try {
+        result = await pool.query(buildQuery(altTable));
+        tableName = altTable;
+        console.log(`Successfully queried ${altTable}`);
+      } catch (secondError) {
+        console.error(`Both table queries failed:`, secondError);
+        throw firstError; // Throw the original error
+      }
+    }
+
+    console.log(`Successfully fetched ${result.rows.length} stocks from ${tableName}`);
 
     const stocks = result.rows.map((row) => ({
       ticker: row.ticker,
