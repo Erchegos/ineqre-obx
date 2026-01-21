@@ -24,15 +24,15 @@ function verifyToken(req: NextRequest): string | null {
 }
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     documentId: string;
     attachmentId: string;
-  };
+  }>;
 };
 
 export async function GET(
   req: NextRequest,
-  { params }: RouteContext
+  context: RouteContext
 ) {
   const tokenId = verifyToken(req);
 
@@ -44,6 +44,7 @@ export async function GET(
   }
 
   try {
+    const params = await context.params;
     const { documentId, attachmentId } = params;
 
     // Get attachment info
