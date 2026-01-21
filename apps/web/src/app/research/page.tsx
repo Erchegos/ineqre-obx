@@ -40,7 +40,7 @@ export default function ResearchPortalPage() {
     });
   };
 
-  // Clean body text for display - just remove disclaimer
+  // Clean body text for display
   const cleanBodyText = (text: string): string => {
     if (!text) return '';
 
@@ -48,6 +48,14 @@ export default function ResearchPortalPage() {
     let cleaned = text.split(/Source:\s*Pareto Securities/i)[0];
     cleaned = cleaned.split(/\n*Full Report:/i)[0];
     cleaned = cleaned.replace(/CLICK HERE FOR THE FULL REPORT/gi, '');
+
+    // Fix common mojibake characters using regex
+    cleaned = cleaned
+      .replace(/â€™/g, "'").replace(/â€˜/g, "'")
+      .replace(/â€œ/g, '"').replace(/â€/g, '"')
+      .replace(/â€"/g, '–').replace(/â€"/g, '—')
+      .replace(/â€¦/g, '...').replace(/Â /g, ' ').replace(/Â/g, '')
+      .replace(/Ã¥/g, 'å').replace(/Ã¸/g, 'ø').replace(/Ã¦/g, 'æ');
 
     return cleaned.trim();
   };
