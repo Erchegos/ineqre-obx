@@ -164,7 +164,7 @@ export default function ResidualSquaresChart({
       </div>
 
       {/* Chart */}
-      <div style={{ position: "relative", width: "100%", height, background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: 8 }}>
+      <div style={{ position: "relative", width: "100%", height, background: "var(--card-bg)", borderRadius: 8, padding: 8 }}>
         <ResponsiveContainer width="100%" height={height}>
           <ScatterChart margin={{ top: 20, right: 30, left: 20, bottom: 30 }}>
             <CartesianGrid
@@ -319,9 +319,10 @@ export default function ResidualSquaresChart({
       <div
         style={{
           marginTop: 16,
-          border: "1px solid rgba(59, 130, 246, 0.2)",
+          border: "1px solid var(--border)",
           borderRadius: 6,
           overflow: "hidden",
+          background: "var(--card-bg)",
         }}
       >
         <button
@@ -329,7 +330,7 @@ export default function ResidualSquaresChart({
           style={{
             width: "100%",
             padding: "10px 12px",
-            background: "rgba(59, 130, 246, 0.05)",
+            background: "transparent",
             border: "none",
             cursor: "pointer",
             display: "flex",
@@ -341,10 +342,10 @@ export default function ResidualSquaresChart({
             transition: "background 0.15s",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(59, 130, 246, 0.1)";
+            e.currentTarget.style.background = "var(--hover-bg)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(59, 130, 246, 0.05)";
+            e.currentTarget.style.background = "transparent";
           }}
         >
           <span>How to Read This Chart</span>
@@ -354,9 +355,11 @@ export default function ResidualSquaresChart({
           <div
             style={{
               padding: 12,
-              background: "rgba(59, 130, 246, 0.05)",
-              fontSize: 13,
+              background: "var(--hover-bg)",
+              fontSize: 11,
               color: "var(--muted-foreground)",
+              lineHeight: 1.5,
+              borderTop: "1px solid var(--border)",
             }}
           >
             <div style={{ display: "grid", gap: 4 }}>
