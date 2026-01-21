@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy initialization to avoid build-time errors when env vars aren't available
+function getSupabaseClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 function verifyToken(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization');
@@ -29,6 +32,9 @@ export async function GET(
 
     // Await params in Next.js 16
     const { documentId } = await params;
+
+    // Get Supabase client at runtime
+    const supabase = getSupabaseClient();
 
     // Fetch document
     const { data: doc, error } = await supabase
