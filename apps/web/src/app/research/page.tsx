@@ -54,31 +54,24 @@ export default function ResearchPortalPage() {
     cleaned = cleaned.replace(/CLICK HERE FOR THE FULL REPORT/gi, '');
 
     // Comprehensive fix for Windows-1252 to UTF-8 double-encoding (mojibake)
-    const mojibakeFixes: Array<[string, string]> = [
-      // Quotes and apostrophes (most common)
+    const replacements: ReadonlyArray<readonly [string, string]> = [
       ['â€™', "'"], ['â€˜', "'"], ['â€œ', '"'], ['â€', '"'],
       ['â€˛', "'"], ['â€³', '"'], [''', "'"], [''', "'"], ['"', '"'], ['"', '"'],
-      // Dashes
       ['â€"', '–'], ['â€"', '—'], ['â€'', '-'],
-      // Special chars
       ['â€¦', '...'], ['â€¢', '•'], ['â€‹', ''],
-      // Spaces
       ['Â ', ' '], ['Â', ''],
-      // Norwegian
       ['Ã¥', 'å'], ['Ã¸', 'ø'], ['Ã¦', 'æ'], ['Ã…', 'Å'], ['Ã˜', 'Ø'], ['Ã†', 'Æ'],
-      // European chars
       ['Ã©', 'é'], ['Ã¨', 'è'], ['Ãª', 'ê'], ['Ã«', 'ë'],
       ['Ã¡', 'á'], ['Ã ', 'à'], ['Ã¢', 'â'], ['Ã¤', 'ä'], ['Ã£', 'ã'],
       ['Ã¶', 'ö'], ['Ã´', 'ô'], ['Ã²', 'ò'], ['Ã³', 'ó'],
       ['Ã¼', 'ü'], ['Ã»', 'û'], ['Ã¹', 'ù'], ['Ãº', 'ú'],
       ['Ã±', 'ñ'], ['Ã§', 'ç'], ['Ã', 'Ø'],
-      // Symbols
       ['Â°', '°'], ['Â±', '±'], ['Ã—', '×'], ['Ã·', '÷'],
       ['Â£', '£'], ['â‚¬', '€'], ['Â¥', '¥'], ['Â¢', '¢'],
       ['Â©', '©'], ['Â®', '®'], ['â„¢', '™'], ['Â§', '§'], ['Âµ', 'µ'],
     ];
 
-    for (const [bad, good] of mojibakeFixes) {
+    for (const [bad, good] of replacements) {
       while (cleaned.includes(bad)) {
         cleaned = cleaned.replace(bad, good);
       }
