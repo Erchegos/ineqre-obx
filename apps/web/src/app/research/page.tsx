@@ -49,13 +49,22 @@ export default function ResearchPortalPage() {
     cleaned = cleaned.split(/\n*Full Report:/i)[0];
     cleaned = cleaned.replace(/CLICK HERE FOR THE FULL REPORT/gi, '');
 
-    // Fix common mojibake characters using regex
+    // Fix mojibake - must do specific patterns before generic ones
     cleaned = cleaned
-      .replace(/â€™/g, "'").replace(/â€˜/g, "'")
-      .replace(/â€œ/g, '"').replace(/â€/g, '"')
-      .replace(/â€"/g, '–').replace(/â€"/g, '—')
-      .replace(/â€¦/g, '...').replace(/Â /g, ' ').replace(/Â/g, '')
-      .replace(/Ã¥/g, 'å').replace(/Ã¸/g, 'ø').replace(/Ã¦/g, 'æ');
+      .replace(/â€™/g, "'")
+      .replace(/â€˜/g, "'")
+      .replace(/â€œ/g, '"')
+      .replace(/â€/g, '"')
+      .replace(/â€"/g, '–')
+      .replace(/â€"/g, '—')
+      .replace(/â€¦/g, '...')
+      .replace(/âs/g, "'s")
+      .replace(/â/g, '"')
+      .replace(/Â /g, ' ')
+      .replace(/Â/g, '')
+      .replace(/Ã¥/g, 'å')
+      .replace(/Ã¸/g, 'ø')
+      .replace(/Ã¦/g, 'æ');
 
     return cleaned.trim();
   };
