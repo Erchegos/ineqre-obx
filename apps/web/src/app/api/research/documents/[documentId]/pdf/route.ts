@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { jsPDF } from 'jspdf';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -25,6 +24,9 @@ export async function GET(
   }
 
   try {
+    // Dynamic import of jsPDF to avoid build-time issues
+    const { jsPDF } = await import('jspdf');
+
     // Await params in Next.js 16
     const { documentId } = await params;
 
