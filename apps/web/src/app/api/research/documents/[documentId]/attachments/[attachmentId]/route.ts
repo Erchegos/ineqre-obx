@@ -3,11 +3,13 @@ import { verify } from 'jsonwebtoken';
 import { createClient } from '@supabase/supabase-js';
 import { pool } from '@/lib/db';
 
-// Supabase client
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Create Supabase client lazily
+function getSupabaseClient() {
+  return createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 // Verify JWT token from request
 function verifyToken(req: NextRequest): string | null {
@@ -73,6 +75,7 @@ export async function GET(
     // Download from Supabase Storage
     console.log('[PDF Download] Downloading from Supabase Storage:', attachment.file_path);
 
+    const supabase = getSupabaseClient();
     const { data: supabaseData, error: supabaseError } = await supabase.storage
       .from('research-pdfs')
       .download(attachment.file_path);
