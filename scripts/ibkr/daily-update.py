@@ -18,9 +18,9 @@ TICKERS = [
     "BRG", "BWLPG", "CADLR", "DNB", "ELK", "ENTRA", "EQNR", "FRO",
     "GJF", "HAVI", "HEX", "KIT", "KOG", "MPCC", "MOWI", "NAS",
     "NHY", "NOD", "ORK", "RECSI", "SALM", "SCATC", "SUBC", "TECH",
-    "TGS", "TIETO", "VAR", "VEI", "YAR", "CMBTO", "DOFG", "HAFNI",
-    "HAUTO", "LSG", "MING", "ODL", "OLT", "PROT", "SB1NO", "SNI",
-    "SPOL", "STB", "SWON", "TEL", "TOM", "WAWI", "WWI", "WWIB",
+    "TGS", "TIETO", "VAR", "VEI", "VEND", "YAR", "CMBTO", "DOFG",
+    "HAFNI", "HAUTO", "LSG", "MING", "ODL", "OLT", "PROT", "SB1NO",
+    "SNI", "SPOL", "STB", "SWON", "TEL", "TOM", "WAWI", "WWI", "WWIB",
 ]
 
 def upsert_bar(conn, ticker, bar):
