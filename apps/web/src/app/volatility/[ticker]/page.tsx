@@ -416,7 +416,7 @@ export default function VolatilityPage() {
             Volatility Correlation with Market (OBX)
           </h2>
           <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 16, lineHeight: 1.5 }}>
-            Rolling 30-day correlation between {ticker} volatility and OBX index volatility.
+            Rolling 30-day correlation between {ticker} volatility and OBX index volatility over the full available history.
             Shows how closely the stock's volatility moves with overall market volatility.
           </p>
           <div style={{

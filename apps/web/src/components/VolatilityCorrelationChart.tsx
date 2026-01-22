@@ -118,16 +118,8 @@ export default function VolatilityCorrelationChart({
     }));
   }, [stockData, marketData, window]);
 
-  // Filter to last 2 years
-  const filteredData = useMemo(() => {
-    const twoYearsAgo = new Date();
-    twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
-
-    return chartData.filter((d) => {
-      const date = new Date(d.date);
-      return date >= twoYearsAgo;
-    });
-  }, [chartData]);
+  // Use all available data
+  const filteredData = chartData;
 
   if (filteredData.length === 0) {
     return (
