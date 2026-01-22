@@ -18,17 +18,20 @@ export async function GET() {
     // Match the stocks list filter: only count tickers with 100+ records
     const query = `
       SELECT
-        COUNT(DISTINCT s.ticker) as securities,
-        MAX(p.date) as last_updated,
-        COUNT(*) as data_points
-      FROM stocks s
-      INNER JOIN (
-        SELECT ticker, MAX(date) as max_date, COUNT(*) as record_count
-        FROM prices_daily
-        WHERE close IS NOT NULL AND close > 0
-        GROUP BY ticker
+        COUNT(DISTINCT ticker_summary.ticker) as securities,
+        MAX(ticker_summary.max_date) as last_updated,
+        SUM(ticker_summary.record_count) as data_points
+      FROM (
+        SELECT
+          p.ticker,
+          MAX(p.date) as max_date,
+          COUNT(*) as record_count
+        FROM prices_daily p
+        INNER JOIN stocks s ON p.ticker = s.ticker
+        WHERE p.close IS NOT NULL AND p.close > 0
+        GROUP BY p.ticker
         HAVING COUNT(*) >= 100
-      ) p ON s.ticker = p.ticker
+      ) ticker_summary
     `;
 
     const result = await pool.query(query);
