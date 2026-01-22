@@ -228,14 +228,10 @@ export default function ResearchPortalPage() {
       });
 
       if (!res.ok) {
-        // PDF not available - show preview instead
+        // PDF not available - show inline preview instead
         const doc = documents.find(d => d.id === documentId);
         if (doc) {
           setSelectedDocument(doc);
-          // Scroll to preview section
-          setTimeout(() => {
-            document.getElementById('document-preview')?.scrollIntoView({ behavior: 'smooth' });
-          }, 100);
         }
         return;
       }
@@ -250,13 +246,10 @@ export default function ResearchPortalPage() {
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (err: any) {
-      // Show preview on error
+      // Show inline preview on error
       const doc = documents.find(d => d.id === documentId);
       if (doc) {
         setSelectedDocument(doc);
-        setTimeout(() => {
-          document.getElementById('document-preview')?.scrollIntoView({ behavior: 'smooth' });
-        }, 100);
       }
     }
   };
@@ -267,8 +260,13 @@ export default function ResearchPortalPage() {
     setDocuments([]);
   };
 
-  // Filter documents
+  // Filter documents - exclude those without content
   const filteredDocuments = documents.filter(doc => {
+    // Filter out documents with no content
+    if (!doc.body_text && !doc.ai_summary) {
+      return false;
+    }
+
     const matchesSource = selectedSource === 'all' || doc.source === selectedSource;
     const matchesSearch = !searchTerm ||
       doc.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -594,39 +592,41 @@ export default function ResearchPortalPage() {
                 </div>
               )}
 
-              {/* Action button */}
-              {doc.attachments && doc.attachments.length > 0 && (
-                <button
-                  onClick={() => handleDownload(doc.id, doc.attachments[0].id, doc.attachments[0].filename)}
-                  style={{
-                    padding: '12px 24px',
-                    background: '#0066CC',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: 6,
-                    fontSize: 14,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                  }}
-                  onMouseOver={(e) => e.currentTarget.style.background = '#0052A3'}
-                  onMouseOut={(e) => e.currentTarget.style.background = '#0066CC'}
-                >
-                  View Report
-                </button>
-              )}
-              {/* Show preview button for documents without attachments */}
-              {(!doc.attachments || doc.attachments.length === 0) && (
+              {/* Action buttons */}
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                {doc.attachments && doc.attachments.length > 0 && (
+                  <button
+                    onClick={() => handleDownload(doc.id, doc.attachments[0].id, doc.attachments[0].filename)}
+                    style={{
+                      padding: '12px 24px',
+                      background: '#0066CC',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 6,
+                      fontSize: 14,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.background = '#0052A3'}
+                    onMouseOut={(e) => e.currentTarget.style.background = '#0066CC'}
+                  >
+                    View Report
+                  </button>
+                )}
+
+                {/* Show full content button */}
                 <button
                   onClick={() => {
-                    setSelectedDocument(doc);
-                    setTimeout(() => {
-                      document.getElementById('document-preview')?.scrollIntoView({ behavior: 'smooth' });
-                    }, 100);
+                    if (selectedDocument?.id === doc.id) {
+                      setSelectedDocument(null);
+                    } else {
+                      setSelectedDocument(doc);
+                    }
                   }}
                   style={{
                     padding: '12px 24px',
-                    background: 'transparent',
+                    background: selectedDocument?.id === doc.id ? 'rgba(0, 102, 204, 0.1)' : 'transparent',
                     color: '#0066CC',
                     border: '2px solid #0066CC',
                     borderRadius: 6,
@@ -636,154 +636,96 @@ export default function ResearchPortalPage() {
                     transition: 'all 0.2s',
                   }}
                   onMouseOver={(e) => {
-                    e.currentTarget.style.background = 'rgba(0, 102, 204, 0.1)';
+                    if (selectedDocument?.id !== doc.id) {
+                      e.currentTarget.style.background = 'rgba(0, 102, 204, 0.1)';
+                    }
                   }}
                   onMouseOut={(e) => {
-                    e.currentTarget.style.background = 'transparent';
+                    if (selectedDocument?.id !== doc.id) {
+                      e.currentTarget.style.background = 'transparent';
+                    }
                   }}
                 >
-                  View Content
+                  {selectedDocument?.id === doc.id ? 'Hide Details ▲' : 'Show Details ▼'}
                 </button>
+              </div>
+
+              {/* Inline Full Content Preview */}
+              {selectedDocument?.id === doc.id && (
+                <div style={{
+                  marginTop: 20,
+                  paddingTop: 20,
+                  borderTop: '2px solid var(--border)',
+                }}>
+                  {/* AI Summary if available */}
+                  {doc.ai_summary && (
+                    <div style={{
+                      padding: 20,
+                      marginBottom: 20,
+                      background: 'rgba(34, 197, 94, 0.05)',
+                      border: '2px solid rgba(34, 197, 94, 0.2)',
+                      borderRadius: 8,
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                        <span style={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: '#22c55e',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                        }}>
+                          AI Summary
+                        </span>
+                      </div>
+                      <div style={{
+                        fontSize: 14,
+                        lineHeight: 1.7,
+                        color: 'var(--foreground)',
+                        whiteSpace: 'pre-wrap',
+                      }}>
+                        {doc.ai_summary}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Full Email Content */}
+                  {doc.body_text && (
+                    <div style={{
+                      padding: 20,
+                      background: 'var(--background)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 8,
+                      maxHeight: 600,
+                      overflow: 'auto',
+                    }}>
+                      <h4 style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: 'var(--muted-foreground)',
+                        marginBottom: 16,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
+                        Full Email Content
+                      </h4>
+                      <div style={{
+                        fontSize: 14,
+                        lineHeight: 1.7,
+                        color: 'var(--foreground)',
+                        whiteSpace: 'pre-wrap',
+                        fontFamily: 'monospace',
+                      }}>
+                        {cleanBodyText(doc.body_text)}
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           ))}
         </div>
       )}
 
-      {/* Document Preview Section */}
-      {selectedDocument && (
-        <div id="document-preview" style={{
-          marginTop: 48,
-          padding: 32,
-          background: 'var(--card-bg)',
-          border: '2px solid var(--border)',
-          borderRadius: 12,
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 24 }}>
-            <div>
-              <h2 style={{ fontSize: 24, fontWeight: 700, color: 'var(--foreground)', marginBottom: 8 }}>
-                Document Preview
-              </h2>
-              <p style={{ fontSize: 14, color: 'var(--muted-foreground)' }}>
-                PDF not available - showing email content
-              </p>
-            </div>
-            <button
-              onClick={() => setSelectedDocument(null)}
-              style={{
-                padding: '8px 16px',
-                background: 'transparent',
-                border: '1px solid var(--border)',
-                borderRadius: 6,
-                color: 'var(--foreground)',
-                fontSize: 14,
-                cursor: 'pointer',
-              }}
-            >
-              Close
-            </button>
-          </div>
-
-          {/* Document Header */}
-          <div style={{ marginBottom: 24, paddingBottom: 24, borderBottom: '1px solid var(--border)' }}>
-            <div style={{ marginBottom: 12 }}>
-              {selectedDocument.ticker && (
-                <span style={{
-                  display: 'inline-block',
-                  padding: '4px 12px',
-                  background: 'rgba(59, 130, 246, 0.1)',
-                  border: '1px solid rgba(59, 130, 246, 0.3)',
-                  borderRadius: 6,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: '#3b82f6',
-                  marginRight: 12,
-                }}>
-                  {selectedDocument.ticker}
-                </span>
-              )}
-              <span style={{
-                display: 'inline-block',
-                padding: '4px 12px',
-                background: 'rgba(107, 114, 128, 0.1)',
-                border: '1px solid rgba(107, 114, 128, 0.3)',
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 600,
-                color: '#6b7280',
-              }}>
-                {selectedDocument.source}
-              </span>
-            </div>
-            <h3 style={{ fontSize: 20, fontWeight: 600, color: 'var(--foreground)', marginBottom: 8 }}>
-              {selectedDocument.subject}
-            </h3>
-            <p style={{ fontSize: 14, color: 'var(--muted-foreground)' }}>
-              {new Date(selectedDocument.received_date).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
-            </p>
-          </div>
-
-          {/* AI Summary if available */}
-          {selectedDocument.ai_summary && (
-            <div style={{
-              padding: 20,
-              marginBottom: 24,
-              background: 'rgba(34, 197, 94, 0.05)',
-              border: '2px solid rgba(34, 197, 94, 0.2)',
-              borderRadius: 8,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <span style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: '#22c55e',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                }}>
-                  AI Summary
-                </span>
-              </div>
-              <div style={{
-                fontSize: 14,
-                lineHeight: 1.7,
-                color: 'var(--foreground)',
-                whiteSpace: 'pre-wrap',
-              }}>
-                {selectedDocument.ai_summary}
-              </div>
-            </div>
-          )}
-
-          {/* Full Content */}
-          <div style={{
-            padding: 20,
-            background: 'var(--background)',
-            border: '1px solid var(--border)',
-            borderRadius: 8,
-            maxHeight: 600,
-            overflow: 'auto',
-          }}>
-            <h4 style={{ fontSize: 14, fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Full Email Content
-            </h4>
-            <div style={{
-              fontSize: 14,
-              lineHeight: 1.7,
-              color: 'var(--foreground)',
-              whiteSpace: 'pre-wrap',
-              fontFamily: 'monospace',
-            }}>
-              {selectedDocument.body_text || 'No content available'}
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   );
 }
