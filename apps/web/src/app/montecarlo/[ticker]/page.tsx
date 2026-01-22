@@ -109,12 +109,16 @@ export default function MonteCarloPage() {
 
     if (returns.length < 20) return null;
 
-    // Calculate parameters from historical data
-    const { drift: historicalDrift, volatility: historicalVolatility } = calculateParameters(returns);
+    // Calculate parameters from historical data (daily)
+    const { drift: dailyDrift, volatility: dailyVolatility } = calculateParameters(returns);
 
-    // Use custom parameters if set, otherwise use historical
-    const drift = customDrift !== null ? customDrift : historicalDrift;
-    const volatility = customVolatility !== null ? customVolatility : historicalVolatility;
+    // Annualize the parameters for display
+    const annualizedDrift = dailyDrift * 252;
+    const annualizedVolatility = dailyVolatility * Math.sqrt(252);
+
+    // Use custom or historical daily parameters for simulation
+    const drift = customDrift !== null ? customDrift : dailyDrift;
+    const volatility = customVolatility !== null ? customVolatility : dailyVolatility;
 
     // Get current price
     const currentPrice = data.prices[data.prices.length - 1].close;
@@ -158,8 +162,10 @@ export default function MonteCarloPage() {
       numSteps,
       drift,
       volatility,
-      historicalDrift,
-      historicalVolatility,
+      dailyDrift,
+      dailyVolatility,
+      annualizedDrift,
+      annualizedVolatility,
     };
   }, [data, numPaths, horizon, customDrift, customVolatility]);
 
@@ -327,12 +333,12 @@ export default function MonteCarloPage() {
                 <input
                   type="number"
                   step="0.001"
-                  value={customDrift !== null ? (customDrift * 100).toFixed(3) : (simulation.historicalDrift * 100).toFixed(3)}
+                  value={customDrift !== null ? (customDrift * 100).toFixed(3) : (simulation.dailyDrift * 100).toFixed(3)}
                   onChange={(e) => {
                     const val = Number(e.target.value) / 100;
                     setCustomDrift(val);
                   }}
-                  placeholder={`Historical: ${(simulation.historicalDrift * 100).toFixed(3)}%`}
+                  placeholder={`Historical: ${(simulation.dailyDrift * 100).toFixed(3)}%`}
                   style={{
                     width: "100%",
                     padding: "8px 12px",
@@ -344,6 +350,9 @@ export default function MonteCarloPage() {
                     fontFamily: "monospace",
                   }}
                 />
+                <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>
+                  Annualized: {(simulation.annualizedDrift * 100).toFixed(2)}%
+                </div>
                 <button
                   onClick={() => setCustomDrift(null)}
                   style={{
@@ -374,12 +383,12 @@ export default function MonteCarloPage() {
                 <input
                   type="number"
                   step="0.001"
-                  value={customVolatility !== null ? (customVolatility * 100).toFixed(3) : (simulation.historicalVolatility * 100).toFixed(3)}
+                  value={customVolatility !== null ? (customVolatility * 100).toFixed(3) : (simulation.dailyVolatility * 100).toFixed(3)}
                   onChange={(e) => {
                     const val = Number(e.target.value) / 100;
                     setCustomVolatility(val);
                   }}
-                  placeholder={`Historical: ${(simulation.historicalVolatility * 100).toFixed(3)}%`}
+                  placeholder={`Historical: ${(simulation.dailyVolatility * 100).toFixed(3)}%`}
                   style={{
                     width: "100%",
                     padding: "8px 12px",
@@ -391,6 +400,9 @@ export default function MonteCarloPage() {
                     fontFamily: "monospace",
                   }}
                 />
+                <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>
+                  Annualized: {(simulation.annualizedVolatility * 100).toFixed(2)}%
+                </div>
                 <button
                   onClick={() => setCustomVolatility(null)}
                   style={{
