@@ -15,16 +15,20 @@ function errShape(e: unknown) {
 
 export async function GET() {
   try {
-    // Just use prices_daily directly
+    // Match the stocks list filter: only count tickers with 100+ records
     const query = `
       SELECT
         COUNT(DISTINCT s.ticker) as securities,
         MAX(p.date) as last_updated,
         COUNT(*) as data_points
       FROM stocks s
-      INNER JOIN prices_daily p ON s.ticker = p.ticker
-      WHERE p.close IS NOT NULL
-        AND p.close > 0
+      INNER JOIN (
+        SELECT ticker, MAX(date) as max_date, COUNT(*) as record_count
+        FROM prices_daily
+        WHERE close IS NOT NULL AND close > 0
+        GROUP BY ticker
+        HAVING COUNT(*) >= 100
+      ) p ON s.ticker = p.ticker
     `;
 
     const result = await pool.query(query);
