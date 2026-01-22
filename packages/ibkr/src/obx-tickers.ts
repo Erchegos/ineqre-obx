@@ -2,7 +2,11 @@
  * OBX and Oslo Børs tickers - VERIFIED WORKING
  * Updated as of 2026-01-22
  *
- * All 57 tickers verified working with IB Gateway (port 4002)
+ * All 58 tickers verified working with IB Gateway (port 4002)
+ * Includes OBX index + 57 stocks
+ *
+ * OBX Index data: April 2020 - Present (~5.75 years, 1453 days)
+ * Note: 20 years of historical data not available in current database
  *
  * Failed/removed: SBNOR, VENDA, VENDB
  */
@@ -10,7 +14,8 @@
 export const OBX_INDEX_TICKER = "OBX";
 
 export const OBX_TICKERS = [
-  // Verified working tickers (56 stocks + OBX index)
+  // Verified working tickers (57 stocks + OBX index)
+  "OBX",      // OBX Index (Oslo Børs Benchmark Index)
   "AFG",      // AF Gruppen ASA
   "AKER",     // Aker ASA-A Shares
   "AKRBP",    // Aker BP ASA
@@ -69,7 +74,8 @@ export const OBX_TICKERS = [
   "YAR",      // Yara International ASA
 ] as const;
 
-export const ALL_TICKERS = [OBX_INDEX_TICKER, ...OBX_TICKERS] as const;
+// OBX is now included in OBX_TICKERS, so ALL_TICKERS = OBX_TICKERS
+export const ALL_TICKERS = OBX_TICKERS;
 
 export type OBXTicker = (typeof OBX_TICKERS)[number];
 export type AllTicker = (typeof ALL_TICKERS)[number];
