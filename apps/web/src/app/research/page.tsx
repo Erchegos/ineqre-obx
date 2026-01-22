@@ -408,23 +408,51 @@ export default function ResearchPortalPage() {
             {documents.length} documents • {filteredDocuments.length} shown
           </p>
         </div>
-        <button
-          onClick={handleLogout}
-          style={{
-            padding: '8px 16px',
-            background: 'transparent',
-            border: '1px solid var(--border)',
-            borderRadius: 6,
-            color: 'var(--foreground)',
-            fontSize: 14,
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-          }}
-          onMouseOver={(e) => e.currentTarget.style.background = 'var(--hover-bg)'}
-          onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
-        >
-          Logout
-        </button>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <button
+            onClick={() => {
+              setSelectedSource('all');
+              setSearchTerm('');
+              setSelectedDocument(null);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            style={{
+              padding: '8px 16px',
+              background: 'transparent',
+              border: '1px solid var(--border)',
+              borderRadius: 6,
+              color: 'var(--foreground)',
+              fontSize: 14,
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+            onMouseOver={(e) => e.currentTarget.style.background = 'var(--hover-bg)'}
+            onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+          >
+            <span style={{ fontSize: 16 }}>🏠</span>
+            Home
+          </button>
+          <button
+            onClick={handleLogout}
+            style={{
+              padding: '8px 16px',
+              background: 'transparent',
+              border: '1px solid var(--border)',
+              borderRadius: 6,
+              color: 'var(--foreground)',
+              fontSize: 14,
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+            onMouseOver={(e) => e.currentTarget.style.background = 'var(--hover-bg)'}
+            onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+          >
+            Logout
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
