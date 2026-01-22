@@ -101,6 +101,42 @@ function identifySource(email) {
 }
 
 /**
+ * Clean text to remove encoding artifacts and fix mojibake
+ */
+function cleanText(text) {
+  if (!text) return '';
+
+  return text
+    // Fix common UTF-8 mojibake patterns (double-encoded UTF-8)
+    .replace(/â€¢/g, '\u2022')  // bullet point
+    .replace(/â€"/g, '\u2013')  // en dash
+    .replace(/â€"/g, '\u2014')  // em dash
+    .replace(/â€˜/g, '\u2018')  // left single quote
+    .replace(/â€™/g, '\u2019')  // right single quote/apostrophe
+    .replace(/â€œ/g, '\u201C')  // left double quote
+    .replace(/â€/g, '\u201D')   // right double quote
+    .replace(/â‚¬/g, '\u20AC')  // euro sign
+    .replace(/Â£/g, '\u00A3')   // pound sign
+    .replace(/Â /g, ' ')   // non-breaking space
+    .replace(/Ã¸/g, '\u00F8')  // o with stroke (Norwegian)
+    .replace(/Ã¥/g, '\u00E5')  // a with ring (Norwegian)
+    .replace(/Ã¦/g, '\u00E6')  // ae ligature (Norwegian)
+    .replace(/Ã˜/g, '\u00D8')  // O with stroke
+    .replace(/Ã…/g, '\u00C5')  // A with ring
+    .replace(/Ã†/g, '\u00C6')  // AE ligature
+    .replace(/â€¦/g, '...')  // ellipsis
+    .replace(/Â°/g, '\u00B0')   // degree symbol
+    .replace(/Â±/g, '\u00B1')   // plus-minus
+    // Remove any remaining control characters and weird symbols
+    .replace(/[^\x20-\x7E\u00A0-\u00FF\u0100-\u017F\u2018-\u201F\u2022\u2013\u2014]/g, '')
+    // Normalize whitespace
+    .replace(/\s\s+/g, ' ')
+    .replace(/\n\s+/g, '\n')
+    .replace(/\n\n\n+/g, '\n\n')
+    .trim();
+}
+
+/**
  * Save file to Supabase Storage
  */
 async function saveToSupabaseStorage(content, relativePath) {
@@ -238,6 +274,9 @@ async function processEmail(message, imap) {
           .replace(/\n\s+/g, '\n')
           .replace(/\n\n\n+/g, '\n\n')
           .trim();
+
+        // Clean up encoding artifacts
+        text = cleanText(text);
 
         // Truncate text first to leave room for link
         text = text.substring(0, 1850);
