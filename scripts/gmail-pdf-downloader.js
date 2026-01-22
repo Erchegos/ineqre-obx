@@ -1,8 +1,15 @@
 /**
- * Gmail API PDF Downloader
+ * Gmail API PDF Downloader for Pareto Research
  *
- * Downloads PDFs directly from Gmail using OAuth authentication.
- * This bypasses the browser automation issues.
+ * This script uses Gmail API to download PDF attachments from research emails
+ * and saves them to Supabase Storage.
+ *
+ * Setup:
+ * 1. Enable Gmail API in Google Cloud Console
+ * 2. Create OAuth 2.0 credentials (Desktop app)
+ * 3. Download credentials.json and save as gmail-credentials.json
+ * 4. Run this script - it will open browser for authorization
+ * 5. Access token will be saved for future use
  *
  * Setup:
  * 1. Enable Gmail API: https://console.cloud.google.com/apis/library/gmail.googleapis.com
@@ -48,73 +55,99 @@ if (!fs.existsSync(CONFIG.storageDir)) {
 }
 
 /**
- * Save file to local storage and Supabase
+ * Save file to Supabase Storage
  */
-async function saveToStorage(content, relativePath) {
-  // Save to local storage (for backup)
-  const fullPath = path.join(CONFIG.storageDir, relativePath);
-  const dir = path.dirname(fullPath);
+async function saveToSupabaseStorage(content, relativePath) {
+  try {
+    const { data, error } = await supabase.storage
+      .from('research-pdfs')
+      .upload(relativePath, content, {
+        contentType: 'application/pdf',
+        upsert: true
+      });
 
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+    if (error) throw error;
+    return relativePath;
+  } catch (error) {
+    console.error(`  Failed to upload to Supabase Storage: ${error.message}`);
+
+    // Fallback to local storage
+    const fullPath = path.join(CONFIG.storageDir, relativePath);
+    const dir = path.dirname(fullPath);
+
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    fs.writeFileSync(fullPath, content);
+    console.log(`  Saved to local storage as fallback: ${relativePath}`);
+    return relativePath;
   }
-
-  fs.writeFileSync(fullPath, content);
-
-  // Upload to Supabase Storage
-  const { error } = await supabase.storage
-    .from('research-pdfs')
-    .upload(relativePath, content, {
-      contentType: 'application/pdf',
-      upsert: true,
-    });
-
-  if (error) {
-    console.log(`    Warning: Failed to upload to Supabase: ${error.message}`);
-  }
-
-  return relativePath;
 }
 
 /**
- * Download PDF from URL
+ * Download PDF from URL (same method as email-processor.js)
  */
-async function downloadPDF(url) {
-  return new Promise((resolve, reject) => {
-    const urlObj = new URL(url);
-    const client = urlObj.protocol === 'https:' ? https : http;
+async function downloadPDF(reportUrl) {
+  const https = require('https');
+  const http = require('http');
 
-    const options = {
-      hostname: urlObj.hostname,
-      path: urlObj.pathname + urlObj.search,
-      method: 'GET',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-        'Accept': 'application/pdf,*/*',
-      }
+  const response = await (async () => {
+    try {
+      // Try using node-fetch if available
+      const nodeFetch = require('node-fetch');
+      return await nodeFetch(reportUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        },
+        timeout: 30000,
+      });
+    } catch (e) {
+      // Fallback: manual HTTPS request
+      return new Promise((resolve, reject) => {
+        const url = new URL(reportUrl);
+        const options = {
+          hostname: url.hostname,
+          path: url.pathname + url.search,
+          method: 'GET',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+          },
+        };
+
+        const req = (url.protocol === 'https:' ? https : http).request(options, (res) => {
+          const chunks = [];
+          res.on('data', (chunk) => chunks.push(chunk));
+          res.on('end', () => {
+            resolve({
+              ok: res.statusCode >= 200 && res.statusCode < 300,
+              statusCode: res.statusCode,
+              buffer: () => Promise.resolve(Buffer.concat(chunks)),
+            });
+          });
+        });
+        req.on('error', reject);
+        req.setTimeout(30000, () => {
+          req.destroy();
+          reject(new Error('Timeout'));
+        });
+        req.end();
+      });
+    }
+  })();
+
+  if (response.ok || response.statusCode === 200) {
+    const pdfBuffer = await response.buffer();
+    return {
+      statusCode: 200,
+      buffer: pdfBuffer
     };
-
-    const req = client.request(options, (res) => {
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return downloadPDF(res.headers.location).then(resolve).catch(reject);
-      }
-
-      const chunks = [];
-      res.on('data', chunk => chunks.push(chunk));
-      res.on('end', () => resolve({
-        statusCode: res.statusCode,
-        buffer: Buffer.concat(chunks)
-      }));
-      res.on('error', reject);
-    });
-
-    req.on('error', reject);
-    req.setTimeout(60000, () => {
-      req.destroy();
-      reject(new Error('Timeout'));
-    });
-    req.end();
-  });
+  } else {
+    return {
+      statusCode: response.statusCode || response.status,
+      buffer: Buffer.alloc(0)
+    };
+  }
 }
 
 /**
@@ -239,13 +272,13 @@ async function main() {
 
   // Get documents without PDFs
   const docsResult = await pool.query(`
-    SELECT d.id, d.subject, d.ticker, d.email_message_id
-    FROM research_documents d
-    LEFT JOIN research_attachments a ON d.id = a.document_id AND a.content_type = 'application/pdf'
-    WHERE a.id IS NULL
-      AND d.source = 'Pareto Securities'
-      AND d.received_date >= '2026-01-01'
-    ORDER BY d.received_date DESC
+    SELECT id, subject, ticker, email_message_id, received_date
+    FROM research_documents
+    WHERE (attachment_count = 0 OR attachment_count IS NULL)
+      AND source = 'Pareto Securities'
+      AND received_date >= CURRENT_DATE - INTERVAL '7 days'
+    ORDER BY received_date DESC
+    LIMIT 50
   `);
 
   console.log(`Found ${docsResult.rows.length} documents without PDFs\n`);
@@ -269,60 +302,101 @@ async function main() {
   let successCount = 0;
   let failCount = 0;
 
-  // Process each message
-  for (const msg of messages) { // Process all messages
+  // Process each document
+  for (const doc of docsResult.rows) {
     try {
-      const fullMessage = await getMessage(auth, msg.id);
+      console.log(`\nProcessing: ${doc.subject.substring(0, 60)}...`);
 
-      // Get subject
-      const subjectHeader = fullMessage.payload.headers.find(h => h.name === 'Subject');
-      const subject = subjectHeader ? subjectHeader.value : 'Unknown';
+      // Find Gmail message by Message-ID
+      const searchQuery = `rfc822msgid:${doc.email_message_id}`;
 
-      // Find matching document
-      const doc = docsResult.rows.find(d =>
-        subject.toLowerCase().includes(d.subject.toLowerCase().substring(0, 30))
-      );
+      const gmail = google.gmail({ version: 'v1', auth });
+      const searchResponse = await gmail.users.messages.list({
+        userId: 'me',
+        q: searchQuery,
+      });
 
-      if (!doc) {
-        console.log(`Skipping: ${subject.substring(0, 60)}... (no match in DB)`);
-        continue;
-      }
-
-      console.log(`\nProcessing: ${subject.substring(0, 60)}...`);
-
-      // Extract PDF URL
-      const pdfUrl = extractPdfUrl(fullMessage);
-
-      if (!pdfUrl) {
-        console.log('  ✗ No PDF link found');
+      if (!searchResponse.data.messages || searchResponse.data.messages.length === 0) {
+        console.log(`  ✗ Email not found in Gmail`);
         failCount++;
         continue;
       }
 
-      console.log(`  Downloading from: ${pdfUrl.substring(0, 60)}...`);
+      const messageId = searchResponse.data.messages[0].id;
 
-      // Download PDF
+      // Get full message with raw content
+      const fullMessage = await gmail.users.messages.get({
+        userId: 'me',
+        id: messageId,
+        format: 'raw',
+      });
+
+      // Decode the raw message
+      const rawEmail = Buffer.from(fullMessage.data.raw, 'base64url').toString('utf-8');
+
+      // Extract PDF URL from email body
+      let pdfUrl = null;
+
+      // Method 1: FactSet hosting link (quoted-printable encoded with line breaks)
+      // The URL spans multiple lines with = at the end of each line
+      const factsetMatch = rawEmail.match(/href=3D["']([^"']*parp\.hosting[^"']{0,2000})["']/i);
+      if (factsetMatch) {
+        // Decode the quoted-printable URL
+        // Order matters: remove line breaks, decode hex, THEN decode =3D
+        pdfUrl = factsetMatch[1]
+          .replace(/=\r?\n/g, '')  // Remove soft line breaks (= at end of line)
+          .replace(/=([0-9A-F]{2})/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16))) // Decode =XX to chars
+          .replace(/=3D/gi, '=');   // Finally convert remaining =3D to =
+
+        console.log(`  Decoded URL length: ${pdfUrl.length} chars`);
+      }
+
+      // Method 2: Direct research.paretosec.com link
+      if (!pdfUrl) {
+        const directMatch = rawEmail.match(/href=["']([^"']*research\.paretosec\.com[^"']*)["']/i);
+        if (directMatch) pdfUrl = directMatch[1];
+      }
+
+      // Method 3: Plain FactSet URL
+      if (!pdfUrl) {
+        const plainMatch = rawEmail.match(/https:\/\/parp\.hosting\.factset\.com[^\s"'<>]+/i);
+        if (plainMatch) pdfUrl = plainMatch[0];
+      }
+
+      if (!pdfUrl) {
+        console.log(`  ✗ No PDF URL found in email`);
+        failCount++;
+        continue;
+      }
+
+      console.log(`  Found URL: ${pdfUrl.substring(0, 60)}...`);
+      console.log(`  Downloading PDF...`);
+
+      // Download PDF from URL
       const response = await downloadPDF(pdfUrl);
 
       if (response.statusCode === 200 && response.buffer.length > 1000) {
         const cleanSubject = doc.subject.replace(/[^a-z0-9]/gi, '_').substring(0, 50);
         const filename = `${doc.ticker || 'report'}_${cleanSubject}.pdf`;
 
-        const now = new Date();
-        const relativePath = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${doc.id}/${filename}`;
+        const receivedDate = new Date(doc.received_date);
+        const relativePath = `${receivedDate.getFullYear()}/${String(receivedDate.getMonth() + 1).padStart(2, '0')}/${doc.id}/${filename}`;
 
-        await saveToStorage(response.buffer, relativePath);
+        await saveToSupabaseStorage(response.buffer, relativePath);
+        console.log(`  ✓ Uploaded to Supabase: ${relativePath}`);
 
         await pool.query(
           `INSERT INTO research_attachments (
             document_id, filename, content_type, file_size, file_path
-          ) VALUES ($1, $2, $3, $4, $5)`,
+          ) VALUES ($1, $2, $3, $4, $5)
+          ON CONFLICT DO NOTHING`,
           [doc.id, filename, 'application/pdf', response.buffer.length, relativePath]
         );
 
         await pool.query(
           `UPDATE research_documents
-           SET attachment_count = attachment_count + 1, has_attachments = true
+           SET attachment_count = (SELECT COUNT(*) FROM research_attachments WHERE document_id = $1),
+               has_attachments = true
            WHERE id = $1`,
           [doc.id]
         );
