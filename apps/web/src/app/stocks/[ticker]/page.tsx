@@ -390,6 +390,26 @@ export default function StockTickerPage() {
         >
           Volatility Analysis
         </Link>
+        <Link
+          href={`/montecarlo/${ticker}`}
+          style={{
+            padding: "8px 16px",
+            borderRadius: 4,
+            background: "var(--card-bg)",
+            border: "1px solid var(--card-border)",
+            color: "var(--foreground)",
+            fontSize: 13,
+            fontWeight: 500,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            textDecoration: "none",
+            letterSpacing: "0.01em",
+            transition: "all 0.15s",
+          }}
+        >
+          Monte Carlo Simulation
+        </Link>
       </div>
 
       <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
