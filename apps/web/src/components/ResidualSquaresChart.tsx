@@ -25,6 +25,7 @@ type ResidualSquaresChartProps = {
   beta?: number;
   rSquared?: number;
   height?: number;
+  ticker?: string;
 };
 
 export default function ResidualSquaresChart({
@@ -33,6 +34,7 @@ export default function ResidualSquaresChart({
   beta = 0,
   rSquared = 0,
   height = 400,
+  ticker,
 }: ResidualSquaresChartProps) {
   const [period, setPeriod] = useState<string>("All");
   const [showGuide, setShowGuide] = useState<boolean>(false);
@@ -194,7 +196,7 @@ export default function ResidualSquaresChart({
               fontSize={12}
               tickFormatter={(val) => `${val.toFixed(1)}%`}
               label={{
-                value: "Portfolio Daily Return",
+                value: ticker ? `${ticker} Daily Return` : "Stock Daily Return",
                 angle: -90,
                 position: "insideLeft",
                 style: { fontSize: 12, fill: "var(--foreground)", fontWeight: 500 },

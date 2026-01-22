@@ -346,7 +346,26 @@ export default function StockTickerPage() {
         </h1>
         <Link
           href="/stocks"
-          style={{ color: "var(--muted)", textDecoration: "none", fontSize: 14 }}
+          style={{
+            display: "inline-block",
+            color: "var(--foreground)",
+            textDecoration: "none",
+            fontSize: 14,
+            fontWeight: 600,
+            padding: "8px 16px",
+            border: "1px solid var(--border)",
+            borderRadius: 2,
+            background: "var(--card-bg)",
+            transition: "all 0.15s ease"
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = "var(--foreground)";
+            e.currentTarget.style.background = "var(--hover-bg)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = "var(--border)";
+            e.currentTarget.style.background = "var(--card-bg)";
+          }}
         >
           ← Back to stocks
         </Link>
@@ -562,6 +581,7 @@ export default function StockTickerPage() {
                 beta={residualsRegression?.beta || 0}
                 rSquared={residualsRegression?.rSquared || 0}
                 height={320}
+                ticker={ticker}
               />
             )}
             {!residualsLoading && !residualsError && (!residualsData || residualsData.length === 0) && (

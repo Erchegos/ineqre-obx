@@ -83,7 +83,13 @@ function generateTimeframeDistributions(allReturns: Array<{ date: string; return
       for (let j = 0; j < days; j++) {
         cumulativeReturn *= 1 + allReturns[i - j].return;
       }
-      returns.push(cumulativeReturn - 1);
+      const returnValue = cumulativeReturn - 1;
+
+      // Filter out unrealistic returns (> 100% or < -95%)
+      // These are likely data errors or stock splits not properly adjusted
+      if (returnValue <= 1.0 && returnValue >= -0.95) {
+        returns.push(returnValue);
+      }
     }
 
     if (returns.length > 0) {
