@@ -52,6 +52,28 @@ export default function ResearchPortalPage() {
     return cleaned.trim();
   };
 
+  // Highlight search term in text
+  const highlightText = (text: string, search: string): React.ReactNode => {
+    if (!search.trim()) return text;
+
+    const parts = text.split(new RegExp(`(${search})`, 'gi'));
+    return parts.map((part, index) =>
+      part.toLowerCase() === search.toLowerCase() ? (
+        <mark key={index} style={{
+          background: '#fef08a',
+          color: '#000',
+          padding: '2px 4px',
+          borderRadius: 3,
+          fontWeight: 600,
+        }}>
+          {part}
+        </mark>
+      ) : (
+        part
+      )
+    );
+  };
+
   // Clean filename for display
   const cleanFilename = (filename: string): string => {
     return filename
@@ -360,7 +382,7 @@ export default function ResearchPortalPage() {
       }}>
         <input
           type="text"
-          placeholder="Search by ticker or subject..."
+          placeholder="Search by ticker, subject, or content..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           style={{
@@ -463,7 +485,7 @@ export default function ResearchPortalPage() {
                     </span>
                   </div>
                   <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 0, color: 'var(--foreground)', lineHeight: 1.4 }}>
-                    {doc.subject}
+                    {highlightText(doc.subject, searchTerm)}
                   </h3>
                 </div>
               </div>
@@ -487,7 +509,7 @@ export default function ResearchPortalPage() {
                     WebkitBoxOrient: 'vertical',
                     overflow: 'hidden',
                   }}>
-                    {cleanBodyText(doc.body_text)}
+                    {highlightText(cleanBodyText(doc.body_text), searchTerm)}
                   </p>
                   {doc.body_text.length > 300 && (
                     <button
