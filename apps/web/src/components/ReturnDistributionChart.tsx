@@ -246,22 +246,50 @@ export default function ReturnDistributionChart({
           Click boxes below to toggle timeframes
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button
-            onClick={() => setSmoothed(!smoothed)}
-            style={{
-              padding: "4px 10px",
-              fontSize: 11,
-              fontWeight: 500,
-              border: "1px solid var(--border)",
-              borderRadius: 4,
-              background: smoothed ? "var(--primary)" : "transparent",
-              color: smoothed ? "#fff" : "var(--foreground)",
-              cursor: "pointer",
-              transition: "all 0.15s",
-            }}
-          >
-            {smoothed ? "Smoothed" : "Stepped"}
-          </button>
+          {/* Toggle Switch */}
+          <div style={{
+            display: "flex",
+            background: "var(--input-bg)",
+            padding: 4,
+            borderRadius: 6,
+            border: "1px solid var(--border)",
+            gap: 4,
+          }}>
+            <button
+              onClick={() => setSmoothed(false)}
+              style={{
+                padding: "6px 12px",
+                fontSize: 11,
+                fontWeight: 500,
+                border: "none",
+                borderRadius: 4,
+                background: !smoothed ? "var(--background)" : "transparent",
+                color: !smoothed ? "var(--foreground)" : "var(--muted)",
+                cursor: "pointer",
+                transition: "all 0.15s",
+                boxShadow: !smoothed ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+              }}
+            >
+              Stepped
+            </button>
+            <button
+              onClick={() => setSmoothed(true)}
+              style={{
+                padding: "6px 12px",
+                fontSize: 11,
+                fontWeight: 500,
+                border: "none",
+                borderRadius: 4,
+                background: smoothed ? "var(--background)" : "transparent",
+                color: smoothed ? "var(--foreground)" : "var(--muted)",
+                cursor: "pointer",
+                transition: "all 0.15s",
+                boxShadow: smoothed ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+              }}
+            >
+              Smoothed
+            </button>
+          </div>
           <div style={{ fontSize: 12, color: "var(--muted)", fontFamily: "monospace" }}>
             σ = {(avgSigma * 100).toFixed(2)}%
           </div>
