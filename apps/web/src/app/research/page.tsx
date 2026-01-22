@@ -123,12 +123,25 @@ export default function ResearchPortalPage() {
     return urlMatch ? urlMatch[0] : null;
   };
 
-  // Check if already authenticated
+  // Check if already authenticated and session hasn't expired
   useEffect(() => {
     const token = sessionStorage.getItem('research_token');
-    if (token) {
-      setIsAuthenticated(true);
-      fetchDocuments(token);
+    const loginTime = sessionStorage.getItem('research_login_time');
+
+    if (token && loginTime) {
+      const now = Date.now();
+      const elapsed = now - parseInt(loginTime);
+      const fourHours = 4 * 60 * 60 * 1000; // 4 hours in milliseconds
+
+      if (elapsed < fourHours) {
+        setIsAuthenticated(true);
+        fetchDocuments(token);
+      } else {
+        // Session expired - clear storage
+        sessionStorage.removeItem('research_token');
+        sessionStorage.removeItem('research_login_time');
+        setIsAuthenticated(false);
+      }
     }
   }, []);
 
@@ -150,6 +163,7 @@ export default function ResearchPortalPage() {
 
       const { token } = await res.json();
       sessionStorage.setItem('research_token', token);
+      sessionStorage.setItem('research_login_time', Date.now().toString());
       setIsAuthenticated(true);
       fetchDocuments(token);
     } catch (err: any) {
@@ -168,6 +182,7 @@ export default function ResearchPortalPage() {
       if (!res.ok) {
         if (res.status === 401) {
           sessionStorage.removeItem('research_token');
+          sessionStorage.removeItem('research_login_time');
           setIsAuthenticated(false);
           return;
         }
@@ -262,6 +277,7 @@ export default function ResearchPortalPage() {
 
   const handleLogout = () => {
     sessionStorage.removeItem('research_token');
+    sessionStorage.removeItem('research_login_time');
     setIsAuthenticated(false);
     setDocuments([]);
   };
