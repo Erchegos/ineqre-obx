@@ -8,6 +8,7 @@ type ResearchDocument = {
   source: string;
   subject: string;
   body_text: string;
+  ai_summary: string | null;
   received_date: string;
   attachment_count: number;
   attachments: {
@@ -507,44 +508,56 @@ export default function ResearchPortalPage() {
                 </div>
               </div>
 
-              {/* Preview text */}
-              {doc.body_text && (
+              {/* Preview text - show AI summary if available, otherwise body text */}
+              {(doc.ai_summary || doc.body_text) && (
                 <div style={{
                   padding: 16,
                   background: 'var(--hover-bg)',
-                  borderLeft: '3px solid #0066CC',
+                  borderLeft: `3px solid ${doc.ai_summary ? '#10B981' : '#0066CC'}`,
                   borderRadius: 6,
                   marginBottom: 16,
                 }}>
-                  <p style={{
-                    fontSize: 14,
-                    lineHeight: 1.6,
-                    color: 'var(--foreground)',
-                    margin: 0,
-                    display: '-webkit-box',
-                    WebkitLineClamp: expandedDocs.has(doc.id) ? 'unset' : 3,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                  }}>
-                    {highlightText(cleanBodyText(doc.body_text), searchTerm)}
-                  </p>
-                  {doc.body_text.length > 300 && (
-                    <button
-                      onClick={() => toggleExpanded(doc.id)}
-                      style={{
-                        marginTop: 12,
-                        padding: '6px 12px',
-                        background: 'transparent',
-                        border: '1px solid var(--border)',
-                        borderRadius: 6,
-                        color: '#0066CC',
-                        fontSize: 13,
-                        fontWeight: 500,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {expandedDocs.has(doc.id) ? 'Show less ▲' : 'Read more ▼'}
-                    </button>
+                  {doc.ai_summary ? (
+                    <div style={{
+                      fontSize: 14,
+                      lineHeight: 1.6,
+                      color: 'var(--foreground)',
+                    }}>
+                      {highlightText(doc.ai_summary, searchTerm)}
+                    </div>
+                  ) : (
+                    <>
+                      <p style={{
+                        fontSize: 14,
+                        lineHeight: 1.6,
+                        color: 'var(--foreground)',
+                        margin: 0,
+                        display: '-webkit-box',
+                        WebkitLineClamp: expandedDocs.has(doc.id) ? 'unset' : 3,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}>
+                        {highlightText(cleanBodyText(doc.body_text), searchTerm)}
+                      </p>
+                      {doc.body_text.length > 300 && (
+                        <button
+                          onClick={() => toggleExpanded(doc.id)}
+                          style={{
+                            marginTop: 12,
+                            padding: '6px 12px',
+                            background: 'transparent',
+                            border: '1px solid var(--border)',
+                            borderRadius: 6,
+                            color: '#0066CC',
+                            fontSize: 13,
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {expandedDocs.has(doc.id) ? 'Show less ▲' : 'Read more ▼'}
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               )}

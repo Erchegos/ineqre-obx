@@ -44,6 +44,7 @@ export async function GET(req: NextRequest) {
         d.source,
         d.subject,
         d.body_text,
+        d.ai_summary,
         d.received_date,
         d.attachment_count,
         COALESCE(
@@ -81,7 +82,7 @@ export async function GET(req: NextRequest) {
       query += ` WHERE ${conditions.join(' AND ')}`;
     }
 
-    query += ` GROUP BY d.id, d.ticker, d.source, d.subject, d.body_text, d.received_date, d.attachment_count`;
+    query += ` GROUP BY d.id, d.ticker, d.source, d.subject, d.body_text, d.ai_summary, d.received_date, d.attachment_count`;
     query += ` ORDER BY d.received_date DESC`;
     query += ` LIMIT $${paramCount + 1}`;
     params.push(limit);
