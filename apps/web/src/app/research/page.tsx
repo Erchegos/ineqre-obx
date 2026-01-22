@@ -28,6 +28,7 @@ export default function ResearchPortalPage() {
   const [selectedSource, setSelectedSource] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedDocs, setExpandedDocs] = useState<Set<string>>(new Set());
+  const [selectedDocument, setSelectedDocument] = useState<ResearchDocument | null>(null);
 
   const toggleExpanded = (docId: string) => {
     setExpandedDocs(prev => {
@@ -226,7 +227,18 @@ export default function ResearchPortalPage() {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
-      if (!res.ok) throw new Error('Download failed');
+      if (!res.ok) {
+        // PDF not available - show preview instead
+        const doc = documents.find(d => d.id === documentId);
+        if (doc) {
+          setSelectedDocument(doc);
+          // Scroll to preview section
+          setTimeout(() => {
+            document.getElementById('document-preview')?.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+        }
+        return;
+      }
 
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
@@ -238,7 +250,14 @@ export default function ResearchPortalPage() {
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (err: any) {
-      alert(`Failed to download: ${err.message}`);
+      // Show preview on error
+      const doc = documents.find(d => d.id === documentId);
+      if (doc) {
+        setSelectedDocument(doc);
+        setTimeout(() => {
+          document.getElementById('document-preview')?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+      }
     }
   };
 
@@ -593,11 +612,176 @@ export default function ResearchPortalPage() {
                   onMouseOver={(e) => e.currentTarget.style.background = '#0052A3'}
                   onMouseOut={(e) => e.currentTarget.style.background = '#0066CC'}
                 >
-                  Open Report
+                  View Report
+                </button>
+              )}
+              {/* Show preview button for documents without attachments */}
+              {(!doc.attachments || doc.attachments.length === 0) && (
+                <button
+                  onClick={() => {
+                    setSelectedDocument(doc);
+                    setTimeout(() => {
+                      document.getElementById('document-preview')?.scrollIntoView({ behavior: 'smooth' });
+                    }, 100);
+                  }}
+                  style={{
+                    padding: '12px 24px',
+                    background: 'transparent',
+                    color: '#0066CC',
+                    border: '2px solid #0066CC',
+                    borderRadius: 6,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = 'rgba(0, 102, 204, 0.1)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                  }}
+                >
+                  View Content
                 </button>
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Document Preview Section */}
+      {selectedDocument && (
+        <div id="document-preview" style={{
+          marginTop: 48,
+          padding: 32,
+          background: 'var(--card-bg)',
+          border: '2px solid var(--border)',
+          borderRadius: 12,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 24 }}>
+            <div>
+              <h2 style={{ fontSize: 24, fontWeight: 700, color: 'var(--foreground)', marginBottom: 8 }}>
+                Document Preview
+              </h2>
+              <p style={{ fontSize: 14, color: 'var(--muted-foreground)' }}>
+                PDF not available - showing email content
+              </p>
+            </div>
+            <button
+              onClick={() => setSelectedDocument(null)}
+              style={{
+                padding: '8px 16px',
+                background: 'transparent',
+                border: '1px solid var(--border)',
+                borderRadius: 6,
+                color: 'var(--foreground)',
+                fontSize: 14,
+                cursor: 'pointer',
+              }}
+            >
+              Close
+            </button>
+          </div>
+
+          {/* Document Header */}
+          <div style={{ marginBottom: 24, paddingBottom: 24, borderBottom: '1px solid var(--border)' }}>
+            <div style={{ marginBottom: 12 }}>
+              {selectedDocument.ticker && (
+                <span style={{
+                  display: 'inline-block',
+                  padding: '4px 12px',
+                  background: 'rgba(59, 130, 246, 0.1)',
+                  border: '1px solid rgba(59, 130, 246, 0.3)',
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: '#3b82f6',
+                  marginRight: 12,
+                }}>
+                  {selectedDocument.ticker}
+                </span>
+              )}
+              <span style={{
+                display: 'inline-block',
+                padding: '4px 12px',
+                background: 'rgba(107, 114, 128, 0.1)',
+                border: '1px solid rgba(107, 114, 128, 0.3)',
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 600,
+                color: '#6b7280',
+              }}>
+                {selectedDocument.source}
+              </span>
+            </div>
+            <h3 style={{ fontSize: 20, fontWeight: 600, color: 'var(--foreground)', marginBottom: 8 }}>
+              {selectedDocument.subject}
+            </h3>
+            <p style={{ fontSize: 14, color: 'var(--muted-foreground)' }}>
+              {new Date(selectedDocument.received_date).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </p>
+          </div>
+
+          {/* AI Summary if available */}
+          {selectedDocument.ai_summary && (
+            <div style={{
+              padding: 20,
+              marginBottom: 24,
+              background: 'rgba(34, 197, 94, 0.05)',
+              border: '2px solid rgba(34, 197, 94, 0.2)',
+              borderRadius: 8,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <span style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: '#22c55e',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}>
+                  AI Summary
+                </span>
+              </div>
+              <div style={{
+                fontSize: 14,
+                lineHeight: 1.7,
+                color: 'var(--foreground)',
+                whiteSpace: 'pre-wrap',
+              }}>
+                {selectedDocument.ai_summary}
+              </div>
+            </div>
+          )}
+
+          {/* Full Content */}
+          <div style={{
+            padding: 20,
+            background: 'var(--background)',
+            border: '1px solid var(--border)',
+            borderRadius: 8,
+            maxHeight: 600,
+            overflow: 'auto',
+          }}>
+            <h4 style={{ fontSize: 14, fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Full Email Content
+            </h4>
+            <div style={{
+              fontSize: 14,
+              lineHeight: 1.7,
+              color: 'var(--foreground)',
+              whiteSpace: 'pre-wrap',
+              fontFamily: 'monospace',
+            }}>
+              {selectedDocument.body_text || 'No content available'}
+            </div>
+          </div>
         </div>
       )}
     </main>
