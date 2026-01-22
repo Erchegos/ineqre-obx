@@ -415,32 +415,69 @@ export default function VolatilityPage() {
             Estimator Guide
           </h3>
           <div style={{
-            padding: 16,
-            borderRadius: 6,
-            border: "1px solid var(--border)",
-            background: "var(--card-bg)",
-            fontSize: 11,
-            lineHeight: 1.6,
-            color: "var(--muted)"
+            display: "flex",
+            flexDirection: "column",
+            gap: 12
           }}>
-            <div style={{ marginBottom: 12 }}>
-              <strong style={{ color: "#f59e0b" }}>Yang-Zhang:</strong> Most accurate. Accounts for overnight gaps and intraday range. Use this for position sizing.
-            </div>
-            <div style={{ marginBottom: 12 }}>
-              <strong style={{ color: "#22c55e" }}>Rogers-Satchell:</strong> Drift-independent. Good for trending markets.
-            </div>
-            <div style={{ marginBottom: 12 }}>
-              <strong style={{ color: "#3b82f6" }}>20-Day Rolling:</strong> Standard deviation of returns. Simple but lags recent changes.
-            </div>
-            <div style={{ marginBottom: 12 }}>
-              <strong style={{ color: "#6366f1" }}>EWMA (λ=0.94):</strong> Exponentially weighted. Reacts faster to regime changes.
-            </div>
-            <div style={{ marginBottom: 12 }}>
-              <strong style={{ color: "#ef4444" }}>Parkinson:</strong> Uses only high-low range. Efficient but ignores close-to-close moves.
-            </div>
-            <div>
-              <strong style={{ color: "#06b6d4" }}>Garman-Klass:</strong> Uses OHLC. More efficient than close-only but assumes no drift.
-            </div>
+            {/* Yang-Zhang */}
+            <EstimatorBox
+              color="#f59e0b"
+              name="Yang-Zhang"
+              formula="Combines overnight + open-to-close + close-to-close"
+              whenToUse="Best for position sizing and risk management"
+              pros="Most accurate, accounts for gaps"
+              cons="Requires OHLC data"
+            />
+
+            {/* Rogers-Satchell */}
+            <EstimatorBox
+              color="#22c55e"
+              name="Rogers-Satchell"
+              formula="log(H/C) × log(H/O) + log(L/C) × log(L/O)"
+              whenToUse="Trending markets with directional bias"
+              pros="Drift-independent, no close bias"
+              cons="Ignores overnight gaps"
+            />
+
+            {/* 20/60/120-Day Rolling */}
+            <EstimatorBox
+              color="#3b82f6"
+              name="20/60/120-Day Rolling"
+              formula="Standard deviation of log returns × √252"
+              whenToUse="Simple baseline, compare short vs long term"
+              pros="Easy to interpret, widely understood"
+              cons="Backward-looking, slow to react"
+            />
+
+            {/* EWMA */}
+            <EstimatorBox
+              color="#6366f1"
+              name="EWMA (λ=0.94)"
+              formula="Exponentially weighted moving average"
+              whenToUse="Regime change detection, recent data matters more"
+              pros="Reacts fast to volatility shifts"
+              cons="Can overreact to noise"
+            />
+
+            {/* Parkinson */}
+            <EstimatorBox
+              color="#ef4444"
+              name="Parkinson"
+              formula="(1/4ln2) × (H - L)²"
+              whenToUse="High-frequency data, intraday range focus"
+              pros="Efficient, uses high-low range"
+              cons="Ignores open/close, overnight gaps"
+            />
+
+            {/* Garman-Klass */}
+            <EstimatorBox
+              color="#06b6d4"
+              name="Garman-Klass"
+              formula="0.5(H-L)² - (2ln2-1)(C-O)²"
+              whenToUse="When you have OHLC but no overnight data"
+              pros="More efficient than close-only"
+              cons="Assumes zero drift"
+            />
           </div>
         </div>
       </div>
@@ -448,7 +485,7 @@ export default function VolatilityPage() {
   );
 }
 
-// --- Helper Component ---
+// --- Helper Components ---
 function MetricCard({
   label,
   value,
@@ -495,6 +532,92 @@ function MetricCard({
         lineHeight: 1.4
       }}>
         {description}
+      </div>
+    </div>
+  );
+}
+
+function EstimatorBox({
+  color,
+  name,
+  formula,
+  whenToUse,
+  pros,
+  cons
+}: {
+  color: string;
+  name: string;
+  formula: string;
+  whenToUse: string;
+  pros: string;
+  cons: string;
+}) {
+  return (
+    <div style={{
+      padding: 14,
+      borderRadius: 6,
+      border: `1px solid ${color}30`,
+      background: `${color}08`,
+      display: "flex",
+      flexDirection: "column",
+      gap: 6
+    }}>
+      {/* Header */}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 4
+      }}>
+        <div style={{
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          background: color
+        }} />
+        <strong style={{
+          fontSize: 12,
+          fontWeight: 700,
+          color: color
+        }}>
+          {name}
+        </strong>
+      </div>
+
+      {/* Formula */}
+      <div style={{
+        fontSize: 10,
+        fontFamily: "monospace",
+        color: "var(--muted)",
+        padding: "4px 8px",
+        background: "var(--background)",
+        borderRadius: 3,
+        border: "1px solid var(--border)"
+      }}>
+        {formula}
+      </div>
+
+      {/* When to use */}
+      <div style={{ fontSize: 11, lineHeight: 1.5 }}>
+        <span style={{ color: "var(--foreground)", fontWeight: 600 }}>Use when: </span>
+        <span style={{ color: "var(--muted)" }}>{whenToUse}</span>
+      </div>
+
+      {/* Pros/Cons */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 8,
+        fontSize: 10
+      }}>
+        <div>
+          <span style={{ color: "#22c55e", fontWeight: 600 }}>✓ </span>
+          <span style={{ color: "var(--muted)" }}>{pros}</span>
+        </div>
+        <div>
+          <span style={{ color: "#ef4444", fontWeight: 600 }}>✗ </span>
+          <span style={{ color: "var(--muted)" }}>{cons}</span>
+        </div>
       </div>
     </div>
   );
