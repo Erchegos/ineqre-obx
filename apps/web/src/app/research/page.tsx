@@ -51,18 +51,18 @@ export default function ResearchPortalPage() {
 
     // Fix encoding artifacts (mojibake from email import)
     cleaned = cleaned
-      .replace(/â€¢/g, '•')   // bullet point
-      .replace(/â€"/g, '–')   // en dash
-      .replace(/â€"/g, '—')   // em dash
-      .replace(/â€˜/g, ''')   // left single quote
-      .replace(/â€™/g, ''')   // right single quote
-      .replace(/â€œ/g, '"')   // left double quote
-      .replace(/â€/g, '"')    // right double quote
-      .replace(/Â /g, ' ')    // non-breaking space
-      .replace(/Ã¸/g, 'ø')   // Norwegian o
-      .replace(/Ã¥/g, 'å')   // Norwegian a
-      .replace(/Ã¦/g, 'æ')   // Norwegian ae
-      .replace(/â€¦/g, '...') // ellipsis
+      .replace(/â€¢/g, '\u2022')   // bullet point
+      .replace(/â€"/g, '\u2013')   // en dash
+      .replace(/â€"/g, '\u2014')   // em dash
+      .replace(/â€˜/g, '\u2018')   // left single quote
+      .replace(/â€™/g, '\u2019')   // right single quote
+      .replace(/â€œ/g, '\u201C')   // left double quote
+      .replace(/â€/g, '\u201D')    // right double quote
+      .replace(/Â /g, ' ')         // non-breaking space
+      .replace(/Ã¸/g, '\u00F8')   // Norwegian o
+      .replace(/Ã¥/g, '\u00E5')   // Norwegian a
+      .replace(/Ã¦/g, '\u00E6')   // Norwegian ae
+      .replace(/â€¦/g, '...')      // ellipsis
       // Remove any remaining mojibake artifacts
       .replace(/[âÂ]/g, '');
 
