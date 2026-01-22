@@ -7,6 +7,7 @@ import { useParams, useSearchParams } from "next/navigation";
 // --- Components ---
 import VolatilityChart from "@/components/VolatilityChart";
 import SeasonalityChart from "@/components/SeasonalityChart";
+import VolatilityCorrelationChart from "@/components/VolatilityCorrelationChart";
 
 // --- Types ---
 type VolatilityData = {
@@ -95,6 +96,7 @@ export default function VolatilityPage() {
 
   const [loading, setLoading] = useState<boolean>(true);
   const [data, setData] = useState<VolatilityData | null>(null);
+  const [marketData, setMarketData] = useState<VolatilityData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [selectedMeasures, setSelectedMeasures] = useState<string[]>([
@@ -111,6 +113,7 @@ export default function VolatilityPage() {
       setLoading(true);
       setError(null);
       try {
+        // Fetch stock volatility data
         const url = `/api/volatility/${encodeURIComponent(ticker)}?limit=${limit}&adjusted=${isAdjusted}`;
         const res = await fetch(url, {
           method: "GET",
@@ -128,8 +131,26 @@ export default function VolatilityPage() {
         }
 
         const json = (await res.json()) as VolatilityData;
+
+        // Fetch OBX (market) volatility data for correlation
+        let marketJson: VolatilityData | null = null;
+        try {
+          const marketUrl = `/api/volatility/OBX?limit=${limit}&adjusted=${isAdjusted}`;
+          const marketRes = await fetch(marketUrl, {
+            method: "GET",
+            headers: { accept: "application/json" },
+            cache: "no-store",
+          });
+          if (marketRes.ok) {
+            marketJson = (await marketRes.json()) as VolatilityData;
+          }
+        } catch (e) {
+          console.warn("Failed to fetch market volatility data:", e);
+        }
+
         if (!cancelled) {
           setData(json);
+          setMarketData(marketJson);
           setLoading(false);
         }
       } catch (e: any) {
@@ -387,6 +408,32 @@ export default function VolatilityPage() {
           />
         </div>
       </div>
+
+      {/* Volatility Correlation Chart */}
+      {marketData && (
+        <div style={{ marginBottom: 40 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: "var(--foreground)" }}>
+            Volatility Correlation with Market (OBX)
+          </h2>
+          <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 16, lineHeight: 1.5 }}>
+            Rolling 30-day correlation between {ticker} volatility and OBX index volatility.
+            Shows how closely the stock's volatility moves with overall market volatility.
+          </p>
+          <div style={{
+            padding: 20,
+            borderRadius: 6,
+            border: "1px solid var(--border)",
+            background: "var(--card-bg)"
+          }}>
+            <VolatilityCorrelationChart
+              stockData={data.series}
+              marketData={marketData.series}
+              height={280}
+              window={30}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Two-Column Layout: Seasonality + Info Box */}
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24 }}>
