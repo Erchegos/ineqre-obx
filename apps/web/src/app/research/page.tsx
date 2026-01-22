@@ -29,6 +29,7 @@ export default function ResearchPortalPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedDocs, setExpandedDocs] = useState<Set<string>>(new Set());
   const [selectedDocument, setSelectedDocument] = useState<ResearchDocument | null>(null);
+  const [pdfCheckStatus, setPdfCheckStatus] = useState<Map<string, boolean>>(new Map());
 
   const toggleExpanded = (docId: string) => {
     setExpandedDocs(prev => {
@@ -228,13 +229,17 @@ export default function ResearchPortalPage() {
       });
 
       if (!res.ok) {
-        // PDF not available - show inline preview instead
+        // PDF not available - mark it and show inline preview instead
+        setPdfCheckStatus(prev => new Map(prev).set(`${documentId}-${attachmentId}`, false));
         const doc = documents.find(d => d.id === documentId);
         if (doc) {
           setSelectedDocument(doc);
         }
         return;
       }
+
+      // PDF available - mark it
+      setPdfCheckStatus(prev => new Map(prev).set(`${documentId}-${attachmentId}`, true));
 
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
@@ -247,6 +252,7 @@ export default function ResearchPortalPage() {
       window.URL.revokeObjectURL(url);
     } catch (err: any) {
       // Show inline preview on error
+      setPdfCheckStatus(prev => new Map(prev).set(`${documentId}-${attachmentId}`, false));
       const doc = documents.find(d => d.id === documentId);
       if (doc) {
         setSelectedDocument(doc);
@@ -593,27 +599,54 @@ export default function ResearchPortalPage() {
               )}
 
               {/* Action buttons */}
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                {doc.attachments && doc.attachments.length > 0 && (
-                  <button
-                    onClick={() => handleDownload(doc.id, doc.attachments[0].id, doc.attachments[0].filename)}
-                    style={{
-                      padding: '12px 24px',
-                      background: '#0066CC',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: 6,
-                      fontSize: 14,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                    }}
-                    onMouseOver={(e) => e.currentTarget.style.background = '#0052A3'}
-                    onMouseOut={(e) => e.currentTarget.style.background = '#0066CC'}
-                  >
-                    View Report
-                  </button>
-                )}
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                {doc.attachments && doc.attachments.length > 0 && (() => {
+                  const pdfKey = `${doc.id}-${doc.attachments[0].id}`;
+                  const pdfStatus = pdfCheckStatus.get(pdfKey);
+                  const isPdfUnavailable = pdfStatus === false;
+
+                  return (
+                    <>
+                      <button
+                        onClick={() => handleDownload(doc.id, doc.attachments[0].id, doc.attachments[0].filename)}
+                        disabled={isPdfUnavailable}
+                        style={{
+                          padding: '12px 24px',
+                          background: isPdfUnavailable ? '#6B7280' : '#0066CC',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: 6,
+                          fontSize: 14,
+                          fontWeight: 600,
+                          cursor: isPdfUnavailable ? 'not-allowed' : 'pointer',
+                          opacity: isPdfUnavailable ? 0.6 : 1,
+                          transition: 'all 0.2s',
+                        }}
+                        onMouseOver={(e) => {
+                          if (!isPdfUnavailable) {
+                            e.currentTarget.style.background = '#0052A3';
+                          }
+                        }}
+                        onMouseOut={(e) => {
+                          if (!isPdfUnavailable) {
+                            e.currentTarget.style.background = '#0066CC';
+                          }
+                        }}
+                      >
+                        {isPdfUnavailable ? 'PDF Not Available' : 'View Report'}
+                      </button>
+                      {isPdfUnavailable && (
+                        <span style={{
+                          fontSize: 12,
+                          color: '#EF4444',
+                          fontWeight: 500,
+                        }}>
+                          Use "Show Details" to view content
+                        </span>
+                      )}
+                    </>
+                  );
+                })()}
 
                 {/* Show full content button */}
                 <button
