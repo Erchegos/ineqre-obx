@@ -14,9 +14,13 @@ if not DATABASE_URL:
     sys.exit(1)
 
 TICKERS = [
-    "OBX", "EQNR", "DNB", "MOWI", "NHY", "TEL", "YAR", "AKER",
-    "SALM", "ORK", "AKRBP", "STB", "SUBSEA", "KAHOT", "GOGL",
-    "MPCC", "PGS", "XXL", "SCATC", "GJF", "TGS"
+    "OBX", "AFG", "AKER", "AKRBP", "ATEA", "AUSS", "AUTO", "BAKKA",
+    "BRG", "BWLPG", "CADLR", "DNB", "ELK", "ENTRA", "EQNR", "FRO",
+    "GJF", "HAVI", "HEX", "KIT", "KOG", "MPCC", "MOWI", "NAS",
+    "NHY", "NOD", "ORK", "RECSI", "SALM", "SCATC", "SUBC", "TECH",
+    "TGS", "TIETO", "VAR", "VEI", "YAR", "CMBTO", "DOFG", "HAFNI",
+    "HAUTO", "LSG", "MING", "ODL", "OLT", "PROT", "SB1NO", "SNI",
+    "SPOL", "STB", "SWON", "TEL", "TOM", "WAWI", "WWI", "WWIB",
 ]
 
 def upsert_bar(conn, ticker, bar):
@@ -90,10 +94,15 @@ async def update_ticker(ib, ticker):
 async def main():
     print("=== TWS Daily Update ===")
     print(f"Time: {datetime.now().isoformat()}\n")
-    
+
     ib = IB()
-    await ib.connectAsync('127.0.0.1', 4001, clientId=1)
-    print("✓ Connected to TWS")
+    # Try IB Gateway port (4002) first, then TWS port (4001)
+    try:
+        await ib.connectAsync('127.0.0.1', 4002, clientId=1)
+        print("✓ Connected to IB Gateway (port 4002)")
+    except:
+        await ib.connectAsync('127.0.0.1', 4001, clientId=1)
+        print("✓ Connected to TWS (port 4001)")
     
     conn = psycopg2.connect(DATABASE_URL, sslmode='require')
     print("✓ Database connected\n")

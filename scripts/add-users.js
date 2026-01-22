@@ -20,9 +20,7 @@ const pool = new Pool({
 
 // Define users to add (you can edit this list)
 const usersToAdd = [
-  { description: 'Admin Access', password: 'Admin2026!' },
-  { description: 'Client Access', password: 'Client2026!' },
-  { description: 'Guest Access', password: 'Guest2026!' },
+  { description: 'Client Access - IsakSve123', password: 'IsakSve123' },
 ];
 
 async function addUser(description, password) {

@@ -1,20 +1,16 @@
 /**
- * OBX and Oslo Børs tickers - FULL LIST FOR TESTING
- * Updated as of 2026-01-20
- * 
- * This list combines:
- * - 36 tickers verified working with IB Gateway
- * - 22 additional tickers to be tested
- * 
- * Total: 58 tickers
- * 
- * After testing, remove tickers that fail to resolve.
+ * OBX and Oslo Børs tickers - VERIFIED WORKING
+ * Updated as of 2026-01-22
+ *
+ * All 57 tickers verified working with IB Gateway (port 4002)
+ *
+ * Failed/removed: SBNOR, VENDA, VENDB
  */
 
 export const OBX_INDEX_TICKER = "OBX";
 
 export const OBX_TICKERS = [
-  // Core verified tickers (36)
+  // Verified working tickers (56 stocks + OBX index)
   "AFG",      // AF Gruppen ASA
   "AKER",     // Aker ASA-A Shares
   "AKRBP",    // Aker BP ASA
@@ -25,56 +21,52 @@ export const OBX_TICKERS = [
   "BRG",      // Borregaard ASA
   "BWLPG",    // BW LPG Ltd
   "CADLR",    // Cadeler A/S
+  "CMBTO",    // Cambi Group ASA
   "DNB",      // DNB Bank ASA
+  "DOFG",     // DOF Group ASA
   "ELK",      // Elkem ASA
   "ENTRA",    // Entra ASA
   "EQNR",     // Equinor ASA
   "FRO",      // Frontline PLC
   "GJF",      // Gjensidige Forsikring ASA
+  "HAFNI",    // Hafnia Limited
+  "HAUTO",    // Hurtigruten ASA
   "HAVI",     // Havila Shipping ASA
   "HEX",      // Hexagon Composites ASA
   "KIT",      // Kitron ASA
   "KOG",      // Kongsberg Gruppen ASA
+  "LSG",      // Lerøy Seafood Group ASA
+  "MING",     // Multiconsult ASA
   "MPCC",     // MPC Container Ships ASA
   "MOWI",     // Mowi ASA
   "NAS",      // Norwegian Air Shuttle ASA
   "NHY",      // Norsk Hydro ASA
   "NOD",      // Nordic Semiconductor ASA
-  "ORK",      // Orkla ASA
-  "RECSI",    // REC Silicon ASA
-  "SALM",     // SalMar ASA
-  "SCATC",    // Scatec ASA
-  "SUBC",     // Subsea 7 SA
-  "TECH",     // Technip Energies NV
-  "TGS",      // TGS ASA
-  "TIETO",    // TietoEVRY Oyj
-  "VAR",      // Vår Energi ASA
-  "VEI",      // Veidekke ASA
-  "YAR",      // Yara International ASA
-  
-  // Additional tickers to test (22)
-  "CMBTO",    // Cambi Group ASA
-  "DOFG",     // DOF Group ASA
-  "HAFNI",    // Hafnia Limited
-  "HAUTO",    // Hurtigruten ASA
-  "LSG",      // Lerøy Seafood Group ASA
-  "MING",     // Multiconsult ASA
   "ODL",      // Odfjell Drilling Ltd
   "OLT",      // Oceanteam ASA
+  "ORK",      // Orkla ASA
   "PROT",     // Protector Forsikring ASA
+  "RECSI",    // REC Silicon ASA
+  "SALM",     // SalMar ASA
   "SB1NO",    // SpareBank 1 Nord-Norge
-  "SBNOR",    // SpareBank 1 Nordvest
+  "SCATC",    // Scatec ASA
   "SNI",      // Schibsted ASA
   "SPOL",     // Sparebank 1 Østlandet
   "STB",      // Storebrand ASA
+  "SUBC",     // Subsea 7 SA
   "SWON",     // Sbanken ASA
+  "TECH",     // Technip Energies NV
   "TEL",      // Telenor ASA
+  "TGS",      // TGS ASA
+  "TIETO",    // TietoEVRY Oyj
   "TOM",      // Tomra Systems ASA
-  "VENDA",    // Veidekke (alternative ticker?)
-  "VENDB",    // Veidekke B-shares
+  "VAR",      // Vår Energi ASA
+  "VEI",      // Veidekke ASA
+  "VEND",     // Vend Marketplace
   "WAWI",     // Wallenius Wilhelmsen ASA
   "WWI",      // Wilh. Wilhelmsen Holding ASA
   "WWIB",     // Wilh. Wilhelmsen Holding B
+  "YAR",      // Yara International ASA
 ] as const;
 
 export const ALL_TICKERS = [OBX_INDEX_TICKER, ...OBX_TICKERS] as const;
