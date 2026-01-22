@@ -425,14 +425,10 @@ export default function ResearchPortalPage() {
               fontSize: 14,
               cursor: 'pointer',
               transition: 'all 0.2s',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
             }}
             onMouseOver={(e) => e.currentTarget.style.background = 'var(--hover-bg)'}
             onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
           >
-            <span style={{ fontSize: 16 }}>🏠</span>
             Home
           </button>
           <button

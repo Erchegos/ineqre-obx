@@ -347,8 +347,8 @@ export default function CorrelationPage() {
               </div>
 
               <div>
-                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 16 }}>💡</span> Why This Matters
+                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 12 }}>
+                  Why This Matters
                 </h3>
                 <div style={{ display: "grid", gap: 10 }}>
                   <div>
@@ -939,7 +939,7 @@ export default function CorrelationPage() {
                 </p>
                 <div style={{ background: "rgba(59, 130, 246, 0.05)", padding: 12, borderRadius: 6, marginBottom: 20, border: "1px solid rgba(59, 130, 246, 0.2)" }}>
                   <p style={{ fontSize: 11, color: "var(--muted-foreground)", margin: 0, lineHeight: 1.5 }}>
-                    💡 <strong>Look for:</strong> Sudden spikes to +1 during red/orange periods = crisis mode (everything falls together).
+                    <strong>Look for:</strong> Sudden spikes to +1 during red/orange periods = crisis mode (everything falls together).
                     Stable line in blue/green areas = normal market where stocks can move independently.
                   </p>
                 </div>
