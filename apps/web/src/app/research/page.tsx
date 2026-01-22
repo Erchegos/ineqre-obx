@@ -49,6 +49,23 @@ export default function ResearchPortalPage() {
     cleaned = cleaned.split(/\n*Full Report:/i)[0];
     cleaned = cleaned.replace(/CLICK HERE FOR THE FULL REPORT/gi, '');
 
+    // Fix encoding artifacts (mojibake from email import)
+    cleaned = cleaned
+      .replace(/â€¢/g, '•')   // bullet point
+      .replace(/â€"/g, '–')   // en dash
+      .replace(/â€"/g, '—')   // em dash
+      .replace(/â€˜/g, ''')   // left single quote
+      .replace(/â€™/g, ''')   // right single quote
+      .replace(/â€œ/g, '"')   // left double quote
+      .replace(/â€/g, '"')    // right double quote
+      .replace(/Â /g, ' ')    // non-breaking space
+      .replace(/Ã¸/g, 'ø')   // Norwegian o
+      .replace(/Ã¥/g, 'å')   // Norwegian a
+      .replace(/Ã¦/g, 'æ')   // Norwegian ae
+      .replace(/â€¦/g, '...') // ellipsis
+      // Remove any remaining mojibake artifacts
+      .replace(/[âÂ]/g, '');
+
     return cleaned.trim();
   };
 

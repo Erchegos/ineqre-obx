@@ -57,16 +57,11 @@ async function main() {
   console.log('Fixing text encoding in research documents...\n');
 
   try {
-    // Get all documents with body text containing encoding artifacts
+    // Get all documents with body text
     const result = await pool.query(`
       SELECT id, subject, body_text
       FROM research_documents
       WHERE body_text IS NOT NULL
-        AND (
-          body_text LIKE '%â€%'
-          OR body_text LIKE '%Â%'
-          OR body_text LIKE '%Ã%'
-        )
       ORDER BY received_date DESC
     `);
 
