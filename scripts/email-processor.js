@@ -14,6 +14,7 @@
 require('dotenv').config();
 const { ImapFlow } = require('imapflow');
 const { Pool } = require('pg');
+const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const path = require('path');
 
@@ -27,6 +28,12 @@ const pool = new Pool({
     rejectUnauthorized: false
   }
 });
+
+// Initialize Supabase client for storage
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 // Configuration
 const CONFIG = {
@@ -94,20 +101,37 @@ function identifySource(email) {
 }
 
 /**
- * Save file to local storage
+ * Save file to Supabase Storage
  */
-async function saveToLocalStorage(content, relativePath) {
-  const fullPath = path.join(CONFIG.storageDir, relativePath);
-  const dir = path.dirname(fullPath);
+async function saveToSupabaseStorage(content, relativePath) {
+  try {
+    const { data, error } = await supabase.storage
+      .from('research-documents')
+      .upload(relativePath, content, {
+        contentType: 'application/pdf',
+        upsert: true
+      });
 
-  // Create directory if it doesn't exist
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+    if (error) {
+      throw error;
+    }
+
+    return relativePath;
+  } catch (error) {
+    console.error(`Failed to upload to Supabase Storage: ${error.message}`);
+
+    // Fallback to local storage
+    const fullPath = path.join(CONFIG.storageDir, relativePath);
+    const dir = path.dirname(fullPath);
+
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    fs.writeFileSync(fullPath, content);
+    console.log(`  Saved to local storage as fallback: ${relativePath}`);
+    return relativePath;
   }
-
-  // Write file
-  fs.writeFileSync(fullPath, content);
-  return relativePath;
 }
 
 /**
@@ -265,8 +289,8 @@ async function processEmail(message, imap) {
         const now = new Date();
         const relativePath = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${documentId}/${att.filename}`;
 
-        // Save to local storage
-        await saveToLocalStorage(content, relativePath);
+        // Save to Supabase Storage
+        await saveToSupabaseStorage(content, relativePath);
 
         // Save attachment record
         await pool.query(
@@ -277,7 +301,7 @@ async function processEmail(message, imap) {
         );
 
         attachmentCount++;
-        console.log(`  Saved attachment: ${att.filename}`);
+        console.log(`  ✓ Saved attachment to Supabase: ${att.filename}`);
       } catch (err) {
         console.error(`  Error processing attachment ${att.filename}:`, err.message);
       }
@@ -347,8 +371,8 @@ async function processEmail(message, imap) {
           const now = new Date();
           const relativePath = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${documentId}/${filename}`;
 
-          // Save to local storage
-          await saveToLocalStorage(pdfBuffer, relativePath);
+          // Save to Supabase Storage
+          await saveToSupabaseStorage(pdfBuffer, relativePath);
 
           // Save as attachment record
           await pool.query(
@@ -359,7 +383,7 @@ async function processEmail(message, imap) {
           );
 
           attachmentCount++;
-          console.log(`  ✓ Downloaded and saved PDF: ${filename} (${Math.round(pdfBuffer.length / 1024)}KB)`);
+          console.log(`  ✓ Downloaded and saved PDF to Supabase: ${filename} (${Math.round(pdfBuffer.length / 1024)}KB)`);
         } else {
           console.log(`  ⚠ PDF download failed: HTTP ${response.statusCode || response.status}`);
         }
