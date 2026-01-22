@@ -55,8 +55,8 @@ export default function ResidualSquaresChart({
     );
   }
 
-  // Filter data based on selected period
-  const filteredData = useMemo(() => {
+  // Filter data based on selected period and calculate regression
+  const { filteredData, filteredRegression } = useMemo(() => {
     const periodDays: Record<string, number> = {
       "1M": 21,
       "3M": 63,
@@ -68,39 +68,105 @@ export default function ResidualSquaresChart({
 
     const days = periodDays[period] || data.length;
     const startIdx = Math.max(0, data.length - days);
+    const slicedData = data.slice(startIdx);
 
-    // Now x = market return, y = stock return (CAPM regression plot)
-    return data.slice(startIdx).map((d) => ({
-      x: d.marketReturn * 100, // Market return as percentage for x-axis
-      y: d.stockReturn * 100, // Stock return as percentage for y-axis
-      date: d.date,
-      residual: d.residual,
-      residualSquare: d.residualSquare,
-    }));
+    if (slicedData.length === 0) {
+      return {
+        filteredData: [],
+        filteredRegression: { alpha: 0, beta: 0, rSquared: 0 }
+      };
+    }
+
+    // Calculate regression statistics on filtered data
+    const n = slicedData.length;
+    const stockReturns = slicedData.map(d => d.stockReturn);
+    const marketReturns = slicedData.map(d => d.marketReturn);
+
+    // Calculate means
+    const meanStock = stockReturns.reduce((a, b) => a + b, 0) / n;
+    const meanMarket = marketReturns.reduce((a, b) => a + b, 0) / n;
+
+    // Calculate covariance and variance
+    let covariance = 0;
+    let marketVariance = 0;
+    for (let i = 0; i < n; i++) {
+      const stockDiff = stockReturns[i] - meanStock;
+      const marketDiff = marketReturns[i] - meanMarket;
+      covariance += stockDiff * marketDiff;
+      marketVariance += marketDiff * marketDiff;
+    }
+
+    // Beta = Cov(stock, market) / Var(market)
+    const calcBeta = marketVariance !== 0 ? covariance / marketVariance : 0;
+
+    // Alpha = mean(stock) - beta * mean(market)
+    const calcAlpha = meanStock - calcBeta * meanMarket;
+
+    // Calculate R²
+    let ssRes = 0;
+    let ssTot = 0;
+    for (let i = 0; i < n; i++) {
+      const predicted = calcAlpha + calcBeta * marketReturns[i];
+      const residual = stockReturns[i] - predicted;
+      ssRes += residual * residual;
+      ssTot += Math.pow(stockReturns[i] - meanStock, 2);
+    }
+
+    const calcRSquared = ssTot !== 0 ? 1 - (ssRes / ssTot) : 0;
+
+    // Map data with recalculated residuals
+    const mappedData = slicedData.map((d) => {
+      const predicted = calcAlpha + calcBeta * d.marketReturn;
+      const newResidual = d.stockReturn - predicted;
+
+      return {
+        x: d.marketReturn * 100, // Market return as percentage for x-axis
+        y: d.stockReturn * 100, // Stock return as percentage for y-axis
+        date: d.date,
+        residual: newResidual, // Recalculated residual
+        residualSquare: newResidual * newResidual,
+        stockReturn: d.stockReturn,
+        marketReturn: d.marketReturn,
+      };
+    });
+
+    return {
+      filteredData: mappedData,
+      filteredRegression: {
+        alpha: calcAlpha,
+        beta: calcBeta,
+        rSquared: calcRSquared,
+      }
+    };
   }, [data, period]);
 
-  // Calculate RSS and regression line using beta and alpha
+  // Calculate RSS and regression line using filtered beta and alpha
   const { rss, regressionLine } = useMemo(() => {
     if (filteredData.length === 0) return { rss: 0, regressionLine: [] };
 
-    const totalRSS = filteredData.reduce((sum, d) => sum + d.residualSquare * 10000, 0);
+    // Recalculate residuals based on filtered regression
+    const totalRSS = filteredData.reduce((sum, d) => {
+      const predicted = filteredRegression.alpha + filteredRegression.beta * d.marketReturn;
+      const residual = d.stockReturn - predicted;
+      return sum + residual * residual * 10000; // Convert to percentage squared
+    }, 0);
 
     // Generate regression line: y = alpha + beta * x (already in percentage)
     const minX = Math.min(...filteredData.map(d => d.x));
     const maxX = Math.max(...filteredData.map(d => d.x));
 
     // Convert alpha and beta from decimal to percentage for display
-    const alphaPercent = alpha * 100;
+    const alphaPercent = filteredRegression.alpha * 100;
     const regressionLineData = [
-      { x: minX, y: alphaPercent + beta * minX },
-      { x: maxX, y: alphaPercent + beta * maxX },
+      { x: minX, y: alphaPercent + filteredRegression.beta * minX },
+      { x: maxX, y: alphaPercent + filteredRegression.beta * maxX },
     ];
 
     return {
       rss: totalRSS,
       regressionLine: regressionLineData,
     };
-  }, [filteredData, alpha, beta]);
+  }, [filteredData, filteredRegression]);
 
   return (
     <div style={{ width: "100%" }}>
@@ -151,16 +217,16 @@ export default function ResidualSquaresChart({
           <div>
             <span style={{ color: "var(--muted-foreground)" }}>β:</span>{" "}
             <strong style={{ color: "var(--foreground)" }}>
-              {beta.toFixed(3)}
+              {filteredRegression.beta.toFixed(3)}
             </strong>
           </div>
           <div>
             <span style={{ color: "var(--muted-foreground)" }}>α:</span>{" "}
-            {(alpha * 100).toFixed(4)}%
+            {(filteredRegression.alpha * 100).toFixed(4)}%
           </div>
           <div>
             <span style={{ color: "var(--muted-foreground)" }}>R²:</span>{" "}
-            {rSquared.toFixed(3)}
+            {filteredRegression.rSquared.toFixed(3)}
           </div>
         </div>
       </div>
