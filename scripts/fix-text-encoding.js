@@ -1,11 +1,14 @@
 /**
- * Fix text encoding in all existing documents
+ * Fix text encoding artifacts in existing database records
+ *
+ * This script cleans up UTF-8 mojibake in the body_text field
+ * of research_documents table.
  */
 
 require('dotenv').config();
 const { Pool } = require('pg');
 
-// Database setup
+// Strip sslmode parameter from connection string
 let connectionString = process.env.DATABASE_URL.trim().replace(/^["']|["']$/g, '');
 connectionString = connectionString.replace(/[?&]sslmode=\w+/g, '');
 
@@ -14,118 +17,96 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-function fixEncoding(text) {
-  if (!text) return text;
+/**
+ * Clean text to remove encoding artifacts and fix mojibake
+ */
+function cleanText(text) {
+  if (!text) return '';
 
-  let fixed = text
-    // Fix smart quotes and apostrophes (mojibake patterns)
-    .replace(/â€™/g, "'")
-    .replace(/â€˜/g, "'")
-    .replace(/â€œ/g, '"')
-    .replace(/â€/g, '"')
-    .replace(/â€"/g, '–')
-    .replace(/â€"/g, '—')
-    .replace(/â€¦/g, '...')
-
-    // Fix common day possessives
-    .replace(/Mondayâs/g, "Monday's")
-    .replace(/Tuesdayâs/g, "Tuesday's")
-    .replace(/Wednesdayâs/g, "Wednesday's")
-    .replace(/Thursdayâs/g, "Thursday's")
-    .replace(/Fridayâs/g, "Friday's")
-    .replace(/Saturdayâs/g, "Saturday's")
-    .replace(/Sundayâs/g, "Sunday's")
-
-    // Fix possessives and contractions with â
-    .replace(/(\w)âs\b/g, "$1's")
-    .replace(/(\w)ât\b/g, "$1't")
-    .replace(/(\w)âre\b/g, "$1're")
-    .replace(/(\w)âve\b/g, "$1've")
-    .replace(/(\w)âll\b/g, "$1'll")
-    .replace(/(\w)âd\b/g, "$1'd")
-
-    // Fix quotes around phrases (â...â becomes "...")
-    .replace(/â([A-Z][^â]*?)â/g, '"$1"')
-    .replace(/â([a-z][^â]*?)â/g, '"$1"')
-
-    // Fix dashes between words
-    .replace(/\sâ\s/g, ' – ')
-
-    // Fix Norwegian characters
-    .replace(/Ã¥/g, 'å')
-    .replace(/Ã¸/g, 'ø')
-    .replace(/Ã¦/g, 'æ')
-    .replace(/Ã…/g, 'Å')
-    .replace(/Ã˜/g, 'Ø')
-    .replace(/Ã†/g, 'Æ')
-
-    // Remove non-breaking space artifacts
-    .replace(/Â /g, ' ')
-    .replace(/Â/g, '')
-
-    // Clean up any remaining stray â characters
-    .replace(/â/g, '');
-
-  // Fix specific known issues from my earlier cleanup
-  fixed = fixed
-    .replace(/\bMondays\b/g, "Monday's")
-    .replace(/\bones\b(?= hardest)/g, "one's");
-
-  // Remove empty quotes ""
-  fixed = fixed.replace(/""/g, '');
-
-  // Clean up multiple spaces to single space
-  fixed = fixed.replace(/  +/g, ' ');
-
-  return fixed;
+  return text
+    // Fix common UTF-8 mojibake patterns (double-encoded UTF-8)
+    .replace(/â€¢/g, '\u2022')  // bullet point
+    .replace(/â€"/g, '\u2013')  // en dash
+    .replace(/â€"/g, '\u2014')  // em dash
+    .replace(/â€˜/g, '\u2018')  // left single quote
+    .replace(/â€™/g, '\u2019')  // right single quote/apostrophe
+    .replace(/â€œ/g, '\u201C')  // left double quote
+    .replace(/â€/g, '\u201D')   // right double quote
+    .replace(/â‚¬/g, '\u20AC')  // euro sign
+    .replace(/Â£/g, '\u00A3')   // pound sign
+    .replace(/Â /g, ' ')   // non-breaking space
+    .replace(/Ã¸/g, '\u00F8')  // o with stroke (Norwegian)
+    .replace(/Ã¥/g, '\u00E5')  // a with ring (Norwegian)
+    .replace(/Ã¦/g, '\u00E6')  // ae ligature (Norwegian)
+    .replace(/Ã˜/g, '\u00D8')  // O with stroke
+    .replace(/Ã…/g, '\u00C5')  // A with ring
+    .replace(/Ã†/g, '\u00C6')  // AE ligature
+    .replace(/â€¦/g, '...')  // ellipsis
+    .replace(/Â°/g, '\u00B0')   // degree symbol
+    .replace(/Â±/g, '\u00B1')   // plus-minus
+    // Remove any remaining control characters and weird symbols
+    .replace(/[^\x20-\x7E\u00A0-\u00FF\u0100-\u017F\u2018-\u201F\u2022\u2013\u2014]/g, '')
+    // Normalize whitespace
+    .replace(/\s\s+/g, ' ')
+    .replace(/\n\s+/g, '\n')
+    .replace(/\n\n\n+/g, '\n\n')
+    .trim();
 }
 
-async function fixAllDocuments() {
-  console.log('Fixing text encoding in all documents...\n');
+async function main() {
+  console.log('Fixing text encoding in research documents...\n');
 
   try {
-    // Get all documents
-    const result = await pool.query(
-      'SELECT id, subject, body_text FROM research_documents ORDER BY received_date DESC'
-    );
+    // Get all documents with body text containing encoding artifacts
+    const result = await pool.query(`
+      SELECT id, subject, body_text
+      FROM research_documents
+      WHERE body_text IS NOT NULL
+        AND (
+          body_text LIKE '%â€%'
+          OR body_text LIKE '%Â%'
+          OR body_text LIKE '%Ã%'
+        )
+      ORDER BY received_date DESC
+    `);
 
-    console.log(`Found ${result.rows.length} documents\n`);
+    console.log(`Found ${result.rows.length} documents with encoding issues\n`);
 
-    let updatedCount = 0;
-    let skippedCount = 0;
+    if (result.rows.length === 0) {
+      console.log('No documents need cleaning!');
+      await pool.end();
+      return;
+    }
+
+    let fixedCount = 0;
+    let unchangedCount = 0;
 
     for (const doc of result.rows) {
-      const fixedSubject = fixEncoding(doc.subject);
-      const fixedBody = fixEncoding(doc.body_text);
+      const cleanedText = cleanText(doc.body_text);
 
-      // Only update if something changed
-      if (fixedSubject !== doc.subject || fixedBody !== doc.body_text) {
-        if (updatedCount < 3) {
-          console.log('Updating doc:', doc.subject.substring(0, 50));
-          console.log('Body changed:', doc.body_text !== fixedBody);
-        }
+      if (cleanedText !== doc.body_text) {
         await pool.query(
-          'UPDATE research_documents SET subject = $1, body_text = $2 WHERE id = $3',
-          [fixedSubject, fixedBody, doc.id]
+          'UPDATE research_documents SET body_text = $1 WHERE id = $2',
+          [cleanedText, doc.id]
         );
-        updatedCount++;
-
-        if (updatedCount % 10 === 0) {
-          console.log(`Updated ${updatedCount} documents...`);
-        }
+        console.log(`✓ Fixed: ${doc.subject.substring(0, 60)}...`);
+        fixedCount++;
       } else {
-        skippedCount++;
+        unchangedCount++;
       }
     }
 
-    console.log(`\n✓ Updated: ${updatedCount} documents`);
-    console.log(`- Skipped: ${skippedCount} documents (no changes needed)`);
+    console.log(`\n${'='.repeat(50)}`);
+    console.log(`Fixed: ${fixedCount} documents`);
+    console.log(`Unchanged: ${unchangedCount} documents`);
+    console.log(`${'='.repeat(50)}\n`);
 
   } catch (error) {
     console.error('Error:', error);
+    process.exit(1);
   } finally {
     await pool.end();
   }
 }
 
-fixAllDocuments();
+main().catch(console.error);
