@@ -345,6 +345,10 @@ export default function VolatilityPage() {
         {/* Right: Seasonality */}
         <div>
           <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: "var(--foreground)" }}>Volatility Seasonality</h3>
+          <p style={{ fontSize: 12, color: "var(--muted-foreground)", marginBottom: 12, lineHeight: 1.6 }}>
+            <strong style={{ color: "var(--foreground)" }}>What this shows:</strong> Average annualized volatility for each calendar month across all years.
+            Higher bars = historically more volatile months. Colors indicate relative volatility levels (blue = low, orange = medium, red = high).
+          </p>
            <div style={{ padding: 20, borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)", height: 260 }}>
              <SeasonalityChart data={data.series} />
           </div>

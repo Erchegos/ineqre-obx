@@ -166,10 +166,24 @@ export default function StocksPage() {
             <Link
               href="/"
               style={{
-                color: "var(--muted)",
+                display: "inline-block",
+                color: "var(--foreground)",
                 textDecoration: "none",
                 fontSize: 14,
-                fontWeight: 500,
+                fontWeight: 600,
+                padding: "8px 16px",
+                border: "1px solid var(--border)",
+                borderRadius: 2,
+                background: "var(--card-bg)",
+                transition: "all 0.15s ease"
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "var(--foreground)";
+                e.currentTarget.style.background = "var(--hover-bg)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "var(--border)";
+                e.currentTarget.style.background = "var(--card-bg)";
               }}
             >
               ← Home
@@ -192,7 +206,7 @@ export default function StocksPage() {
           </Link>
         </div>
         <p style={{ color: "var(--muted)", marginBottom: 24, fontSize: 14 }}>
-          Universe: {stocks.length} tickers <span style={{ color: "var(--muted-foreground)" }}>(coming more)</span>
+          Universe: {stocks.length} tickers <span style={{ color: "var(--muted-foreground)" }}>(more coming)</span>
           <span style={{ marginLeft: 16, fontSize: 13 }}>Source: Interactive Brokers</span>
         </p>
 

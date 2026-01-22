@@ -105,14 +105,14 @@ export default function HomePage() {
           
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <NavCard
-              href="/research"
-              title="Research Portal"
-              description="Password-protected analyst research repository. Automated email ingestion from Pareto Securities and other brokers"
-            />
-            <NavCard
               href="/stocks"
               title="Universe Explorer"
               description="Browse covered securities with price history and fundamental filters"
+            />
+            <NavCard
+              href="/research"
+              title="Research Portal"
+              description="Password-protected analyst research repository. Automated email ingestion from Pareto Securities and other brokers"
             />
             <NavCard
               href="/correlation"
