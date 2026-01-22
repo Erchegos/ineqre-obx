@@ -365,9 +365,22 @@ export default function ResearchPortalPage() {
         borderBottom: '2px solid var(--border)'
       }}>
         <div>
-          <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 4, color: 'var(--foreground)' }}>
-            Research Portal
-          </h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+            <h1 style={{ fontSize: 32, fontWeight: 700, color: 'var(--foreground)' }}>
+              Research Portal
+            </h1>
+            <span style={{
+              fontSize: 12,
+              fontWeight: 600,
+              padding: '4px 10px',
+              background: 'rgba(59, 130, 246, 0.1)',
+              border: '1px solid rgba(59, 130, 246, 0.3)',
+              borderRadius: 4,
+              color: '#3b82f6',
+            }}>
+              Data from 2026
+            </span>
+          </div>
           <p style={{ fontSize: 14, color: 'var(--muted-foreground)' }}>
             {documents.length} documents • {filteredDocuments.length} shown
           </p>
