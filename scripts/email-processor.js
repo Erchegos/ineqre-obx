@@ -142,7 +142,7 @@ function cleanText(text) {
 async function saveToSupabaseStorage(content, relativePath) {
   try {
     const { data, error } = await supabase.storage
-      .from('research-documents')
+      .from('research-pdfs')
       .upload(relativePath, content, {
         contentType: 'application/pdf',
         upsert: true
