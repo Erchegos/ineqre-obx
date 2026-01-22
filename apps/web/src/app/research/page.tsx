@@ -410,13 +410,8 @@ export default function ResearchPortalPage() {
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <button
-            onClick={(e) => {
-              e.preventDefault();
-              setSelectedSource('all');
-              setSearchTerm('');
-              setSelectedDocument(null);
-              setExpandedDocs(new Set());
-              window.scrollTo({ top: 0, behavior: 'smooth' });
+            onClick={() => {
+              window.location.href = 'https://ineqre.no';
             }}
             style={{
               padding: '8px 16px',
