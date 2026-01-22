@@ -16,6 +16,7 @@ require('dotenv').config();
 const { ImapFlow } = require('imapflow');
 const { Pool } = require('pg');
 const { createClient } = require('@supabase/supabase-js');
+const Anthropic = require('@anthropic-ai/sdk');
 const fs = require('fs');
 const path = require('path');
 
@@ -35,6 +36,11 @@ const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
+
+// Initialize Claude API for content cleaning
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
 
 // Configuration
 const CONFIG = {
@@ -137,6 +143,50 @@ function cleanText(text) {
     .replace(/\n\s+/g, '\n')
     .replace(/\n\n\n+/g, '\n\n')
     .trim();
+}
+
+/**
+ * Clean and format Xtrainvestor content using Claude API
+ */
+async function cleanXtrainvestorContent(rawContent) {
+  const CLEANING_PROMPT = `You are cleaning up a Norwegian stock market newsletter email. Extract and format the key information clearly.
+
+Format the output as follows:
+
+**MARKET OVERVIEW:**
+[Brief summary of market performance - Oslo Børs, US markets, oil price, etc.]
+
+**ANALYST ACTIONS:**
+[List all upgrades, downgrades, target price changes, and new coverage. Format as:
+- TICKER: Action - Details (Analyst/Firm if mentioned)]
+
+**KEY TOPICS:**
+[Major themes, sector updates, or company news mentioned]
+
+Rules:
+- Keep all Norwegian text as-is (don't translate)
+- Use clear bullet points
+- Preserve all ticker symbols
+- Keep price targets and percentages
+- Remove advertising/promotional content
+- Remove "View in browser" links and footer content
+- Keep it concise but informative`;
+
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-3-haiku-20240307',
+      max_tokens: 2000,
+      messages: [{
+        role: 'user',
+        content: `${CLEANING_PROMPT}\n\nEmail content:\n${rawContent}`
+      }]
+    });
+
+    return message.content[0].text;
+  } catch (error) {
+    console.error('  Claude API cleaning failed:', error.message);
+    return rawContent; // Return original if cleaning fails
+  }
 }
 
 /**
@@ -298,6 +348,20 @@ async function processEmail(message, imap) {
       }
     } catch (err) {
       console.log(`  Body extraction failed: ${err.message}`);
+    }
+
+    // Clean Xtrainvestor content using Claude API
+    if (source === 'Xtrainvestor' && bodyText && bodyText.length > 100) {
+      try {
+        console.log(`  Cleaning with Claude API...`);
+        const cleanedText = await cleanXtrainvestorContent(bodyText);
+        if (cleanedText && cleanedText.length > 50) {
+          bodyText = cleanedText;
+          console.log(`  ✓ Cleaned (${cleanedText.length} chars)`);
+        }
+      } catch (err) {
+        console.log(`  Claude cleaning failed: ${err.message}`);
+      }
     }
 
     // Insert document record
