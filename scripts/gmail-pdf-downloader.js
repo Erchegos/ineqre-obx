@@ -47,6 +47,8 @@ const CONFIG = {
   storageDir: process.env.STORAGE_DIR || path.join(__dirname, '..', 'storage', 'research'),
   credentialsPath: path.join(__dirname, '..', 'gmail-credentials.json'),
   tokenPath: path.join(__dirname, '..', 'gmail-token.json'),
+  // GitHub Actions mode - use environment variables
+  useEnvCredentials: !!process.env.GMAIL_CREDENTIALS,
 };
 
 // Ensure storage directory exists
@@ -154,6 +156,17 @@ async function downloadPDF(reportUrl) {
  * Authorize Gmail API
  */
 async function authorize() {
+  // GitHub Actions mode - use environment variables
+  if (CONFIG.useEnvCredentials) {
+    const credentials = JSON.parse(process.env.GMAIL_CREDENTIALS);
+    const token = JSON.parse(process.env.GMAIL_TOKEN);
+    const { client_secret, client_id, redirect_uris } = credentials.installed || credentials.web;
+    const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
+    oAuth2Client.setCredentials(token);
+    return oAuth2Client;
+  }
+
+  // Local mode - use files
   const credentials = JSON.parse(fs.readFileSync(CONFIG.credentialsPath));
   const { client_secret, client_id, redirect_uris } = credentials.installed || credentials.web;
   const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
@@ -259,8 +272,8 @@ function extractPdfUrl(message) {
 async function main() {
   console.log('Gmail PDF Downloader\n');
 
-  // Check for credentials
-  if (!fs.existsSync(CONFIG.credentialsPath)) {
+  // Check for credentials (only in local mode)
+  if (!CONFIG.useEnvCredentials && !fs.existsSync(CONFIG.credentialsPath)) {
     console.error('Error: gmail-credentials.json not found!');
     console.log('\nPlease follow these steps:');
     console.log('1. Go to: https://console.cloud.google.com/apis/credentials');
