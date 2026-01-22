@@ -13,8 +13,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -22,9 +20,7 @@ jobs:
           node-version: '18'
 
       - name: Install dependencies
-        run: |
-          cd InEqRe_OBX
-          npm install
+        run: npm install
 
       - name: Import emails
         env:
@@ -33,6 +29,4 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-        run: |
-          cd InEqRe_OBX
-          node scripts/email-processor.js
+        run: node scripts/email-processor.js
