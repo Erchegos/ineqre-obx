@@ -629,8 +629,16 @@ export default function StockTickerPage() {
                 <StatItem label="Avg Loss" value={fmtPct(returnStats.avgLoss, 3)} colorType="danger" />
                 <StatItem label="Best Day" value={fmtPct(returnStats.bestDay, 3)} colorType="success" />
                 <StatItem label="Worst Day" value={fmtPct(returnStats.worstDay, 3)} colorType="danger" />
-                <StatItem label="Green Days" value={String(returnStats.positiveDays)} colorType="success" />
-                <StatItem label="Red Days" value={String(returnStats.negativeDays)} colorType="danger" />
+                <StatItem
+                  label="Green Days"
+                  value={`${returnStats.positiveDays} ↑ ${((returnStats.positiveDays / returnStats.totalDays) * 100).toFixed(1)}%`}
+                  colorType="success"
+                />
+                <StatItem
+                  label="Red Days"
+                  value={`${returnStats.negativeDays} ↓ ${((returnStats.negativeDays / returnStats.totalDays) * 100).toFixed(1)}%`}
+                  colorType="danger"
+                />
               </div>
             )}
 
