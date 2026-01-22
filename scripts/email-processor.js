@@ -1,8 +1,9 @@
 /**
- * Email Processor for Pareto Securities Research
+ * Email Processor for Research Portal
  *
- * This script monitors your email inbox for Pareto research emails and
- * automatically imports them into the research portal database.
+ * This script monitors your email inbox for research emails from multiple sources
+ * (Pareto Securities, Xtrainvestor, DNB Markets, etc.) and automatically imports
+ * them into the research portal database.
  *
  * Setup:
  * 1. npm install imapflow pg dotenv
@@ -48,10 +49,11 @@ const CONFIG = {
     },
   },
 
-  // Filter for Pareto emails
+  // Filter for research emails
   senderFilters: [
     'noreply@research.paretosec.com',
     'research@pareto.no',
+    'info@xtrainvestor.com',
     // Add more senders as needed
   ],
 
@@ -95,6 +97,7 @@ function extractTicker(subject) {
  */
 function identifySource(email) {
   if (email.includes('pareto')) return 'Pareto Securities';
+  if (email.includes('xtrainvestor')) return 'Xtrainvestor';
   if (email.includes('dnb')) return 'DNB Markets';
   if (email.includes('abg')) return 'ABG Sundal Collier';
   return 'Unknown';
@@ -479,49 +482,51 @@ async function main() {
     // Select inbox
     await imap.mailboxOpen('INBOX');
 
-    // Search for Pareto emails from 2026
-    const searchCriteria = {
-      since: new Date('2026-01-01'),
-      before: new Date('2027-01-01'),
-      from: 'noreply@research.paretosec.com'
-    };
-
-    console.log('Searching for Pareto research emails from 2026...');
-    const messages = imap.fetch(searchCriteria, {
-      envelope: true,
-      bodyStructure: true,
-      source: true,  // Fetch raw email source for reliable body extraction
-      uid: true,
-    });
-
-    let count = 0;
+    console.log('Searching for research emails from 2026...');
     let processed = 0;
-    for await (const message of messages) {
-      count++;
+    let totalCount = 0;
 
-      // Filter by sender
-      const sender = message.envelope.from[0].address;
-      const isPareto = CONFIG.senderFilters.some(filter =>
-        sender.toLowerCase().includes(filter.toLowerCase())
-      );
+    // Search for each sender separately (IMAP limitation)
+    for (const sender of CONFIG.senderFilters) {
+      const searchCriteria = {
+        since: new Date('2026-01-01'),
+        before: new Date('2027-01-01'),
+        from: sender
+      };
 
-      if (!isPareto) {
-        continue; // Skip non-Pareto emails
+      console.log(`\nSearching for emails from ${sender}...`);
+      const messages = imap.fetch(searchCriteria, {
+        envelope: true,
+        bodyStructure: true,
+        source: true,  // Fetch raw email source for reliable body extraction
+        uid: true,
+      });
+
+      let count = 0;
+      for await (const message of messages) {
+        count++;
+        totalCount++;
+
+        await processEmail(message, imap);
+        processed++;
+
+        if (processed >= CONFIG.batchSize) {
+          console.log(`Reached batch limit of ${CONFIG.batchSize}`);
+          break;
+        }
       }
 
-      await processEmail(message, imap);
-      processed++;
+      console.log(`  Found ${count} emails from ${sender}`);
 
       if (processed >= CONFIG.batchSize) {
-        console.log(`Reached batch limit of ${CONFIG.batchSize}`);
         break;
       }
     }
 
     if (processed === 0) {
-      console.log(`No Pareto emails found from 2026 (checked ${count} messages)`);
+      console.log(`\nNo research emails found from 2026 (checked ${totalCount} messages)`);
     } else {
-      console.log(`\n✓ Processed ${processed} Pareto emails from 2026 (out of ${count} total messages)`);
+      console.log(`\n✓ Processed ${processed} research emails from 2026 (out of ${totalCount} total messages)`);
     }
 
   } catch (error) {
