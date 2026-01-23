@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Clean existing AI summaries that contain prompt language
+ * Test cleaning summaries with "Main Investment Thesis" text
  */
 
 require('dotenv').config();
@@ -12,38 +12,30 @@ const pool = new Pool({
 });
 
 async function main() {
-  console.log('Cleaning AI summaries with prompt language...\n');
-
-  // Find summaries that start with "Here is"
+  // Find summaries with 'Main Investment Thesis'
   const result = await pool.query(`
     SELECT id, subject, ai_summary
     FROM research_documents
-    WHERE ai_summary LIKE 'Here is%'
-       OR ai_summary LIKE 'Based on%'
-    ORDER BY received_date DESC
+    WHERE ai_summary LIKE '%Main Investment Thesis%'
+       OR ai_summary LIKE '%Key Point%'
+    LIMIT 10
   `);
 
-  console.log(`Found ${result.rows.length} summaries to clean\n`);
+  console.log(`Found ${result.rows.length} summaries with problematic text\n`);
 
   let cleaned = 0;
 
   for (const doc of result.rows) {
-    let summary = doc.ai_summary;
+    console.log(`Subject: ${doc.subject.substring(0, 60)}...`);
+    console.log(`First 200 chars: ${doc.ai_summary.substring(0, 200)}...\n`);
 
+    // Clean it
+    let summary = doc.ai_summary;
     // Remove "Summary:" at the start
     summary = summary.replace(/^Summary:\s*\n+/i, '');
-
-    // Remove prompt language and meta-commentary
-    summary = summary.replace(/^Here is (a|the) (concise,?\s*)?(professional\s*)?summary[^:]*:\s*/i, '');
-    summary = summary.replace(/^Based on the (content|report)[^:]*:\s*/i, '');
-
-    // Remove section headers at start of lines
+    // Remove headers at start of lines or paragraphs
     summary = summary.replace(/^(Main Investment Thesis\/Recommendation|Main Investment Thesis or Key Recommendation|Main Thesis and Recommendation|Main Thesis and Recommendations|Key Financial(s| Metrics)( and Estimates)?|Significant Events(, Catalysts,? or Changes)?|Target Price or Rating|Target Price\/Rating|Catalysts and Key Events|Key Points?|Important Financial (Metrics|Information)):\s*/gim, '');
-
-    // Remove section headers in the middle of text
     summary = summary.replace(/\n\s*(Main Investment Thesis\/Recommendation|Main Investment Thesis or Key Recommendation|Main Thesis and Recommendation|Main Thesis and Recommendations|Key Financial(s| Metrics)(,? and Estimates|, Estimates,? and Valuation)?|Significant Events(, Catalysts,? (or|and) Changes)?|Target Price or Rating|Target Price\/Rating|Catalysts and Key Events|Key Points?|Important Financial (Metrics|Information)):\s*/gim, '\n');
-
-    // Remove multiple consecutive newlines
     summary = summary.replace(/\n{3,}/g, '\n\n');
     summary = summary.trim();
 
@@ -52,18 +44,14 @@ async function main() {
         `UPDATE research_documents SET ai_summary = $1 WHERE id = $2`,
         [summary, doc.id]
       );
-
-      console.log(`✓ Cleaned: ${doc.subject.substring(0, 60)}...`);
+      console.log(`✓ Cleaned: ${doc.subject.substring(0, 60)}...\n`);
       cleaned++;
     }
   }
 
-  console.log(`\n✓ Cleaned ${cleaned} summaries`);
+  console.log(`\n✓ Total cleaned: ${cleaned}`);
 
   await pool.end();
 }
 
-main().catch(error => {
-  console.error('Fatal error:', error);
-  process.exit(1);
-});
+main().catch(console.error);

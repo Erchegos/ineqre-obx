@@ -190,6 +190,83 @@ Rules:
 }
 
 /**
+ * Generate AI summary for research document
+ */
+async function generateAISummary(bodyText, subject) {
+  // Clean body text before sending to Claude
+  let cleanedText = bodyText
+    .split(/This message is confidential/i)[0]
+    .split(/Source:\s*Pareto Securities/i)[0]
+    .split(/Analyst\(s\):/i)[0]
+    .split(/Please refer to the specific research discla/i)[0]
+    .split(/\n*Full Report:/i)[0];
+
+  // Remove email addresses and phone numbers
+  cleanedText = cleanedText
+    .replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '')
+    .replace(/\+\d{2}\s*\d{2}\s*\d{2}\s*\d{2}\s*\d{2}/g, '');
+
+  // Remove "CLICK HERE" buttons
+  cleanedText = cleanedText.replace(/CLICK HERE FOR THE FULL REPORT/gi, '');
+  cleanedText = cleanedText.replace(/Click to open report/gi, '');
+  cleanedText = cleanedText.trim();
+
+  if (!cleanedText || cleanedText.length < 100) {
+    console.log('  ⚠️  Body text too short, skipping AI summary');
+    return null;
+  }
+
+  const prompt = `Analyze this financial research report and write a professional summary (2-3 paragraphs) covering:
+
+- Investment thesis and recommendation
+- Key financial metrics, estimates, or valuation
+- Significant events, catalysts, or changes
+- Target price or rating if mentioned
+
+Write directly in a professional tone without meta-commentary.
+
+Report: ${subject}
+
+Content:
+${cleanedText.substring(0, 15000)}`;
+
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-3-haiku-20240307',
+      max_tokens: 1024,
+      messages: [{
+        role: 'user',
+        content: prompt
+      }]
+    });
+
+    // Clean any residual prompt language
+    let summary = message.content[0].text;
+
+    // Remove "Summary:" at the start
+    summary = summary.replace(/^Summary:\s*\n+/i, '');
+
+    // Remove prompt language
+    summary = summary.replace(/^Here is (a|the) (concise,?\s*)?(professional\s*)?summary[^:]*:\s*/i, '');
+    summary = summary.replace(/^Based on the (content|report)[^:]*:\s*/i, '');
+
+    // Remove section headers at start of lines
+    summary = summary.replace(/^(Main Investment Thesis\/Recommendation|Main Investment Thesis or Key Recommendation|Main Thesis and Recommendation|Main Thesis and Recommendations|Key Financial(s| Metrics)( and Estimates)?|Significant Events(, Catalysts,? or Changes)?|Target Price or Rating|Target Price\/Rating|Catalysts and Key Events|Key Points?|Important Financial (Metrics|Information)):\s*/gim, '');
+
+    // Remove section headers in the middle of text
+    summary = summary.replace(/\n\s*(Main Investment Thesis\/Recommendation|Main Investment Thesis or Key Recommendation|Main Thesis and Recommendation|Main Thesis and Recommendations|Key Financial(s| Metrics)(,? and Estimates|, Estimates,? and Valuation)?|Significant Events(, Catalysts,? (or|and) Changes)?|Target Price or Rating|Target Price\/Rating|Catalysts and Key Events|Key Points?|Important Financial (Metrics|Information)):\s*/gim, '\n');
+
+    // Remove multiple consecutive newlines
+    summary = summary.replace(/\n{3,}/g, '\n\n');
+
+    return summary.trim();
+  } catch (error) {
+    console.error(`  ❌ Claude API error: ${error.message}`);
+    return null;
+  }
+}
+
+/**
  * Save file to Supabase Storage
  */
 async function saveToSupabaseStorage(content, relativePath) {
@@ -364,14 +441,24 @@ async function processEmail(message, imap) {
       }
     }
 
+    // Generate AI summary
+    let aiSummary = null;
+    if (bodyText && bodyText.length > 100) {
+      console.log(`  Generating AI summary...`);
+      aiSummary = await generateAISummary(bodyText, subject);
+      if (aiSummary) {
+        console.log(`  ✓ AI summary generated (${aiSummary.length} chars)`);
+      }
+    }
+
     // Insert document record
     const docResult = await pool.query(
       `INSERT INTO research_documents (
         ticker, email_message_id, source, sender_email,
-        subject, body_text, received_date
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        subject, body_text, ai_summary, received_date
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING id`,
-      [ticker, messageId, source, sender, subject, bodyText, receivedDate]
+      [ticker, messageId, source, sender, subject, bodyText, aiSummary, receivedDate]
     );
 
     const documentId = docResult.rows[0].id;

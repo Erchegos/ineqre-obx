@@ -69,8 +69,22 @@ ${cleanedText.substring(0, 15000)}`;
 
     // Clean any residual prompt language
     let summary = message.content[0].text;
+
+    // Remove "Summary:" at the start
+    summary = summary.replace(/^Summary:\s*\n+/i, '');
+
+    // Remove prompt language
     summary = summary.replace(/^Here is (a|the) (concise,?\s*)?(professional\s*)?summary[^:]*:\s*/i, '');
     summary = summary.replace(/^Based on the (content|report)[^:]*:\s*/i, '');
+
+    // Remove section headers at start of lines
+    summary = summary.replace(/^(Main Investment Thesis\/Recommendation|Main Investment Thesis or Key Recommendation|Main Thesis and Recommendation|Main Thesis and Recommendations|Key Financial(s| Metrics)( and Estimates)?|Significant Events(, Catalysts,? or Changes)?|Target Price or Rating|Target Price\/Rating|Catalysts and Key Events|Key Points?|Important Financial (Metrics|Information)):\s*/gim, '');
+
+    // Remove section headers in the middle of text
+    summary = summary.replace(/\n\s*(Main Investment Thesis\/Recommendation|Main Investment Thesis or Key Recommendation|Main Thesis and Recommendation|Main Thesis and Recommendations|Key Financial(s| Metrics)(,? and Estimates|, Estimates,? and Valuation)?|Significant Events(, Catalysts,? (or|and) Changes)?|Target Price or Rating|Target Price\/Rating|Catalysts and Key Events|Key Points?|Important Financial (Metrics|Information)):\s*/gim, '\n');
+
+    // Remove multiple consecutive newlines
+    summary = summary.replace(/\n{3,}/g, '\n\n');
 
     return summary.trim();
   } catch (error) {
