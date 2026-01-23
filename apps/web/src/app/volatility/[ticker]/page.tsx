@@ -210,24 +210,32 @@ export default function VolatilityPage() {
   return (
     <main style={{ padding: 24, maxWidth: 1400, margin: "0 auto" }}>
       {/* Header */}
+      <div style={{ marginBottom: 32 }}>
+        <Link
+          href={`/stocks/${ticker}`}
+          style={{
+            display: "inline-block",
+            padding: "8px 16px",
+            marginBottom: 20,
+            fontSize: 13,
+            fontWeight: 500,
+            color: "var(--muted)",
+            textDecoration: "none",
+            border: "1px solid var(--border)",
+            borderRadius: 6,
+            background: "transparent",
+            transition: "all 0.2s"
+          }}
+        >
+          ← Back to stocks
+        </Link>
+        <h1 style={{ fontSize: 32, fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
+          Volatility Analysis
+        </h1>
+      </div>
+
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 32, flexWrap: "wrap", gap: 16 }}>
-        <div>
-          <Link
-            href={`/stocks/${ticker}`}
-            style={{
-              display: "inline-block",
-              color: "var(--muted)",
-              fontSize: 13,
-              marginBottom: 8,
-              textDecoration: "none"
-            }}
-          >
-            ← Back to {ticker}
-          </Link>
-          <h1 style={{ fontSize: 32, fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
-            Volatility Analysis
-          </h1>
-        </div>
+        <div style={{ fontSize: 40, fontWeight: 700 }}>{ticker}</div>
 
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           {/* Price Mode Toggle */}
