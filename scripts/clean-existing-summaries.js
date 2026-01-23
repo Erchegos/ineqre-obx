@@ -30,9 +30,15 @@ async function main() {
   for (const doc of result.rows) {
     let summary = doc.ai_summary;
 
-    // Remove prompt language
+    // Remove prompt language and meta-commentary
     summary = summary.replace(/^Here is (a|the) (concise,?\s*)?(professional\s*)?summary[^:]*:\s*/i, '');
     summary = summary.replace(/^Based on the (content|report)[^:]*:\s*/i, '');
+
+    // Remove section headers like "Main Thesis and Recommendation:", "Key Financials:", etc.
+    summary = summary.replace(/^(Main Thesis and Recommendation|Key Financial(s| Metrics)( and Estimates)?|Significant Events(, Catalysts,? or Changes)?|Target Price or Rating|Catalysts and Key Events):\s*/gim, '');
+
+    // Remove multiple consecutive newlines
+    summary = summary.replace(/\n{3,}/g, '\n\n');
     summary = summary.trim();
 
     if (summary !== doc.ai_summary) {
