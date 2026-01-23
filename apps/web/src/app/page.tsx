@@ -73,7 +73,7 @@ export default function HomePage() {
           </h1>
           <p style={{ fontSize: 15, color: "var(--muted-foreground)", lineHeight: 1.7, maxWidth: 720 }}>
             Institutional-grade quantitative equity research platform for Oslo Børs.
-            Automated research aggregation, server-side analytics, volatility modeling, and cross-sectional factor analysis.
+            Automated research aggregation with AI summarization, advanced volatility modeling, Monte Carlo simulation, and cross-sectional correlation analysis.
           </p>
         </header>
 
@@ -112,12 +112,12 @@ export default function HomePage() {
             <NavCard
               href="/research"
               title="Research Portal"
-              description="Password-protected analyst research repository. Automated email ingestion from Pareto Securities and other brokers"
+              description="Password-protected analyst research repository with Claude AI summaries. Automated email ingestion from Pareto Securities, DNB Markets, and manual PDF uploads"
             />
             <NavCard
               href="/correlation"
               title="Correlation Analysis"
-              description="Cross-sectional correlation matrices with configurable lookback periods"
+              description="Cross-sectional correlation matrices with configurable lookback periods and rolling window analysis"
             />
           </div>
         </section>
@@ -142,19 +142,53 @@ export default function HomePage() {
             gap: 16
           }}>
             <Capability title="Research Aggregation">
-              Automated email processing and document management. IMAP-based ingestion from Pareto Securities with full-text search and ticker mapping.
+              Automated email processing with Claude AI summarization. IMAP-based ingestion from Pareto Securities, DNB Markets. Manual PDF analysis with text extraction and AI-generated summaries.
             </Capability>
             <Capability title="Volatility Estimation">
-              Yang-Zhang, Rogers-Satchell, Parkinson high-low estimators. Rolling windows and EWMA smoothing.
+              Yang-Zhang, Rogers-Satchell, Parkinson, Garman-Klass high-low estimators. Rolling windows, EWMA smoothing, and historical percentile ranking.
+            </Capability>
+            <Capability title="Monte Carlo Simulation">
+              Geometric Brownian Motion (GBM) path generation with configurable drift, volatility, and time horizons. Statistical analysis of price distributions and probability scenarios.
             </Capability>
             <Capability title="Risk Metrics">
-              Maximum drawdown, Sharpe ratio, beta calculation, and historical stress scenarios.
+              Maximum drawdown, Sharpe ratio, beta calculation, and historical stress scenarios. Expected daily/weekly moves with standard deviation bands.
             </Capability>
             <Capability title="Time Series Analysis">
-              Returns decomposition, autocorrelation diagnostics, and stationarity tests.
+              Returns decomposition, autocorrelation diagnostics, seasonality patterns, and volatility correlation with market indices.
             </Capability>
             <Capability title="Data Infrastructure">
-              PostgreSQL with Drizzle ORM. Real-time ingestion via Interactive Brokers API. Supabase transaction pooler.
+              PostgreSQL with Drizzle ORM. Real-time ingestion via Interactive Brokers API. Supabase storage for PDF attachments and transaction pooling.
+            </Capability>
+          </div>
+        </section>
+
+        {/* Upcoming Projects */}
+        <section style={{ marginBottom: 56 }}>
+          <h2 style={{
+            fontWeight: 700,
+            marginBottom: 20,
+            color: "var(--foreground)",
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+            fontSize: 12,
+            fontFamily: "monospace"
+          }}>
+            // Upcoming Projects
+          </h2>
+
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+            gap: 16
+          }}>
+            <Capability title="Commodities Integration">
+              Oil, gas, power, and metals pricing data. Cross-asset correlation analysis with energy-exposed equities and sector-specific hedging strategies.
+            </Capability>
+            <Capability title="FX Hedging Analytics">
+              Currency exposure analysis for NOK-based portfolios. Forward rate calculations, carry trade metrics, and multi-currency hedging optimization.
+            </Capability>
+            <Capability title="Advanced Correlation Models">
+              Dynamic conditional correlation (DCC-GARCH), copula-based dependence structures, and tail risk co-movement analysis across asset classes.
             </Capability>
           </div>
         </section>
