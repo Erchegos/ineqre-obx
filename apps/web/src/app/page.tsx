@@ -142,22 +142,22 @@ export default function HomePage() {
             gap: 16
           }}>
             <Capability title="Research Aggregation">
-              Automated email processing with Claude AI summarization. IMAP-based ingestion from Pareto Securities, DNB Markets. Manual PDF analysis with text extraction and AI-generated summaries.
+              Automated email processing with Claude AI summarization (Anthropic API). IMAP-based ingestion from Pareto Securities, DNB Markets with full-text search. Manual PDF analysis using pdf-parse for text extraction and AI-generated summaries. Document deduplication and merge logic.
             </Capability>
             <Capability title="Volatility Estimation">
-              Yang-Zhang, Rogers-Satchell, Parkinson, Garman-Klass high-low estimators. Rolling windows, EWMA smoothing, and historical percentile ranking.
+              Yang-Zhang (gap-adjusted), Rogers-Satchell (drift-independent), Parkinson (high-low range), Garman-Klass (OHLC) estimators. Rolling windows (20/60/120-day), EWMA smoothing (λ=0.94/0.97), historical percentile ranking, and volatility regime detection.
             </Capability>
             <Capability title="Monte Carlo Simulation">
-              Geometric Brownian Motion (GBM) path generation with configurable drift, volatility, and time horizons. Statistical analysis of price distributions and probability scenarios.
+              10,000-path Geometric Brownian Motion (GBM) with configurable drift (μ), volatility (σ), and time horizons. Price distribution analysis with percentile bands (5th/25th/50th/75th/95th). Probability cone visualization and statistical scenario testing.
             </Capability>
             <Capability title="Risk Metrics">
-              Maximum drawdown, Sharpe ratio, beta calculation, and historical stress scenarios. Expected daily/weekly moves with standard deviation bands.
+              Maximum drawdown with recovery period tracking, annualized Sharpe ratio, market beta vs OBX index, and historical stress testing. Expected daily/weekly moves using 1σ normal distribution assumptions. Rolling correlation with benchmark indices.
             </Capability>
             <Capability title="Time Series Analysis">
-              Returns decomposition, autocorrelation diagnostics, seasonality patterns, and volatility correlation with market indices.
+              Log-return decomposition, autocorrelation function (ACF) diagnostics, monthly seasonality patterns with bar chart visualization. Rolling 30-day volatility correlation with OBX market index for co-movement analysis.
             </Capability>
             <Capability title="Data Infrastructure">
-              PostgreSQL with Drizzle ORM. Real-time ingestion via Interactive Brokers API. Supabase storage for PDF attachments and transaction pooling.
+              PostgreSQL 17 with Drizzle ORM and type-safe schema definitions. Real-time OHLCV ingestion via Interactive Brokers TWS API with 160K+ daily data points. Supabase storage for PDF attachments (year/month/document_id structure) and connection pooling for serverless edge deployment.
             </Capability>
           </div>
         </section>
@@ -182,13 +182,13 @@ export default function HomePage() {
             gap: 16
           }}>
             <Capability title="Commodities Integration">
-              Oil, gas, power, and metals pricing data. Cross-asset correlation analysis with energy-exposed equities and sector-specific hedging strategies.
+              Brent crude oil, natural gas (TTF/NBP), Nord Pool power prices, and base metals (copper, aluminum, zinc). Cross-asset correlation matrices with energy-exposed Oslo Børs equities (Equinor, Aker BP, subsea contractors). Sector-specific beta decomposition and hedging ratio calculations.
             </Capability>
             <Capability title="FX Hedging Analytics">
-              Currency exposure analysis for NOK-based portfolios. Forward rate calculations, carry trade metrics, and multi-currency hedging optimization.
+              Multi-currency exposure analysis for NOK-denominated portfolios with USD, EUR, GBP revenue streams. Forward rate pricing using interest rate parity, carry trade P&L attribution, and optimal hedge ratio determination. Currency beta estimation for export-heavy Norwegian equities.
             </Capability>
             <Capability title="Advanced Correlation Models">
-              Dynamic conditional correlation (DCC-GARCH), copula-based dependence structures, and tail risk co-movement analysis across asset classes.
+              Dynamic Conditional Correlation (DCC-GARCH) for time-varying co-movement. Gaussian and Student-t copula models for tail dependence structure. VaR/CVaR calculation with historical simulation and parametric methods. Crisis period co-movement analysis and systemic risk indicators.
             </Capability>
           </div>
         </section>
