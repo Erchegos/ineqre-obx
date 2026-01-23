@@ -103,21 +103,34 @@ function extractDocumentType(filename) {
 }
 
 /**
+ * Determine source from folder/filepath
+ */
+function extractSource(filepath) {
+  if (filepath.includes('Individual_Stocks_Pareto') || filepath.includes('Pareto')) {
+    return 'Pareto Securities';
+  }
+  if (filepath.includes('DNB_Carnegie') || filepath.includes('DNB')) {
+    return 'DNB Markets';
+  }
+  return 'Manual Upload';
+}
+
+/**
  * Generate AI summary of PDF content using Claude
  */
 async function generateSummary(pdfText, filename) {
-  const prompt = `You are analyzing a financial research report. Please provide a concise summary (2-3 paragraphs) of the key points, including:
+  const prompt = `Analyze this financial research report and write a professional summary (2-3 paragraphs) covering:
 
-- Main thesis or recommendation
-- Key financial metrics or estimates mentioned
-- Important events, catalysts, or changes
-- Target price or valuation if mentioned
+- Investment thesis and recommendation
+- Key financial metrics, estimates, or valuation
+- Significant events, catalysts, or changes
+- Target price or rating if mentioned
 
-Keep the summary professional and focused on actionable insights.
+Write directly in a professional tone without meta-commentary.
 
-PDF filename: ${filename}
+Report: ${filename}
 
-PDF content:
+Content:
 ${pdfText.substring(0, 15000)}`; // Limit to ~15k chars to avoid token limits
 
   try {
@@ -130,7 +143,12 @@ ${pdfText.substring(0, 15000)}`; // Limit to ~15k chars to avoid token limits
       }]
     });
 
-    return message.content[0].text;
+    // Clean any residual prompt language
+    let summary = message.content[0].text;
+    summary = summary.replace(/^Here is (a|the) (concise,?\s*)?(professional\s*)?summary[^:]*:\s*/i, '');
+    summary = summary.replace(/^Based on the (content|report)[^:]*:\s*/i, '');
+
+    return summary.trim();
   } catch (error) {
     console.error(`  ❌ Claude API error: ${error.message}`);
     return null;
@@ -177,10 +195,11 @@ async function processPdf(filepath, filename) {
 
     console.log(`  ✓ Extracted ${pdfText.length} characters`);
 
-    // Extract metadata from filename
+    // Extract metadata from filename and filepath
     const ticker = extractTickerFromFilename(filename);
     const documentDate = extractDateFromFilename(filename) || new Date(fs.statSync(filepath).mtime);
     const documentType = extractDocumentType(filename);
+    const source = extractSource(filepath);
 
     // Generate subject line
     const subject = filename
@@ -192,6 +211,7 @@ async function processPdf(filepath, filename) {
     console.log(`  Ticker: ${ticker || 'N/A'}`);
     console.log(`  Date: ${documentDate.toISOString().slice(0, 10)}`);
     console.log(`  Type: ${documentType}`);
+    console.log(`  Source: ${source}`);
 
     // Check if document already exists
     const existing = await pool.query(
@@ -238,8 +258,9 @@ async function processPdf(filepath, filename) {
       RETURNING id`,
       [
         ticker,
-        'Manual Upload',
-        'manual@upload.local',  // Placeholder email
+        source,  // Use extracted source (Pareto Securities or DNB Markets)
+        source === 'Pareto Securities' ? 'research@paretosec.com' :
+        source === 'DNB Markets' ? 'research@dnb.no' : 'manual@upload.local',
         subject,
         bodyText,
         aiSummary,

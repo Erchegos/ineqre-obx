@@ -43,14 +43,14 @@ function cleanBodyText(text) {
 async function generateSummary(bodyText, subject) {
   const cleanedText = cleanBodyText(bodyText);
 
-  const prompt = `You are analyzing a financial research report. Provide a concise, professional summary (2-3 paragraphs) focusing on:
+  const prompt = `Analyze this financial research report and write a professional summary (2-3 paragraphs) covering:
 
-- Main investment thesis or key recommendation
-- Important financial metrics, estimates, or valuation
+- Investment thesis and recommendation
+- Key financial metrics, estimates, or valuation
 - Significant events, catalysts, or changes
 - Target price or rating if mentioned
 
-Keep it factual and actionable.
+Write directly in a professional tone without meta-commentary.
 
 Report: ${subject}
 
@@ -67,7 +67,12 @@ ${cleanedText.substring(0, 15000)}`;
       }]
     });
 
-    return message.content[0].text;
+    // Clean any residual prompt language
+    let summary = message.content[0].text;
+    summary = summary.replace(/^Here is (a|the) (concise,?\s*)?(professional\s*)?summary[^:]*:\s*/i, '');
+    summary = summary.replace(/^Based on the (content|report)[^:]*:\s*/i, '');
+
+    return summary.trim();
   } catch (error) {
     console.error(`  ❌ Claude API error: ${error.message}`);
     return null;
