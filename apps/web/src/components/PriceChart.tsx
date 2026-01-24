@@ -72,7 +72,7 @@ export default function PriceChart({
             stroke="var(--muted)"
             fontSize={12}
             domain={["auto", "auto"]}
-            tickFormatter={(val) => isPercentageMode ? `${val.toFixed(0)}%` : val.toFixed(2)}
+            tickFormatter={(val) => isPercentageMode ? `${val.toFixed(0)}%` : `${val.toFixed(0)} kr`}
           />
           
           <Tooltip
@@ -88,7 +88,7 @@ export default function PriceChart({
             formatter={(value: any, name: any) => {
               if (value === null || value === undefined) return ["-", name];
               const formattedValue = typeof value === "number"
-                ? (isPercentageMode ? `${value.toFixed(2)}%` : value.toFixed(2))
+                ? (isPercentageMode ? `${value.toFixed(2)}%` : `${value.toFixed(2)} kr`)
                 : value;
               const label = name === "raw" ? "Price Return" : name === "total" ? "Total Return" : "Value";
               return [formattedValue, label];
@@ -124,7 +124,7 @@ export default function PriceChart({
                     }}>
                       <span>{entry.name}:</span>
                       <span style={{ fontWeight: 600, fontFamily: "monospace" }}>
-                        {isPercentageMode ? `${entry.value.toFixed(2)}%` : entry.value.toFixed(2)}
+                        {isPercentageMode ? `${entry.value.toFixed(2)}%` : `${entry.value.toFixed(2)} kr`}
                       </span>
                     </div>
                   ))}

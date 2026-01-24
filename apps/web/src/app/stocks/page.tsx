@@ -421,7 +421,7 @@ export default function StocksPage() {
                     color: "var(--foreground)",
                     fontSize: 14,
                   }}>
-                    {stock.last_close.toFixed(2)}
+                    {stock.last_close.toFixed(2)} kr
                   </td>
                   <td style={{
                     padding: "16px",
@@ -430,7 +430,7 @@ export default function StocksPage() {
                     color: "var(--muted)",
                     fontSize: 14,
                   }}>
-                    {stock.last_adj_close.toFixed(2)}
+                    {stock.last_adj_close.toFixed(2)} kr
                   </td>
                   <td style={{ padding: "16px", textAlign: "right", color: "var(--muted)", fontSize: 13 }}>
                     {stock.start_date}

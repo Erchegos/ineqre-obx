@@ -7,6 +7,7 @@ import PriceChart from "@/components/PriceChart";
 import ReturnDistributionChart from "@/components/ReturnDistributionChart";
 import ResidualSquaresChart from "@/components/ResidualSquaresChart";
 import TimeframeSelector from "@/components/TimeframeSelector";
+import StockFundamentalsPanel from "@/components/StockFundamentalsPanel";
 
 type Stats = {
   totalReturn: number;
@@ -106,6 +107,7 @@ export default function StockTickerPage() {
   // UI State: 'comparison' is the new mode
   const [chartMode, setChartMode] = useState<"price" | "total_return" | "comparison">("comparison");
   const [showInfo, setShowInfo] = useState<boolean>(false);
+  const [isPanelOpen, setIsPanelOpen] = useState<boolean>(false);
 
   const [returnsStartDate, setReturnsStartDate] = useState<string>("");
   const [returnsEndDate, setReturnsEndDate] = useState<string>("");
@@ -514,6 +516,30 @@ export default function StockTickerPage() {
                    </svg>
                 </button>
             </div>
+            <button
+              onClick={() => setIsPanelOpen(true)}
+              style={{
+                padding: "8px 16px",
+                borderRadius: 4,
+                background: "var(--card-bg)",
+                border: "1px solid var(--card-border)",
+                color: "var(--foreground)",
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: "pointer",
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "var(--foreground)";
+                e.currentTarget.style.background = "var(--hover-bg)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "var(--card-border)";
+                e.currentTarget.style.background = "var(--card-bg)";
+              }}
+            >
+              Fundamental Details
+            </button>
           </div>
 
            {/* --- INFO BOX --- */}
@@ -696,6 +722,12 @@ export default function StockTickerPage() {
           </div>
         </>
       )}
+
+      <StockFundamentalsPanel
+        ticker={ticker}
+        isOpen={isPanelOpen}
+        onClose={() => setIsPanelOpen(false)}
+      />
     </main>
   );
 }
