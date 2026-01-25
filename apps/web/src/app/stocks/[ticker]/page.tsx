@@ -274,6 +274,16 @@ export default function StockTickerPage() {
     return chartMode === "price" ? data.returns.raw : data.returns.adjusted;
   }, [data, chartMode]);
 
+  // Calculate total available days from date range (not fetched count)
+  const totalAvailableDays = useMemo(() => {
+    if (!data?.dateRange?.start || !data?.dateRange?.end) return undefined;
+    const start = new Date(data.dateRange.start);
+    const end = new Date(data.dateRange.end);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  }, [data?.dateRange]);
+
   // --- CHART DATA TRANSFORMATION ---
   const chartData = useMemo(() => {
     if (!data?.prices || data.prices.length === 0) return [];
@@ -469,7 +479,7 @@ export default function StockTickerPage() {
             }
           }}
           customDateRange={customDateRange}
-          availableDataDays={data?.count}
+          availableDataDays={totalAvailableDays}
         />
       </div>
 
