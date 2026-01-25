@@ -281,25 +281,32 @@ export default function StockTickerPage() {
     // 1. Comparison Mode: Normalize both to % change starting at 0
     // Using keys 'raw' and 'total' so PriceChart can find them easily
     if (chartMode === "comparison") {
-      // IMPORTANT: Align both series to start from the same date
-      // Use adjustedStart if valid adj_close data starts later than raw data
+      // Show full history for Price Return, but Total Return only from adjustedStart
       const adjustedStart = data.dateRange?.adjustedStart || data.prices[0].date;
 
-      // Filter prices to only include data from adjustedStart onwards
-      const alignedPrices = data.prices.filter(p => p.date >= adjustedStart);
+      // Find the index where adj_close data begins
+      const adjStartIndex = data.prices.findIndex(p => p.date >= adjustedStart);
 
-      if (alignedPrices.length === 0) return [];
+      // Calculate baseline prices
+      const startPrice = data.prices[0].close;
+      const startAdj = adjStartIndex >= 0
+        ? (data.prices[adjStartIndex].adj_close ?? data.prices[adjStartIndex].close)
+        : (data.prices[0].adj_close ?? data.prices[0].close);
 
-      const startPrice = alignedPrices[0].close;
-      const startAdj = alignedPrices[0].adj_close ?? alignedPrices[0].close;
+      return data.prices.map((p, i) => {
+        const priceReturn = ((p.close - startPrice) / startPrice) * 100;
 
-      return alignedPrices.map(p => ({
-        date: p.date,
-        // Green Line (Raw)
-        raw: ((p.close - startPrice) / startPrice) * 100,
-        // Blue Line (Total Return)
-        total: (((p.adj_close ?? p.close) - startAdj) / startAdj) * 100,
-      }));
+        // Only show Total Return from adjustedStart onwards
+        const totalReturn = i >= adjStartIndex
+          ? (((p.adj_close ?? p.close) - startAdj) / startAdj) * 100
+          : null;
+
+        return {
+          date: p.date,
+          raw: priceReturn,      // Green Line (full history)
+          total: totalReturn,    // Blue Line (from adjustedStart only)
+        };
+      });
     }
 
     // 2. Standard Modes: Just show the absolute value
