@@ -72,8 +72,35 @@ function calculateMetrics(
   };
 }
 
-async function fetchPrices(ticker: string, limit: number): Promise<PriceRow[]> {
+async function fetchPrices(
+  ticker: string,
+  limit: number,
+  startDate?: string,
+  endDate?: string
+): Promise<PriceRow[]> {
   const tableName = await getPriceTable();
+
+  // If date range is provided, use that instead of limit
+  if (startDate && endDate) {
+    const q = `
+      SELECT date::date as date, close, adj_close
+      FROM public.${tableName}
+      WHERE upper(ticker) = upper($1)
+        AND close IS NOT NULL
+        AND close > 0
+        AND date >= $2::date
+        AND date <= $3::date
+      ORDER BY date ASC
+    `;
+    const result = await pool.query(q, [ticker, startDate, endDate]);
+    return result.rows.map(r => ({
+      date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date),
+      close: Number(r.close),
+      adj_close: r.adj_close ? Number(r.adj_close) : Number(r.close),
+    }));
+  }
+
+  // Otherwise use limit (fetching most recent N rows)
   const q = `
     SELECT date::date as date, close, adj_close
     FROM public.${tableName}
@@ -110,9 +137,15 @@ export async function GET(
   try {
     const { ticker } = await ctx.params;
     const url = new URL(req.url);
-    const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 1500), 20), 5000);
 
-    const prices = await fetchPrices(ticker, limit);
+    // Support both limit-based and date-range-based queries
+    const startDate = url.searchParams.get("startDate") || undefined;
+    const endDate = url.searchParams.get("endDate") || undefined;
+
+    // Increase max limit to 10000 to support data back to 1999 (~6500 trading days)
+    const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 1500), 20), 10000);
+
+    const prices = await fetchPrices(ticker, limit, startDate, endDate);
 
     if (prices.length < 20) {
       return NextResponse.json({ ticker, error: "Insufficient data" }, { status: 400 });

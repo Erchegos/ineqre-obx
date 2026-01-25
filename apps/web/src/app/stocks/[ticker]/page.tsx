@@ -100,6 +100,7 @@ export default function StockTickerPage() {
   }, [searchParams]);
 
   const [limit, setLimit] = useState<number>(initialLimit);
+  const [customDateRange, setCustomDateRange] = useState<{ start: string; end: string } | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -143,11 +144,16 @@ export default function StockTickerPage() {
       setError(null);
 
       try {
-        // --- CRITICAL FIX: Always request adjusted=true ---
-        // This ensures the backend sends both Raw Price AND Total Return data
-        const url = `/api/analytics/${encodeURIComponent(ticker)}?limit=${encodeURIComponent(
-          String(limit)
-        )}&adjusted=true`;
+        // Build URL with either date range or limit
+        let url = `/api/analytics/${encodeURIComponent(ticker)}?adjusted=true`;
+
+        if (customDateRange && customDateRange.start && customDateRange.end) {
+          // Use date range
+          url += `&startDate=${encodeURIComponent(customDateRange.start)}&endDate=${encodeURIComponent(customDateRange.end)}`;
+        } else {
+          // Use limit
+          url += `&limit=${encodeURIComponent(String(limit))}`;
+        }
 
         const res = await fetch(url, {
           method: "GET",
@@ -191,7 +197,7 @@ export default function StockTickerPage() {
     return () => {
       cancelled = true;
     };
-  }, [ticker, limit]);
+  }, [ticker, limit, customDateRange]);
 
   // Fetch residuals data
   useEffect(() => {
@@ -418,7 +424,18 @@ export default function StockTickerPage() {
         <span style={{ fontSize: 13, color: "var(--muted)", letterSpacing: "0.02em", textTransform: "uppercase" }}>
           Timeframe
         </span>
-        <TimeframeSelector selected={limit} onChange={setLimit} />
+        <TimeframeSelector
+          selected={limit}
+          onChange={setLimit}
+          onDateRangeChange={(start, end) => {
+            if (start && end) {
+              setCustomDateRange({ start, end });
+            } else {
+              setCustomDateRange(null);
+            }
+          }}
+          customDateRange={customDateRange}
+        />
       </div>
 
       {loading && (
