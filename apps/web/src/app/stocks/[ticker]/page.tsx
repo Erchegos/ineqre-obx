@@ -39,6 +39,7 @@ type AnalyticsData = {
   dateRange: {
     start: string;
     end: string;
+    adjustedStart?: string; // When valid adj_close data begins
   };
 };
 
@@ -276,17 +277,26 @@ export default function StockTickerPage() {
   // --- CHART DATA TRANSFORMATION ---
   const chartData = useMemo(() => {
     if (!data?.prices || data.prices.length === 0) return [];
-    
+
     // 1. Comparison Mode: Normalize both to % change starting at 0
     // Using keys 'raw' and 'total' so PriceChart can find them easily
     if (chartMode === "comparison") {
-      const startPrice = data.prices[0].close;
-      const startAdj = data.prices[0].adj_close ?? data.prices[0].close;
+      // IMPORTANT: Align both series to start from the same date
+      // Use adjustedStart if valid adj_close data starts later than raw data
+      const adjustedStart = data.dateRange?.adjustedStart || data.prices[0].date;
 
-      return data.prices.map(p => ({
+      // Filter prices to only include data from adjustedStart onwards
+      const alignedPrices = data.prices.filter(p => p.date >= adjustedStart);
+
+      if (alignedPrices.length === 0) return [];
+
+      const startPrice = alignedPrices[0].close;
+      const startAdj = alignedPrices[0].adj_close ?? alignedPrices[0].close;
+
+      return alignedPrices.map(p => ({
         date: p.date,
         // Green Line (Raw)
-        raw: ((p.close - startPrice) / startPrice) * 100, 
+        raw: ((p.close - startPrice) / startPrice) * 100,
         // Blue Line (Total Return)
         total: (((p.adj_close ?? p.close) - startAdj) / startAdj) * 100,
       }));
@@ -299,7 +309,7 @@ export default function StockTickerPage() {
       raw: chartMode === "total_return" ? (p.adj_close ?? p.close) : p.close,
       total: null // No second line
     }));
-  }, [data?.prices, chartMode]);
+  }, [data?.prices, data?.dateRange, chartMode]);
 
   const filteredReturns = useMemo(() => {
     return activeReturns.filter(r => {
@@ -435,6 +445,7 @@ export default function StockTickerPage() {
             }
           }}
           customDateRange={customDateRange}
+          availableDataDays={data?.count}
         />
       </div>
 

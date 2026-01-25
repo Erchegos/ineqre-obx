@@ -7,15 +7,18 @@ type TimeframeSelectorProps = {
   onChange: (limit: number) => void;
   onDateRangeChange?: (startDate: string, endDate: string) => void;
   customDateRange?: { start: string; end: string } | null;
+  availableDataDays?: number; // Number of days of data available
 };
 
-const TIMEFRAMES = [
+const ALL_TIMEFRAMES = [
   { label: "1M", value: 21 },
   { label: "3M", value: 63 },
   { label: "6M", value: 126 },
   { label: "1Y", value: 252 },
   { label: "2Y", value: 504 },
   { label: "5Y", value: 1260 },
+  { label: "10Y", value: 2520 },
+  { label: "20Y", value: 5040 },
   { label: "Max", value: 10000 },
 ];
 
@@ -24,12 +27,21 @@ export default function TimeframeSelector({
   onChange,
   onDateRangeChange,
   customDateRange,
+  availableDataDays,
 }: TimeframeSelectorProps) {
   const [showCustom, setShowCustom] = useState(false);
   const [customStart, setCustomStart] = useState(customDateRange?.start || "");
   const [customEnd, setCustomEnd] = useState(customDateRange?.end || "");
 
   const isCustomActive = customDateRange !== null && customDateRange !== undefined && customDateRange.start !== "";
+
+  // Filter timeframes based on available data
+  // Show a timeframe only if we have at least 80% of the required data
+  const TIMEFRAMES = ALL_TIMEFRAMES.filter(tf => {
+    if (tf.label === "Max") return true; // Always show Max
+    if (!availableDataDays) return true; // If unknown, show all
+    return availableDataDays >= tf.value * 0.8; // Show if we have 80% of required data
+  });
 
   const handleApplyCustom = () => {
     if (customStart && customEnd && onDateRangeChange) {
