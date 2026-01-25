@@ -1,79 +1,46 @@
-import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { pool } from "@/lib/db";
+import { rateLimit } from "@/lib/rate-limit";
+import { secureJsonResponse } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const checks: Record<string, any> = {
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV,
-    databaseUrl: process.env.DATABASE_URL ? "✓ Set" : "✗ Missing",
-  };
+/**
+ * GET /api/health
+ *
+ * Health check endpoint for monitoring.
+ *
+ * SECURITY: This endpoint is intentionally minimal to avoid
+ * information disclosure. It only returns:
+ * - status: "healthy" or "unhealthy"
+ * - timestamp
+ *
+ * Internal details (table names, counts, error messages) are NOT exposed.
+ */
+export async function GET(req: NextRequest) {
+  // Rate limit health checks to prevent abuse
+  const rateLimitResult = rateLimit(req, 'public');
+  if (rateLimitResult) return rateLimitResult;
 
   try {
-    // Test 1: Basic connection
-    const connResult = await pool.query("SELECT NOW() as current_time");
-    checks.connection = "✓ Connected";
-    checks.serverTime = connResult.rows[0].current_time;
+    // Simple database connectivity check - no details exposed
+    await pool.query("SELECT 1");
 
-    // Test 2: Check tables exist
-    const tablesResult = await pool.query(`
-      SELECT table_name 
-      FROM information_schema.tables 
-      WHERE table_schema = 'public' 
-        AND table_name IN ('stocks', 'prices_daily', 'obx_equities')
-      ORDER BY table_name
-    `);
-    checks.tables = tablesResult.rows.map((r) => r.table_name);
+    return secureJsonResponse({
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+    });
 
-    // Test 3: Check stocks count
-    const stocksResult = await pool.query("SELECT COUNT(*) as count FROM stocks");
-    checks.stocksCount = Number(stocksResult.rows[0].count);
+  } catch (error: unknown) {
+    // Log error internally but don't expose details
+    console.error('[Health Check] Database connection failed:', error);
 
-    // Test 4: Check prices count
-    let pricesCount = 0;
-    try {
-      const pricesResult = await pool.query("SELECT COUNT(*) as count FROM prices_daily WHERE source = 'ibkr'");
-      pricesCount = Number(pricesResult.rows[0].count);
-    } catch (e) {
-      // Try obx_equities if prices_daily doesn't exist
-      try {
-        const obxResult = await pool.query("SELECT COUNT(*) as count FROM obx_equities WHERE source = 'ibkr'");
-        pricesCount = Number(obxResult.rows[0].count);
-      } catch (e2) {
-        pricesCount = 0;
-      }
-    }
-    checks.pricesCount = pricesCount;
-
-    // Test 5: Check recent data
-    try {
-      const recentResult = await pool.query(`
-        SELECT MAX(date) as latest_date 
-        FROM prices_daily 
-        WHERE source = 'ibkr'
-      `);
-      checks.latestPriceDate = recentResult.rows[0].latest_date;
-    } catch (e) {
-      try {
-        const recentResult = await pool.query(`
-          SELECT MAX(date) as latest_date 
-          FROM obx_equities 
-          WHERE source = 'ibkr'
-        `);
-        checks.latestPriceDate = recentResult.rows[0].latest_date;
-      } catch (e2) {
-        checks.latestPriceDate = null;
-      }
-    }
-
-    checks.status = "✓ All checks passed";
-    return NextResponse.json(checks, { status: 200 });
-
-  } catch (error: any) {
-    checks.status = "✗ Error";
-    checks.error = error.message;
-    checks.errorStack = error.stack;
-    return NextResponse.json(checks, { status: 500 });
+    return secureJsonResponse(
+      {
+        status: "unhealthy",
+        timestamp: new Date().toISOString(),
+      },
+      { status: 503 }
+    );
   }
 }

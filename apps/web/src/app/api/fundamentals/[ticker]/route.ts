@@ -2,19 +2,20 @@
  * API Route: Get company fundamentals
  * GET /api/fundamentals/[ticker]
  *
- * Returns fundamental data for a specific ticker from database
+ * Returns fundamental data for a specific ticker from database.
+ *
+ * Security measures:
+ * - Rate limiting (public endpoint)
+ * - Ticker validation
+ * - Parameterized queries
+ * - Uses shared pool with proper SSL config
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { Pool } from "pg";
-
-// Disable SSL cert validation for development
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: false,
-});
+import { NextRequest } from "next/server";
+import { pool } from "@/lib/db";
+import { rateLimit } from "@/lib/rate-limit";
+import { tickerSchema } from "@/lib/validation";
+import { secureJsonResponse, safeErrorResponse } from "@/lib/security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,15 +24,22 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ ticker: string }> }
 ) {
-  try {
-    const { ticker } = await params;
+  // Rate limiting
+  const rateLimitResult = rateLimit(req, 'public');
+  if (rateLimitResult) return rateLimitResult;
 
-    if (!ticker) {
-      return NextResponse.json(
-        { error: "Ticker is required" },
+  try {
+    const { ticker: rawTicker } = await params;
+
+    // Validate ticker parameter
+    const tickerResult = tickerSchema.safeParse(rawTicker);
+    if (!tickerResult.success) {
+      return secureJsonResponse(
+        { error: "Invalid ticker format" },
         { status: 400 }
       );
     }
+    const ticker = tickerResult.data;
 
     // Fetch company fundamentals with officers
     const result = await pool.query(
@@ -80,7 +88,7 @@ export async function GET(
     );
 
     if (result.rows.length === 0) {
-      return NextResponse.json(
+      return secureJsonResponse(
         { error: "Company not found" },
         { status: 404 }
       );
@@ -126,19 +134,12 @@ export async function GET(
       lastModified: company.lastModified,
     };
 
-    return NextResponse.json({
+    return secureJsonResponse({
       success: true,
       data: response,
     });
-  } catch (error: any) {
-    console.error("[Fundamentals API Error]", error);
-
-    return NextResponse.json(
-      {
-        error: "Failed to fetch fundamentals",
-        details: error.message,
-      },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    // Don't expose error details to client
+    return safeErrorResponse(error, "Failed to fetch fundamentals");
   }
 }

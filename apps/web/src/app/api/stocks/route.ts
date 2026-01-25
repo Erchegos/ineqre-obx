@@ -1,32 +1,51 @@
-import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { pool } from "@/lib/db";
-import { getPriceTable } from "@/lib/price-data-adapter";
+import { rateLimit } from "@/lib/rate-limit";
+import { validateQuery, stocksQuerySchema } from "@/lib/validation";
+import { secureJsonResponse, safeErrorResponse } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-function errShape(e: unknown) {
-  const x = e as any;
-  return {
-    message: x?.message ?? String(e),
-    code: x?.code ?? null,
-    detail: x?.detail ?? null,
-    hint: x?.hint ?? null,
-    where: x?.where ?? null,
-    name: x?.name ?? null,
-  };
-}
+/**
+ * GET /api/stocks
+ *
+ * List all stocks with basic info. Public endpoint.
+ *
+ * Query parameters:
+ * - assetTypes: comma-separated list of asset types to include
+ *   Valid values: equity, index, commodity_etf, index_etf
+ *   Default: equity (equities only)
+ *   Example: ?assetTypes=equity,index
+ *
+ * Security measures:
+ * - Rate limiting (100 req/min per IP)
+ * - Input validation
+ * - Secure error handling (no internal details exposed)
+ * - Security headers on response
+ */
+export async function GET(req: NextRequest) {
+  // Rate limiting for public endpoints
+  const rateLimitResult = rateLimit(req, 'public');
+  if (rateLimitResult) return rateLimitResult;
 
-export async function GET() {
   try {
-    console.log('[STOCKS API] Starting query...');
-    console.log('[STOCKS API] DATABASE_URL set:', !!process.env.DATABASE_URL);
+    // Validate query parameters
+    const searchParams = req.nextUrl.searchParams;
+    const validation = validateQuery(searchParams, stocksQuerySchema);
+    if (!validation.success) return validation.response;
 
-    // Just use prices_daily directly - we know that's the table name
+    const { assetTypes } = validation.data;
+
+    console.log('[STOCKS API] Starting query...');
+    console.log('[STOCKS API] Asset types filter:', assetTypes);
+
+    // Build query with asset type filter
     const query = `
       SELECT
         s.ticker,
         s.name,
+        s.asset_type,
         (ARRAY_AGG(p.close ORDER BY p.date DESC))[1] as last_close,
         (ARRAY_AGG(p.adj_close ORDER BY p.date DESC))[1] as last_adj_close,
         MIN(p.date) as start_date,
@@ -36,18 +55,20 @@ export async function GET() {
       INNER JOIN prices_daily p ON s.ticker = p.ticker
       WHERE p.close IS NOT NULL
         AND p.close > 0
-      GROUP BY s.ticker, s.name
+        AND s.asset_type = ANY($1)
+      GROUP BY s.ticker, s.name, s.asset_type
       HAVING COUNT(*) >= 100
       ORDER BY s.ticker
     `;
 
     console.log('[STOCKS API] Executing query...');
-    const result = await pool.query(query);
-    console.log(`[STOCKS API] Successfully fetched ${result.rows.length} stocks from prices_daily`);
+    const result = await pool.query(query, [assetTypes]);
+    console.log(`[STOCKS API] Successfully fetched ${result.rows.length} assets`);
 
     const stocks = result.rows.map((row) => ({
       ticker: row.ticker,
       name: row.name || row.ticker,
+      asset_type: row.asset_type || 'equity',
       last_close: Number(row.last_close || 0),
       last_adj_close: row.last_adj_close ? Number(row.last_adj_close) : Number(row.last_close || 0),
       start_date: row.start_date instanceof Date
@@ -59,16 +80,9 @@ export async function GET() {
       rows: Number(row.rows),
     }));
 
-    return NextResponse.json(stocks);
+    return secureJsonResponse(stocks);
   } catch (e: unknown) {
-    console.error("Error fetching stocks:", e);
-
-    return NextResponse.json(
-      {
-        error: "Failed to fetch stocks data",
-        pg: errShape(e),
-      },
-      { status: 500 }
-    );
+    // Don't expose internal database error details to clients
+    return safeErrorResponse(e, 'Failed to fetch stocks data');
   }
 }

@@ -1,6 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { sql } from "drizzle-orm";
+import { rateLimit } from "@/lib/rate-limit";
+import { tickerSchema, clampInt } from "@/lib/validation";
+import { secureJsonResponse, safeErrorResponse } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
 
@@ -22,12 +25,6 @@ type PriceRow = {
   volume: number | null;
 };
 
-function clampInt(v: string | null, def: number, min: number, max: number) {
-  const n = v ? Number(v) : Number.NaN;
-  if (!Number.isFinite(n)) return def;
-  return Math.min(Math.max(Math.trunc(n), min), max);
-}
-
 function toNum(v: unknown): number | null {
   if (v === null || v === undefined) return null;
   const n = typeof v === "number" ? v : Number(v);
@@ -35,21 +32,48 @@ function toNum(v: unknown): number | null {
 }
 
 function toISODate(d: unknown): string {
-  // supports Date, string, etc
   const s = String(d);
-  // if already YYYY-MM-DD
   if (s.length >= 10 && s[4] === "-" && s[7] === "-") return s.slice(0, 10);
   const dt = new Date(s);
   if (Number.isNaN(dt.getTime())) return s.slice(0, 10);
   return dt.toISOString().slice(0, 10);
 }
 
-export async function GET(req: Request, ctx: { params: Promise<{ ticker: string }> }) {
-  try {
-    const { ticker } = await ctx.params;
-    const url = new URL(req.url);
+/**
+ * GET /api/prices/[ticker]
+ *
+ * Get historical prices for a stock. Public endpoint.
+ *
+ * Security measures:
+ * - Rate limiting (200 req/min per IP)
+ * - Ticker validation (alphanumeric only, max 10 chars)
+ * - Limit parameter bounds checking
+ * - Parameterized SQL queries
+ */
+export async function GET(req: NextRequest, ctx: { params: Promise<{ ticker: string }> }) {
+  // Rate limiting
+  const rateLimitResult = rateLimit(req, 'read');
+  if (rateLimitResult) return rateLimitResult;
 
-    const limit = clampInt(url.searchParams.get("limit"), 1500, 1, 5000);
+  try {
+    const { ticker: rawTicker } = await ctx.params;
+
+    // Validate ticker parameter
+    const tickerResult = tickerSchema.safeParse(rawTicker);
+    if (!tickerResult.success) {
+      return secureJsonResponse(
+        { error: 'Invalid ticker format' },
+        { status: 400 }
+      );
+    }
+    const ticker = tickerResult.data;
+
+    const url = new URL(req.url);
+    const limit = clampInt(
+      parseInt(url.searchParams.get("limit") || "1500", 10),
+      1,
+      5000
+    );
 
     // This endpoint reads from the raw prices table/view used elsewhere in your app.
     // Keep SQL generic to avoid tight coupling to drizzle schema until Phase 2 tables are live.
@@ -82,13 +106,12 @@ export async function GET(req: Request, ctx: { params: Promise<{ ticker: string 
       volume: toNum(r.volume),
     }));
 
-    return NextResponse.json({
+    return secureJsonResponse({
       ticker: ticker.toUpperCase(),
       count: priceRows.length,
       rows: priceRows,
     });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return safeErrorResponse(e, 'Failed to fetch price data');
   }
 }

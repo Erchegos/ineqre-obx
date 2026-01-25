@@ -2,17 +2,38 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcrypt';
 import { sign } from 'jsonwebtoken';
 import { pool } from '@/lib/db';
+import { rateLimit, getClientIp } from '@/lib/rate-limit';
+import { validateBody, authRequestSchema } from '@/lib/validation';
+import { getJwtSecret, safeErrorResponse, secureJsonResponse, logSecurityEvent } from '@/lib/security';
 
+/**
+ * POST /api/research/auth
+ *
+ * Authenticate with password to receive a JWT token.
+ *
+ * Security measures:
+ * - Rate limiting (5 attempts per 15 minutes per IP)
+ * - Input validation (password required, max 128 chars)
+ * - Secure JWT secret from environment (no fallback)
+ * - Generic error messages (no information leakage)
+ * - Security event logging for failed attempts
+ */
 export async function POST(req: NextRequest) {
-  try {
-    const { password } = await req.json();
+  // Rate limiting - strict for auth endpoints (prevent brute force)
+  const rateLimitResult = rateLimit(req, 'auth');
+  if (rateLimitResult) {
+    logSecurityEvent('rate_limit_exceeded', { endpoint: '/api/research/auth' }, req);
+    return rateLimitResult;
+  }
 
-    if (!password) {
-      return NextResponse.json(
-        { error: 'Password required' },
-        { status: 400 }
-      );
+  try {
+    // Validate request body
+    const validation = await validateBody(req, authRequestSchema);
+    if (!validation.success) {
+      return validation.response;
     }
+
+    const { password } = validation.data;
 
     // Get active tokens from database
     const result = await pool.query(
@@ -32,27 +53,27 @@ export async function POST(req: NextRequest) {
           [row.id]
         );
 
-        // Generate JWT token for session
+        // Generate JWT token for session using secure secret
         const token = sign(
           { tokenId: row.id },
-          process.env.JWT_SECRET || 'your-secret-key-change-this',
+          getJwtSecret(),
           { expiresIn: '24h' }
         );
 
-        return NextResponse.json({ token });
+        return secureJsonResponse({ token });
       }
     }
 
-    // No matching token found
-    return NextResponse.json(
-      { error: 'Invalid password' },
+    // Log failed authentication attempt
+    logSecurityEvent('auth_failed', { reason: 'invalid_password' }, req);
+
+    // No matching token found - use generic message to prevent enumeration
+    return secureJsonResponse(
+      { error: 'Authentication failed' },
       { status: 401 }
     );
   } catch (error) {
-    console.error('Auth error:', error);
-    return NextResponse.json(
-      { error: 'Authentication failed' },
-      { status: 500 }
-    );
+    // Log error but don't expose internal details
+    return safeErrorResponse(error, 'Authentication failed');
   }
 }

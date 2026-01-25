@@ -1,16 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
+
+type AssetType = 'equity' | 'index' | 'commodity_etf' | 'index_etf';
 
 type StockData = {
   ticker: string;
   name: string;
+  asset_type: AssetType;
   last_close: number;
   last_adj_close: number;
   start_date: string;
   end_date: string;
   rows: number;
+};
+
+const ASSET_TYPE_LABELS: Record<AssetType, string> = {
+  equity: 'Equities',
+  index: 'Indexes',
+  commodity_etf: 'Commodity ETFs',
+  index_etf: 'Index ETFs',
 };
 
 export default function StocksPage() {
@@ -20,31 +30,51 @@ export default function StocksPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<keyof StockData>("ticker");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [selectedAssetTypes, setSelectedAssetTypes] = useState<Set<AssetType>>(
+    new Set(['equity']) // Default to equities only
+  );
+
+  const fetchStocks = useCallback(async (assetTypes: Set<AssetType>) => {
+    setLoading(true);
+    try {
+      const typesParam = Array.from(assetTypes).join(',');
+      const res = await fetch(`/api/stocks?assetTypes=${typesParam}`, {
+        method: "GET",
+        headers: { accept: "application/json" },
+        cache: "no-store",
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch stocks: ${res.statusText}`);
+      }
+
+      const data = await res.json();
+      setStocks(data);
+      setLoading(false);
+    } catch (e: any) {
+      setError(e?.message ?? String(e));
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    async function fetchStocks() {
-      try {
-        const res = await fetch("/api/stocks", {
-          method: "GET",
-          headers: { accept: "application/json" },
-          cache: "no-store",
-        });
+    fetchStocks(selectedAssetTypes);
+  }, [selectedAssetTypes, fetchStocks]);
 
-        if (!res.ok) {
-          throw new Error(`Failed to fetch stocks: ${res.statusText}`);
+  const toggleAssetType = (type: AssetType) => {
+    setSelectedAssetTypes(prev => {
+      const next = new Set(prev);
+      if (next.has(type)) {
+        // Don't allow deselecting all types
+        if (next.size > 1) {
+          next.delete(type);
         }
-
-        const data = await res.json();
-        setStocks(data);
-        setLoading(false);
-      } catch (e: any) {
-        setError(e?.message ?? String(e));
-        setLoading(false);
+      } else {
+        next.add(type);
       }
-    }
-
-    fetchStocks();
-  }, []);
+      return next;
+    });
+  };
 
   const filteredAndSortedStocks = useMemo(() => {
     let filtered = stocks;
@@ -205,26 +235,78 @@ export default function StocksPage() {
             → Correlation Matrix
           </Link>
         </div>
-        <p style={{ color: "var(--muted)", marginBottom: 24, fontSize: 14 }}>
-          Universe: {stocks.length} tickers <span style={{ color: "var(--muted-foreground)" }}>(more coming)</span>
+        <p style={{ color: "var(--muted)", marginBottom: 16, fontSize: 14 }}>
+          Universe: {stocks.length} {selectedAssetTypes.size === 1 && selectedAssetTypes.has('equity') ? 'equities' : 'assets'}
           <span style={{ marginLeft: 16, fontSize: 13 }}>Source: Interactive Brokers</span>
         </p>
 
-        {/* Search Bar */}
-        <div style={{ marginBottom: 24 }}>
-          <input
-            type="text"
-            className="search-input"
-            placeholder="Search by ticker or name..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          {searchQuery && (
-            <div style={{ marginTop: 8, fontSize: 13, color: "var(--muted)" }}>
-              Found {filteredAndSortedStocks.length} result{filteredAndSortedStocks.length !== 1 ? 's' : ''}
-            </div>
-          )}
+        {/* Search Bar with Asset Type Filters */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          marginBottom: 24,
+          flexWrap: "wrap"
+        }}>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Search by ticker or name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          {/* Asset Type Toggles */}
+          <div style={{
+            display: "flex",
+            gap: 6,
+            flexWrap: "wrap"
+          }}>
+            {(Object.keys(ASSET_TYPE_LABELS) as AssetType[]).map((type) => {
+              const isSelected = selectedAssetTypes.has(type);
+              return (
+                <button
+                  key={type}
+                  onClick={() => toggleAssetType(type)}
+                  style={{
+                    padding: "10px 14px",
+                    fontSize: 12,
+                    fontWeight: 500,
+                    border: isSelected ? "1px solid var(--accent)" : "1px solid var(--border)",
+                    borderRadius: 4,
+                    background: isSelected ? "var(--accent)" : "var(--card-bg)",
+                    color: isSelected ? "#fff" : "var(--foreground)",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                    whiteSpace: "nowrap",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSelected) {
+                      e.currentTarget.style.borderColor = "var(--accent)";
+                      e.currentTarget.style.background = "var(--hover-bg)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSelected) {
+                      e.currentTarget.style.borderColor = "var(--border)";
+                      e.currentTarget.style.background = "var(--card-bg)";
+                    }
+                  }}
+                >
+                  {ASSET_TYPE_LABELS[type]}
+                </button>
+              );
+            })}
+          </div>
         </div>
+
+        {searchQuery && (
+          <div style={{ marginTop: -16, marginBottom: 16, fontSize: 13, color: "var(--muted)" }}>
+            Found {filteredAndSortedStocks.length} result{filteredAndSortedStocks.length !== 1 ? 's' : ''}
+          </div>
+        )}
 
         <div style={{ overflowX: "auto" }}>
           <table className="stock-table" style={{
@@ -403,13 +485,32 @@ export default function StocksPage() {
                   style={{ cursor: "pointer" }}
                 >
                   <td style={{ padding: "16px" }}>
-                    <span style={{
-                      color: "var(--accent)",
-                      fontWeight: 600,
-                      fontSize: 14,
-                    }}>
-                      {stock.ticker}
-                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{
+                        color: "var(--accent)",
+                        fontWeight: 600,
+                        fontSize: 14,
+                      }}>
+                        {stock.ticker}
+                      </span>
+                      {selectedAssetTypes.size > 1 && stock.asset_type !== 'equity' && (
+                        <span style={{
+                          fontSize: 10,
+                          fontWeight: 600,
+                          padding: "2px 6px",
+                          borderRadius: 3,
+                          background: stock.asset_type === 'index' ? '#3b82f6' :
+                                     stock.asset_type === 'commodity_etf' ? '#f59e0b' :
+                                     stock.asset_type === 'index_etf' ? '#8b5cf6' : 'var(--muted)',
+                          color: '#fff',
+                          textTransform: 'uppercase',
+                        }}>
+                          {stock.asset_type === 'index' ? 'IDX' :
+                           stock.asset_type === 'commodity_etf' ? 'C-ETF' :
+                           stock.asset_type === 'index_etf' ? 'I-ETF' : stock.asset_type}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td style={{ padding: "16px", color: "var(--foreground)", fontSize: 14 }}>
                     {stock.name}

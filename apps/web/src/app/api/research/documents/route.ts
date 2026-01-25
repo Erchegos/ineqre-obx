@@ -1,41 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verify } from 'jsonwebtoken';
 import { pool } from '@/lib/db';
+import { rateLimit } from '@/lib/rate-limit';
+import { validateQuery, documentsQuerySchema } from '@/lib/validation';
+import { getAuthUser, secureJsonResponse, safeErrorResponse } from '@/lib/security';
 
-// Verify JWT token from request
-function verifyToken(req: NextRequest): string | null {
-  const authHeader = req.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-  try {
-    const decoded = verify(
-      token,
-      process.env.JWT_SECRET || 'your-secret-key-change-this'
-    ) as { tokenId: string };
-    return decoded.tokenId;
-  } catch (error) {
-    return null;
-  }
-}
-
+/**
+ * GET /api/research/documents
+ *
+ * List research documents. Requires authentication.
+ *
+ * Security measures:
+ * - JWT authentication required
+ * - Rate limiting (200 req/min)
+ * - Input validation for query params
+ * - Parameterized queries (SQL injection prevention)
+ */
 export async function GET(req: NextRequest) {
-  const tokenId = verifyToken(req);
+  // Rate limiting
+  const rateLimitResult = rateLimit(req, 'read');
+  if (rateLimitResult) return rateLimitResult;
 
-  if (!tokenId) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
+  // Authentication required
+  const user = getAuthUser(req);
+  if (!user) {
+    return secureJsonResponse(
+      { error: 'Unauthorized', message: 'Valid authentication token required' },
       { status: 401 }
     );
   }
 
   try {
+    // Validate query parameters
     const { searchParams } = new URL(req.url);
-    const ticker = searchParams.get('ticker');
-    const source = searchParams.get('source');
-    const limit = parseInt(searchParams.get('limit') || '1000');
+    const validation = validateQuery(searchParams, documentsQuerySchema);
+    if (!validation.success) return validation.response;
+
+    const { ticker, source, limit } = validation.data;
 
     let query = `
       SELECT
@@ -93,15 +93,11 @@ export async function GET(req: NextRequest) {
     await pool.query(
       `INSERT INTO research_access_logs (token_id, action, accessed_at)
        VALUES ($1, 'list', NOW())`,
-      [tokenId]
+      [user.tokenId]
     );
 
-    return NextResponse.json(result.rows);
+    return secureJsonResponse(result.rows);
   } catch (error) {
-    console.error('Error fetching documents:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch documents' },
-      { status: 500 }
-    );
+    return safeErrorResponse(error, 'Failed to fetch documents');
   }
 }
