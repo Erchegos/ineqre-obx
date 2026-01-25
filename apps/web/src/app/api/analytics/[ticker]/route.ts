@@ -154,39 +154,58 @@ export async function GET(
     // Prepare data arrays
     const dates = prices.map(p => p.date);
     const closes = prices.map(p => p.close);
-    const adjCloses = prices.map(p => p.adj_close);
+
+    // For adjusted prices, find the first valid adj_close (>0) and only use data from that point
+    // This avoids the spike caused by mixing close (when adj_close=0) with real adj_close values
+    const firstValidAdjIndex = prices.findIndex(p => p.adj_close > 0 && p.adj_close !== p.close);
+    const hasValidAdjClose = firstValidAdjIndex >= 0;
+
+    // If no valid adj_close data exists, use close for both series
+    const adjCloses = hasValidAdjClose
+      ? prices.slice(firstValidAdjIndex).map(p => p.adj_close)
+      : closes;
+    const adjDates = hasValidAdjClose
+      ? dates.slice(firstValidAdjIndex)
+      : dates;
 
     // Fetch Market Data for Beta (align length roughly)
     let marketReturns: number[] | null = null;
+    let adjMarketReturns: number[] | null = null;
     try {
       const marketCloses = await fetchMarketPrices(limit);
       if (marketCloses.length >= closes.length) {
          // Trim to match exactly if needed, or just use simpler alignment
          const alignedMarket = marketCloses.slice(-closes.length);
          marketReturns = computeReturns(alignedMarket);
+
+         // Also align market returns for adjusted series
+         if (hasValidAdjClose && marketCloses.length >= adjCloses.length) {
+           const adjAlignedMarket = marketCloses.slice(-adjCloses.length);
+           adjMarketReturns = computeReturns(adjAlignedMarket);
+         }
       }
     } catch (e) { console.warn("Beta calc failed", e); }
 
     // --- CALCULATE TWICE ---
-    // 1. Adjusted (Total Return) - The Default
+    // 1. Adjusted (Total Return) - Uses only valid adj_close data
     const adjStats = calculateMetrics(
-        adjCloses, 
-        marketReturns, 
-        adjCloses[0], 
+        adjCloses,
+        adjMarketReturns || marketReturns,
+        adjCloses[0],
         adjCloses[adjCloses.length - 1]
     );
 
-    // 2. Raw (Price Return)
+    // 2. Raw (Price Return) - Uses all close data
     const rawStats = calculateMetrics(
-        closes, 
-        marketReturns, 
-        closes[0], 
+        closes,
+        marketReturns,
+        closes[0],
         closes[closes.length - 1]
     );
 
     // Helper to format returns series with dates
-    const formatReturns = (rets: number[]) => rets.map((r, i) => ({
-      date: dates[i + 1],
+    const formatReturns = (rets: number[], dateArr: string[]) => rets.map((r, i) => ({
+      date: dateArr[i + 1],
       return: r
     }));
 
@@ -198,23 +217,24 @@ export async function GET(
         adjusted: adjStats.metrics,
         raw: rawStats.metrics
       },
-      // Return BOTH sets of series
+      // Return BOTH sets of series (adjusted may have different date range)
       returns: {
-        adjusted: formatReturns(adjStats.returns),
-        raw: formatReturns(rawStats.returns)
+        adjusted: formatReturns(adjStats.returns, adjDates),
+        raw: formatReturns(rawStats.returns, dates)
       },
       drawdown: {
         adjusted: adjStats.drawdown,
         raw: rawStats.drawdown
       },
-      prices: prices.map(p => ({ 
-        date: p.date, 
-        close: p.close, 
-        adj_close: p.adj_close 
+      prices: prices.map(p => ({
+        date: p.date,
+        close: p.close,
+        adj_close: p.adj_close > 0 ? p.adj_close : p.close // Fallback for display
       })),
       dateRange: {
         start: dates[0],
         end: dates[dates.length - 1],
+        adjustedStart: adjDates[0], // When valid adj_close data begins
       },
     });
 

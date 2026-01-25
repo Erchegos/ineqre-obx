@@ -122,12 +122,12 @@ export default function TimeframeSelector({
               position: "absolute",
               top: "calc(100% + 8px)",
               left: 0,
-              background: "var(--card-bg)",
-              border: "1px solid var(--card-border)",
+              background: "#1a1a1a",
+              border: "1px solid rgba(255, 255, 255, 0.2)",
               borderRadius: 6,
               padding: 16,
               zIndex: 100,
-              boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
               minWidth: 280,
             }}
           >
@@ -136,7 +136,7 @@ export default function TimeframeSelector({
                 style={{
                   display: "block",
                   fontSize: 11,
-                  color: "var(--muted)",
+                  color: "rgba(255, 255, 255, 0.6)",
                   marginBottom: 4,
                   textTransform: "uppercase",
                 }}
@@ -151,9 +151,9 @@ export default function TimeframeSelector({
                   width: "100%",
                   padding: "8px 10px",
                   borderRadius: 4,
-                  border: "1px solid var(--input-border)",
-                  background: "var(--input-bg)",
-                  color: "var(--foreground)",
+                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                  background: "#252525",
+                  color: "#ffffff",
                   fontSize: 13,
                 }}
               />
@@ -163,7 +163,7 @@ export default function TimeframeSelector({
                 style={{
                   display: "block",
                   fontSize: 11,
-                  color: "var(--muted)",
+                  color: "rgba(255, 255, 255, 0.6)",
                   marginBottom: 4,
                   textTransform: "uppercase",
                 }}
@@ -178,9 +178,9 @@ export default function TimeframeSelector({
                   width: "100%",
                   padding: "8px 10px",
                   borderRadius: 4,
-                  border: "1px solid var(--input-border)",
-                  background: "var(--input-bg)",
-                  color: "var(--foreground)",
+                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                  background: "#252525",
+                  color: "#ffffff",
                   fontSize: 13,
                 }}
               />
@@ -192,9 +192,9 @@ export default function TimeframeSelector({
                   flex: 1,
                   padding: "8px 12px",
                   borderRadius: 4,
-                  border: "1px solid var(--input-border)",
-                  background: "var(--input-bg)",
-                  color: "var(--foreground)",
+                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                  background: "#252525",
+                  color: "#ffffff",
                   fontSize: 12,
                   cursor: "pointer",
                 }}
@@ -210,7 +210,7 @@ export default function TimeframeSelector({
                   borderRadius: 4,
                   border: "none",
                   background:
-                    customStart && customEnd ? "var(--accent)" : "var(--muted)",
+                    customStart && customEnd ? "var(--accent)" : "#444",
                   color: "#ffffff",
                   fontSize: 12,
                   fontWeight: 500,
