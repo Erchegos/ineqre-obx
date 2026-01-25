@@ -130,6 +130,30 @@ async function fetchMarketPrices(limit: number): Promise<number[]> {
   return result.rows.map(r => Number(r.close)).reverse();
 }
 
+async function getFullDateRange(ticker: string): Promise<{ start: string; end: string } | null> {
+  const tableName = await getPriceTable();
+  const q = `
+    SELECT
+      MIN(date::date) as start_date,
+      MAX(date::date) as end_date
+    FROM public.${tableName}
+    WHERE upper(ticker) = upper($1)
+      AND close IS NOT NULL
+      AND close > 0
+  `;
+  const result = await pool.query(q, [ticker]);
+  if (result.rows.length === 0 || !result.rows[0].start_date) return null;
+
+  return {
+    start: result.rows[0].start_date instanceof Date
+      ? result.rows[0].start_date.toISOString().slice(0, 10)
+      : String(result.rows[0].start_date),
+    end: result.rows[0].end_date instanceof Date
+      ? result.rows[0].end_date.toISOString().slice(0, 10)
+      : String(result.rows[0].end_date)
+  };
+}
+
 export async function GET(
   req: Request,
   ctx: { params: Promise<{ ticker: string }> }
@@ -150,6 +174,9 @@ export async function GET(
     if (prices.length < 20) {
       return NextResponse.json({ ticker, error: "Insufficient data" }, { status: 400 });
     }
+
+    // Get the full date range available in database (not just fetched range)
+    const fullDateRange = await getFullDateRange(ticker);
 
     // Prepare data arrays
     const dates = prices.map(p => p.date);
@@ -235,6 +262,8 @@ export async function GET(
         start: dates[0],
         end: dates[dates.length - 1],
         adjustedStart: adjDates[0], // When valid adj_close data begins
+        fullStart: fullDateRange?.start, // Earliest data in database
+        fullEnd: fullDateRange?.end, // Latest data in database
       },
     });
 

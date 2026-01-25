@@ -40,6 +40,8 @@ type AnalyticsData = {
     start: string;
     end: string;
     adjustedStart?: string; // When valid adj_close data begins
+    fullStart?: string; // Earliest data available in database
+    fullEnd?: string; // Latest data available in database
   };
 };
 
@@ -274,11 +276,16 @@ export default function StockTickerPage() {
     return chartMode === "price" ? data.returns.raw : data.returns.adjusted;
   }, [data, chartMode]);
 
-  // Calculate total available days from date range (not fetched count)
+  // Calculate total available days from FULL date range (not fetched count)
   const totalAvailableDays = useMemo(() => {
-    if (!data?.dateRange?.start || !data?.dateRange?.end) return undefined;
-    const start = new Date(data.dateRange.start);
-    const end = new Date(data.dateRange.end);
+    // Use fullStart/fullEnd which represent the total available range in database
+    const startDate = data?.dateRange?.fullStart || data?.dateRange?.start;
+    const endDate = data?.dateRange?.fullEnd || data?.dateRange?.end;
+
+    if (!startDate || !endDate) return undefined;
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
     const diffTime = Math.abs(end.getTime() - start.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
