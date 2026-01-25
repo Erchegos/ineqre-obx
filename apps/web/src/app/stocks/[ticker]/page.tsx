@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import PriceChart from "@/components/PriceChart";
 import ReturnDistributionChart from "@/components/ReturnDistributionChart";
@@ -106,6 +106,9 @@ export default function StockTickerPage() {
   const [customDateRange, setCustomDateRange] = useState<{ start: string; end: string } | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [data, setData] = useState<AnalyticsData | null>(null);
+
+  // Cache the full date range once we have it (prevents flickering of timeframe buttons)
+  const fullDateRangeRef = useRef<{ start: string; end: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // UI State: 'comparison' is the new mode
@@ -279,8 +282,18 @@ export default function StockTickerPage() {
   // Calculate total available days from FULL date range (not fetched count)
   const totalAvailableDays = useMemo(() => {
     // Use fullStart/fullEnd which represent the total available range in database
-    const startDate = data?.dateRange?.fullStart || data?.dateRange?.start;
-    const endDate = data?.dateRange?.fullEnd || data?.dateRange?.end;
+    const fullStart = data?.dateRange?.fullStart;
+    const fullEnd = data?.dateRange?.fullEnd;
+
+    // Cache the full range once we have it
+    if (fullStart && fullEnd) {
+      fullDateRangeRef.current = { start: fullStart, end: fullEnd };
+    }
+
+    // Use cached value if available, otherwise fall back to current data
+    const cached = fullDateRangeRef.current;
+    const startDate = cached?.start || data?.dateRange?.start;
+    const endDate = cached?.end || data?.dateRange?.end;
 
     if (!startDate || !endDate) return undefined;
 
