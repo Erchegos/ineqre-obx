@@ -281,31 +281,48 @@ export default function StockTickerPage() {
     // 1. Comparison Mode: Normalize both to % change starting at 0
     // Using keys 'raw' and 'total' so PriceChart can find them easily
     if (chartMode === "comparison") {
-      // Show full history for Price Return, but Total Return only from adjustedStart
+      // Use adjustedStart as the common baseline for BOTH series
+      // This ensures dividend impact is calculated correctly (apples-to-apples)
       const adjustedStart = data.dateRange?.adjustedStart || data.prices[0].date;
 
       // Find the index where adj_close data begins
       const adjStartIndex = data.prices.findIndex(p => p.date >= adjustedStart);
 
-      // Calculate baseline prices
-      const startPrice = data.prices[0].close;
-      const startAdj = adjStartIndex >= 0
-        ? (data.prices[adjStartIndex].adj_close ?? data.prices[adjStartIndex].close)
-        : (data.prices[0].adj_close ?? data.prices[0].close);
+      if (adjStartIndex < 0) {
+        // No valid adj_close data - fall back to using close for both
+        const startPrice = data.prices[0].close;
+        return data.prices.map(p => ({
+          date: p.date,
+          raw: ((p.close - startPrice) / startPrice) * 100,
+          total: ((p.close - startPrice) / startPrice) * 100,
+        }));
+      }
+
+      // Baseline prices at adjustedStart (where both series begin comparison)
+      const baselineClose = data.prices[adjStartIndex].close;
+      const baselineAdj = data.prices[adjStartIndex].adj_close ?? data.prices[adjStartIndex].close;
 
       return data.prices.map((p, i) => {
-        const priceReturn = ((p.close - startPrice) / startPrice) * 100;
+        if (i < adjStartIndex) {
+          // Before adjustedStart: show only Price Return, no Total Return
+          // Calculate from the very beginning to show full history
+          const earlyStartPrice = data.prices[0].close;
+          return {
+            date: p.date,
+            raw: ((p.close - earlyStartPrice) / earlyStartPrice) * 100,
+            total: null,
+          };
+        } else {
+          // From adjustedStart onwards: both lines start at 0% for fair comparison
+          const priceReturn = ((p.close - baselineClose) / baselineClose) * 100;
+          const totalReturn = (((p.adj_close ?? p.close) - baselineAdj) / baselineAdj) * 100;
 
-        // Only show Total Return from adjustedStart onwards
-        const totalReturn = i >= adjStartIndex
-          ? (((p.adj_close ?? p.close) - startAdj) / startAdj) * 100
-          : null;
-
-        return {
-          date: p.date,
-          raw: priceReturn,      // Green Line (full history)
-          total: totalReturn,    // Blue Line (from adjustedStart only)
-        };
+          return {
+            date: p.date,
+            raw: priceReturn,      // Green Line (from adjustedStart = 0%)
+            total: totalReturn,    // Blue Line (from adjustedStart = 0%)
+          };
+        }
       });
     }
 
