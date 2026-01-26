@@ -191,8 +191,46 @@ export default function ResearchPortalPage() {
 
       const data = await res.json();
       setDocuments(data);
+
+      // Automatically generate summaries in background if any are missing
+      autoGenerateSummaries(token, data);
     } catch (err: any) {
       setError(err.message || 'Failed to load documents');
+    }
+  };
+
+  // Silently generate AI summaries in background for documents that need them
+  const autoGenerateSummaries = async (token: string, docs: ResearchDocument[]) => {
+    // Check if any documents are missing summaries
+    const missingCount = docs.filter(doc =>
+      !doc.ai_summary && doc.body_text && doc.body_text.length > 100
+    ).length;
+
+    if (missingCount === 0) {
+      return; // All documents have summaries
+    }
+
+    try {
+      // Silently trigger summary generation in background
+      const res = await fetch('/api/research/generate-summaries', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        // After summaries are generated, refresh documents to show them
+        const docsRes = await fetch('/api/research/documents?limit=2000', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+
+        if (docsRes.ok) {
+          const updatedData = await docsRes.json();
+          setDocuments(updatedData);
+        }
+      }
+    } catch (err) {
+      // Silently fail - don't show errors to user for background operation
+      console.log('Background summary generation skipped');
     }
   };
 
