@@ -30,8 +30,6 @@ export default function ResearchPortalPage() {
   const [expandedDocs, setExpandedDocs] = useState<Set<string>>(new Set());
   const [selectedDocument, setSelectedDocument] = useState<ResearchDocument | null>(null);
   const [pdfCheckStatus, setPdfCheckStatus] = useState<Map<string, boolean>>(new Map());
-  const [isGeneratingSummaries, setIsGeneratingSummaries] = useState(false);
-  const [summaryStatus, setSummaryStatus] = useState('');
 
   const toggleExpanded = (docId: string) => {
     setExpandedDocs(prev => {
@@ -284,43 +282,6 @@ export default function ResearchPortalPage() {
     setDocuments([]);
   };
 
-  const handleGenerateSummaries = async () => {
-    setIsGeneratingSummaries(true);
-    setSummaryStatus('Generating summaries...');
-
-    const token = sessionStorage.getItem('research_token');
-    if (!token) return;
-
-    try {
-      const res = await fetch('/api/research/generate-summaries', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        setSummaryStatus(`✅ Generated ${data.processed} summaries!`);
-        // Refresh documents to show new summaries
-        const docsRes = await fetch('/api/research/documents?limit=2000', {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        if (docsRes.ok) {
-          const docsData = await docsRes.json();
-          setDocuments(docsData.documents || []);
-        }
-      } else {
-        setSummaryStatus(`❌ Error: ${data.error}`);
-      }
-    } catch (error: any) {
-      setSummaryStatus(`❌ Failed: ${error.message}`);
-    } finally {
-      setIsGeneratingSummaries(false);
-      // Clear status after 3 seconds
-      setTimeout(() => setSummaryStatus(''), 3000);
-    }
-  };
-
   // Filter documents - exclude those without content
   const filteredDocuments = documents.filter(doc => {
     // Filter out documents with no content
@@ -464,38 +425,6 @@ export default function ResearchPortalPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          {summaryStatus && (
-            <div style={{
-              padding: '8px 16px',
-              fontSize: 13,
-              fontWeight: 600,
-              borderRadius: 6,
-              background: summaryStatus.startsWith('✅') ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-              color: summaryStatus.startsWith('✅') ? '#16a34a' : '#dc2626',
-            }}>
-              {summaryStatus}
-            </div>
-          )}
-          <button
-            onClick={handleGenerateSummaries}
-            disabled={isGeneratingSummaries}
-            style={{
-              padding: '8px 16px',
-              background: isGeneratingSummaries ? 'var(--muted)' : 'rgba(59, 130, 246, 0.1)',
-              border: '1px solid rgba(59, 130, 246, 0.3)',
-              borderRadius: 6,
-              color: '#3b82f6',
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: isGeneratingSummaries ? 'not-allowed' : 'pointer',
-              transition: 'all 0.2s',
-              opacity: isGeneratingSummaries ? 0.6 : 1,
-            }}
-            onMouseOver={(e) => !isGeneratingSummaries && (e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)')}
-            onMouseOut={(e) => !isGeneratingSummaries && (e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)')}
-          >
-            {isGeneratingSummaries ? 'Generating...' : 'Generate AI Summaries'}
-          </button>
           <button
             onClick={() => {
               window.location.href = 'https://ineqre.no';
