@@ -192,8 +192,8 @@ export const documentsQuerySchema = z.object({
     .string()
     .optional()
     .transform((val) => {
-      const num = parseInt(val || '100', 10);
-      return Math.min(Math.max(1, num), 500);
+      const num = parseInt(val || '1000', 10);
+      return Math.min(Math.max(1, num), 5000); // Allow up to 5000 documents
     }),
   offset: paginationSchema.shape.offset,
   source: z
