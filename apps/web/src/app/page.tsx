@@ -72,8 +72,8 @@ export default function HomePage() {
             Intelligence Equity Research
           </h1>
           <p style={{ fontSize: 15, color: "var(--muted-foreground)", lineHeight: 1.7, maxWidth: 720 }}>
-            Institutional-grade quantitative equity research platform for Oslo Børs.
-            Automated research aggregation with AI summarization, advanced volatility modeling, Monte Carlo simulation, and cross-sectional correlation analysis.
+            A quantitative equity research platform for Oslo Børs.
+            Automated research aggregation with AI summarization, volatility modeling, Monte Carlo simulation, and correlation analysis.
           </p>
         </header>
 
@@ -189,6 +189,12 @@ export default function HomePage() {
             </Capability>
             <Capability title="Advanced Correlation Models">
               Dynamic Conditional Correlation (DCC-GARCH) for time-varying co-movement. Gaussian and Student-t copula models for tail dependence structure. VaR/CVaR calculation with historical simulation and parametric methods. Crisis period co-movement analysis and systemic risk indicators.
+            </Capability>
+            <Capability title="Portfolio Risk Optimizer">
+              Mean-variance optimization with efficient frontier calculation. Multi-asset portfolio construction with constraints (sector limits, position sizing, turnover). Risk parity and minimum variance allocation strategies. Backtesting framework with transaction costs and rebalancing logic.
+            </Capability>
+            <Capability title="Candlestick Standard Deviation Channels">
+              TradingView-style candlestick charts with Bollinger Bands and standard deviation channels. Keltner Channels using ATR (Average True Range) for volatility-adjusted bands. Support/resistance zone detection and price breakout signals. Multi-timeframe technical analysis with 20/60/120-day moving averages.
             </Capability>
           </div>
         </section>
