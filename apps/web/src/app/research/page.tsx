@@ -206,31 +206,43 @@ export default function ResearchPortalPage() {
       !doc.ai_summary && doc.body_text && doc.body_text.length > 100
     ).length;
 
+    console.log(`[Auto-Summary] Found ${missingCount} documents needing summaries`);
+
     if (missingCount === 0) {
       return; // All documents have summaries
     }
 
     try {
+      console.log('[Auto-Summary] Starting background generation...');
+
       // Silently trigger summary generation in background
       const res = await fetch('/api/research/generate-summaries', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
-      if (res.ok) {
-        // After summaries are generated, refresh documents to show them
-        const docsRes = await fetch('/api/research/documents?limit=2000', {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-
-        if (docsRes.ok) {
-          const updatedData = await docsRes.json();
-          setDocuments(updatedData);
-        }
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('[Auto-Summary] API returned error:', res.status, errorText);
+        return;
       }
-    } catch (err) {
-      // Silently fail - don't show errors to user for background operation
-      console.log('Background summary generation skipped');
+
+      const result = await res.json();
+      console.log('[Auto-Summary] Generation completed:', result);
+
+      // After summaries are generated, refresh documents to show them
+      console.log('[Auto-Summary] Refreshing documents...');
+      const docsRes = await fetch('/api/research/documents?limit=2000', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      if (docsRes.ok) {
+        const updatedData = await docsRes.json();
+        setDocuments(updatedData);
+        console.log('[Auto-Summary] Documents refreshed with new summaries');
+      }
+    } catch (err: any) {
+      console.error('[Auto-Summary] Failed:', err.message);
     }
   };
 
