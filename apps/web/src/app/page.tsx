@@ -194,7 +194,10 @@ export default function HomePage() {
               Mean-variance optimization with efficient frontier calculation. Multi-asset portfolio construction with constraints (sector limits, position sizing, turnover). Risk parity and minimum variance allocation strategies. Backtesting framework with transaction costs and rebalancing logic.
             </Capability>
             <Capability title="Candlestick Standard Deviation Channels">
-              TradingView-style candlestick charts with Bollinger Bands and standard deviation channels. Keltner Channels using ATR (Average True Range) for volatility-adjusted bands. Support/resistance zone detection and price breakout signals. Multi-timeframe technical analysis with 20/60/120-day moving averages.
+              Candlestick charts with Bollinger Bands and standard deviation channels. Keltner Channels using ATR (Average True Range) for volatility-adjusted bands. Support/resistance zone detection and price breakout signals. Multi-timeframe technical analysis with 20/60/120-day moving averages.
+            </Capability>
+            <Capability title="Option Pricing Models">
+              Black-Scholes-Merton model for European options with Greeks calculation (Delta, Gamma, Vega, Theta, Rho). Implied volatility surface construction using Newton-Raphson iteration. Put-Call parity validation and arbitrage detection. American options pricing using binomial tree models. Volatility smile analysis and risk-neutral probability distributions.
             </Capability>
           </div>
         </section>
