@@ -372,6 +372,7 @@ export default function MonteCarloChart({
                     style: { fill: "var(--foreground)", fontSize: 12 },
                   }}
                   domain={['auto', 'auto']}
+                  reversed={true}
                   tickFormatter={(val) => `${val.toFixed(0)} kr`}
                 />
 
