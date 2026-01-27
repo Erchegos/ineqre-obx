@@ -49,7 +49,8 @@ const SECTOR_MAPPING: Record<string, string> = {
   "GSF": "Shipping",
   "SUBC": "Shipping",
   "WWI": "Shipping",
-  "WAWI": "Shipping"
+  "WAWI": "Shipping",
+  "2020": "Shipping",  // 2020 Bulkers Ltd
 
   // Seafood & Aquaculture
   "MOWI": "Seafood",
@@ -103,7 +104,6 @@ const SECTOR_MAPPING: Record<string, string> = {
   "MEDI": "Healthcare",
 
   // Materials
-  "2020": "Materials",
   "ELK": "Materials",
   "RECSI": "Materials",  // REC Silicon - Silicon production
 
