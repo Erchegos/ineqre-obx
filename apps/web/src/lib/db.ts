@@ -26,7 +26,8 @@ function createPool() {
       ssl: {
         rejectUnauthorized: false
       },
-      query_timeout: 10000
+      query_timeout: 30000, // Increased from 10s to 30s for large queries
+      statement_timeout: 30000
     });
 
     newPool.on('error', (err) => {

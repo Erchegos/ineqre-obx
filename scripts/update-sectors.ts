@@ -21,6 +21,7 @@ const SECTOR_MAPPING: Record<string, string> = {
   "VAR": "Energy",
   "AKSO": "Energy",
   "TGS": "Energy",
+  "OET": "Energy",    // Okea ASA - Oil & gas exploration
 
   // Finance
   "DNB": "Finance",
@@ -53,6 +54,12 @@ const SECTOR_MAPPING: Record<string, string> = {
   "KCC": "Shipping",    // Klaveness Combination Carriers
   "ODF": "Shipping",    // Odfjell - Chemical tankers
   "ODL": "Shipping",    // Odfjell Drilling
+  "HSHP": "Shipping",   // Hamilton Shipping Partners - Product tankers
+  "BORR": "Shipping",   // Borr Drilling - Dual listed (US: NYSE)
+  "BWLP": "Shipping",   // BW LPG - Dual listed (US: NYSE)
+  "CDLR": "Shipping",   // Cadeler - Dual listed (US: NYSE)
+  "ECO": "Shipping",    // Okeanis Eco Tankers - Dual listed (US: NYSE)
+  "HAFN": "Shipping",   // Hafnia - Dual listed (US: NYSE)
 
   // Seafood & Aquaculture
   "MOWI": "Seafood",

@@ -88,65 +88,47 @@ async function saveToSupabaseStorage(content, relativePath) {
 }
 
 /**
- * Download PDF from URL (same method as email-processor.js)
+ * Download PDF from URL - simple fetch approach
+ * FactSet links should work without special authentication if accessed quickly
  */
 async function downloadPDF(reportUrl) {
-  const https = require('https');
-  const http = require('http');
+  try {
+    const response = await fetch(reportUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/pdf,*/*',
+      },
+      redirect: 'follow',
+    });
 
-  const response = await (async () => {
-    try {
-      // Try using node-fetch if available
-      const nodeFetch = require('node-fetch');
-      return await nodeFetch(reportUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-        },
-        timeout: 30000,
-      });
-    } catch (e) {
-      // Fallback: manual HTTPS request
-      return new Promise((resolve, reject) => {
-        const url = new URL(reportUrl);
-        const options = {
-          hostname: url.hostname,
-          path: url.pathname + url.search,
-          method: 'GET',
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-          },
-        };
-
-        const req = (url.protocol === 'https:' ? https : http).request(options, (res) => {
-          const chunks = [];
-          res.on('data', (chunk) => chunks.push(chunk));
-          res.on('end', () => {
-            resolve({
-              ok: res.statusCode >= 200 && res.statusCode < 300,
-              statusCode: res.statusCode,
-              buffer: () => Promise.resolve(Buffer.concat(chunks)),
-            });
-          });
-        });
-        req.on('error', reject);
-        req.setTimeout(30000, () => {
-          req.destroy();
-          reject(new Error('Timeout'));
-        });
-        req.end();
-      });
+    if (!response.ok) {
+      console.log(`  HTTP ${response.status}: ${response.statusText}`);
+      return {
+        statusCode: response.status,
+        buffer: Buffer.alloc(0)
+      };
     }
-  })();
 
-  if (response.ok || response.statusCode === 200) {
-    const pdfBuffer = await response.buffer();
+    const buffer = await response.arrayBuffer();
+    const pdfBuffer = Buffer.from(buffer);
+
+    // Check if it's actually a PDF
+    if (pdfBuffer.length > 4 && pdfBuffer.toString('utf8', 0, 4) === '%PDF') {
+      return {
+        statusCode: 200,
+        buffer: pdfBuffer
+      };
+    } else {
+      console.log(`  Response is not a PDF (starts with: ${pdfBuffer.toString('utf8', 0, 20)})`);
+      return {
+        statusCode: 500,
+        buffer: Buffer.alloc(0)
+      };
+    }
+  } catch (error) {
+    console.log(`  Download error: ${error.message}`);
     return {
-      statusCode: 200,
-      buffer: pdfBuffer
-    };
-  } else {
-    return {
-      statusCode: response.statusCode || response.status,
+      statusCode: 500,
       buffer: Buffer.alloc(0)
     };
   }

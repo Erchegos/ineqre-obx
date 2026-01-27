@@ -1,0 +1,336 @@
+"use client";
+
+/**
+ * Example: Stocks page with fundamentals panel
+ *
+ * This shows how to integrate the StockFundamentalsPanel component.
+ * To use this:
+ * 1. Copy the changes below into your stocks/page.tsx
+ * 2. Import the StockFundamentalsPanel component
+ * 3. Add state for selected ticker and panel visibility
+ * 4. Add onClick handler to stock rows
+ */
+
+import Link from "next/link";
+import { useEffect, useState, useMemo } from "react";
+import StockFundamentalsPanel from "@/components/StockFundamentalsPanel";
+
+type StockData = {
+  ticker: string;
+  name: string;
+  last_close: number;
+  last_adj_close: number;
+  start_date: string;
+  end_date: string;
+  rows: number;
+};
+
+export default function StocksPage() {
+  const [stocks, setStocks] = useState<StockData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<keyof StockData>("ticker");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+
+  // NEW: State for fundamentals panel
+  const [selectedTicker, setSelectedTicker] = useState<string>("");
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
+
+  useEffect(() => {
+    async function fetchStocks() {
+      try {
+        const res = await fetch("/api/stocks", {
+          method: "GET",
+          headers: { accept: "application/json" },
+          cache: "no-store",
+        });
+
+        if (!res.ok) {
+          throw new Error(`Failed to fetch stocks: ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        setStocks(data);
+        setLoading(false);
+      } catch (e: any) {
+        setError(e?.message ?? String(e));
+        setLoading(false);
+      }
+    }
+
+    fetchStocks();
+  }, []);
+
+  const filteredAndSortedStocks = useMemo(() => {
+    let filtered = stocks;
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = stocks.filter(
+        (stock) =>
+          stock.ticker.toLowerCase().includes(query) ||
+          stock.name.toLowerCase().includes(query)
+      );
+    }
+
+    const sorted = [...filtered].sort((a, b) => {
+      let aVal: any = a[sortBy];
+      let bVal: any = b[sortBy];
+
+      if (typeof aVal === "string") {
+        aVal = aVal.toLowerCase();
+        bVal = (bVal as string).toLowerCase();
+      }
+
+      if (sortOrder === "asc") {
+        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+      } else {
+        return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+      }
+    });
+
+    return sorted;
+  }, [stocks, searchQuery, sortBy, sortOrder]);
+
+  const toggleSort = (column: keyof StockData) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(column);
+      setSortOrder("asc");
+    }
+  };
+
+  // NEW: Handler to open fundamentals panel
+  const handleStockClick = (ticker: string, event: React.MouseEvent) => {
+    // Don't open panel if clicking on a link
+    if ((event.target as HTMLElement).tagName === "A") {
+      return;
+    }
+
+    setSelectedTicker(ticker);
+    setIsPanelOpen(true);
+  };
+
+  const SortIcon = ({ column }: { column: keyof StockData }) => {
+    if (sortBy !== column) return <span style={{ opacity: 0.4 }}>↕</span>;
+    return sortOrder === "asc" ? <span>↑</span> : <span>↓</span>;
+  };
+
+  if (loading) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        background: "var(--background)",
+        padding: "40px 20px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}>
+        <div style={{ fontSize: 16, color: "var(--muted-foreground)" }}>
+          Loading stocks...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        background: "var(--background)",
+        padding: "40px 20px",
+      }}>
+        <div style={{
+          maxWidth: 600,
+          margin: "0 auto",
+          padding: 24,
+          background: "rgba(239, 68, 68, 0.1)",
+          border: "1px solid rgba(239, 68, 68, 0.3)",
+          borderRadius: 8,
+          color: "#ef4444",
+        }}>
+          <h2 style={{ margin: "0 0 12px 0", fontSize: 18, fontWeight: 600 }}>
+            Error Loading Stocks
+          </h2>
+          <p style={{ margin: 0, fontSize: 14 }}>{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: "var(--background)",
+      padding: "40px 20px",
+    }}>
+      <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+        {/* Header */}
+        <div style={{ marginBottom: 32 }}>
+          <h1 style={{
+            fontSize: 32,
+            fontWeight: 700,
+            margin: "0 0 8px 0",
+            color: "var(--foreground)",
+          }}>
+            Stocks
+          </h1>
+          <p style={{
+            fontSize: 14,
+            color: "var(--muted-foreground)",
+            margin: 0,
+          }}>
+            {stocks.length} stocks available • Click any row for fundamentals
+          </p>
+        </div>
+
+        {/* Search */}
+        <div style={{ marginBottom: 24 }}>
+          <input
+            type="text"
+            placeholder="Search by ticker or name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              width: "100%",
+              maxWidth: 400,
+              padding: "12px 16px",
+              fontSize: 14,
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              background: "var(--card-bg)",
+              color: "var(--foreground)",
+            }}
+          />
+        </div>
+
+        {/* Table */}
+        <div style={{
+          background: "var(--card-bg)",
+          border: "1px solid var(--border)",
+          borderRadius: 12,
+          overflow: "hidden",
+        }}>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{
+              width: "100%",
+              borderCollapse: "collapse",
+            }}>
+              <thead>
+                <tr style={{
+                  background: "var(--muted)",
+                  borderBottom: "1px solid var(--border)",
+                }}>
+                  <th style={tableHeaderStyle} onClick={() => toggleSort("ticker")}>
+                    Ticker <SortIcon column="ticker" />
+                  </th>
+                  <th style={tableHeaderStyle} onClick={() => toggleSort("name")}>
+                    Name <SortIcon column="name" />
+                  </th>
+                  <th style={{...tableHeaderStyle, textAlign: "right"}} onClick={() => toggleSort("last_close")}>
+                    Last Close <SortIcon column="last_close" />
+                  </th>
+                  <th style={{...tableHeaderStyle, textAlign: "right"}} onClick={() => toggleSort("rows")}>
+                    Data Points <SortIcon column="rows" />
+                  </th>
+                  <th style={{...tableHeaderStyle, textAlign: "center"}}>
+                    Date Range
+                  </th>
+                  <th style={{...tableHeaderStyle, textAlign: "center"}}>
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredAndSortedStocks.map((stock) => (
+                  <tr
+                    key={stock.ticker}
+                    onClick={(e) => handleStockClick(stock.ticker, e)}
+                    style={{
+                      borderBottom: "1px solid var(--border)",
+                      cursor: "pointer",
+                      transition: "background 0.2s",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "var(--muted)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "transparent";
+                    }}
+                  >
+                    <td style={tableCellStyle}>
+                      <span style={{ fontWeight: 600, color: "#3b82f6" }}>
+                        {stock.ticker}
+                      </span>
+                    </td>
+                    <td style={tableCellStyle}>{stock.name}</td>
+                    <td style={{...tableCellStyle, textAlign: "right", fontFamily: "monospace"}}>
+                      {stock.last_close?.toFixed(2) || "N/A"}
+                    </td>
+                    <td style={{...tableCellStyle, textAlign: "right"}}>
+                      {stock.rows?.toLocaleString() || "0"}
+                    </td>
+                    <td style={{...tableCellStyle, textAlign: "center", fontSize: 13}}>
+                      {stock.start_date} → {stock.end_date}
+                    </td>
+                    <td style={{...tableCellStyle, textAlign: "center"}}>
+                      <Link
+                        href={`/stock/${stock.ticker}`}
+                        style={{
+                          padding: "6px 12px",
+                          fontSize: 13,
+                          color: "#3b82f6",
+                          textDecoration: "none",
+                          border: "1px solid rgba(59, 130, 246, 0.3)",
+                          borderRadius: 4,
+                          display: "inline-block",
+                        }}
+                      >
+                        View Stats
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {filteredAndSortedStocks.length === 0 && (
+            <div style={{
+              padding: 40,
+              textAlign: "center",
+              color: "var(--muted-foreground)",
+            }}>
+              No stocks found matching "{searchQuery}"
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* NEW: Fundamentals Panel */}
+      <StockFundamentalsPanel
+        ticker={selectedTicker}
+        isOpen={isPanelOpen}
+        onClose={() => setIsPanelOpen(false)}
+      />
+    </div>
+  );
+}
+
+const tableHeaderStyle: React.CSSProperties = {
+  padding: "16px",
+  textAlign: "left",
+  fontSize: 13,
+  fontWeight: 600,
+  color: "var(--muted-foreground)",
+  cursor: "pointer",
+  userSelect: "none",
+};
+
+const tableCellStyle: React.CSSProperties = {
+  padding: "16px",
+  fontSize: 14,
+  color: "var(--foreground)",
+};
