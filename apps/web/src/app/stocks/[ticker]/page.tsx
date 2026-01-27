@@ -1024,68 +1024,6 @@ export default function StockTickerPage() {
                 </div>
               </div>
 
-              {/* Methodology & Interpretation (Collapsible) */}
-              <div style={{
-                padding: 20,
-                borderRadius: 4,
-                border: "1px solid var(--card-border)",
-                background: "var(--card-bg)",
-                marginBottom: 20,
-              }}>
-                <button
-                  onClick={() => setShowMethodology(!showMethodology)}
-                  style={{
-                    width: "100%",
-                    padding: "10px 12px",
-                    borderRadius: 4,
-                    border: "1px solid var(--border)",
-                    background: "var(--hover-bg)",
-                    color: "var(--foreground)",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    transition: "all 0.15s",
-                  }}
-                >
-                  <span>Methodology & Interpretation</span>
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    style={{
-                      transform: showMethodology ? "rotate(180deg)" : "rotate(0deg)",
-                      transition: "transform 0.2s",
-                    }}
-                  >
-                    <polyline points="6 9 12 15 18 9"></polyline>
-                  </svg>
-                </button>
-
-                {showMethodology && (
-                  <div style={{
-                    marginTop: 12,
-                    padding: 12,
-                    borderRadius: 4,
-                    background: "var(--hover-bg)",
-                    border: "1px solid var(--border)",
-                  }}>
-                    <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
-                      • <strong>R² (Fit Quality)</strong>: Measures how well the linear regression explains price variance. {(stdChannelData.metadata.r2 * 100).toFixed(1)}% of price movement is explained by the trend line.
-                      <br />
-                      • <strong>Correlation (R)</strong>: Measures the strength of the linear relationship between time and price. Values close to ±1 indicate strong trends, close to 0 means random walk.
-                      <br />
-                      • <strong>±1σ and ±2σ Bands</strong>: Statistical deviation bands around the trend line. ±1σ typically contains ~68% of price movements (closer bands), while ±2σ contains ~95% (wider bands). Prices touching outer bands suggest potential mean reversion opportunities.
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* Chart */}
               {stdChartData.length > 0 && (
                 <div style={{
@@ -1243,7 +1181,7 @@ export default function StockTickerPage() {
 
                 {showMethodology && (
                   <div style={{ marginTop: 16, fontSize: 13, lineHeight: 1.7, color: "var(--foreground)" }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
                       <div>
                         <h4 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "var(--muted)" }}>Core Features:</h4>
                         <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6, color: "var(--foreground)" }}>
@@ -1263,6 +1201,27 @@ export default function StockTickerPage() {
                         </ul>
                       </div>
                     </div>
+
+                    <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+                      <h4 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "var(--muted)" }}>Statistical Metrics:</h4>
+                      <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6, color: "var(--foreground)" }}>
+                        <li>
+                          <strong>R² (Fit Quality):</strong> Measures how well the linear regression fits the price data.
+                          Values range from 0 (no fit) to 1 (perfect fit). Higher R² means the trend line better explains price movements,
+                          making channel boundaries more reliable for analysis.
+                        </li>
+                        <li>
+                          <strong>Correlation (R):</strong> Strength of linear relationship between time and price.
+                          Values closer to +1 or −1 indicate stronger directional trends. Values near 0 suggest sideways or non-linear movement.
+                        </li>
+                        <li>
+                          <strong>±1σ and ±2σ Bands:</strong> Statistical deviation bands around the trend line.
+                          ±1σ typically contains ~68% of price movements (closer bands), while ±2σ contains ~95% (wider bands).
+                          Prices touching outer bands suggest potential mean reversion opportunities.
+                        </li>
+                      </ul>
+                    </div>
+
                     <div style={{ marginTop: 16, padding: 12, borderRadius: 4, background: "var(--hover-bg)", border: "1px solid var(--border)" }}>
                       <div style={{ fontSize: 11, color: "var(--muted)" }}>
                         <strong>Note:</strong> The standard deviation channel uses linear regression to identify the trend and statistical boundaries.
