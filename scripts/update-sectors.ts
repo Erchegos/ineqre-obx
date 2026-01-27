@@ -32,6 +32,8 @@ const SECTOR_MAPPING: Record<string, string> = {
   "PARB": "Finance",
   "SWON": "Finance",
   "MING": "Finance",  // Bank
+  "GJF": "Finance",   // Gjensidige Forsikring - Insurance
+  "NONG": "Finance",  // SpareBank 1 Nord-Norge - Bank
 
   // Shipping & Offshore
   "FRO": "Shipping",
@@ -42,15 +44,12 @@ const SECTOR_MAPPING: Record<string, string> = {
   "HUNT": "Shipping",
   "SNI": "Shipping",
   "SALM": "Shipping",
-  "GJF": "Shipping",
   "BWLPG": "Shipping",
   "MPCC": "Shipping",
   "GSF": "Shipping",
-  "RECSI": "Shipping",
   "SUBC": "Shipping",
   "WWI": "Shipping",
-  "WAWI": "Shipping",
-  "NONG": "Shipping",  // Bulkers
+  "WAWI": "Shipping"
 
   // Seafood & Aquaculture
   "MOWI": "Seafood",
@@ -106,6 +105,7 @@ const SECTOR_MAPPING: Record<string, string> = {
   // Materials
   "2020": "Materials",
   "ELK": "Materials",
+  "RECSI": "Materials",  // REC Silicon - Silicon production
 
   // Renewable Energy
   "NEL": "Renewable Energy",
