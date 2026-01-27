@@ -153,6 +153,9 @@ export default function HomePage() {
             <Capability title="Risk Metrics">
               Maximum drawdown with recovery period tracking, annualized Sharpe ratio, market beta vs OBX index, and historical stress testing. Expected daily/weekly moves using 1σ normal distribution assumptions. Rolling correlation with benchmark indices.
             </Capability>
+            <Capability title="Standard Deviation Channels">
+              Linear regression channels with configurable ±1σ and ±2σ bands. Automatic window optimization (255-1530 bars) by maximizing R². Fixed window analysis with preset time ranges. Position classification system (extreme high/low, elevated/depressed, within range). Mean reversion opportunity identification with distance-to-band analytics.
+            </Capability>
             <Capability title="Time Series Analysis">
               Log-return decomposition, autocorrelation function (ACF) diagnostics, monthly seasonality patterns with bar chart visualization. Rolling 30-day volatility correlation with OBX market index for co-movement analysis.
             </Capability>
@@ -192,9 +195,6 @@ export default function HomePage() {
             </Capability>
             <Capability title="Portfolio Risk Optimizer">
               Mean-variance optimization with efficient frontier calculation. Multi-asset portfolio construction with constraints (sector limits, position sizing, turnover). Risk parity and minimum variance allocation strategies. Backtesting framework with transaction costs and rebalancing logic.
-            </Capability>
-            <Capability title="Candlestick Standard Deviation Channels">
-              Candlestick charts with Bollinger Bands and standard deviation channels. Keltner Channels using ATR (Average True Range) for volatility-adjusted bands. Support/resistance zone detection and price breakout signals. Multi-timeframe technical analysis with 20/60/120-day moving averages.
             </Capability>
             <Capability title="Option Pricing Models">
               Black-Scholes-Merton model for European options with Greeks calculation (Delta, Gamma, Vega, Theta, Rho). Implied volatility surface construction using Newton-Raphson iteration. Put-Call parity validation and arbitrage detection. American options pricing using binomial tree models. Volatility smile analysis and risk-neutral probability distributions.
