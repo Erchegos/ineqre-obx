@@ -12,9 +12,9 @@ import {
 
 type OHLCData = {
   date: string;
-  open?: number;
-  high?: number;
-  low?: number;
+  open?: number | null;
+  high?: number | null;
+  low?: number | null;
   close: number;
   midLine?: number | null;
   upperBand1?: number | null;
