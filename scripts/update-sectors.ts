@@ -20,9 +20,7 @@ const SECTOR_MAPPING: Record<string, string> = {
   "AKRBP": "Energy",
   "VAR": "Energy",
   "AKSO": "Energy",
-  "BOUV": "Energy",
-  "OTEC": "Energy",
-  "TECH": "Energy",
+  "TGS": "Energy",
 
   // Finance
   "DNB": "Finance",
@@ -30,27 +28,31 @@ const SECTOR_MAPPING: Record<string, string> = {
   "SPOL": "Finance",
   "STB": "Finance",
   "PARB": "Finance",
-  "SWON": "Finance",
   "MING": "Finance",  // Bank
   "GJF": "Finance",   // Gjensidige Forsikring - Insurance
   "NONG": "Finance",  // SpareBank 1 Nord-Norge - Bank
+  "PROT": "Finance",  // Protector Forsikring - Insurance
 
   // Shipping & Offshore
   "FRO": "Shipping",
-  "BRG": "Shipping",
   "BWO": "Shipping",
   "HAFNI": "Shipping",
   "HAUTO": "Shipping",
   "HUNT": "Shipping",
   "SNI": "Shipping",
-  "SALM": "Shipping",
   "BWLPG": "Shipping",
   "MPCC": "Shipping",
-  "GSF": "Shipping",
   "SUBC": "Shipping",
   "WWI": "Shipping",
   "WAWI": "Shipping",
-  "2020": "Shipping",  // 2020 Bulkers Ltd
+  "WWIB": "Shipping",
+  "2020": "Shipping",   // 2020 Bulkers Ltd
+  "HAVI": "Shipping",   // Havila Shipping
+  "SOFF": "Shipping",   // Solstad Offshore
+  "DOFG": "Shipping",   // DOF Group
+  "KCC": "Shipping",    // Klaveness Combination Carriers
+  "ODF": "Shipping",    // Odfjell - Chemical tankers
+  "ODL": "Shipping",    // Odfjell Drilling
 
   // Seafood & Aquaculture
   "MOWI": "Seafood",
@@ -59,7 +61,7 @@ const SECTOR_MAPPING: Record<string, string> = {
   "LSG": "Seafood",
   "AUSS": "Seafood",
   "GSF": "Seafood",
-  "NRS": "Seafood",
+  "BAKKA": "Seafood",  // Bakkafrost - Salmon farming
 
   // Technology & Telecom
   "TEL": "Technology",
@@ -70,11 +72,16 @@ const SECTOR_MAPPING: Record<string, string> = {
   "IDEX": "Technology",
   "CADLR": "Technology",
   "NORBT": "Technology",
-  "NAPA": "Technology",  // Napatech - Networking equipment
+  "NAPA": "Technology",   // Napatech - Networking equipment
+  "CMBTO": "Technology",  // CMB Tech
+  "BOUV": "Technology",   // Bouvet - IT consulting
+  "OTEC": "Technology",   // Otello - Ad tech
+  "TECH": "Technology",   // Techstep - IT services
+  "NOD": "Technology",    // Nordic Semiconductor
+  "SWON": "Technology",   // SoftwareOne
 
   // Real Estate
   "ENTRA": "Real Estate",
-  "MULTI": "Real Estate",
   "OLT": "Real Estate",
 
   // Industrial
@@ -89,19 +96,23 @@ const SECTOR_MAPPING: Record<string, string> = {
   "BRG": "Industrial",
   "SCATC": "Industrial",
   "KIT": "Industrial",
-  "YAR": "Industrial",  // Yara - Fertilizer/Chemical
-  "NHY": "Industrial",  // Norsk Hydro - Aluminum/Metal
-  "KOA": "Industrial",  // Komplett - E-commerce/Retail
+  "YAR": "Industrial",   // Yara - Fertilizer/Chemical
+  "NHY": "Industrial",   // Norsk Hydro - Aluminum/Metal
+  "KOA": "Industrial",   // Kongsberg Automotive
+  "VEI": "Industrial",   // Veidekke - Construction
+  "AFG": "Industrial",   // AF Gruppen - Construction
+  "ABL": "Industrial",   // ABL Group - Marine/offshore engineering
+  "MULTI": "Industrial", // Multiconsult - Engineering consulting
 
   // Consumer
   "NAS": "Consumer",
   "KID": "Consumer",
   "ABG": "Consumer",
-  "BAKKA": "Consumer",
-  "BONHR": "Consumer",
 
   // Healthcare
   "MEDI": "Healthcare",
+  "PCIB": "Healthcare",  // PCI Biotech - Biotech
+  "PHO": "Healthcare",   // Photocure - Medical devices/pharma
 
   // Materials
   "ELK": "Materials",
@@ -113,21 +124,8 @@ const SECTOR_MAPPING: Record<string, string> = {
   "HEX": "Renewable Energy",
 
   // Investment/Holding Companies
-  "AFG": "Investment",
-  "KCC": "Investment",
-  "100B": "Investment",
   "ENDUR": "Investment",
-  "PCIB": "Investment",
-  "PHO": "Investment",
-  "PROT": "Investment",
-  "SOFF": "Investment",
-  "VEI": "Investment",
-  "ODF": "Investment",
-  "ODL": "Investment",
-  "ABL": "Investment",
-  "DOFG": "Investment",
-  "HAVI": "Investment",
-  "NOD": "Investment",
+  "BONHR": "Investment",  // Bonheur - Diversified holding company
 
   // ETFs/Indices (mark as Index for filtering)
   "OBX": "Index",
