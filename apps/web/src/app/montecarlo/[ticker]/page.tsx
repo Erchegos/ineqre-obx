@@ -199,7 +199,7 @@ export default function MonteCarloPage() {
             e.currentTarget.style.background = "var(--card-bg)";
           }}
         >
-          ← Back to {ticker} analysis
+          {ticker} Analysis
         </Link>
       </div>
 

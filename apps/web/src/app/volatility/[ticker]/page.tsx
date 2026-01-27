@@ -219,15 +219,23 @@ export default function VolatilityPage() {
             marginBottom: 20,
             fontSize: 13,
             fontWeight: 500,
-            color: "var(--muted)",
+            color: "var(--foreground)",
             textDecoration: "none",
             border: "1px solid var(--border)",
-            borderRadius: 6,
-            background: "transparent",
-            transition: "all 0.2s"
+            borderRadius: 4,
+            background: "var(--card-bg)",
+            transition: "all 0.15s ease"
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = "var(--foreground)";
+            e.currentTarget.style.background = "var(--hover-bg)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = "var(--border)";
+            e.currentTarget.style.background = "var(--card-bg)";
           }}
         >
-          ← Back to stocks
+          Asset List
         </Link>
         <h1 style={{ fontSize: 32, fontWeight: 700, margin: 0, color: "var(--foreground)" }}>
           Volatility Analysis

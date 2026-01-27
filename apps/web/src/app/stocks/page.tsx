@@ -192,18 +192,18 @@ export default function StocksPage() {
       <div style={{ maxWidth: 1400, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <h1 style={{ fontSize: 32, fontWeight: 700, margin: 0 }}>Stocks</h1>
+            <h1 style={{ fontSize: 32, fontWeight: 700, margin: 0 }}>Assets</h1>
             <Link
               href="/"
               style={{
                 display: "inline-block",
                 color: "var(--foreground)",
                 textDecoration: "none",
-                fontSize: 14,
-                fontWeight: 600,
+                fontSize: 13,
+                fontWeight: 500,
                 padding: "8px 16px",
                 border: "1px solid var(--border)",
-                borderRadius: 2,
+                borderRadius: 4,
                 background: "var(--card-bg)",
                 transition: "all 0.15s ease"
               }}
@@ -216,7 +216,7 @@ export default function StocksPage() {
                 e.currentTarget.style.background = "var(--card-bg)";
               }}
             >
-              ← Home
+              Home
             </Link>
           </div>
           <Link
@@ -236,7 +236,7 @@ export default function StocksPage() {
           </Link>
         </div>
         <p style={{ color: "var(--muted)", marginBottom: 16, fontSize: 14 }}>
-          Universe: {stocks.length} {selectedAssetTypes.size === 1 && selectedAssetTypes.has('equity') ? 'equities' : 'assets'}
+          Universe: {stocks.length} assets
           <span style={{ marginLeft: 16, fontSize: 13 }}>Source: Interactive Brokers</span>
         </p>
 

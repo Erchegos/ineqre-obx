@@ -598,7 +598,7 @@ export default function StockTickerPage() {
             e.currentTarget.style.background = "var(--card-bg)";
           }}
         >
-          ← Back to stocks
+          Asset List
         </Link>
         <div style={{ flex: 1 }} />
         <Link
