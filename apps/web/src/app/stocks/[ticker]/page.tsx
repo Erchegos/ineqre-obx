@@ -1022,62 +1022,68 @@ export default function StockTickerPage() {
                     </div>
                   </div>
                 </div>
+              </div>
 
-                {/* Collapsible Explanation */}
-                <div style={{ marginTop: 16 }}>
-                  <button
-                    onClick={() => setShowMethodology(!showMethodology)}
+              {/* Methodology & Interpretation (Collapsible) */}
+              <div style={{
+                padding: 20,
+                borderRadius: 4,
+                border: "1px solid var(--card-border)",
+                background: "var(--card-bg)",
+                marginBottom: 20,
+              }}>
+                <button
+                  onClick={() => setShowMethodology(!showMethodology)}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: 4,
+                    border: "1px solid var(--border)",
+                    background: "var(--hover-bg)",
+                    color: "var(--foreground)",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  <span>Methodology & Interpretation</span>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
                     style={{
-                      width: "100%",
-                      padding: "10px 12px",
-                      borderRadius: 4,
-                      border: "1px solid var(--border)",
-                      background: "var(--hover-bg)",
-                      color: "var(--foreground)",
-                      fontSize: 12,
-                      fontWeight: 500,
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      transition: "all 0.15s",
+                      transform: showMethodology ? "rotate(180deg)" : "rotate(0deg)",
+                      transition: "transform 0.2s",
                     }}
                   >
-                    <span>Understanding the metrics</span>
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      style={{
-                        transform: showMethodology ? "rotate(180deg)" : "rotate(0deg)",
-                        transition: "transform 0.2s",
-                      }}
-                    >
-                      <polyline points="6 9 12 15 18 9"></polyline>
-                    </svg>
-                  </button>
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
 
-                  {showMethodology && (
-                    <div style={{
-                      marginTop: 8,
-                      padding: 12,
-                      borderRadius: 4,
-                      background: "var(--card-bg)",
-                      border: "1px solid var(--border)",
-                    }}>
-                      <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
-                        • <strong>R² (Fit Quality)</strong>: Measures how well the linear regression explains price variance. {(stdChannelData.metadata.r2 * 100).toFixed(1)}% of price movement is explained by the trend line.
-                        <br />
-                        • <strong>Correlation (R)</strong>: Measures the strength of the linear relationship between time and price. Values close to ±1 indicate strong trends, close to 0 means random walk.
-                        <br />
-                        • <strong>±1σ and ±2σ Bands</strong>: Statistical deviation bands around the trend line. ±1σ typically contains ~68% of price movements (closer bands), while ±2σ contains ~95% (wider bands). Prices touching outer bands suggest potential mean reversion opportunities.
-                      </div>
+                {showMethodology && (
+                  <div style={{
+                    marginTop: 12,
+                    padding: 12,
+                    borderRadius: 4,
+                    background: "var(--hover-bg)",
+                    border: "1px solid var(--border)",
+                  }}>
+                    <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
+                      • <strong>R² (Fit Quality)</strong>: Measures how well the linear regression explains price variance. {(stdChannelData.metadata.r2 * 100).toFixed(1)}% of price movement is explained by the trend line.
+                      <br />
+                      • <strong>Correlation (R)</strong>: Measures the strength of the linear relationship between time and price. Values close to ±1 indicate strong trends, close to 0 means random walk.
+                      <br />
+                      • <strong>±1σ and ±2σ Bands</strong>: Statistical deviation bands around the trend line. ±1σ typically contains ~68% of price movements (closer bands), while ±2σ contains ~95% (wider bands). Prices touching outer bands suggest potential mean reversion opportunities.
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
 
               {/* Chart */}
