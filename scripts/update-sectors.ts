@@ -70,13 +70,12 @@ const SECTOR_MAPPING: Record<string, string> = {
   "IDEX": "Technology",
   "CADLR": "Technology",
   "NORBT": "Technology",
+  "NAPA": "Technology",  // Napatech - Networking equipment
 
   // Real Estate
   "ENTRA": "Real Estate",
   "MULTI": "Real Estate",
-  "KOA": "Real Estate",
   "OLT": "Real Estate",
-  "NAPA": "Real Estate",
 
   // Industrial
   "KOG": "Industrial",
@@ -92,6 +91,7 @@ const SECTOR_MAPPING: Record<string, string> = {
   "KIT": "Industrial",
   "YAR": "Industrial",  // Yara - Fertilizer/Chemical
   "NHY": "Industrial",  // Norsk Hydro - Aluminum/Metal
+  "KOA": "Industrial",  // Komplett - E-commerce/Retail
 
   // Consumer
   "NAS": "Consumer",
