@@ -999,15 +999,6 @@ export default function StockTickerPage() {
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Sigma (σ)</div>
-                    <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "monospace", color: "var(--foreground)" }}>
-                      {stdChannelData.metadata.sigma.toFixed(2)}
-                    </div>
-                    <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2, lineHeight: 1.4 }}>
-                      Avg deviation from trend
-                    </div>
-                  </div>
-                  <div>
                     <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Slope (Trend)</div>
                     <div style={{
                       fontSize: 22,
@@ -1032,17 +1023,60 @@ export default function StockTickerPage() {
                   </div>
                 </div>
 
-                {/* Explanation */}
-                <div style={{ marginTop: 16, padding: 12, borderRadius: 4, background: "var(--hover-bg)", border: "1px solid var(--border)" }}>
-                  <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
-                    <strong style={{ color: "var(--foreground)" }}>Understanding the metrics:</strong>
-                    <br />
-                    • <strong>R² (Fit Quality)</strong>: Measures how well the linear regression explains price variance. {(stdChannelData.metadata.r2 * 100).toFixed(1)}% of price movement is explained by the trend line.
-                    <br />
-                    • <strong>Correlation (R)</strong>: Measures the strength of the linear relationship between time and price. Values close to ±1 indicate strong trends, close to 0 means random walk.
-                    <br />
-                    • <strong>Sigma (σ)</strong>: Standard deviation of prices from the regression line, in the same units as the stock price. For example, σ = {stdChannelData.metadata.sigma.toFixed(2)} means prices typically deviate ±{stdChannelData.metadata.sigma.toFixed(2)} from the trend line. Higher sigma = more volatile around trend.
-                  </div>
+                {/* Collapsible Explanation */}
+                <div style={{ marginTop: 16 }}>
+                  <button
+                    onClick={() => setShowMethodology(!showMethodology)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      borderRadius: 4,
+                      border: "1px solid var(--border)",
+                      background: "var(--hover-bg)",
+                      color: "var(--foreground)",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    <span>Understanding the metrics</span>
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      style={{
+                        transform: showMethodology ? "rotate(180deg)" : "rotate(0deg)",
+                        transition: "transform 0.2s",
+                      }}
+                    >
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                  </button>
+
+                  {showMethodology && (
+                    <div style={{
+                      marginTop: 8,
+                      padding: 12,
+                      borderRadius: 4,
+                      background: "var(--card-bg)",
+                      border: "1px solid var(--border)",
+                    }}>
+                      <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
+                        • <strong>R² (Fit Quality)</strong>: Measures how well the linear regression explains price variance. {(stdChannelData.metadata.r2 * 100).toFixed(1)}% of price movement is explained by the trend line.
+                        <br />
+                        • <strong>Correlation (R)</strong>: Measures the strength of the linear relationship between time and price. Values close to ±1 indicate strong trends, close to 0 means random walk.
+                        <br />
+                        • <strong>Sigma (σ)</strong>: Standard deviation of prices from the regression line, in the same units as the stock price. For example, σ = {stdChannelData.metadata.sigma.toFixed(2)} means prices typically deviate ±{stdChannelData.metadata.sigma.toFixed(2)} from the trend line. Higher sigma = more volatile around trend.
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
