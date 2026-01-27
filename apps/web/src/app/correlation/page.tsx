@@ -27,6 +27,12 @@ const ROLLING_WINDOWS = [
   { label: "252 Days (1 Year)", days: 252, desc: "Annual correlation cycle" },
 ];
 
+type Stock = {
+  ticker: string;
+  name: string;
+  sector: string | null;
+};
+
 export default function CorrelationPage() {
   const [selectedTickers, setSelectedTickers] = useState<string[]>([
     "AKER",
@@ -35,6 +41,8 @@ export default function CorrelationPage() {
     "OBX",
   ]);
   const [availableTickers, setAvailableTickers] = useState<string[]>([]);
+  const [stocks, setStocks] = useState<Stock[]>([]);
+  const [selectedSectors, setSelectedSectors] = useState<Set<string>>(new Set());
   const [tickerInput, setTickerInput] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
   const [showTickerPanel, setShowTickerPanel] = useState(false);
@@ -58,9 +66,10 @@ export default function CorrelationPage() {
     try {
       const res = await fetch("/api/stocks");
       if (res.ok) {
-        const stocks = await res.json();
+        const stocksData = await res.json();
+        setStocks(stocksData);
         // Extract just the ticker strings from the stock objects
-        const tickers = stocks.map((stock: any) => stock.ticker);
+        const tickers = stocksData.map((stock: any) => stock.ticker);
         setAvailableTickers(tickers);
       }
     } catch (e) {
@@ -68,13 +77,28 @@ export default function CorrelationPage() {
     }
   }
 
+  // Get unique sectors
+  const availableSectors = Array.from(
+    new Set(stocks.map(s => s.sector).filter(Boolean))
+  ).sort() as string[];
+
+  // Filter stocks by selected sectors
+  const filteredStocks = selectedSectors.size > 0
+    ? stocks.filter(s => s.sector && selectedSectors.has(s.sector))
+    : stocks;
+
+  const filteredTickersBySector = filteredStocks.map(s => s.ticker);
+
   const filteredTickers = availableTickers.filter(
     (t) =>
       t.toLowerCase().includes(tickerInput.toLowerCase()) &&
-      !selectedTickers.includes(t)
+      !selectedTickers.includes(t) &&
+      (selectedSectors.size === 0 || filteredTickersBySector.includes(t))
   );
 
-  const sortedTickers = [...availableTickers].sort((a, b) => {
+  const sortedTickers = [...availableTickers].filter(t =>
+    selectedSectors.size === 0 || filteredTickersBySector.includes(t)
+  ).sort((a, b) => {
     if (sortBy === "selected") {
       const aSelected = selectedTickers.includes(a);
       const bSelected = selectedTickers.includes(b);
@@ -675,6 +699,66 @@ export default function CorrelationPage() {
                 </select>
               </div>
             </div>
+
+            {/* Sector Filter */}
+            {availableSectors.length > 0 && (
+              <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: "1px solid var(--border)" }}>
+                <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10, color: "var(--muted-foreground)" }}>
+                  Filter by Sector
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {availableSectors.map((sector) => {
+                    const isSelected = selectedSectors.has(sector);
+                    return (
+                      <button
+                        key={sector}
+                        onClick={() => {
+                          setSelectedSectors(prev => {
+                            const next = new Set(prev);
+                            if (next.has(sector)) {
+                              next.delete(sector);
+                            } else {
+                              next.add(sector);
+                            }
+                            return next;
+                          });
+                        }}
+                        style={{
+                          padding: "4px 10px",
+                          fontSize: 11,
+                          fontWeight: 500,
+                          border: isSelected ? "1px solid var(--accent)" : "1px solid var(--border)",
+                          borderRadius: 3,
+                          background: isSelected ? "var(--accent)" : "transparent",
+                          color: isSelected ? "#fff" : "var(--foreground)",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        {sector}
+                      </button>
+                    );
+                  })}
+                  {selectedSectors.size > 0 && (
+                    <button
+                      onClick={() => setSelectedSectors(new Set())}
+                      style={{
+                        padding: "4px 10px",
+                        fontSize: 11,
+                        fontWeight: 500,
+                        border: "1px solid var(--danger)",
+                        borderRadius: 3,
+                        background: "transparent",
+                        color: "var(--danger)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div style={{
               display: "grid",

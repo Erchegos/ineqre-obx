@@ -9,6 +9,7 @@ type StockData = {
   ticker: string;
   name: string;
   asset_type: AssetType;
+  sector: string | null;
   last_close: number;
   last_adj_close: number;
   start_date: string;
@@ -33,6 +34,7 @@ export default function StocksPage() {
   const [selectedAssetTypes, setSelectedAssetTypes] = useState<Set<AssetType>>(
     new Set(['equity']) // Default to equities only
   );
+  const [selectedSectors, setSelectedSectors] = useState<Set<string>>(new Set());
 
   const fetchStocks = useCallback(async (assetTypes: Set<AssetType>) => {
     setLoading(true);
@@ -76,13 +78,29 @@ export default function StocksPage() {
     });
   };
 
+  // Get unique sectors from stocks
+  const availableSectors = useMemo(() => {
+    const sectors = new Set<string>();
+    stocks.forEach(stock => {
+      if (stock.sector) sectors.add(stock.sector);
+    });
+    return Array.from(sectors).sort();
+  }, [stocks]);
+
   const filteredAndSortedStocks = useMemo(() => {
     let filtered = stocks;
+
+    // Filter by sector
+    if (selectedSectors.size > 0) {
+      filtered = filtered.filter(stock =>
+        stock.sector && selectedSectors.has(stock.sector)
+      );
+    }
 
     // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = stocks.filter(
+      filtered = filtered.filter(
         (stock) =>
           stock.ticker.toLowerCase().includes(query) ||
           stock.name.toLowerCase().includes(query)
@@ -107,7 +125,7 @@ export default function StocksPage() {
     });
 
     return sorted;
-  }, [stocks, searchQuery, sortBy, sortOrder]);
+  }, [stocks, searchQuery, sortBy, sortOrder, selectedSectors]);
 
   const toggleSort = (column: keyof StockData) => {
     if (sortBy === column) {
@@ -302,6 +320,102 @@ export default function StocksPage() {
           </div>
         </div>
 
+        {/* Sector Filters */}
+        {availableSectors.length > 0 && (
+          <div style={{
+            marginBottom: 24,
+            padding: 16,
+            background: "var(--card-bg)",
+            border: "1px solid var(--border)",
+            borderRadius: 4,
+          }}>
+            <div style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--muted-foreground)",
+              marginBottom: 12,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em"
+            }}>
+              Filter by Sector
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {availableSectors.map((sector) => {
+                const isSelected = selectedSectors.has(sector);
+                return (
+                  <button
+                    key={sector}
+                    onClick={() => {
+                      setSelectedSectors(prev => {
+                        const next = new Set(prev);
+                        if (next.has(sector)) {
+                          next.delete(sector);
+                        } else {
+                          next.add(sector);
+                        }
+                        return next;
+                      });
+                    }}
+                    style={{
+                      padding: "6px 12px",
+                      fontSize: 11.5,
+                      fontWeight: 500,
+                      border: isSelected ? "1px solid var(--accent)" : "1px solid var(--border)",
+                      borderRadius: 3,
+                      background: isSelected ? "var(--accent)" : "transparent",
+                      color: isSelected ? "#fff" : "var(--foreground)",
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                      whiteSpace: "nowrap",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.borderColor = "var(--accent)";
+                        e.currentTarget.style.background = "var(--hover-bg)";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.borderColor = "var(--border)";
+                        e.currentTarget.style.background = "transparent";
+                      }
+                    }}
+                  >
+                    {sector}
+                  </button>
+                );
+              })}
+              {selectedSectors.size > 0 && (
+                <button
+                  onClick={() => setSelectedSectors(new Set())}
+                  style={{
+                    padding: "6px 12px",
+                    fontSize: 11.5,
+                    fontWeight: 500,
+                    border: "1px solid var(--danger)",
+                    borderRadius: 3,
+                    background: "transparent",
+                    color: "var(--danger)",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                    whiteSpace: "nowrap",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "var(--danger)";
+                    e.currentTarget.style.color = "#fff";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.color = "var(--danger)";
+                  }}
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {searchQuery && (
           <div style={{ marginTop: -16, marginBottom: 16, fontSize: 13, color: "var(--muted)" }}>
             Found {filteredAndSortedStocks.length} result{filteredAndSortedStocks.length !== 1 ? 's' : ''}
@@ -358,6 +472,27 @@ export default function StocksPage() {
                     }}
                   >
                     Name <SortIcon column="name" />
+                  </button>
+                </th>
+                <th style={{ textAlign: "left", padding: "16px" }}>
+                  <button
+                    onClick={() => toggleSort("sector")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--foreground)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      padding: 0,
+                    }}
+                  >
+                    Sector <SortIcon column="sector" />
                   </button>
                 </th>
                 <th style={{ textAlign: "right", padding: "16px" }}>
@@ -514,6 +649,9 @@ export default function StocksPage() {
                   </td>
                   <td style={{ padding: "16px", color: "var(--foreground)", fontSize: 14 }}>
                     {stock.name}
+                  </td>
+                  <td style={{ padding: "16px", color: "var(--muted-foreground)", fontSize: 13 }}>
+                    {stock.sector || '—'}
                   </td>
                   <td style={{
                     padding: "16px",
