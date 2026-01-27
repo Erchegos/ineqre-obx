@@ -225,6 +225,7 @@ export class TWSClient {
    * @param barSize Bar size (default: '1 day')
    * @param secType Security type (default: SecType.STK)
    * @param currency Currency (default: 'NOK')
+   * @param adjusted Whether to get dividend-adjusted prices (default: true)
    * @returns Array of historical bars
    */
   async getHistoricalData(
@@ -233,7 +234,8 @@ export class TWSClient {
     duration: string = "1 Y",
     barSize: BarSizeSetting = BarSizeSetting.DAYS_ONE,
     secType: SecType = SecType.STK,
-    currency: string = "NOK"
+    currency: string = "NOK",
+    adjusted: boolean = true
   ): Promise<HistoricalBar[]> {
     if (!this.connected) {
       throw new Error("Not connected to IB Gateway. Call connect() first.");
@@ -262,13 +264,16 @@ export class TWSClient {
       });
 
       // Request historical data
+      // Use ADJUSTED_LAST for dividend-adjusted prices, TRADES for raw prices
+      const whatToShow = adjusted ? WhatToShow.ADJUSTED_LAST : WhatToShow.TRADES;
+
       this.ib.reqHistoricalData(
         reqId,
         contract,
         "", // endDateTime (empty = now)
         duration,
         barSize,
-        WhatToShow.TRADES,
+        whatToShow,
         0, // useRTH (0 = include outside regular trading hours)
         1, // formatDate (1 = yyyyMMdd HH:mm:ss)
         false // keepUpToDate
