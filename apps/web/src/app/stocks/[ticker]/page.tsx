@@ -8,6 +8,7 @@ import ReturnDistributionChart from "@/components/ReturnDistributionChart";
 import ResidualSquaresChart from "@/components/ResidualSquaresChart";
 import TimeframeSelector from "@/components/TimeframeSelector";
 import StockFundamentalsPanel from "@/components/StockFundamentalsPanel";
+import CandlestickChart from "@/components/CandlestickChart";
 
 type Stats = {
   totalReturn: number;
@@ -43,6 +44,36 @@ type AnalyticsData = {
     fullStart?: string; // Earliest data available in database
     fullEnd?: string; // Latest data available in database
   };
+};
+
+type StdChannelData = {
+  date: string;
+  open: number | null;
+  high: number | null;
+  low: number | null;
+  close: number | null;
+  midLine: number | null;
+  upperBand1: number | null;
+  lowerBand1: number | null;
+  upperBand2: number | null;
+  lowerBand2: number | null;
+};
+
+type StdChannelResponse = {
+  ticker: string;
+  count: number;
+  metadata: {
+    windowSize: number;
+    k1: number;
+    k2: number;
+    slope: number;
+    intercept: number;
+    sigma: number;
+    r: number;
+    r2: number;
+    score: number;
+  };
+  data: StdChannelData[];
 };
 
 function calculateReturnStats(returns: Array<{ date: string; return: number }>) {
@@ -111,7 +142,8 @@ export default function StockTickerPage() {
   const fullDateRangeRef = useRef<{ start: string; end: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // UI State: 'comparison' is the new mode
+  // UI State: Toggle between historical analysis and STD channel
+  const [viewMode, setViewMode] = useState<"historical" | "std_channel">("historical");
   const [chartMode, setChartMode] = useState<"price" | "total_return" | "comparison">("comparison");
   const [showInfo, setShowInfo] = useState<boolean>(false);
   const [isPanelOpen, setIsPanelOpen] = useState<boolean>(false);
@@ -134,6 +166,20 @@ export default function StockTickerPage() {
   } | null>(null);
   const [residualsLoading, setResidualsLoading] = useState<boolean>(false);
   const [residualsError, setResidualsError] = useState<string | null>(null);
+
+  // STD Channel data and settings
+  const [stdChannelData, setStdChannelData] = useState<StdChannelResponse | null>(null);
+  const [stdChannelLoading, setStdChannelLoading] = useState<boolean>(false);
+  const [stdChannelError, setStdChannelError] = useState<string | null>(null);
+  const [k1, setK1] = useState<number>(1.0);
+  const [k2, setK2] = useState<number>(2.0);
+  const [showDeviation1, setShowDeviation1] = useState<boolean>(true);
+  const [showDeviation2, setShowDeviation2] = useState<boolean>(true);
+  const [minWindow, setMinWindow] = useState<number>(255);
+  const [maxWindow, setMaxWindow] = useState<number>(1530);
+  const [step, setStep] = useState<number>(20);
+  const [fixedWindow, setFixedWindow] = useState<number | null>(null);
+  const [showMethodology, setShowMethodology] = useState<boolean>(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -264,6 +310,66 @@ export default function StockTickerPage() {
     };
   }, [ticker, limit, chartMode]);
 
+  // Fetch STD Channel data
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchStdChannel() {
+      if (!ticker || viewMode !== "std_channel") {
+        return;
+      }
+
+      setStdChannelLoading(true);
+      setStdChannelError(null);
+
+      try {
+        // Use fixed limit of 1600 for STD channel analysis
+        let url = `/api/std-channel/${encodeURIComponent(ticker)}?k1=${k1}&k2=${k2}&limit=1600`;
+
+        if (fixedWindow) {
+          url += `&windowSize=${fixedWindow}`;
+        } else {
+          url += `&minWindow=${minWindow}&maxWindow=${maxWindow}&step=${step}`;
+        }
+
+        const res = await fetch(url, {
+          method: "GET",
+          headers: { accept: "application/json" },
+          cache: "no-store",
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({ error: res.statusText }));
+          const errorMsg = errorData.error || res.statusText;
+          if (!cancelled) {
+            setStdChannelError(errorMsg);
+            setStdChannelData(null);
+            setStdChannelLoading(false);
+          }
+          return;
+        }
+
+        const json = await res.json();
+
+        if (!cancelled) {
+          setStdChannelData(json);
+          setStdChannelLoading(false);
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setStdChannelError(e?.message || "Failed to fetch STD channel data");
+          setStdChannelData(null);
+          setStdChannelLoading(false);
+        }
+      }
+    }
+
+    fetchStdChannel();
+    return () => {
+      cancelled = true;
+    };
+  }, [ticker, viewMode, k1, k2, minWindow, maxWindow, step, fixedWindow]);
+
   const activeStats = useMemo(() => {
     if (!data?.summary) return null;
     return chartMode === "price" ? data.summary.raw : data.summary.adjusted;
@@ -386,6 +492,59 @@ export default function StockTickerPage() {
     return calculateReturnStats(filteredReturns);
   }, [filteredReturns]);
 
+  // STD Channel chart data
+  const stdChartData = useMemo(() => {
+    if (!stdChannelData) return [];
+
+    return stdChannelData.data.map(d => ({
+      date: d.date,
+      open: d.open ?? d.close,
+      high: d.high ?? d.close,
+      low: d.low ?? d.close,
+      close: d.close!,
+      midLine: d.midLine,
+      upperBand1: d.upperBand1,
+      lowerBand1: d.lowerBand1,
+      upperBand2: d.upperBand2,
+      lowerBand2: d.lowerBand2,
+    }));
+  }, [stdChannelData]);
+
+  // Mean reversal analysis for STD Channel
+  const meanReversalInfo = useMemo(() => {
+    if (!stdChannelData || stdChartData.length === 0) return null;
+
+    const lastBar = stdChartData[stdChartData.length - 1];
+    if (!lastBar.midLine || !lastBar.upperBand2 || !lastBar.lowerBand2) return null;
+
+    const sigma = stdChannelData.metadata.sigma;
+    const distanceFromMid = lastBar.close - lastBar.midLine;
+    const sigmaUnits = distanceFromMid / sigma;
+
+    let position: 'extreme_high' | 'high' | 'neutral' | 'low' | 'extreme_low';
+    if (sigmaUnits > 1.8) position = 'extreme_high';
+    else if (sigmaUnits > 0.8) position = 'high';
+    else if (sigmaUnits < -1.8) position = 'extreme_low';
+    else if (sigmaUnits < -0.8) position = 'low';
+    else position = 'neutral';
+
+    const distanceToUpper2 = ((lastBar.upperBand2 - lastBar.close) / lastBar.close) * 100;
+    const distanceToLower2 = ((lastBar.close - lastBar.lowerBand2) / lastBar.close) * 100;
+
+    return {
+      sigmaUnits,
+      distanceFromMid,
+      distanceToUpper2,
+      distanceToLower2,
+      position,
+      lastClose: lastBar.close,
+      midLine: lastBar.midLine,
+      upperBand2: lastBar.upperBand2,
+      lowerBand2: lastBar.lowerBand2,
+    };
+  }, [stdChannelData, stdChartData]);
+
+
   const handleDateRangePreset = (preset: string) => {
     if (!activeReturns || activeReturns.length === 0) return;
     const endDate = activeReturns[activeReturns.length - 1].date;
@@ -484,24 +643,68 @@ export default function StockTickerPage() {
         </Link>
       </div>
 
+      {/* View Mode Toggle */}
       <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
         <span style={{ fontSize: 13, color: "var(--muted)", letterSpacing: "0.02em", textTransform: "uppercase" }}>
-          Timeframe
+          Analysis Mode
         </span>
-        <TimeframeSelector
-          selected={limit}
-          onChange={setLimit}
-          onDateRangeChange={(start, end) => {
-            if (start && end) {
-              setCustomDateRange({ start, end });
-            } else {
-              setCustomDateRange(null);
-            }
-          }}
-          customDateRange={customDateRange}
-          availableDataDays={totalAvailableDays}
-        />
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => setViewMode("historical")}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 4,
+              border: viewMode === "historical" ? "1px solid var(--accent)" : "1px solid var(--card-border)",
+              background: viewMode === "historical" ? "var(--accent)" : "var(--card-bg)",
+              color: viewMode === "historical" ? "white" : "var(--foreground)",
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: "pointer",
+              transition: "all 0.15s",
+            }}
+          >
+            Historical Analysis
+          </button>
+          <button
+            onClick={() => setViewMode("std_channel")}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 4,
+              border: viewMode === "std_channel" ? "1px solid #2962ff" : "1px solid var(--card-border)",
+              background: viewMode === "std_channel" ? "#2962ff" : "var(--card-bg)",
+              color: viewMode === "std_channel" ? "white" : "var(--foreground)",
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: "pointer",
+              transition: "all 0.15s",
+            }}
+          >
+            STD Channel Analysis
+          </button>
+        </div>
       </div>
+
+      {/* Timeframe Selector - Only shown in Historical mode */}
+      {viewMode === "historical" && (
+        <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 13, color: "var(--muted)", letterSpacing: "0.02em", textTransform: "uppercase" }}>
+            Timeframe
+          </span>
+          <TimeframeSelector
+            selected={limit}
+            onChange={setLimit}
+            onDateRangeChange={(start, end) => {
+              if (start && end) {
+                setCustomDateRange({ start, end });
+              } else {
+                setCustomDateRange(null);
+              }
+            }}
+            customDateRange={customDateRange}
+            availableDataDays={totalAvailableDays}
+          />
+        </div>
+      )}
 
       {loading && (
         <div style={{ padding: 20, borderRadius: 4, border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--muted)", fontSize: 14 }}>
@@ -516,7 +719,8 @@ export default function StockTickerPage() {
         </div>
       )}
 
-      {!loading && data && activeStats && (
+      {/* HISTORICAL ANALYSIS MODE */}
+      {!loading && data && activeStats && viewMode === "historical" && (
         <>
            {/* --- CONTROLS SECTION --- */}
            <div style={{
@@ -669,7 +873,353 @@ export default function StockTickerPage() {
               height={320} 
             />
           </div>
+        </>
+      )}
 
+      {/* STD CHANNEL ANALYSIS MODE */}
+      {!loading && viewMode === "std_channel" && (
+        <>
+          {stdChannelLoading && (
+            <div style={{ padding: 20, borderRadius: 4, border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--muted)" }}>
+              Loading STD channel data...
+            </div>
+          )}
+
+          {stdChannelError && (
+            <div style={{ padding: 20, borderRadius: 4, border: "1px solid var(--danger)", background: "var(--card-bg)" }}>
+              <div style={{ fontWeight: 600, color: "var(--danger)", marginBottom: 8 }}>Error</div>
+              <div style={{ fontSize: 14, color: "var(--muted)" }}>{stdChannelError}</div>
+            </div>
+          )}
+
+          {!stdChannelLoading && !stdChannelError && stdChannelData && (
+            <>
+              {/* Window Optimization Info */}
+              <div style={{
+                padding: 16,
+                borderRadius: 4,
+                border: "1px solid var(--card-border)",
+                background: "var(--card-bg)",
+                marginBottom: 20,
+              }}>
+                <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: "var(--foreground)" }}>
+                  Window Optimization
+                </h3>
+                <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12, lineHeight: 1.6 }}>
+                  The optimal window size is automatically selected by maximizing the R² (coefficient of determination) across different lookback periods.
+                  This ensures the best linear fit for the regression channel. You can override this by setting a fixed window size or adjusting the search range.
+                </p>
+
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                  <div style={{ flex: "0 1 120px" }}>
+                    <label style={{ display: "block", fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Fixed Window</label>
+                    <input type="number" value={fixedWindow ?? ""} onChange={(e) => setFixedWindow(e.target.value === "" ? null : parseInt(e.target.value))} placeholder="Auto" min="50" max="3000" style={{ width: "100%", padding: "7px 10px", borderRadius: 4, border: "1px solid var(--input-border)", background: "var(--input-bg)", color: "var(--foreground)", fontSize: 13 }} />
+                  </div>
+
+                  <div style={{ flex: "0 1 120px" }}>
+                    <label style={{ display: "block", fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Min Window</label>
+                    <input type="number" value={minWindow} onChange={(e) => setMinWindow(parseInt(e.target.value) || 255)} min="50" max="2000" disabled={fixedWindow !== null} style={{ width: "100%", padding: "7px 10px", borderRadius: 4, border: "1px solid var(--input-border)", background: fixedWindow ? "var(--hover-bg)" : "var(--input-bg)", color: fixedWindow ? "var(--muted)" : "var(--foreground)", fontSize: 13 }} />
+                  </div>
+
+                  <div style={{ flex: "0 1 120px" }}>
+                    <label style={{ display: "block", fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Max Window</label>
+                    <input type="number" value={maxWindow} onChange={(e) => setMaxWindow(parseInt(e.target.value) || 1530)} min="20" max="3000" disabled={fixedWindow !== null} style={{ width: "100%", padding: "7px 10px", borderRadius: 4, border: "1px solid var(--input-border)", background: fixedWindow ? "var(--hover-bg)" : "var(--input-bg)", color: fixedWindow ? "var(--muted)" : "var(--foreground)", fontSize: 13 }} />
+                  </div>
+
+                  <div style={{ flex: "0 1 100px" }}>
+                    <label style={{ display: "block", fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Step Size</label>
+                    <input type="number" value={step} onChange={(e) => setStep(parseInt(e.target.value) || 20)} min="1" max="100" disabled={fixedWindow !== null} style={{ width: "100%", padding: "7px 10px", borderRadius: 4, border: "1px solid var(--input-border)", background: fixedWindow ? "var(--hover-bg)" : "var(--input-bg)", color: fixedWindow ? "var(--muted)" : "var(--foreground)", fontSize: 13 }} />
+                  </div>
+                </div>
+
+                {/* Deviation Bands Controls */}
+                <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+                  <h4 style={{ fontSize: 12, fontWeight: 600, marginBottom: 12, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    Deviation Bands
+                  </h4>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, cursor: "pointer", userSelect: "none", color: "var(--foreground)" }}>
+                      <input type="checkbox" checked={showDeviation1} onChange={(e) => setShowDeviation1(e.target.checked)} style={{ width: 16, height: 16, cursor: "pointer" }} />
+                      <span style={{ flex: 1 }}>±1σ Deviation</span>
+                      <input type="number" value={k1} onChange={(e) => setK1(parseFloat(e.target.value) || 1.0)} min="0.1" max="5" step="0.1" disabled={!showDeviation1} style={{ width: "60px", padding: "5px 8px", borderRadius: 4, border: "1px solid var(--input-border)", background: showDeviation1 ? "var(--input-bg)" : "var(--hover-bg)", color: showDeviation1 ? "var(--foreground)" : "var(--muted)", fontSize: 13 }} />
+                    </label>
+
+                    <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, cursor: "pointer", userSelect: "none", color: "var(--foreground)" }}>
+                      <input type="checkbox" checked={showDeviation2} onChange={(e) => setShowDeviation2(e.target.checked)} style={{ width: 16, height: 16, cursor: "pointer" }} />
+                      <span style={{ flex: 1 }}>±2σ Deviation</span>
+                      <input type="number" value={k2} onChange={(e) => setK2(parseFloat(e.target.value) || 2.0)} min="0.1" max="5" step="0.1" disabled={!showDeviation2} style={{ width: "60px", padding: "5px 8px", borderRadius: 4, border: "1px solid var(--input-border)", background: showDeviation2 ? "var(--input-bg)" : "var(--hover-bg)", color: showDeviation2 ? "var(--foreground)" : "var(--muted)", fontSize: 13 }} />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Channel Statistics */}
+              <div style={{
+                padding: 20,
+                borderRadius: 4,
+                border: "1px solid var(--card-border)",
+                background: "var(--card-bg)",
+                marginBottom: 20,
+              }}>
+                <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: "var(--foreground)" }}>
+                  Channel Statistics
+                </h2>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Data Points</div>
+                    <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "monospace", color: "var(--foreground)" }}>
+                      {stdChannelData.count}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Window Size</div>
+                    <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "monospace", color: "#2962ff" }}>
+                      {stdChannelData.metadata.windowSize}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>R² (Fit Quality)</div>
+                    <div style={{
+                      fontSize: 22,
+                      fontWeight: 600,
+                      fontFamily: "monospace",
+                      color: stdChannelData.metadata.r2 > 0.8 ? "var(--success)"
+                        : stdChannelData.metadata.r2 > 0.6 ? "#26a69a"
+                        : stdChannelData.metadata.r2 > 0.4 ? "var(--warning)"
+                        : "var(--danger)"
+                    }}>
+                      {stdChannelData.metadata.r2.toFixed(4)}
+                    </div>
+                    <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2 }}>
+                      {stdChannelData.metadata.r2 > 0.8 ? "Excellent" : stdChannelData.metadata.r2 > 0.6 ? "Good" : stdChannelData.metadata.r2 > 0.4 ? "Moderate" : "Poor"}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Sigma (σ)</div>
+                    <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "monospace", color: "var(--foreground)" }}>
+                      {stdChannelData.metadata.sigma.toFixed(2)}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Slope (Trend)</div>
+                    <div style={{
+                      fontSize: 22,
+                      fontWeight: 600,
+                      fontFamily: "monospace",
+                      color: stdChannelData.metadata.slope > 0 ? "var(--success)" : "var(--danger)"
+                    }}>
+                      {stdChannelData.metadata.slope > 0 ? "↑" : "↓"} {Math.abs(stdChannelData.metadata.slope).toFixed(4)}
+                    </div>
+                    <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2 }}>
+                      {stdChannelData.metadata.slope > 0 ? "Uptrend" : "Downtrend"}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Correlation (R)</div>
+                    <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "monospace", color: "var(--foreground)" }}>
+                      {stdChannelData.metadata.r.toFixed(4)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Chart */}
+              {stdChartData.length > 0 && (
+                <div style={{
+                  padding: 20,
+                  borderRadius: 4,
+                  border: "1px solid var(--card-border)",
+                  background: "var(--card-bg)",
+                  marginBottom: 20,
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--foreground)" }}>
+                      {ticker} - Price Chart with STD Channels
+                    </h2>
+                    <div style={{ fontSize: 12, color: "var(--muted)", fontFamily: "monospace" }}>
+                      Showing {stdChartData.length} bars | Window: {stdChannelData.metadata.windowSize} | k1={k1}, k2={k2}
+                    </div>
+                  </div>
+                  <CandlestickChart
+                    data={stdChartData}
+                    height={600}
+                    showStdChannel={true}
+                    showDeviation1={showDeviation1}
+                    showDeviation2={showDeviation2}
+                    stdChannelColor="#2962ff"
+                  />
+                </div>
+              )}
+
+              {/* Position Analysis */}
+              {meanReversalInfo && (
+                <div style={{
+                  padding: 20,
+                  borderRadius: 4,
+                  border: "1px solid var(--card-border)",
+                  background: "var(--card-bg)",
+                  marginBottom: 20,
+                }}>
+                  <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: "var(--foreground)" }}>
+                    Position Analysis
+                  </h2>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 16 }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Current Price</div>
+                      <div style={{ fontSize: 20, fontWeight: 600, fontFamily: "monospace", color: "var(--foreground)" }}>
+                        {meanReversalInfo.lastClose.toFixed(2)}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Distance from Regression Line</div>
+                      <div style={{
+                        fontSize: 20,
+                        fontWeight: 600,
+                        fontFamily: "monospace",
+                        color: meanReversalInfo.sigmaUnits > 0 ? "var(--success)" : "var(--danger)"
+                      }}>
+                        {meanReversalInfo.sigmaUnits > 0 ? "+" : ""}{meanReversalInfo.sigmaUnits.toFixed(2)}σ
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
+                        {meanReversalInfo.distanceFromMid > 0 ? "+" : ""}{meanReversalInfo.distanceFromMid.toFixed(2)} pts
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Position Classification</div>
+                      <div style={{
+                        fontSize: 16,
+                        fontWeight: 600,
+                        color: meanReversalInfo.position === 'extreme_high' || meanReversalInfo.position === 'extreme_low' ? "var(--danger)"
+                          : meanReversalInfo.position === 'high' || meanReversalInfo.position === 'low' ? "var(--warning)"
+                          : "var(--muted)"
+                      }}>
+                        {meanReversalInfo.position === 'extreme_high' ? "Extreme High"
+                          : meanReversalInfo.position === 'extreme_low' ? "Extreme Low"
+                          : meanReversalInfo.position === 'high' ? "Elevated"
+                          : meanReversalInfo.position === 'low' ? "Depressed"
+                          : "Within Range"}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>
+                        Distance to {meanReversalInfo.sigmaUnits > 0 ? "Upper" : "Lower"} Band (±2σ)
+                      </div>
+                      <div style={{ fontSize: 16, fontWeight: 600, fontFamily: "monospace", color: "var(--foreground)" }}>
+                        {meanReversalInfo.sigmaUnits > 0
+                          ? `${meanReversalInfo.distanceToUpper2.toFixed(2)}%`
+                          : `${meanReversalInfo.distanceToLower2.toFixed(2)}%`
+                        }
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
+                        Level: {meanReversalInfo.sigmaUnits > 0
+                          ? meanReversalInfo.upperBand2.toFixed(2)
+                          : meanReversalInfo.lowerBand2.toFixed(2)
+                        }
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    padding: 14,
+                    borderRadius: 4,
+                    background: "var(--hover-bg)",
+                    border: "1px solid var(--border)",
+                  }}>
+                    <div style={{ fontSize: 12, color: "var(--foreground)", lineHeight: 1.6 }}>
+                      <strong style={{ color: "var(--muted)" }}>Analysis:</strong>{" "}
+                      {meanReversalInfo.position === 'extreme_high' || meanReversalInfo.position === 'extreme_low' ? (
+                        <>
+                          Price is currently {Math.abs(meanReversalInfo.sigmaUnits).toFixed(1)}σ {meanReversalInfo.sigmaUnits > 0 ? "above" : "below"} the regression line,
+                          indicating an extended move. Historical patterns suggest increased probability of mean reversion.
+                          The midline at {meanReversalInfo.midLine.toFixed(2)} represents the statistical mean for this period.
+                        </>
+                      ) : meanReversalInfo.position === 'high' || meanReversalInfo.position === 'low' ? (
+                        <>
+                          Price is moderately {meanReversalInfo.sigmaUnits > 0 ? "elevated" : "depressed"} at {Math.abs(meanReversalInfo.sigmaUnits).toFixed(1)}σ
+                          from the regression line. Monitor for potential continuation or reversal signals.
+                        </>
+                      ) : (
+                        <>
+                          Price is trading within normal range (±0.8σ) of the regression line. Current position suggests
+                          trend continuation is more likely than mean reversion.
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Methodology (Collapsible) */}
+              <div style={{
+                padding: 20,
+                borderRadius: 4,
+                border: "1px solid var(--card-border)",
+                background: "var(--card-bg)",
+              }}>
+                <div
+                  onClick={() => setShowMethodology(!showMethodology)}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    cursor: "pointer",
+                    userSelect: "none",
+                  }}
+                >
+                  <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--foreground)" }}>
+                    Methodology & Interpretation
+                  </h3>
+                  <span style={{ fontSize: 18, color: "var(--muted)" }}>
+                    {showMethodology ? "−" : "+"}
+                  </span>
+                </div>
+
+                {showMethodology && (
+                  <div style={{ marginTop: 16, fontSize: 13, lineHeight: 1.7, color: "var(--foreground)" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                      <div>
+                        <h4 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "var(--muted)" }}>Core Features:</h4>
+                        <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6, color: "var(--foreground)" }}>
+                          <li><strong>Automatic Window Optimization:</strong> Identifies optimal lookback period (255-1530 bars) by maximizing R²</li>
+                          <li><strong>Fixed Window Analysis:</strong> Manual window size selection for specific time periods</li>
+                          <li><strong>Preset Time Ranges:</strong> Predefined configurations for short, medium, and long-term analysis</li>
+                          <li><strong>Position Analysis:</strong> Statistical classification of price position relative to regression channel</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <h4 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "var(--muted)" }}>Position Classifications:</h4>
+                        <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6, color: "var(--foreground)" }}>
+                          <li><strong>Extreme High/Low:</strong> Price exceeds ±1.8σ - Elevated mean reversion probability</li>
+                          <li><strong>Elevated/Depressed:</strong> Price between ±0.8σ and ±1.8σ - Moderate deviation range</li>
+                          <li><strong>Within Range:</strong> Price within ±0.8σ - Normal statistical range</li>
+                          <li><strong>R² Interpretation:</strong> Values &gt; 0.7 indicate strong linear trend and reliable channel structure</li>
+                        </ul>
+                      </div>
+                    </div>
+                    <div style={{ marginTop: 16, padding: 12, borderRadius: 4, background: "var(--hover-bg)", border: "1px solid var(--border)" }}>
+                      <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                        <strong>Note:</strong> The standard deviation channel uses linear regression to identify the trend and statistical boundaries.
+                        Higher R² values indicate better linear fit and more reliable mean reversion characteristics. Position analysis considers both
+                        the distance from the regression line (in sigma units) and proximity to the outer bands. This tool is intended for analysis purposes
+                        and should be used in conjunction with other technical and fundamental analysis methods.
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      {/* SHARED ANALYSIS SECTIONS - Visible in both modes */}
+      {!loading && data && activeReturns && (
+        <>
           <div style={{ marginBottom: 24, padding: 20, borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)" }}>
             <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "var(--foreground)" }}>
               Return Distribution Analysis
