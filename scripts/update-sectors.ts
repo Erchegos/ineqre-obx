@@ -31,6 +31,7 @@ const SECTOR_MAPPING: Record<string, string> = {
   "STB": "Finance",
   "PARB": "Finance",
   "SWON": "Finance",
+  "MING": "Finance",  // Bank
 
   // Shipping & Offshore
   "FRO": "Shipping",
@@ -49,6 +50,7 @@ const SECTOR_MAPPING: Record<string, string> = {
   "SUBC": "Shipping",
   "WWI": "Shipping",
   "WAWI": "Shipping",
+  "NONG": "Shipping",  // Bulkers
 
   // Seafood & Aquaculture
   "MOWI": "Seafood",
@@ -88,6 +90,8 @@ const SECTOR_MAPPING: Record<string, string> = {
   "BRG": "Industrial",
   "SCATC": "Industrial",
   "KIT": "Industrial",
+  "YAR": "Industrial",  // Yara - Fertilizer/Chemical
+  "NHY": "Industrial",  // Norsk Hydro - Aluminum/Metal
 
   // Consumer
   "NAS": "Consumer",
@@ -100,11 +104,7 @@ const SECTOR_MAPPING: Record<string, string> = {
   "MEDI": "Healthcare",
 
   // Materials
-  "NHY": "Materials",
-  "NONG": "Materials",
   "2020": "Materials",
-  "YAR": "Materials",
-  "MING": "Materials",
   "ELK": "Materials",
 
   // Renewable Energy
