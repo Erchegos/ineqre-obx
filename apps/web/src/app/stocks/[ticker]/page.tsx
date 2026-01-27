@@ -1073,7 +1073,7 @@ export default function StockTickerPage() {
                         <br />
                         • <strong>Correlation (R)</strong>: Measures the strength of the linear relationship between time and price. Values close to ±1 indicate strong trends, close to 0 means random walk.
                         <br />
-                        • <strong>Sigma (σ)</strong>: Standard deviation of prices from the regression line, in the same units as the stock price. For example, σ = {stdChannelData.metadata.sigma.toFixed(2)} means prices typically deviate ±{stdChannelData.metadata.sigma.toFixed(2)} from the trend line. Higher sigma = more volatile around trend.
+                        • <strong>±1σ and ±2σ Bands</strong>: Statistical deviation bands around the trend line. ±1σ typically contains ~68% of price movements (closer bands), while ±2σ contains ~95% (wider bands). Prices touching outer bands suggest potential mean reversion opportunities.
                       </div>
                     </div>
                   )}
