@@ -26,15 +26,21 @@ This guide outlines the critical data points, structure, and process for fetchin
 {
   ticker: string;        // Foreign key to stocks
   date: string;          // Format: YYYYMMDD (e.g., "20260127")
-  open: number;          // Opening price
-  high: number;          // Daily high
-  low: number;           // Daily low
-  close: number;         // Closing price (REQUIRED)
+  open: number;          // Opening price (raw)
+  high: number;          // Daily high (raw)
+  low: number;           // Daily low (raw)
+  close: number;         // Closing price RAW/UNADJUSTED (REQUIRED)
   volume: number;        // Trading volume (integer)
-  adj_close: number;     // Adjusted close for splits/dividends
+  adj_close: number;     // ADJUSTED close for splits/dividends (REQUIRED)
   source: string;        // "ibkr" for IB Gateway data
 }
 ```
+
+**CRITICAL:** Always store BOTH raw and adjusted prices:
+- `close`: Raw unadjusted closing price
+- `adj_close`: Dividend and split adjusted price
+
+**Frontend should ALWAYS use `adj_close` for calculations** to get accurate returns and performance metrics.
 
 ---
 
@@ -81,14 +87,32 @@ await client.connect();
 
 ### B. Historical Data Request Parameters
 ```typescript
-const historicalData = await client.getHistoricalData(
+const adjustedData = await client.getHistoricalData(
   ticker: string,        // "EQNR", "DNB", etc.
   exchange: string,      // "OSE" for Oslo Stock Exchange
   duration: string,      // "10 Y" = 10 years, "5 Y" = 5 years
   barSize: string,       // "1 day" for daily data
   secType: SecType,      // SecType.STK for stocks
-  currency: string       // "NOK" for Norwegian stocks
+  currency: string,      // "NOK" for Norwegian stocks
+  adjusted: boolean      // true = ADJUSTED_LAST (default), false = TRADES
 );
+```
+
+**CRITICAL:** Always fetch BOTH adjusted and raw prices:
+```typescript
+// 1. Fetch adjusted prices (dividend/split adjusted)
+const adjustedData = await client.getHistoricalData(
+  ticker, exchange, "10 Y", "1 day", SecType.STK, "NOK", true
+);
+
+// 2. Fetch raw prices (unadjusted)
+const rawData = await client.getHistoricalData(
+  ticker, exchange, "10 Y", "1 day", SecType.STK, "NOK", false
+);
+
+// 3. Store both in database:
+//    - close = rawData[i].close
+//    - adj_close = adjustedData[i].close
 ```
 
 ### C. Recommended Fetch Parameters
@@ -197,25 +221,60 @@ for (const stock of newTickers) {
   console.log(`Fetching ${stock.ticker}...`);
 
   // 1. Connect to IB Gateway
-  const historicalData = await client.getHistoricalData(
+  // Fetch ADJUSTED prices (dividend/split adjusted)
+  const adjustedData = await client.getHistoricalData(
     stock.ticker,
     stock.exchange,
     "10 Y",
     "1 day",
     SecType.STK,
-    stock.currency
+    stock.currency,
+    true  // ADJUSTED
+  );
+
+  // Fetch RAW prices (unadjusted)
+  const rawData = await client.getHistoricalData(
+    stock.ticker,
+    stock.exchange,
+    "10 Y",
+    "1 day",
+    SecType.STK,
+    stock.currency,
+    false  // RAW
   );
 
   // 2. Insert stock master record
   await insertStock(stock);
 
-  // 3. Insert daily price data
-  for (const bar of historicalData) {
-    await insertPriceData(stock.ticker, bar);
+  // 3. Insert daily price data with BOTH raw and adjusted
+  for (let i = 0; i < rawData.length; i++) {
+    const rawBar = rawData[i];
+    const adjBar = adjustedData.find(b => b.time === rawBar.time);
+
+    await pool.query(`
+      INSERT INTO prices_daily (ticker, date, open, high, low, close, volume, adj_close, source)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'ibkr')
+      ON CONFLICT (ticker, date, source) DO UPDATE SET
+        open = EXCLUDED.open,
+        high = EXCLUDED.high,
+        low = EXCLUDED.low,
+        close = EXCLUDED.close,  -- Raw close
+        volume = EXCLUDED.volume,
+        adj_close = EXCLUDED.adj_close  -- Adjusted close
+    `, [
+      stock.ticker,
+      rawBar.time.replace(/-/g, ''),
+      rawBar.open,
+      rawBar.high,
+      rawBar.low,
+      rawBar.close,      // Raw close
+      Math.round(rawBar.volume),
+      adjBar?.close || rawBar.close  // Adjusted close
+    ]);
   }
 
-  // 4. Rate limiting (500ms between requests)
-  await sleep(500);
+  // 4. Rate limiting (1000ms between requests to fetch both)
+  await sleep(1000);
 }
 ```
 
