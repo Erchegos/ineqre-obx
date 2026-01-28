@@ -859,7 +859,6 @@ export default function StockTickerPage() {
             <MetricCard label="Max Drawdown" value={fmtPct(activeStats.maxDrawdown)} colorType="danger" />
             <MetricCard label="VaR (95%)" value={fmtPct(activeStats.var95)} />
             <MetricCard label="CVaR (95%)" value={fmtPct(activeStats.cvar95)} />
-            <MetricCard label="Beta (vs OBX)" value={fmtNum(activeStats.beta, 3)} />
             <MetricCard label="Sharpe Ratio" value={fmtNum(activeStats.sharpeRatio, 3)} />
           </div>
 
