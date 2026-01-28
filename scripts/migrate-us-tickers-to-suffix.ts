@@ -127,19 +127,28 @@ async function renameTickerSafely(mapping: TickerToRename): Promise<{
       };
     }
 
-    // 3. Perform rename in transaction
+    // 3. Perform rename using insert-update-delete approach to satisfy FK constraint
     await pool.query('BEGIN');
 
-    // Update child table first (prices_daily)
+    // Step 1: Insert new stock record with .US suffix (copy all data from old record)
+    await pool.query(
+      `INSERT INTO stocks (ticker, name, sector, exchange, currency, asset_type, is_active)
+       SELECT $1, name, sector, exchange, currency, asset_type, is_active
+       FROM stocks
+       WHERE ticker = $2 AND currency = $3`,
+      [newTicker, oldTicker, currency]
+    );
+
+    // Step 2: Update prices_daily to reference new ticker (FK constraint satisfied)
     const pricesUpdate = await pool.query(
       `UPDATE prices_daily SET ticker = $1 WHERE ticker = $2`,
       [newTicker, oldTicker]
     );
 
-    // Update parent table (stocks)
-    const stocksUpdate = await pool.query(
-      `UPDATE stocks SET ticker = $1 WHERE ticker = $2 AND currency = $3`,
-      [newTicker, oldTicker, currency]
+    // Step 3: Delete old stock record (now has no child records)
+    await pool.query(
+      `DELETE FROM stocks WHERE ticker = $1 AND currency = $2`,
+      [oldTicker, currency]
     );
 
     // 4. Verify counts
