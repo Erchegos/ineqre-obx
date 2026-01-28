@@ -10,6 +10,7 @@ type StockData = {
   name: string;
   asset_type: AssetType;
   sector: string | null;
+  currency: string;
   last_close: number;
   last_adj_close: number;
   start_date: string;
@@ -495,6 +496,27 @@ export default function StocksPage() {
                     Sector <SortIcon column="sector" />
                   </button>
                 </th>
+                <th style={{ textAlign: "left", padding: "16px" }}>
+                  <button
+                    onClick={() => toggleSort("currency")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--foreground)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      padding: 0,
+                    }}
+                  >
+                    Currency <SortIcon column="currency" />
+                  </button>
+                </th>
                 <th style={{ textAlign: "right", padding: "16px" }}>
                   <button
                     onClick={() => toggleSort("last_close")}
@@ -653,6 +675,9 @@ export default function StocksPage() {
                   <td style={{ padding: "16px", color: "var(--muted-foreground)", fontSize: 13 }}>
                     {stock.sector || '—'}
                   </td>
+                  <td style={{ padding: "16px", color: "var(--foreground)", fontSize: 13, fontWeight: 500 }}>
+                    {stock.currency || 'NOK'}
+                  </td>
                   <td style={{
                     padding: "16px",
                     textAlign: "right",
@@ -660,7 +685,7 @@ export default function StocksPage() {
                     color: "var(--foreground)",
                     fontSize: 14,
                   }}>
-                    {stock.last_close.toFixed(2)} kr
+                    {stock.last_close.toFixed(2)}
                   </td>
                   <td style={{
                     padding: "16px",
@@ -669,7 +694,7 @@ export default function StocksPage() {
                     color: "var(--muted)",
                     fontSize: 14,
                   }}>
-                    {stock.last_adj_close.toFixed(2)} kr
+                    {stock.last_adj_close.toFixed(2)}
                   </td>
                   <td style={{ padding: "16px", textAlign: "right", color: "var(--muted)", fontSize: 13 }}>
                     {stock.start_date}

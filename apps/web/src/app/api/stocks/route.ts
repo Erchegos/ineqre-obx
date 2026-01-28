@@ -47,6 +47,7 @@ export async function GET(req: NextRequest) {
         s.name,
         s.asset_type,
         s.sector,
+        s.currency,
         (ARRAY_AGG(p.close ORDER BY p.date DESC))[1] as last_close,
         (ARRAY_AGG(p.adj_close ORDER BY p.date DESC))[1] as last_adj_close,
         MIN(p.date) as start_date,
@@ -57,7 +58,7 @@ export async function GET(req: NextRequest) {
       WHERE p.close IS NOT NULL
         AND p.close > 0
         AND s.asset_type = ANY($1)
-      GROUP BY s.ticker, s.name, s.asset_type, s.sector
+      GROUP BY s.ticker, s.name, s.asset_type, s.sector, s.currency
       HAVING COUNT(*) >= 100
       ORDER BY s.ticker
     `;
@@ -71,6 +72,7 @@ export async function GET(req: NextRequest) {
       name: row.name || row.ticker,
       asset_type: row.asset_type || 'equity',
       sector: row.sector || null,
+      currency: row.currency || 'NOK',
       last_close: Number(row.last_close || 0),
       last_adj_close: row.last_adj_close ? Number(row.last_adj_close) : Number(row.last_close || 0),
       start_date: row.start_date instanceof Date
