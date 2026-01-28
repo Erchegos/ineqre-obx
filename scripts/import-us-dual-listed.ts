@@ -21,19 +21,19 @@ interface USStock {
   asset_type: string;
 }
 
-// US-listed versions of dual-listed stocks
+// US-listed versions of dual-listed stocks (use .US suffix to avoid collision with OSE versions)
 const usStocks: USStock[] = [
   {
-    ticker: "BORR",
-    name: "Borr Drilling Limited",
+    ticker: "BORR.US",
+    name: "Borr Drilling Ltd (Dual Listed US)",
     sector: "Shipping",
     exchange: "NYSE",
     currency: "USD",
     asset_type: "equity"
   },
   {
-    ticker: "BWLP",
-    name: "BW LPG Limited",
+    ticker: "BWLP.US",
+    name: "BW LPG Ltd (Dual Listed US)",
     sector: "Shipping",
     exchange: "NYSE",
     currency: "USD",
@@ -41,47 +41,47 @@ const usStocks: USStock[] = [
   },
   {
     ticker: "CDLR",
-    name: "Cadeler A/S",
+    name: "Cadeler A/S (Dual Listed US)",
     sector: "Shipping",
     exchange: "NYSE",
     currency: "USD",
     asset_type: "equity"
   },
   {
-    ticker: "ECO",
-    name: "Okeanis Eco Tankers Corp",
+    ticker: "ECO.US",
+    name: "Okeanis Eco Tankers Corp (Dual Listed US)",
     sector: "Shipping",
     exchange: "NYSE",
     currency: "USD",
     asset_type: "equity"
   },
   {
-    ticker: "HAFN",
-    name: "Hafnia Limited",
+    ticker: "HAFN.US",
+    name: "Hafnia Ltd (Dual Listed US)",
     sector: "Shipping",
     exchange: "NYSE",
     currency: "USD",
     asset_type: "equity"
   },
   {
-    ticker: "HSHP",
-    name: "Hamilton Shipping Partners",
+    ticker: "HSHP.US",
+    name: "Hamilton Shipping Partners (Dual Listed US)",
     sector: "Shipping",
     exchange: "NYSE",
     currency: "USD",
     asset_type: "equity"
   },
   {
-    ticker: "EQNR",
-    name: "Equinor ASA",
+    ticker: "EQNR.US",
+    name: "Equinor ASA (Dual Listed US)",
     sector: "Energy",
     exchange: "NYSE",
     currency: "USD",
     asset_type: "equity"
   },
   {
-    ticker: "FRO",
-    name: "Frontline Ltd",
+    ticker: "FRO.US",
+    name: "Frontline Ltd (Dual Listed US)",
     sector: "Shipping",
     exchange: "NYSE",
     currency: "USD",
@@ -150,10 +150,13 @@ async function main() {
       console.log(`${"=".repeat(60)}\n`);
 
       try {
+        // For IB fetch, use plain ticker (IB doesn't recognize .US suffix)
+        const ibTicker = stock.ticker.replace('.US', '');
+
         // Fetch US version using SMART routing
-        console.log(`Fetching ${stock.ticker} from US markets...`);
+        console.log(`Fetching ${ibTicker} from US markets (storing as ${stock.ticker})...`);
         const usData = await client.getHistoricalData(
-          stock.ticker,
+          ibTicker,
           "SMART",
           "10 Y",
           "1 day",
@@ -161,13 +164,13 @@ async function main() {
           stock.currency
         );
 
-        console.log(`✓ Fetched ${usData.length} bars for ${stock.ticker}`);
+        console.log(`✓ Fetched ${usData.length} bars for ${ibTicker}`);
 
-        // Insert stock master record
+        // Insert stock master record (with .US suffix)
         await insertStock(stock);
         console.log(`✓ Inserted stock record: ${stock.ticker}`);
 
-        // Insert price data
+        // Insert price data (with .US suffix)
         for (const bar of usData) {
           await insertPriceData(stock.ticker, bar);
         }

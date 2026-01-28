@@ -12,28 +12,31 @@ const pool = new Pool({
 
 async function main() {
   // Update US-listed stocks to mark them as "Dual Listed (US)"
+  // Note: US versions now use .US suffix
   const usStocks = [
-    { ticker: 'BORR', name: 'Borr Drilling Ltd (Dual Listed US)' },
-    { ticker: 'BWLP', name: 'BW LPG Ltd (Dual Listed US)' },
+    { ticker: 'BORR.US', name: 'Borr Drilling Ltd (Dual Listed US)' },
+    { ticker: 'BWLP.US', name: 'BW LPG Ltd (Dual Listed US)' },
     { ticker: 'CDLR', name: 'Cadeler A/S (Dual Listed US)' },
-    { ticker: 'ECO', name: 'Okeanis Eco Tankers (Dual Listed US)' },
-    { ticker: 'HAFN', name: 'Hafnia Ltd (Dual Listed US)' },
-    { ticker: 'HSHP', name: 'Hamilton Shipping Partners (Dual Listed US)' },
-    { ticker: 'EQNR', name: 'Equinor ASA (Dual Listed US)' },
-    { ticker: 'FRO', name: 'Frontline Ltd (Dual Listed US)' }
+    { ticker: 'ECO.US', name: 'Okeanis Eco Tankers Corp (Dual Listed US)' },
+    { ticker: 'HAFN.US', name: 'Hafnia Ltd (Dual Listed US)' },
+    { ticker: 'HSHP.US', name: 'Hamilton Shipping Partners (Dual Listed US)' },
+    { ticker: 'EQNR.US', name: 'Equinor ASA (Dual Listed US)' },
+    { ticker: 'FRO.US', name: 'Frontline Ltd (Dual Listed US)' }
   ];
 
   console.log('Updating dual-listed stock names...\n');
 
   for (const stock of usStocks) {
-    // Only update US-listed versions (USD currency)
+    // Update by ticker (already has .US suffix)
     const result = await pool.query(
-      'UPDATE stocks SET name = $1 WHERE ticker = $2 AND currency = $3',
-      [stock.name, stock.ticker, 'USD']
+      'UPDATE stocks SET name = $1 WHERE ticker = $2',
+      [stock.name, stock.ticker]
     );
 
     if (result.rowCount && result.rowCount > 0) {
-      console.log(`✓ Updated ${stock.ticker} (US): ${stock.name}`);
+      console.log(`✓ Updated ${stock.ticker}: ${stock.name}`);
+    } else {
+      console.log(`⚠ ${stock.ticker} not found in database`);
     }
   }
 
@@ -45,12 +48,19 @@ async function main() {
   const result = await pool.query(`
     SELECT ticker, name, exchange, currency, sector
     FROM stocks
-    WHERE ticker IN ('BORR', 'BWLP', 'CDLR', 'ECO', 'HAFN', 'HSHP', 'EQNR', 'FRO', 'OET')
+    WHERE ticker IN ('BORR.US', 'BWLP.US', 'CDLR', 'ECO.US', 'HAFN.US', 'HSHP.US', 'EQNR.US', 'FRO.US',
+                     'BORR', 'BWLP', 'ECO', 'HAFN', 'EQNR', 'FRO')
     ORDER BY ticker, exchange
   `);
 
-  result.rows.forEach(row => {
-    console.log(`${row.ticker.padEnd(6)} (${row.exchange.padEnd(6)}, ${row.currency}): ${row.name}`);
+  console.log('US versions (.US suffix):');
+  result.rows.filter(r => r.ticker.endsWith('.US')).forEach(row => {
+    console.log(`  ${row.ticker.padEnd(10)} (${row.exchange.padEnd(6)}, ${row.currency}): ${row.name}`);
+  });
+
+  console.log('\nOSE versions (no suffix):');
+  result.rows.filter(r => !r.ticker.endsWith('.US')).forEach(row => {
+    console.log(`  ${row.ticker.padEnd(10)} (${row.exchange.padEnd(6)}, ${row.currency}): ${row.name}`);
   });
 
   await pool.end();

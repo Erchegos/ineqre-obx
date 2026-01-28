@@ -88,50 +88,6 @@ async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function renameUsVersion(oldTicker: string, newTicker: string) {
-  // Rename US version to add .US suffix
-  try {
-    // First check if this ticker is USD (US version)
-    const check = await pool.query(
-      `SELECT currency FROM stocks WHERE ticker = $1`,
-      [oldTicker]
-    );
-
-    if (check.rows.length === 0) {
-      console.log(`⚠ ${oldTicker} not found in database`);
-      return;
-    }
-
-    if (check.rows[0].currency !== 'USD') {
-      console.log(`⚠ ${oldTicker} is not USD version (${check.rows[0].currency}), skipping`);
-      return;
-    }
-
-    // Begin transaction
-    await pool.query('BEGIN');
-
-    // First, update prices_daily records (must update child table first)
-    await pool.query(
-      `UPDATE prices_daily SET ticker = $1 WHERE ticker = $2`,
-      [newTicker, oldTicker]
-    );
-
-    // Then update stocks table (parent table)
-    await pool.query(
-      `UPDATE stocks SET ticker = $1 WHERE ticker = $2`,
-      [newTicker, oldTicker]
-    );
-
-    // Commit transaction
-    await pool.query('COMMIT');
-
-    console.log(`✓ Renamed ${oldTicker} (USD) → ${newTicker}`);
-  } catch (error: any) {
-    await pool.query('ROLLBACK');
-    console.error(`✗ Error renaming ${oldTicker}:`, error.message);
-  }
-}
-
 async function insertStock(stock: StockInfo) {
   await pool.query(
     `INSERT INTO stocks (ticker, name, sector, exchange, currency, asset_type, is_active)
@@ -176,16 +132,7 @@ async function main() {
   console.log("=".repeat(70));
   console.log("IMPORTING OSE VERSIONS OF DUAL-LISTED STOCKS");
   console.log("=".repeat(70));
-  console.log("\nStep 1: Renaming US versions to add .US suffix\n");
-
-  // First, rename existing US versions to add .US suffix
-  for (const stock of oseStocks) {
-    await renameUsVersion(stock.ticker, stock.usTicker);
-    await sleep(100);
-  }
-
-  console.log("\n" + "=".repeat(70));
-  console.log("Step 2: Fetching OSE versions from IB Gateway\n");
+  console.log("\nNote: US versions should already have .US suffix\n");
 
   const client = new TWSClient();
 
