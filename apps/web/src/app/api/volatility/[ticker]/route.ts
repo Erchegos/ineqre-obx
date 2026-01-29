@@ -4,9 +4,17 @@ import { getPriceTable } from "@/lib/price-data-adapter";
 import {
   computeVolatilityMeasures,
   compareVolatilityAroundEvent,
-  currentVolatilityPercentile
+  currentVolatilityPercentile,
+  calculateRegimeDuration,
+  type RegimePoint
 } from "@/lib/volatility";
 import { computeReturns, computeBeta } from "@/lib/metrics";
+import {
+  classifyRegime,
+  determineVolatilityTrend,
+  getRegimeInterpretation,
+  type VolatilityRegime
+} from "@/lib/regimeClassification";
 
 export const dynamic = "force-dynamic";
 
@@ -164,18 +172,70 @@ export async function GET(
     // FIX APPLIED HERE: Added '?? null' inside the .map() calls
     const percentiles = {
       rolling20: currentVolatilityPercentile(current.rolling20, volSeries.map(v => v.rolling20)),
+      rolling60: currentVolatilityPercentile(current.rolling60, volSeries.map(v => v.rolling60)),
       ewma94: currentVolatilityPercentile(current.ewma94, volSeries.map(v => v.ewma94)),
-      
+
       // FIX: Explicitly convert undefined -> null for the array elements
       yangZhang: currentVolatilityPercentile(
-        current.yangZhang ?? null, 
+        current.yangZhang ?? null,
         volSeries.map(v => v.yangZhang ?? null)
       ),
       rogersSatchell: currentVolatilityPercentile(
-        current.rogersSatchell ?? null, 
+        current.rogersSatchell ?? null,
         volSeries.map(v => v.rogersSatchell ?? null)
       ),
     };
+
+    // Regime Classification
+    // Use Yang-Zhang if available, fallback to Rolling20
+    const primaryVol = current.yangZhang ?? current.rolling20 ?? 0;
+    const primaryPercentile = current.yangZhang
+      ? percentiles.yangZhang
+      : percentiles.rolling20;
+
+    // Determine trend by comparing short-term vs medium-term
+    const trend = determineVolatilityTrend(current.rolling20, current.rolling60);
+    const regime = classifyRegime(primaryPercentile, trend);
+
+    // Build regime history
+    const regimeHistory: RegimePoint[] = [];
+    for (let i = 0; i < volSeries.length; i++) {
+      const point = volSeries[i];
+      const pointVol = point.yangZhang ?? point.rolling20 ?? 0;
+      const pointPercentile = point.yangZhang
+        ? currentVolatilityPercentile(point.yangZhang ?? null, volSeries.map(v => v.yangZhang ?? null))
+        : currentVolatilityPercentile(point.rolling20, volSeries.map(v => v.rolling20));
+      const pointTrend = determineVolatilityTrend(point.rolling20, point.rolling60);
+      const pointRegime = classifyRegime(pointPercentile, pointTrend);
+
+      regimeHistory.push({
+        date: point.date,
+        regime: pointRegime,
+        volatility: pointVol,
+      });
+    }
+
+    // Calculate regime duration stats
+    const regimeStats = calculateRegimeDuration(regimeHistory);
+
+    // Calculate expected moves in NOK
+    const currentPrice = bars[bars.length - 1].close;
+    const dailyVol = primaryVol / Math.sqrt(252);
+    const expectedMoves = {
+      currentPrice,
+      daily1Sigma: currentPrice * dailyVol,
+      weekly1Sigma: currentPrice * dailyVol * Math.sqrt(5),
+      daily2Sigma: currentPrice * dailyVol * 2,
+    };
+
+    // Generate regime interpretation
+    const interpretation = getRegimeInterpretation(
+      regime,
+      primaryPercentile,
+      trend,
+      beta,
+      ticker.toUpperCase()
+    );
 
     // Event Analysis
     const largeMoves = bars.filter((b, i) => {
@@ -207,17 +267,43 @@ export async function GET(
         rogersSatchell: sanitizeNumber(current.rogersSatchell),
         yangZhang: sanitizeNumber(current.yangZhang),
       },
-      
+
       percentiles: {
         rolling20: sanitizeNumber(percentiles.rolling20),
+        rolling60: sanitizeNumber(percentiles.rolling60),
         ewma94: sanitizeNumber(percentiles.ewma94),
         rogersSatchell: sanitizeNumber(percentiles.rogersSatchell),
         yangZhang: sanitizeNumber(percentiles.yangZhang),
       },
-      
+
+      regime: {
+        current: regime,
+        level: sanitizeNumber(primaryVol),
+        percentile: sanitizeNumber(primaryPercentile),
+        trend,
+        duration: regimeStats.currentDuration,
+        lastShift: regimeStats.lastShift,
+        averageDuration: regimeStats.averageDuration,
+        interpretation,
+      },
+
+      expectedMoves: {
+        currentPrice: sanitizeNumber(expectedMoves.currentPrice),
+        daily1Sigma: sanitizeNumber(expectedMoves.daily1Sigma),
+        weekly1Sigma: sanitizeNumber(expectedMoves.weekly1Sigma),
+        daily2Sigma: sanitizeNumber(expectedMoves.daily2Sigma),
+      },
+
+      regimeHistory: regimeHistory.map(point => ({
+        date: point.date,
+        regime: point.regime,
+        volatility: sanitizeNumber(point.volatility),
+        close: sanitizeNumber(bars.find(b => b.date === point.date)?.close ?? 0),
+      })),
+
       series: sanitizeData(volSeries),
       eventAnalysis: eventAnalysis.length > 0 ? sanitizeData(eventAnalysis) : undefined,
-      
+
       dateRange: {
         start: volSeries[0].date,
         end: volSeries[volSeries.length - 1].date,

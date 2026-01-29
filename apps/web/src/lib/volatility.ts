@@ -336,3 +336,129 @@ export function currentVolatilityPercentile(
   const belowCount = validVols.filter(v => v <= currentVol).length;
   return (belowCount / validVols.length) * 100;
 }
+
+/**
+ * Regime Analysis Utilities
+ */
+
+export type RegimePoint = {
+  date: string;
+  regime: string;
+  volatility: number;
+};
+
+export type RegimeStats = {
+  currentDuration: number;
+  averageDuration: number;
+  lastShift: string | null;
+};
+
+export type RegimePeriod = {
+  regime: string;
+  start: string;
+  end: string;
+};
+
+/**
+ * Calculate regime duration statistics
+ *
+ * @param series Array of regime points sorted by date
+ * @returns RegimeStats object
+ */
+export function calculateRegimeDuration(series: RegimePoint[]): RegimeStats {
+  if (series.length === 0) {
+    return {
+      currentDuration: 0,
+      averageDuration: 0,
+      lastShift: null,
+    };
+  }
+
+  const currentRegime = series[series.length - 1].regime;
+  let currentDuration = 0;
+  let lastShift: string | null = null;
+
+  // Walk backward to find current duration
+  for (let i = series.length - 1; i >= 0; i--) {
+    if (series[i].regime === currentRegime) {
+      currentDuration++;
+    } else {
+      // Found the shift point
+      if (i + 1 < series.length) {
+        lastShift = series[i + 1].date;
+      }
+      break;
+    }
+  }
+
+  // If we went through the entire array, there's no previous regime
+  if (currentDuration === series.length) {
+    lastShift = series[0].date;
+  }
+
+  // Calculate average regime duration
+  const durations: number[] = [];
+  let tempDuration = 1;
+
+  for (let i = 1; i < series.length; i++) {
+    if (series[i].regime === series[i - 1].regime) {
+      tempDuration++;
+    } else {
+      durations.push(tempDuration);
+      tempDuration = 1;
+    }
+  }
+
+  // Add the last duration
+  if (tempDuration > 0) {
+    durations.push(tempDuration);
+  }
+
+  const averageDuration =
+    durations.length > 0
+      ? durations.reduce((sum, d) => sum + d, 0) / durations.length
+      : currentDuration;
+
+  return {
+    currentDuration,
+    averageDuration: Math.round(averageDuration),
+    lastShift,
+  };
+}
+
+/**
+ * Group consecutive regime periods for visualization
+ *
+ * @param data Array of regime points
+ * @returns Array of regime periods with start/end dates
+ */
+export function groupRegimePeriods(data: RegimePoint[]): RegimePeriod[] {
+  if (data.length === 0) return [];
+
+  const periods: RegimePeriod[] = [];
+  let currentPeriod: RegimePeriod | null = null;
+
+  for (const point of data) {
+    if (!currentPeriod || currentPeriod.regime !== point.regime) {
+      // Start new period
+      if (currentPeriod) {
+        periods.push(currentPeriod);
+      }
+      currentPeriod = {
+        regime: point.regime,
+        start: point.date,
+        end: point.date,
+      };
+    } else {
+      // Extend current period
+      currentPeriod.end = point.date;
+    }
+  }
+
+  // Add the last period
+  if (currentPeriod) {
+    periods.push(currentPeriod);
+  }
+
+  return periods;
+}
