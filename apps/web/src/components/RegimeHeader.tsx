@@ -143,7 +143,7 @@ export default function RegimeHeader({
               color: "var(--muted-foreground)",
             }}
           >
-            {Math.round(percentile)}th percentile (period)
+            {Math.round(percentile)}th percentile within timeframe
           </div>
         </div>
 
