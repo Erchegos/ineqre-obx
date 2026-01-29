@@ -8,14 +8,13 @@
 
 import { useState } from "react";
 import VolatilityCorrelationChart from "./VolatilityCorrelationChart";
-import type { VolatilityPoint } from "@/lib/volatility";
 
 type MarketCorrelationProps = {
   beta: number | null;
   avgCorrelation: number;
   portfolioImplications: string[];
-  stockData: VolatilityPoint[];
-  marketData: VolatilityPoint[];
+  stockData: any[]; // API returns series with optional properties
+  marketData: any[]; // API returns series with optional properties
 };
 
 export default function MarketCorrelation({

@@ -166,7 +166,7 @@ export default function RegimeTimeline({
                 borderRadius: "4px",
                 fontSize: "12px",
               }}
-              formatter={(value: any, name: string) => {
+              formatter={(value: any, name?: string) => {
                 if (name === "close") {
                   return [`${formatPrice(value)} NOK`, "Price"];
                 }
