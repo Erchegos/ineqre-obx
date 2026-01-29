@@ -18,13 +18,13 @@ import { NextResponse } from 'next/server';
 /**
  * Ticker symbol validation
  * - 1-10 uppercase alphanumeric characters
- * - No special characters except allowed ones
+ * - Allows periods for exchange suffixes (e.g., .US)
  */
 export const tickerSchema = z
   .string()
   .min(1, 'Ticker is required')
   .max(10, 'Ticker must be at most 10 characters')
-  .regex(/^[A-Z0-9]+$/, 'Ticker must contain only uppercase letters and numbers')
+  .regex(/^[A-Z0-9.]+$/, 'Ticker must contain only uppercase letters, numbers, and periods')
   .transform((val) => val.toUpperCase());
 
 /**

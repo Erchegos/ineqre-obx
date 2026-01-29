@@ -42,6 +42,9 @@ export default function MonteCarloChart({
   height = 400,
   ticker = "Stock",
 }: MonteCarloChartProps) {
+  // Detect currency based on ticker suffix
+  const currency = ticker.endsWith(".US") ? "USD" : "kr";
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentStep, setCurrentStep] = useState(paths[0]?.length || 0);
   const [playbackSpeed, setPlaybackSpeed] = useState(50); // ms per step
@@ -373,7 +376,7 @@ export default function MonteCarloChart({
                   }}
                   domain={['auto', 'auto']}
                   reversed={true}
-                  tickFormatter={(val) => `${val.toFixed(0)} kr`}
+                  tickFormatter={(val) => `${val.toFixed(0)} ${currency}`}
                 />
 
                 <Tooltip
@@ -532,11 +535,11 @@ export default function MonteCarloChart({
         gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
         gap: 12,
       }}>
-        <StatCard label="Start Price" value={`${startPrice.toFixed(2)} kr`} />
-        <StatCard label="Mean (Final)" value={`${percentiles.mean.toFixed(2)} kr`} />
-        <StatCard label="Median (p50)" value={`${percentiles.p50.toFixed(2)} kr`} />
-        <StatCard label="5th Percentile" value={`${percentiles.p5.toFixed(2)} kr`} colorType="danger" />
-        <StatCard label="95th Percentile" value={`${percentiles.p95.toFixed(2)} kr`} colorType="success" />
+        <StatCard label="Start Price" value={`${startPrice.toFixed(2)} ${currency}`} />
+        <StatCard label="Mean (Final)" value={`${percentiles.mean.toFixed(2)} ${currency}`} />
+        <StatCard label="Median (p50)" value={`${percentiles.p50.toFixed(2)} ${currency}`} />
+        <StatCard label="5th Percentile" value={`${percentiles.p5.toFixed(2)} ${currency}`} colorType="danger" />
+        <StatCard label="95th Percentile" value={`${percentiles.p95.toFixed(2)} ${currency}`} colorType="success" />
       </div>
 
       {/* Results Explanation - Show when animation completes */}
@@ -562,7 +565,7 @@ export default function MonteCarloChart({
           </h4>
           <div style={{ display: "grid", gap: 10 }}>
             <div>
-              <strong style={{ color: "var(--foreground)" }}>Mean Final Price ({percentiles.mean.toFixed(2)} kr):</strong>{" "}
+              <strong style={{ color: "var(--foreground)" }}>Mean Final Price ({percentiles.mean.toFixed(2)} {currency}):</strong>{" "}
               The average price across all {paths.length} simulated paths at time T={finalTime}.
               {percentiles.mean > startPrice ? (
                 <span style={{ color: "var(--success)" }}> This suggests an expected upward trend of {((percentiles.mean / startPrice - 1) * 100).toFixed(1)}%.</span>
@@ -571,13 +574,13 @@ export default function MonteCarloChart({
               )}
             </div>
             <div>
-              <strong style={{ color: "var(--foreground)" }}>Median (p50) ({percentiles.p50.toFixed(2)} kr):</strong>{" "}
+              <strong style={{ color: "var(--foreground)" }}>Median (p50) ({percentiles.p50.toFixed(2)} {currency}):</strong>{" "}
               Half of the simulated paths ended above this price, half below. Often more representative than the mean for skewed distributions.
             </div>
             <div>
-              <strong style={{ color: "var(--foreground)" }}>90% Confidence Interval ({percentiles.p5.toFixed(2)} kr - {percentiles.p95.toFixed(2)} kr):</strong>{" "}
+              <strong style={{ color: "var(--foreground)" }}>90% Confidence Interval ({percentiles.p5.toFixed(2)} {currency} - {percentiles.p95.toFixed(2)} {currency}):</strong>{" "}
               Based on this simulation, there's a 90% probability the price will fall within this range.
-              The range of {(percentiles.p95 - percentiles.p5).toFixed(2)} kr indicates the level of uncertainty.
+              The range of {(percentiles.p95 - percentiles.p5).toFixed(2)} {currency} indicates the level of uncertainty.
             </div>
             <div>
               <strong style={{ color: "var(--foreground)" }}>Distribution Shape:</strong>{" "}
