@@ -14,17 +14,17 @@ const PRESET_GROUPS = {
 };
 
 const TIMEFRAMES = [
-  { label: "6 Months", days: 180 },
-  { label: "1 Year", days: 365 },
-  { label: "3 Years", days: 1095 },
-  { label: "5 Years", days: 1825 },
+  { label: "6M", days: 180 },
+  { label: "1Y", days: 365 },
+  { label: "3Y", days: 1095 },
+  { label: "5Y", days: 1825 },
 ];
 
 const ROLLING_WINDOWS = [
-  { label: "20 Days (1 Month)", days: 20, desc: "Captures short-term co-movement" },
-  { label: "60 Days (1 Quarter)", days: 60, desc: "Medium-term relationships" },
-  { label: "120 Days (6 Months)", days: 120, desc: "Longer-term structural correlation" },
-  { label: "252 Days (1 Year)", days: 252, desc: "Annual correlation cycle" },
+  { label: "20D", days: 20 },
+  { label: "60D", days: 60 },
+  { label: "120D", days: 120 },
+  { label: "252D", days: 252 },
 ];
 
 type Stock = {
@@ -56,7 +56,7 @@ export default function CorrelationPage() {
   const [timeframe, setTimeframe] = useState(365);
   const [rollingWindow, setRollingWindow] = useState(60);
   const [dataMode, setDataMode] = useState<"price" | "total_return">("total_return");
-  const [showInfo, setShowInfo] = useState(false);
+  const [matrixMode, setMatrixMode] = useState<"correlation" | "covariance">("correlation");
 
   useEffect(() => {
     fetchTickers();
@@ -68,7 +68,6 @@ export default function CorrelationPage() {
       if (res.ok) {
         const stocksData = await res.json();
         setStocks(stocksData);
-        // Extract just the ticker strings from the stock objects
         const tickers = stocksData.map((stock: any) => stock.ticker);
         setAvailableTickers(tickers);
       }
@@ -77,12 +76,10 @@ export default function CorrelationPage() {
     }
   }
 
-  // Get unique sectors
   const availableSectors = Array.from(
     new Set(stocks.map(s => s.sector).filter(Boolean))
   ).sort() as string[];
 
-  // Filter stocks by selected sectors
   const filteredStocks = selectedSectors.size > 0
     ? stocks.filter(s => s.sector && selectedSectors.has(s.sector))
     : stocks;
@@ -126,7 +123,7 @@ export default function CorrelationPage() {
 
   async function computeCorrelations() {
     if (selectedTickers.length < 2) {
-      setError("Please select at least 2 tickers to compute correlations.");
+      setError("Minimum 2 tickers required");
       return;
     }
 
@@ -138,7 +135,7 @@ export default function CorrelationPage() {
         tickers: selectedTickers.join(","),
         limit: timeframe.toString(),
         window: rollingWindow.toString(),
-        mode: dataMode, // <--- Passing the new mode to API
+        mode: dataMode,
       });
 
       const res = await fetch(`/api/correlation?${params}`);
@@ -158,552 +155,494 @@ export default function CorrelationPage() {
     }
   }
 
+  function exportToCSV() {
+    if (!correlationData?.matrix) return;
+
+    const rows = [
+      ['', ...correlationData.matrix.map((row: any) => row.ticker)],
+      ...correlationData.matrix.map((row: any, i: number) => [
+        row.ticker,
+        ...row.values.map((v: number) => v.toFixed(4))
+      ])
+    ];
+
+    const csv = rows.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `correlation_${dataMode}_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+  }
+
+  const currentDate = new Date().toISOString().split('T')[0];
+
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--background)",
-        color: "var(--foreground)",
-        padding: "32px 24px",
-      }}
-    >
+    <div style={{
+      minHeight: "100vh",
+      background: "var(--background)",
+      color: "var(--foreground)",
+      padding: 32
+    }}>
       <style dangerouslySetInnerHTML={{ __html: `
-        @media (prefers-color-scheme: dark) {
-          .card-enhanced {
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-          }
-          .stat-box {
-            background: rgba(255, 255, 255, 0.03) !important;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-          }
-          .stat-box:hover {
-            background: rgba(255, 255, 255, 0.05) !important;
-            border-color: rgba(59, 130, 246, 0.4);
-          }
-        }
-        .toggle-btn {
-          padding: 6px 12px;
-          border-radius: 6px;
-          border: none;
-          font-size: 13px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .toggle-btn.active {
-          background: var(--background);
+        .search-input {
+          width: 100%;
+          padding: 12px 16px;
+          font-size: 14px;
+          border: 1px solid var(--border);
+          border-radius: 4px;
+          background: var(--card-bg);
           color: var(--foreground);
-          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          outline: none;
+          transition: border-color 0.2s;
         }
-        .toggle-btn.inactive {
-          background: transparent;
+        .search-input:focus {
+          border-color: var(--accent);
+        }
+        .search-input::placeholder {
           color: var(--muted);
         }
-        .toggle-btn.inactive:hover {
-          color: var(--foreground);
+        .stat-box {
+          background: var(--card-bg);
+          border: 1px solid var(--border);
+          transition: all 0.15s;
+        }
+        .stat-box:hover {
+          border-color: var(--accent);
         }
       `}} />
-      
+
       <div style={{ maxWidth: 1400, margin: "0 auto" }}>
-        
-        {/* Header Section */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 32 }}>
-          <div>
+
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <h1 style={{ fontSize: 32, fontWeight: 700, margin: 0 }}>
+              Correlation Matrix
+            </h1>
             <Link
               href="/stocks"
               style={{
-                color: "var(--muted)",
+                display: "inline-block",
+                color: "var(--foreground)",
                 textDecoration: "none",
-                fontSize: 14,
-                marginBottom: 8,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4
-              }}
-            >
-              ← Back to stocks
-            </Link>
-            <h1 style={{ fontSize: 32, fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>
-              Correlation Matrix
-            </h1>
-            <p style={{ color: "var(--muted)", margin: "8px 0 0 0", fontSize: 15 }}>
-              Analyze how assets move in relation to each other.
-            </p>
-          </div>
-          
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-             {/* Mode Toggle */}
-             <div style={{ display: "flex", gap: 4, background: "var(--input-bg)", padding: 4, borderRadius: 8 }}>
-                <button
-                  onClick={() => setDataMode("price")}
-                  className={`toggle-btn ${dataMode === "price" ? "active" : "inactive"}`}
-                >
-                  Price (Raw)
-                </button>
-                <button
-                  onClick={() => setDataMode("total_return")}
-                  className={`toggle-btn ${dataMode === "total_return" ? "active" : "inactive"}`}
-                  style={{ color: dataMode === "total_return" ? "var(--accent)" : undefined }}
-                >
-                  Total Return
-                </button>
-              </div>
-
-            {/* Info Button */}
-            <button
-              onClick={() => setShowInfo(!showInfo)}
-              style={{
-                background: "var(--card-bg)",
+                fontSize: 13,
+                fontWeight: 500,
+                padding: "8px 16px",
                 border: "1px solid var(--border)",
-                borderRadius: 8,
-                width: 36,
-                height: 36,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                color: showInfo ? "var(--accent)" : "var(--muted)",
-                transition: "all 0.2s"
+                borderRadius: 4,
+                background: "var(--card-bg)",
+                transition: "all 0.15s ease"
               }}
-              title="Show guide"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "var(--foreground)";
+                e.currentTarget.style.background = "var(--hover-bg)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "var(--border)";
+                e.currentTarget.style.background = "var(--card-bg)";
+              }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-                <line x1="12" y1="17" x2="12.01" y2="17" />
-              </svg>
-            </button>
+              Back to Assets
+            </Link>
+          </div>
+          <div style={{ fontSize: 13, color: "var(--muted)" }}>
+            Last updated: {currentDate}
+          </div>
+        </div>
+        <p style={{ color: "var(--muted)", marginBottom: 24, fontSize: 14 }}>
+          Quantitative correlation and regime analysis
+        </p>
+
+        {/* Quick Presets - Prominent */}
+        <div style={{
+          background: "var(--card-bg)",
+          border: "1px solid var(--border)",
+          borderRadius: 4,
+          padding: 20,
+          marginBottom: 16
+        }}>
+          <h3 style={{ fontSize: 12, fontWeight: 600, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted-foreground)" }}>
+            Quick Presets
+          </h3>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {Object.keys(PRESET_GROUPS).map((group) => (
+              <button
+                key={group}
+                onClick={() => handlePresetGroup(group as keyof typeof PRESET_GROUPS)}
+                style={{
+                  padding: "8px 14px",
+                  background: "var(--card-bg)",
+                  color: "var(--foreground)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 4,
+                  cursor: "pointer",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "var(--accent)";
+                  e.currentTarget.style.background = "var(--hover-bg)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "var(--border)";
+                  e.currentTarget.style.background = "var(--card-bg)";
+                }}
+              >
+                {group}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Info Panel */}
-        {showInfo && (
-          <div
-            className="card-enhanced"
-            style={{
-              padding: 24,
-              marginBottom: 32,
-              fontSize: 13,
-              lineHeight: 1.7,
-              borderRadius: 8,
-              animation: "fadeIn 0.2s ease-in-out"
-            }}
-          >
-            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: "var(--foreground)" }}>
-              How to Read This Analysis
-            </h2>
-            <p style={{ fontSize: 13, color: "var(--muted-foreground)", marginBottom: 20, lineHeight: 1.6 }}>
-              Correlation measures how two stocks move together. Think of it like a dance: high correlation means they move in sync, low correlation means they dance independently.
-            </p>
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 24 }}>
-              <div>
-                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 16 }}>📊</span> What Are You Measuring?
-                </h3>
-                <div style={{ background: "rgba(59, 130, 246, 0.05)", padding: 12, borderRadius: 6, marginBottom: 10, border: "1px solid rgba(59, 130, 246, 0.2)" }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "var(--accent)", marginBottom: 4 }}>✓ Total Return (Recommended)</div>
-                  <p style={{ fontSize: 11, color: "var(--muted-foreground)", margin: 0, lineHeight: 1.5 }}>
-                    Includes dividends. Shows the real relationship. Example: If EQUINOR pays a big dividend, the stock price drops artificially — Total Return fixes this.
-                  </p>
-                </div>
-                <div style={{ background: "var(--input-bg)", padding: 12, borderRadius: 6, border: "1px solid var(--border-subtle)" }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", marginBottom: 4 }}>Price (Raw)</div>
-                  <p style={{ fontSize: 11, color: "var(--muted-foreground)", margin: 0, lineHeight: 1.5 }}>
-                    Only stock price. Can show fake breaks on dividend dates. Use for short-term or non-dividend stocks.
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 16 }}>🎯</span> Reading the Numbers
-                </h3>
-                <div style={{ display: "grid", gap: 8 }}>
-                  <div style={{ padding: "8px 12px", background: "rgba(34, 197, 94, 0.1)", borderRadius: 4, border: "1px solid rgba(34, 197, 94, 0.3)" }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "#22c55e" }}>+0.8 to +1.0</div>
-                    <div style={{ fontSize: 10, color: "var(--muted-foreground)" }}>Move together like twins. One goes up → the other goes up.</div>
-                  </div>
-                  <div style={{ padding: "8px 12px", background: "rgba(59, 130, 246, 0.1)", borderRadius: 4, border: "1px solid rgba(59, 130, 246, 0.3)" }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "#3b82f6" }}>+0.5 to +0.8</div>
-                    <div style={{ fontSize: 10, color: "var(--muted-foreground)" }}>Often move together. Same sector stocks (e.g., all energy).</div>
-                  </div>
-                  <div style={{ padding: "8px 12px", background: "var(--input-bg)", borderRadius: 4, border: "1px solid var(--border-subtle)" }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)" }}>-0.2 to +0.5</div>
-                    <div style={{ fontSize: 10, color: "var(--muted-foreground)" }}>No clear pattern. Independent businesses.</div>
-                  </div>
-                  <div style={{ padding: "8px 12px", background: "rgba(239, 68, 68, 0.1)", borderRadius: 4, border: "1px solid rgba(239, 68, 68, 0.3)" }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "#ef4444" }}>-1.0 to -0.5</div>
-                    <div style={{ fontSize: 10, color: "var(--muted-foreground)" }}>Move opposite. Great for hedging (when one falls, other rises).</div>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 16 }}>⏱️</span> Time Windows
-                </h3>
-                <p style={{ fontSize: 11, color: "var(--muted-foreground)", marginBottom: 12 }}>
-                  Correlations change over time. The rolling window shows how stable the relationship is.
-                </p>
-                <div style={{ display: "grid", gap: 10 }}>
-                  <div style={{ borderLeft: "3px solid #f59e0b", paddingLeft: 10 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--foreground)" }}>20 Days</div>
-                    <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.4 }}>
-                      Catches recent changes fast. Jumpy. Good for short-term traders.
-                    </div>
-                  </div>
-                  <div style={{ borderLeft: "3px solid #3b82f6", paddingLeft: 10 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--foreground)" }}>60 Days</div>
-                    <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.4 }}>
-                      Balanced. Not too noisy. Best for most analyses.
-                    </div>
-                  </div>
-                  <div style={{ borderLeft: "3px solid #8b5cf6", paddingLeft: 10 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--foreground)" }}>120-252 Days</div>
-                    <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.4 }}>
-                      Smooth, long-term trend. Ignores short blips.
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 12 }}>
-                  Why This Matters
-                </h3>
-                <div style={{ display: "grid", gap: 10 }}>
-                  <div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--foreground)", marginBottom: 4 }}>Build a Better Portfolio</div>
-                    <p style={{ fontSize: 10, color: "var(--muted-foreground)", margin: 0, lineHeight: 1.4 }}>
-                      Want low risk? Pick stocks with low correlation. If one drops, the others won't necessarily follow.
-                    </p>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--foreground)", marginBottom: 4 }}>Spot Market Crashes</div>
-                    <p style={{ fontSize: 10, color: "var(--muted-foreground)", margin: 0, lineHeight: 1.4 }}>
-                      During crises, correlations spike to +1. Everything falls together. The rolling chart shows this.
-                    </p>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--foreground)", marginBottom: 4 }}>Find Trading Pairs</div>
-                    <p style={{ fontSize: 10, color: "var(--muted-foreground)", margin: 0, lineHeight: 1.4 }}>
-                      Two stocks with 0.8+ correlation usually move together. If they diverge, one might be mispriced.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 16 }}>🔥</span> Market Stress Levels
-                </h3>
-                <p style={{ fontSize: 11, color: "var(--muted-foreground)", marginBottom: 12 }}>
-                  The background color on the rolling chart shows market stress (similar to VIX).
-                </p>
-                <div style={{ display: "grid", gap: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ width: 12, height: 12, background: "#22c55e", borderRadius: 2 }}></div>
-                    <div>
-                      <div style={{ fontSize: 10, fontWeight: 600, color: "#22c55e" }}>Low Volatility</div>
-                      <div style={{ fontSize: 9, color: "var(--muted-foreground)" }}>Calm market, stocks move independently</div>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ width: 12, height: 12, background: "#3b82f6", borderRadius: 2 }}></div>
-                    <div>
-                      <div style={{ fontSize: 10, fontWeight: 600, color: "#3b82f6" }}>Normal</div>
-                      <div style={{ fontSize: 9, color: "var(--muted-foreground)" }}>Business as usual</div>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ width: 12, height: 12, background: "#fb923c", borderRadius: 2 }}></div>
-                    <div>
-                      <div style={{ fontSize: 10, fontWeight: 600, color: "#fb923c" }}>Elevated Risk</div>
-                      <div style={{ fontSize: 9, color: "var(--muted-foreground)" }}>Market getting nervous</div>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ width: 12, height: 12, background: "#ef4444", borderRadius: 2 }}></div>
-                    <div>
-                      <div style={{ fontSize: 10, fontWeight: 600, color: "#ef4444" }}>High Stress</div>
-                      <div style={{ fontSize: 9, color: "var(--muted-foreground)" }}>Panic mode, everything moves together</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 16 }}>⚠️</span> Things to Watch
-                </h3>
-                <div style={{ display: "grid", gap: 10 }}>
-                  <div style={{ background: "rgba(251, 146, 60, 0.1)", padding: 10, borderRadius: 6, border: "1px solid rgba(251, 146, 60, 0.3)" }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: "#fb923c", marginBottom: 4 }}>Need Enough Data</div>
-                    <p style={{ fontSize: 10, color: "var(--muted-foreground)", margin: 0 }}>
-                      At least 60 trading days. Otherwise the numbers aren't trustworthy.
-                    </p>
-                  </div>
-                  <div style={{ background: "rgba(251, 146, 60, 0.1)", padding: 10, borderRadius: 6, border: "1px solid rgba(251, 146, 60, 0.3)" }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: "#fb923c", marginBottom: 4 }}>Correlations Change</div>
-                    <p style={{ fontSize: 10, color: "var(--muted-foreground)", margin: 0 }}>
-                      What's true today might not be true next year. Check regularly.
-                    </p>
-                  </div>
-                  <div style={{ background: "rgba(251, 146, 60, 0.1)", padding: 10, borderRadius: 6, border: "1px solid rgba(251, 146, 60, 0.3)" }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: "#fb923c", marginBottom: 4 }}>Crisis = Everything Correlates</div>
-                    <p style={{ fontSize: 10, color: "var(--muted-foreground)", margin: 0 }}>
-                      During market crashes, diversification often fails. Everything drops together.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Controls Grid */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-            gap: 20,
-            marginBottom: 32,
-          }}
-        >
-          {/* Preset Groups */}
-          <div className="card-enhanced" style={{ padding: 20, borderRadius: 8 }}>
-            <h3 style={{ fontSize: 12, fontWeight: 600, marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted)" }}>
-              Quick Presets
-            </h3>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {Object.keys(PRESET_GROUPS).map((group) => (
-                <button
-                  key={group}
-                  onClick={() => handlePresetGroup(group as keyof typeof PRESET_GROUPS)}
-                  style={{
-                    padding: "6px 12px",
-                    background: "var(--button-bg)",
-                    color: "var(--foreground)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 6,
-                    cursor: "pointer",
-                    fontSize: 12,
-                    fontWeight: 500,
-                    transition: "all 0.15s",
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.borderColor = "var(--accent)"}
-                  onMouseLeave={(e) => e.currentTarget.style.borderColor = "var(--border)"}
-                >
-                  {group}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Add Ticker */}
-          <div className="card-enhanced" style={{ padding: 20, borderRadius: 8 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
-               <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted)", margin: 0 }}>
-                Selection ({selectedTickers.length})
-              </h3>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  onClick={() => setShowTickerPanel(!showTickerPanel)}
-                  style={{
-                    background: "none",
-                    border: "1px solid var(--border)",
-                    fontSize: 11,
-                    color: "var(--accent)",
-                    cursor: "pointer",
-                    padding: "4px 8px",
-                    borderRadius: 4,
-                    fontWeight: 500
-                  }}
-                >
-                  {showTickerPanel ? "Hide" : "Show"} All Tickers
-                </button>
-                {selectedTickers.length > 0 && (
+        {/* Settings Panel - More Prominent */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          gap: 16,
+          marginBottom: 16
+        }}>
+          {/* Lookback Period */}
+          <div style={{
+            background: "var(--card-bg)",
+            border: "1px solid var(--border)",
+            borderRadius: 4,
+            padding: 16
+          }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              Lookback Period
+            </label>
+            <div style={{ display: "flex", gap: 4 }}>
+              {TIMEFRAMES.map((tf) => {
+                const isSelected = timeframe === tf.days;
+                return (
                   <button
-                    onClick={() => setSelectedTickers([])}
-                    style={{ background: "none", border: "none", fontSize: 11, color: "var(--danger)", cursor: "pointer", padding: 0 }}
+                    key={tf.days}
+                    onClick={() => setTimeframe(tf.days)}
+                    style={{
+                      flex: 1,
+                      padding: "8px 4px",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      border: isSelected ? "1px solid var(--accent)" : "1px solid var(--border)",
+                      borderRadius: 3,
+                      background: isSelected ? "var(--accent)" : "var(--card-bg)",
+                      color: isSelected ? "#fff" : "var(--foreground)",
+                      cursor: "pointer",
+                      transition: "all 0.15s"
+                    }}
                   >
-                    Clear All
+                    {tf.label}
                   </button>
-                )}
-              </div>
+                );
+              })}
             </div>
+          </div>
 
-            <div style={{ position: "relative" }}>
-              <input
-                type="text"
-                value={tickerInput}
-                onChange={(e) => {
-                  setTickerInput(e.target.value);
-                  setShowDropdown(true);
-                }}
-                onFocus={() => setShowDropdown(true)}
-                onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-                placeholder="Type to search (e.g. TEL)..."
+          {/* Rolling Window */}
+          <div style={{
+            background: "var(--card-bg)",
+            border: "1px solid var(--border)",
+            borderRadius: 4,
+            padding: 16
+          }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              Rolling Window
+            </label>
+            <div style={{ display: "flex", gap: 4 }}>
+              {ROLLING_WINDOWS.map((rw) => {
+                const isSelected = rollingWindow === rw.days;
+                return (
+                  <button
+                    key={rw.days}
+                    onClick={() => setRollingWindow(rw.days)}
+                    style={{
+                      flex: 1,
+                      padding: "8px 4px",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      border: isSelected ? "1px solid var(--accent)" : "1px solid var(--border)",
+                      borderRadius: 3,
+                      background: isSelected ? "var(--accent)" : "var(--card-bg)",
+                      color: isSelected ? "#fff" : "var(--foreground)",
+                      cursor: "pointer",
+                      transition: "all 0.15s"
+                    }}
+                  >
+                    {rw.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Data Mode */}
+          <div style={{
+            background: "var(--card-bg)",
+            border: "1px solid var(--border)",
+            borderRadius: 4,
+            padding: 16
+          }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              Data Mode
+            </label>
+            <div style={{ display: "flex", gap: 4 }}>
+              <button
+                onClick={() => setDataMode("price")}
                 style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  background: "var(--input-bg)",
-                  color: "var(--foreground)",
-                  border: "1px solid var(--input-border)",
-                  borderRadius: 6,
-                  fontSize: 13,
-                  outline: "none",
+                  flex: 1,
+                  padding: "8px 4px",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  border: dataMode === "price" ? "1px solid var(--accent)" : "1px solid var(--border)",
+                  borderRadius: 3,
+                  background: dataMode === "price" ? "var(--accent)" : "var(--card-bg)",
+                  color: dataMode === "price" ? "#fff" : "var(--foreground)",
+                  cursor: "pointer",
+                  transition: "all 0.15s"
                 }}
-              />
+              >
+                Price
+              </button>
+              <button
+                onClick={() => setDataMode("total_return")}
+                style={{
+                  flex: 1,
+                  padding: "8px 4px",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  border: dataMode === "total_return" ? "1px solid var(--accent)" : "1px solid var(--border)",
+                  borderRadius: 3,
+                  background: dataMode === "total_return" ? "var(--accent)" : "var(--card-bg)",
+                  color: dataMode === "total_return" ? "#fff" : "var(--foreground)",
+                  cursor: "pointer",
+                  transition: "all 0.15s"
+                }}
+              >
+                Total Return
+              </button>
+            </div>
+          </div>
 
-              {showDropdown && tickerInput && filteredTickers.length > 0 && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "calc(100% + 4px)",
-                    left: 0,
-                    right: 0,
-                    background: "var(--card-bg)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 6,
-                    maxHeight: 240,
-                    overflowY: "auto",
-                    zIndex: 20,
-                    boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
-                  }}
+          {/* Matrix Type */}
+          <div style={{
+            background: "var(--card-bg)",
+            border: "1px solid var(--border)",
+            borderRadius: 4,
+            padding: 16
+          }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              Matrix Type
+            </label>
+            <div style={{ display: "flex", gap: 4 }}>
+              <button
+                onClick={() => setMatrixMode("correlation")}
+                style={{
+                  flex: 1,
+                  padding: "8px 4px",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  border: matrixMode === "correlation" ? "1px solid var(--accent)" : "1px solid var(--border)",
+                  borderRadius: 3,
+                  background: matrixMode === "correlation" ? "var(--accent)" : "var(--card-bg)",
+                  color: matrixMode === "correlation" ? "#fff" : "var(--foreground)",
+                  cursor: "pointer",
+                  transition: "all 0.15s"
+                }}
+              >
+                Corr
+              </button>
+              <button
+                onClick={() => setMatrixMode("covariance")}
+                style={{
+                  flex: 1,
+                  padding: "8px 4px",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  border: matrixMode === "covariance" ? "1px solid var(--accent)" : "1px solid var(--border)",
+                  borderRadius: 3,
+                  background: matrixMode === "covariance" ? "var(--accent)" : "var(--card-bg)",
+                  color: matrixMode === "covariance" ? "#fff" : "var(--foreground)",
+                  cursor: "pointer",
+                  transition: "all 0.15s"
+                }}
+              >
+                Cov
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Ticker Selection */}
+        <div style={{
+          background: "var(--card-bg)",
+          border: "1px solid var(--border)",
+          borderRadius: 4,
+          padding: 20,
+          marginBottom: 16
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted-foreground)", margin: 0 }}>
+              Selection ({selectedTickers.length})
+            </h3>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={() => setShowTickerPanel(!showTickerPanel)}
+                style={{
+                  background: "none",
+                  border: "1px solid var(--border)",
+                  fontSize: 11,
+                  color: "var(--accent)",
+                  cursor: "pointer",
+                  padding: "4px 8px",
+                  borderRadius: 3,
+                  fontWeight: 500
+                }}
+              >
+                {showTickerPanel ? "Hide" : "Show"} All
+              </button>
+              {selectedTickers.length > 0 && (
+                <button
+                  onClick={() => setSelectedTickers([])}
+                  style={{ background: "none", border: "none", fontSize: 11, color: "var(--danger)", cursor: "pointer", padding: 0 }}
                 >
-                  {filteredTickers.slice(0, 50).map((ticker) => (
-                    <div
-                      key={ticker}
-                      onClick={() => addTicker(ticker)}
-                      style={{
-                        padding: "10px 12px",
-                        cursor: "pointer",
-                        fontSize: 13,
-                        borderBottom: "1px solid var(--border-subtle)",
-                        transition: "background 0.1s"
-                      }}
-                      className="hover:bg-accent/10"
-                      onMouseEnter={(e) => e.currentTarget.style.background = "var(--hover-bg)"}
-                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                    >
-                      {ticker}
-                    </div>
-                  ))}
-                </div>
+                  Clear
+                </button>
               )}
             </div>
           </div>
 
-          {/* Configuration */}
-          <div className="card-enhanced" style={{ padding: 20, borderRadius: 8 }}>
-            <h3 style={{ fontSize: 12, fontWeight: 600, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted)" }}>
-              Settings
-            </h3>
-            <p style={{ fontSize: 11, color: "var(--muted-foreground)", marginBottom: 16 }}>
-              Configure analysis parameters
-            </p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16 }}>
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)" }}>Lookback Period</label>
-                  <span style={{ fontSize: 10, color: "var(--muted-foreground)" }}>Historical data range</span>
-                </div>
-                <select
-                  value={timeframe}
-                  onChange={(e) => setTimeframe(Number(e.target.value))}
-                  style={{
-                    width: "100%",
-                    padding: "8px 10px",
-                    background: "var(--input-bg)",
-                    color: "var(--foreground)",
-                    border: "1px solid var(--input-border)",
-                    borderRadius: 6,
-                    fontSize: 13,
-                  }}
-                >
-                  {TIMEFRAMES.map((tf) => (
-                    <option key={tf.days} value={tf.days}>
-                      {tf.label}
-                    </option>
-                  ))}
-                </select>
+          <div style={{ position: "relative", marginBottom: 16 }}>
+            <input
+              type="text"
+              value={tickerInput}
+              onChange={(e) => {
+                setTickerInput(e.target.value);
+                setShowDropdown(true);
+              }}
+              onFocus={() => setShowDropdown(true)}
+              onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+              placeholder="Search tickers..."
+              className="search-input"
+            />
+
+            {showDropdown && tickerInput && filteredTickers.length > 0 && (
+              <div style={{
+                position: "absolute",
+                top: "calc(100% + 4px)",
+                left: 0,
+                right: 0,
+                background: "var(--card-bg)",
+                border: "1px solid var(--border)",
+                borderRadius: 4,
+                maxHeight: 240,
+                overflowY: "auto",
+                zIndex: 20,
+                boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
+              }}>
+                {filteredTickers.slice(0, 50).map((ticker) => (
+                  <div
+                    key={ticker}
+                    onClick={() => addTicker(ticker)}
+                    style={{
+                      padding: "10px 12px",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      borderBottom: "1px solid var(--border)",
+                      transition: "background 0.1s"
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = "var(--hover-bg)"}
+                    onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                  >
+                    {ticker}
+                  </div>
+                ))}
               </div>
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)" }}>Rolling Window</label>
-                  <span style={{ fontSize: 10, color: "var(--muted-foreground)" }}>Correlation smoothing</span>
-                </div>
-                <select
-                  value={rollingWindow}
-                  onChange={(e) => setRollingWindow(Number(e.target.value))}
-                  style={{
-                    width: "100%",
-                    padding: "8px 10px",
-                    background: "var(--input-bg)",
-                    color: "var(--foreground)",
-                    border: "1px solid var(--input-border)",
-                    borderRadius: 6,
-                    fontSize: 13,
-                  }}
-                >
-                  {ROLLING_WINDOWS.map((rw) => (
-                    <option key={rw.days} value={rw.days}>
-                      {rw.label}
-                    </option>
-                  ))}
-                </select>
-                <p style={{ fontSize: 10, color: "var(--muted-foreground)", marginTop: 4, fontStyle: "italic" }}>
-                  {ROLLING_WINDOWS.find(w => w.days === rollingWindow)?.desc}
-                </p>
-              </div>
-            </div>
+            )}
           </div>
+
+          {selectedTickers.length === 0 ? (
+            <span style={{ fontSize: 13, color: "var(--muted)" }}>
+              No tickers selected
+            </span>
+          ) : (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {selectedTickers.map((ticker) => (
+                <div
+                  key={ticker}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "6px 12px",
+                    background: "rgba(59, 130, 246, 0.15)",
+                    color: "rgb(59, 130, 246)",
+                    border: "1px solid rgba(59, 130, 246, 0.3)",
+                    borderRadius: 3,
+                    fontSize: 13,
+                    fontWeight: 600,
+                  }}
+                >
+                  {ticker}
+                  <button
+                    onClick={() => removeTicker(ticker)}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      color: "currentColor",
+                      cursor: "pointer",
+                      fontSize: 16,
+                      lineHeight: 0.5,
+                      padding: "0 2px",
+                      opacity: 0.7
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
+                    onMouseLeave={(e) => e.currentTarget.style.opacity = "0.7"}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* All Tickers Panel - Sortable Checklist */}
+        {/* All Tickers Panel */}
         {showTickerPanel && (
-          <div
-            className="card-enhanced"
-            style={{
-              padding: 24,
-              marginBottom: 24,
-              borderRadius: 8,
-              maxHeight: 500,
-              overflowY: "auto"
-            }}
-          >
+          <div style={{
+            background: "var(--card-bg)",
+            border: "1px solid var(--border)",
+            borderRadius: 4,
+            padding: 20,
+            marginBottom: 16,
+            maxHeight: 400,
+            overflowY: "auto"
+          }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>
-                All Available Tickers ({availableTickers.length})
+                All Tickers ({availableTickers.length})
               </h3>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <span style={{ fontSize: 11, color: "var(--muted)" }}>Sort by:</span>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as "alpha" | "selected")}
-                  style={{
-                    padding: "4px 8px",
-                    background: "var(--input-bg)",
-                    color: "var(--foreground)",
-                    border: "1px solid var(--input-border)",
-                    borderRadius: 4,
-                    fontSize: 11,
-                  }}
-                >
-                  <option value="alpha">Alphabetical</option>
-                  <option value="selected">Selected First</option>
-                </select>
-              </div>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as "alpha" | "selected")}
+                style={{
+                  padding: "4px 8px",
+                  background: "var(--card-bg)",
+                  color: "var(--foreground)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 3,
+                  fontSize: 11,
+                }}
+              >
+                <option value="alpha">Alphabetical</option>
+                <option value="selected">Selected First</option>
+              </select>
             </div>
 
-            {/* Sector Filter */}
             {availableSectors.length > 0 && (
               <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: "1px solid var(--border)" }}>
-                <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10, color: "var(--muted-foreground)" }}>
+                <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                   Filter by Sector
                 </div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -725,7 +664,7 @@ export default function CorrelationPage() {
                         }}
                         style={{
                           padding: "4px 10px",
-                          fontSize: 11,
+                          fontSize: 11.5,
                           fontWeight: 500,
                           border: isSelected ? "1px solid var(--accent)" : "1px solid var(--border)",
                           borderRadius: 3,
@@ -744,7 +683,7 @@ export default function CorrelationPage() {
                       onClick={() => setSelectedSectors(new Set())}
                       style={{
                         padding: "4px 10px",
-                        fontSize: 11,
+                        fontSize: 11.5,
                         fontWeight: 500,
                         border: "1px solid var(--danger)",
                         borderRadius: 3,
@@ -775,26 +714,14 @@ export default function CorrelationPage() {
                       alignItems: "center",
                       gap: 8,
                       padding: "8px 10px",
-                      background: isSelected ? "rgba(59, 130, 246, 0.1)" : "var(--input-bg)",
-                      border: `1px solid ${isSelected ? "var(--accent)" : "var(--border-subtle)"}`,
-                      borderRadius: 6,
+                      background: isSelected ? "rgba(59, 130, 246, 0.1)" : "var(--card-bg)",
+                      border: `1px solid ${isSelected ? "var(--accent)" : "var(--border)"}`,
+                      borderRadius: 3,
                       cursor: "pointer",
                       fontSize: 12,
                       fontWeight: isSelected ? 600 : 400,
                       color: isSelected ? "var(--accent)" : "var(--foreground)",
                       transition: "all 0.15s"
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.borderColor = "var(--accent)";
-                        e.currentTarget.style.background = "rgba(59, 130, 246, 0.05)";
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.borderColor = "var(--border-subtle)";
-                        e.currentTarget.style.background = "var(--input-bg)";
-                      }
                     }}
                   >
                     <input
@@ -822,156 +749,153 @@ export default function CorrelationPage() {
           </div>
         )}
 
-        {/* Selected Tickers List */}
-        <div
-          className="card-enhanced"
-          style={{
-            padding: 16,
-            marginBottom: 24,
-            borderRadius: 8,
-            minHeight: 60,
-            display: "flex",
-            alignItems: "center"
-          }}
-        >
-          {selectedTickers.length === 0 ? (
-            <span style={{ fontSize: 13, color: "var(--muted)", width: "100%", textAlign: "center" }}>
-              No tickers selected. Choose a preset or search above.
-            </span>
-          ) : (
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", width: "100%" }}>
-              {selectedTickers.map((ticker) => (
-                <div
-                  key={ticker}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "6px 12px",
-                    background: "var(--accent-bg, rgba(59, 130, 246, 0.15))",
-                    color: "var(--accent, rgb(59, 130, 246))",
-                    border: "1px solid var(--accent-border, rgba(59, 130, 246, 0.3))",
-                    borderRadius: 20,
-                    fontSize: 13,
-                    fontWeight: 600,
-                  }}
-                >
-                  {ticker}
-                  <button
-                    onClick={() => removeTicker(ticker)}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      color: "currentColor",
-                      cursor: "pointer",
-                      fontSize: 16,
-                      lineHeight: 0.5,
-                      padding: "0 2px",
-                      opacity: 0.7
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
-                    onMouseLeave={(e) => e.currentTarget.style.opacity = "0.7"}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
         {/* Compute Button */}
         <button
           onClick={computeCorrelations}
           disabled={loading || selectedTickers.length < 2}
           style={{
             width: "100%",
-            padding: "16px",
+            padding: 16,
             background: loading || selectedTickers.length < 2 ? "var(--muted)" : "var(--accent)",
             color: "white",
             border: "none",
-            borderRadius: 8,
-            fontSize: 15,
+            borderRadius: 4,
+            fontSize: 14,
             fontWeight: 600,
             cursor: loading || selectedTickers.length < 2 ? "not-allowed" : "pointer",
-            marginBottom: 40,
-            boxShadow: loading || selectedTickers.length < 2 ? "none" : "0 4px 12px rgba(59, 130, 246, 0.3)",
+            marginBottom: 24,
             transition: "all 0.2s",
             opacity: loading ? 0.8 : 1
           }}
         >
-          {loading ? "Crunching Numbers..." : `Compute ${dataMode === 'total_return' ? 'Total Return' : 'Price'} Correlations`}
+          {loading ? "Computing..." : `Compute Correlations (${selectedTickers.length} assets)`}
         </button>
 
         {/* Error */}
         {error && (
-          <div
-            style={{
-              background: "rgba(239, 68, 68, 0.1)",
-              border: "1px solid rgb(239, 68, 68)",
-              color: "rgb(239, 68, 68)",
-              padding: 16,
-              borderRadius: 8,
-              marginBottom: 32,
-              fontSize: 14,
-              display: "flex",
-              alignItems: "center",
-              gap: 12
-            }}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
+          <div style={{
+            background: "rgba(239, 68, 68, 0.1)",
+            border: "1px solid rgb(239, 68, 68)",
+            color: "rgb(239, 68, 68)",
+            padding: 16,
+            borderRadius: 4,
+            marginBottom: 24,
+            fontSize: 13,
+          }}>
             {error}
           </div>
         )}
 
         {/* Results */}
         {correlationData && (
-          <div style={{ animation: "slideUp 0.3s ease-out" }}>
-            
-            <div style={{ 
-              display: "flex", 
-              justifyContent: "center", 
+          <div>
+
+            {/* Data Quality Indicator */}
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
               marginBottom: 24,
-              fontSize: 13, 
-              color: "var(--muted)", 
-              gap: 24 
+              padding: 16,
+              background: "var(--card-bg)",
+              border: "1px solid var(--border)",
+              borderRadius: 4,
+              fontSize: 12,
+              color: "var(--muted-foreground)"
             }}>
-              <span><strong>Period:</strong> {correlationData.startDate} — {correlationData.endDate}</span>
-              <span><strong>Data Points:</strong> {correlationData.observations}</span>
-              <span><strong>Mode:</strong> {dataMode === 'total_return' ? 'Adjusted' : 'Raw Price'}</span>
+              <div style={{ display: "flex", gap: 24 }}>
+                <span><strong>Period:</strong> {correlationData.startDate} to {correlationData.endDate}</span>
+                <span><strong>Observations:</strong> {correlationData.observations}</span>
+                <span><strong>Mode:</strong> {dataMode === 'total_return' ? 'Adjusted' : 'Raw'}</span>
+                <span><strong>Window:</strong> {rollingWindow}D</span>
+              </div>
+              {correlationData.matrix && (
+                <button
+                  onClick={exportToCSV}
+                  style={{
+                    padding: "6px 12px",
+                    background: "var(--accent)",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 3,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em"
+                  }}
+                >
+                  Export CSV
+                </button>
+              )}
             </div>
+
+            {/* Market Regime Distribution - PROMINENT */}
+            {correlationData.regimeDistribution && (
+              <div style={{
+                background: "var(--card-bg)",
+                border: "1px solid var(--border)",
+                borderRadius: 4,
+                padding: 24,
+                marginBottom: 24
+              }}>
+                <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  Market Regime Distribution
+                </h2>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 16 }}>
+                  {Object.entries(correlationData.regimeDistribution).map(
+                    ([regime, pct]) => {
+                      const colors: Record<string, string> = {
+                        "High Stress": "rgb(239, 68, 68)",
+                        "Elevated Risk": "rgb(251, 146, 60)",
+                        "Normal": "rgb(59, 130, 246)",
+                        "Low Volatility": "rgb(34, 197, 94)",
+                      };
+                      return (
+                        <div key={regime} className="stat-box" style={{ padding: 16, borderRadius: 4, textAlign: "center" }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 8, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                            {regime}
+                          </div>
+                          <div style={{ fontSize: 24, fontWeight: 700, color: colors[regime] }}>
+                            {(pct as number).toFixed(1)}%
+                          </div>
+                        </div>
+                      );
+                    }
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Matrix & Stats Grid */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(500px, 1fr))", gap: 24, marginBottom: 24 }}>
 
               {/* Correlation Matrix */}
               {correlationData.matrix && (
-                <div className="card-enhanced" style={{ padding: 24, borderRadius: 8 }}>
-                  <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
-                    Correlation Matrix
+                <div style={{
+                  background: "var(--card-bg)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 4,
+                  padding: 24
+                }}>
+                  <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    {matrixMode === "correlation" ? "Correlation Matrix" : "Covariance Matrix"}
                   </h2>
-                  <p style={{ fontSize: 12, color: "var(--muted-foreground)", marginBottom: 16, lineHeight: 1.5 }}>
-                    <strong>How to read:</strong> Each cell shows how two stocks move together. Darker blue = stronger correlation.
-                    Look for light colors (low correlation) to find good diversification pairs.
-                  </p>
                   <CorrelationHeatmap data={correlationData.matrix} />
                 </div>
               )}
 
               {/* Average Correlations */}
               {correlationData.averageCorrelations && (
-                <div className="card-enhanced" style={{ padding: 24, borderRadius: 8 }}>
-                  <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
+                <div style={{
+                  background: "var(--card-bg)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 4,
+                  padding: 24
+                }}>
+                  <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                     Average Correlations
                   </h2>
-                  <p style={{ fontSize: 12, color: "var(--muted-foreground)", marginBottom: 16, lineHeight: 1.5 }}>
-                    <strong>What this shows:</strong> How strongly each stock correlates with all the others combined.
-                    High number = moves with the group. Low number = independent stock.
-                  </p>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
                     {correlationData.averageCorrelations.map(
                       (item: { ticker: string; avgCorrelation: number }) => (
@@ -980,20 +904,18 @@ export default function CorrelationPage() {
                           className="stat-box"
                           style={{
                             padding: 16,
-                            borderRadius: 6,
+                            borderRadius: 4,
                             textAlign: "center",
-                            cursor: "help",
                           }}
-                          title={`Average correlation of ${item.ticker}`}
                         >
-                          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, color: "var(--muted)" }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, color: "var(--muted-foreground)" }}>
                             {item.ticker}
                           </div>
-                          <div style={{ 
-                            fontSize: 20, 
-                            fontWeight: 700, 
-                            color: item.avgCorrelation > 0.7 ? "var(--accent)" : 
-                                   item.avgCorrelation < 0.3 ? "var(--muted)" : "var(--foreground)" 
+                          <div style={{
+                            fontSize: 20,
+                            fontWeight: 700,
+                            color: item.avgCorrelation > 0.7 ? "var(--accent)" :
+                                   item.avgCorrelation < 0.3 ? "var(--muted)" : "var(--foreground)"
                           }}>
                             {item.avgCorrelation.toFixed(2)}
                           </div>
@@ -1007,63 +929,23 @@ export default function CorrelationPage() {
 
             {/* Rolling Correlation Chart */}
             {correlationData.rollingCorrelations && correlationData.rollingCorrelations.length > 0 && (
-              <div className="card-enhanced" style={{ padding: 24, borderRadius: 8, marginBottom: 24 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <h2 style={{ fontSize: 18, fontWeight: 600 }}>
-                    Rolling Correlation Over Time
+              <div style={{
+                background: "var(--card-bg)",
+                border: "1px solid var(--border)",
+                borderRadius: 4,
+                padding: 24,
+                marginBottom: 24
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <h2 style={{ fontSize: 16, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    Rolling Correlation Time Series
                   </h2>
-                  <span style={{ fontSize: 13, padding: "4px 8px", background: "var(--input-bg)", borderRadius: 4, fontWeight: 600 }}>
+                  <span style={{ fontSize: 13, padding: "4px 8px", background: "var(--hover-bg)", borderRadius: 3, fontWeight: 600 }}>
                     {selectedTickers[0]} vs {selectedTickers[1]}
                   </span>
                 </div>
-                <p style={{ fontSize: 12, color: "var(--muted-foreground)", marginBottom: 16, lineHeight: 1.5 }}>
-                  <strong>What this shows:</strong> How the correlation changes day by day.
-                  The <strong style={{ color: "#3b82f6" }}>blue line</strong> is correlation (left axis).
-                  The <strong style={{ color: "var(--muted)" }}>background shading</strong> shows market stress levels (right axis).
-                </p>
-                <div style={{ background: "rgba(59, 130, 246, 0.05)", padding: 12, borderRadius: 6, marginBottom: 20, border: "1px solid rgba(59, 130, 246, 0.2)" }}>
-                  <p style={{ fontSize: 11, color: "var(--muted-foreground)", margin: 0, lineHeight: 1.5 }}>
-                    <strong>Look for:</strong> Sudden spikes to +1 during red/orange periods = crisis mode (everything falls together).
-                    Stable line in blue/green areas = normal market where stocks can move independently.
-                  </p>
-                </div>
                 <div style={{ height: 400 }}>
                   <RollingCorrelationChart data={correlationData.rollingCorrelations} />
-                </div>
-              </div>
-            )}
-
-            {/* Market Regime Distribution */}
-            {correlationData.regimeDistribution && (
-              <div className="card-enhanced" style={{ padding: 24, borderRadius: 8 }}>
-                <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
-                  Market Regime Distribution
-                </h2>
-                <p style={{ fontSize: 12, color: "var(--muted-foreground)", marginBottom: 20, lineHeight: 1.5 }}>
-                  <strong>What this shows:</strong> What percentage of time the market was in each stress level during your selected period.
-                  High stress = correlations spike, diversification fails.
-                </p>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 16 }}>
-                  {Object.entries(correlationData.regimeDistribution).map(
-                    ([regime, pct]) => {
-                      const colors: Record<string, string> = {
-                        "High Stress": "rgb(239, 68, 68)",
-                        "Elevated Risk": "rgb(251, 146, 60)",
-                        "Normal": "rgb(59, 130, 246)",
-                        "Low Volatility": "rgb(34, 197, 94)",
-                      };
-                      return (
-                        <div key={regime} className="stat-box" style={{ padding: 16, borderRadius: 6, textAlign: "center" }}>
-                          <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 8, color: "var(--muted)", textTransform: "uppercase" }}>
-                            {regime}
-                          </div>
-                          <div style={{ fontSize: 24, fontWeight: 700, color: colors[regime] }}>
-                            {(pct as number).toFixed(1)}%
-                          </div>
-                        </div>
-                      );
-                    }
-                  )}
                 </div>
               </div>
             )}
