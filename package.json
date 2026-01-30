@@ -8,26 +8,42 @@
     "import:ose": "tsx scripts/ibkr/import-ose-stocks.ts",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
-    "test": "turbo test"
+    "test": "turbo test",
+    "cleanup:analyze": "pnpm run cleanup:exports && pnpm run cleanup:deps && pnpm run cleanup:files",
+    "cleanup:exports": "cd apps/web && ts-prune 2>/dev/null | tee ../../cleanup-reports/unused-exports.txt || echo 'ts-prune skipped (monorepo)' > cleanup-reports/unused-exports.txt",
+    "cleanup:deps": "depcheck --json | tee cleanup-reports/unused-deps.json && depcheck",
+    "cleanup:files": "unimported | tee cleanup-reports/unimported-files.txt",
+    "cleanup:lint": "eslint --format=json --output-file=cleanup-reports/lint-issues.json apps packages scripts || true",
+    "cleanup:archive": "tsx scripts/cleanup/archive-old-scripts.ts",
+    "cleanup:report": "tsx scripts/cleanup/generate-report.ts"
   },
   "devDependencies": {
     "@stoqey/ib": "^1.5.3",
     "@types/node": "^25.0.9",
     "@types/pg": "^8.16.0",
+    "@typescript-eslint/eslint-plugin": "^8.20.0",
+    "@typescript-eslint/parser": "^8.20.0",
+    "depcheck": "^1.4.7",
+    "eslint-plugin-unused-imports": "^4.1.4",
     "puppeteer": "^24.35.0",
-    "ts-node": "^10.9.2",
+    "ts-prune": "^0.10.3",
     "tsx": "^4.21.0",
     "turbo": "^2.7.5",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "unimported": "^1.31.1"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
     "@supabase/supabase-js": "^2.89.0",
     "bcrypt": "^6.0.0",
+    "cheerio": "^1.2.0",
     "dotenv": "^17.2.3",
+    "fast-xml-parser": "^5.0.1",
     "googleapis": "^170.1.0",
     "imapflow": "^1.2.6",
+    "node-fetch": "^3.3.2",
     "pdf-parse": "1.1.1",
-    "pg": "^8.17.1"
+    "pg": "^8.17.1",
+    "yahoo-finance2": "^3.13.0"
   }
 }

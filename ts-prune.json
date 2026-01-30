@@ -1,0 +1,8 @@
+{
+  "ignore": [
+    "apps/web/src/app/api/**/route.ts",
+    "apps/web/src/app/**/page.tsx",
+    "apps/web/src/app/**/layout.tsx",
+    "packages/*/src/index.ts"
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "entry": [
+    "apps/web/src/app/**/page.tsx",
+    "apps/web/src/app/**/layout.tsx",
+    "apps/web/src/app/api/**/route.ts",
+    "scripts/**/*.ts",
+    "scripts/**/*.js",
+    "packages/*/src/index.ts"
+  ],
+  "extensions": [".ts", ".tsx", ".js", ".jsx", ".mjs"],
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/.next/**",
+    "**/dist/**",
+    "**/.turbo/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.backup.*",
+    "**/scripts/archive/**"
+  ],
+  "ignoreUnresolved": [
+    "react",
+    "next",
+    "@ineqre/*"
+  ]
+}

@@ -1,0 +1,297 @@
+{
+  "archiveDate": "2026-01-29T18:01:14.949Z",
+  "totalScripts": 57,
+  "byCategory": {
+    "checks": 22,
+    "migrations": 9,
+    "fixes": 20,
+    "imports": 6
+  },
+  "scripts": [
+    {
+      "filename": "check-havi.mjs",
+      "category": "checks",
+      "lastModified": "2026-01-20T12:40:35.855Z"
+    },
+    {
+      "filename": "update-body-text-batch.js",
+      "category": "migrations",
+      "lastModified": "2026-01-21T17:07:29.922Z"
+    },
+    {
+      "filename": "fix-body-text-simple.js",
+      "category": "fixes",
+      "lastModified": "2026-01-21T17:50:59.754Z"
+    },
+    {
+      "filename": "check-supabase-storage.js",
+      "category": "checks",
+      "lastModified": "2026-01-21T22:58:42.325Z"
+    },
+    {
+      "filename": "update-password.js",
+      "category": "migrations",
+      "lastModified": "2026-01-21T23:07:43.407Z"
+    },
+    {
+      "filename": "fix-apostrophes.js",
+      "category": "fixes",
+      "lastModified": "2026-01-21T23:42:51.590Z"
+    },
+    {
+      "filename": "fix-simple.js",
+      "category": "fixes",
+      "lastModified": "2026-01-21T23:43:26.919Z"
+    },
+    {
+      "filename": "fix-all-now.js",
+      "category": "fixes",
+      "lastModified": "2026-01-21T23:47:52.936Z"
+    },
+    {
+      "filename": "fix-text-encoding.js",
+      "category": "fixes",
+      "lastModified": "2026-01-22T09:05:15.275Z"
+    },
+    {
+      "filename": "check-missing-pdfs.js",
+      "category": "checks",
+      "lastModified": "2026-01-22T12:32:09.457Z"
+    },
+    {
+      "filename": "fix-missing-pdfs.js",
+      "category": "fixes",
+      "lastModified": "2026-01-22T12:35:35.519Z"
+    },
+    {
+      "filename": "migrate-pdfs-bucket.js",
+      "category": "migrations",
+      "lastModified": "2026-01-22T12:37:52.584Z"
+    },
+    {
+      "filename": "check-all-pdfs.js",
+      "category": "checks",
+      "lastModified": "2026-01-22T13:24:51.199Z"
+    },
+    {
+      "filename": "reimport-dnb.js",
+      "category": "imports",
+      "lastModified": "2026-01-22T16:21:56.070Z"
+    },
+    {
+      "filename": "check-prices.js",
+      "category": "checks",
+      "lastModified": "2026-01-22T16:49:09.222Z"
+    },
+    {
+      "filename": "check-email-attachments.js",
+      "category": "checks",
+      "lastModified": "2026-01-23T08:50:27.406Z"
+    },
+    {
+      "filename": "update-manual-summaries.js",
+      "category": "migrations",
+      "lastModified": "2026-01-23T09:08:17.036Z"
+    },
+    {
+      "filename": "check-manual-matches.js",
+      "category": "checks",
+      "lastModified": "2026-01-23T09:55:01.655Z"
+    },
+    {
+      "filename": "check-summaries.js",
+      "category": "checks",
+      "lastModified": "2026-01-23T15:35:01.097Z"
+    },
+    {
+      "filename": "check-missing-summaries.js",
+      "category": "checks",
+      "lastModified": "2026-01-23T15:35:05.879Z"
+    },
+    {
+      "filename": "fix-source.ts",
+      "category": "fixes",
+      "lastModified": "2026-01-24T11:12:35.369Z"
+    },
+    {
+      "filename": "check-dates.ts",
+      "category": "checks",
+      "lastModified": "2026-01-24T11:13:29.881Z"
+    },
+    {
+      "filename": "check-multi.ts",
+      "category": "checks",
+      "lastModified": "2026-01-24T11:18:29.152Z"
+    },
+    {
+      "filename": "update-latest-prices.ts",
+      "category": "migrations",
+      "lastModified": "2026-01-24T11:24:24.206Z"
+    },
+    {
+      "filename": "check-data.ts",
+      "category": "checks",
+      "lastModified": "2026-01-24T11:39:10.108Z"
+    },
+    {
+      "filename": "fix-fundamentals-and-names.ts",
+      "category": "fixes",
+      "lastModified": "2026-01-24T11:45:07.541Z"
+    },
+    {
+      "filename": "fix-failed-stocks.ts",
+      "category": "fixes",
+      "lastModified": "2026-01-24T11:45:34.661Z"
+    },
+    {
+      "filename": "check-cmbto.ts",
+      "category": "checks",
+      "lastModified": "2026-01-24T11:45:59.475Z"
+    },
+    {
+      "filename": "fix-cmbto.ts",
+      "category": "fixes",
+      "lastModified": "2026-01-24T11:46:18.917Z"
+    },
+    {
+      "filename": "fix-cmbto-manual.ts",
+      "category": "fixes",
+      "lastModified": "2026-01-24T11:46:46.223Z"
+    },
+    {
+      "filename": "verify-data.ts",
+      "category": "checks",
+      "lastModified": "2026-01-24T11:47:02.828Z"
+    },
+    {
+      "filename": "fix-names.ts",
+      "category": "fixes",
+      "lastModified": "2026-01-24T11:47:28.237Z"
+    },
+    {
+      "filename": "check-adj-close.ts",
+      "category": "checks",
+      "lastModified": "2026-01-24T12:03:45.418Z"
+    },
+    {
+      "filename": "fix-adj-close.ts",
+      "category": "fixes",
+      "lastModified": "2026-01-24T17:02:28.399Z"
+    },
+    {
+      "filename": "check-equity-history.ts",
+      "category": "checks",
+      "lastModified": "2026-01-25T10:07:38.316Z"
+    },
+    {
+      "filename": "check-last-logins.js",
+      "category": "checks",
+      "lastModified": "2026-01-26T14:45:29.562Z"
+    },
+    {
+      "filename": "check-body-text.js",
+      "category": "checks",
+      "lastModified": "2026-01-26T18:25:54.165Z"
+    },
+    {
+      "filename": "check-sectors.ts",
+      "category": "checks",
+      "lastModified": "2026-01-27T16:37:19.990Z"
+    },
+    {
+      "filename": "fix-sector-classifications.ts",
+      "category": "fixes",
+      "lastModified": "2026-01-27T16:46:46.968Z"
+    },
+    {
+      "filename": "fix-sector-classifications-2.ts",
+      "category": "fixes",
+      "lastModified": "2026-01-27T16:49:46.871Z"
+    },
+    {
+      "filename": "fix-sector-classifications-3.ts",
+      "category": "fixes",
+      "lastModified": "2026-01-27T16:52:30.110Z"
+    },
+    {
+      "filename": "fix-sector-classifications-4.ts",
+      "category": "fixes",
+      "lastModified": "2026-01-27T16:55:01.377Z"
+    },
+    {
+      "filename": "fix-all-sectors.ts",
+      "category": "fixes",
+      "lastModified": "2026-01-27T16:57:12.218Z"
+    },
+    {
+      "filename": "update-sectors.ts",
+      "category": "migrations",
+      "lastModified": "2026-01-27T17:54:50.783Z"
+    },
+    {
+      "filename": "reimport-with-adjusted-prices.ts",
+      "category": "imports",
+      "lastModified": "2026-01-27T18:25:20.359Z"
+    },
+    {
+      "filename": "update-all-with-adjusted-prices.ts",
+      "category": "migrations",
+      "lastModified": "2026-01-27T18:47:40.239Z"
+    },
+    {
+      "filename": "reimport-eqnr-20y.ts",
+      "category": "imports",
+      "lastModified": "2026-01-27T19:49:35.189Z"
+    },
+    {
+      "filename": "update-dual-listed-names.ts",
+      "category": "migrations",
+      "lastModified": "2026-01-28T09:13:26.785Z"
+    },
+    {
+      "filename": "migrate-us-tickers-to-suffix.ts",
+      "category": "migrations",
+      "lastModified": "2026-01-28T09:18:35.753Z"
+    },
+    {
+      "filename": "verify-migration.ts",
+      "category": "checks",
+      "lastModified": "2026-01-28T09:19:51.532Z"
+    },
+    {
+      "filename": "fix-us-adj-close.ts",
+      "category": "fixes",
+      "lastModified": "2026-01-29T15:03:19.459Z"
+    },
+    {
+      "filename": "verify-adj-close.ts",
+      "category": "checks",
+      "lastModified": "2026-01-29T16:55:12.481Z"
+    },
+    {
+      "filename": "backfill-research-pdfs.ts",
+      "category": "imports",
+      "lastModified": "2026-01-29T17:12:13.401Z"
+    },
+    {
+      "filename": "backfill-pdfs-gmail.js",
+      "category": "imports",
+      "lastModified": "2026-01-29T17:13:52.509Z"
+    },
+    {
+      "filename": "backfill-pdfs-from-attachments.js",
+      "category": "imports",
+      "lastModified": "2026-01-29T17:14:43.027Z"
+    },
+    {
+      "filename": "verify-supabase-pdfs.js",
+      "category": "checks",
+      "lastModified": "2026-01-29T17:32:46.904Z"
+    },
+    {
+      "filename": "fix-swapped-pdfs.js",
+      "category": "fixes",
+      "lastModified": "2026-01-29T17:35:09.754Z"
+    }
+  ]
+}

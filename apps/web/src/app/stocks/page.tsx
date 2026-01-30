@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, useMemo, useCallback } from "react";
+import { calculateDataQualityMetrics, type DataTier } from "@/lib/dataQuality";
 
 type AssetType = 'equity' | 'index' | 'commodity_etf' | 'index_etf';
 
@@ -16,6 +17,11 @@ type StockData = {
   start_date: string;
   end_date: string;
   rows: number;
+  // Data quality metrics
+  expectedDays: number;
+  completenessPct: number;
+  dataTier: DataTier;
+  dualPair?: string;
 };
 
 const ASSET_TYPE_LABELS: Record<AssetType, string> = {
@@ -30,12 +36,13 @@ export default function StocksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<keyof StockData>("ticker");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [sortBy, setSortBy] = useState<keyof StockData>("completenessPct");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc"); // Default: highest completeness first
   const [selectedAssetTypes, setSelectedAssetTypes] = useState<Set<AssetType>>(
     new Set(['equity']) // Default to equities only
   );
   const [selectedSectors, setSelectedSectors] = useState<Set<string>>(new Set());
+  const [tierFilter, setTierFilter] = useState<'all' | 'tierA' | 'tierAB' | 'strategy3y'>('all');
 
   const fetchStocks = useCallback(async (assetTypes: Set<AssetType>) => {
     setLoading(true);
@@ -52,7 +59,26 @@ export default function StocksPage() {
       }
 
       const data = await res.json();
-      setStocks(data);
+
+      // Calculate data quality metrics for each stock
+      const enrichedData = data.map((stock: any) => {
+        const metrics = calculateDataQualityMetrics(
+          stock.start_date,
+          stock.end_date,
+          stock.rows,
+          stock.ticker
+        );
+
+        return {
+          ...stock,
+          expectedDays: metrics.expectedDays,
+          completenessPct: metrics.completenessPct,
+          dataTier: metrics.dataTier,
+          dualPair: metrics.dualPair,
+        };
+      });
+
+      setStocks(enrichedData);
       setLoading(false);
     } catch (e: any) {
       setError(e?.message ?? String(e));
@@ -91,6 +117,15 @@ export default function StocksPage() {
   const filteredAndSortedStocks = useMemo(() => {
     let filtered = stocks;
 
+    // Filter by tier
+    if (tierFilter === 'tierA') {
+      filtered = filtered.filter(stock => stock.dataTier === 'A');
+    } else if (tierFilter === 'tierAB') {
+      filtered = filtered.filter(stock => stock.dataTier === 'A' || stock.dataTier === 'B');
+    } else if (tierFilter === 'strategy3y') {
+      filtered = filtered.filter(stock => stock.rows >= 756); // 3+ years
+    }
+
     // Filter by sector
     if (selectedSectors.size > 0) {
       filtered = filtered.filter(stock =>
@@ -126,7 +161,16 @@ export default function StocksPage() {
     });
 
     return sorted;
-  }, [stocks, searchQuery, sortBy, sortOrder, selectedSectors]);
+  }, [stocks, searchQuery, sortBy, sortOrder, selectedSectors, tierFilter]);
+
+  // Calculate tier counts for summary panel
+  const tierCounts = useMemo(() => {
+    const counts = { A: 0, B: 0, C: 0, F: 0 };
+    stocks.forEach(stock => {
+      counts[stock.dataTier]++;
+    });
+    return counts;
+  }, [stocks]);
 
   const toggleSort = (column: keyof StockData) => {
     if (sortBy === column) {
@@ -140,6 +184,16 @@ export default function StocksPage() {
   const SortIcon = ({ column }: { column: keyof StockData }) => {
     if (sortBy !== column) return <span style={{ opacity: 0.4 }}>↕</span>;
     return sortOrder === "asc" ? <span>↑</span> : <span>↓</span>;
+  };
+
+  const getTierColor = (tier: DataTier): string => {
+    switch (tier) {
+      case 'A': return '#10b981'; // Green
+      case 'B': return '#f59e0b'; // Amber
+      case 'C': return '#f97316'; // Orange
+      case 'F': return '#ef4444'; // Red
+      default: return 'var(--muted)';
+    }
   };
 
   if (loading) {
@@ -255,9 +309,58 @@ export default function StocksPage() {
           </Link>
         </div>
         <p style={{ color: "var(--muted)", marginBottom: 16, fontSize: 14 }}>
-          Universe: {stocks.length} assets
+          Universe: {stocks.length} assets | Tier A: {tierCounts.A} | Tier B: {tierCounts.B} | Tier C: {tierCounts.C} | Tier F: {tierCounts.F}
           <span style={{ marginLeft: 16, fontSize: 13 }}>Source: Interactive Brokers</span>
         </p>
+
+        {/* Tier Filters */}
+        <div style={{
+          display: "flex",
+          gap: 8,
+          marginBottom: 16,
+          flexWrap: "wrap"
+        }}>
+          {[
+            { key: 'all', label: 'All' },
+            { key: 'tierA', label: 'Tier A Only' },
+            { key: 'tierAB', label: 'A+B Only' },
+            { key: 'strategy3y', label: 'Strategy Ready (3Y+)' },
+          ].map((filter) => {
+            const isSelected = tierFilter === filter.key;
+            return (
+              <button
+                key={filter.key}
+                onClick={() => setTierFilter(filter.key as typeof tierFilter)}
+                style={{
+                  padding: "8px 14px",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  border: isSelected ? "1px solid var(--accent)" : "1px solid var(--border)",
+                  borderRadius: 4,
+                  background: isSelected ? "var(--accent)" : "var(--card-bg)",
+                  color: isSelected ? "#fff" : "var(--foreground)",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  whiteSpace: "nowrap",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSelected) {
+                    e.currentTarget.style.borderColor = "var(--accent)";
+                    e.currentTarget.style.background = "var(--hover-bg)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSelected) {
+                    e.currentTarget.style.borderColor = "var(--border)";
+                    e.currentTarget.style.background = "var(--card-bg)";
+                  }
+                }}
+              >
+                {filter.label}
+              </button>
+            );
+          })}
+        </div>
 
         {/* Search Bar with Asset Type Filters */}
         <div style={{
@@ -632,6 +735,75 @@ export default function StocksPage() {
                     Rows <SortIcon column="rows" />
                   </button>
                 </th>
+                <th style={{ textAlign: "right", padding: "16px" }}>
+                  <button
+                    onClick={() => toggleSort("expectedDays")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--foreground)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "flex-end",
+                      gap: 8,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      padding: 0,
+                      marginLeft: "auto",
+                    }}
+                  >
+                    Expected <SortIcon column="expectedDays" />
+                  </button>
+                </th>
+                <th style={{ textAlign: "right", padding: "16px" }}>
+                  <button
+                    onClick={() => toggleSort("completenessPct")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--foreground)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "flex-end",
+                      gap: 8,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      padding: 0,
+                      marginLeft: "auto",
+                    }}
+                  >
+                    Complete <SortIcon column="completenessPct" />
+                  </button>
+                </th>
+                <th style={{ textAlign: "center", padding: "16px" }}>
+                  <button
+                    onClick={() => toggleSort("dataTier")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--foreground)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      padding: 0,
+                      margin: "0 auto",
+                    }}
+                  >
+                    Tier <SortIcon column="dataTier" />
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -704,6 +876,35 @@ export default function StocksPage() {
                   </td>
                   <td style={{ padding: "16px", textAlign: "right", color: "var(--muted)", fontSize: 13 }}>
                     {stock.rows.toLocaleString()}
+                  </td>
+                  <td style={{
+                    padding: "16px",
+                    textAlign: "right",
+                    fontFamily: "monospace",
+                    color: "var(--muted)",
+                    fontSize: 13,
+                  }}>
+                    {stock.expectedDays.toLocaleString()}
+                  </td>
+                  <td style={{
+                    padding: "16px",
+                    textAlign: "right",
+                    fontFamily: "monospace",
+                    color: "var(--foreground)",
+                    fontSize: 13,
+                    fontWeight: 500,
+                  }}>
+                    {stock.completenessPct.toFixed(1)}%
+                  </td>
+                  <td style={{
+                    padding: "16px",
+                    textAlign: "center",
+                    fontFamily: "monospace",
+                    color: getTierColor(stock.dataTier),
+                    fontSize: 14,
+                    fontWeight: 700,
+                  }}>
+                    {stock.dataTier}
                   </td>
                 </tr>
               ))}

@@ -1,8 +1,5 @@
 /**
  * Upload PDFs to Supabase Storage
- *
- * This script uploads all locally stored PDFs to Supabase Storage
- * and updates the database with the new storage URLs.
  */
 
 require('dotenv').config();
@@ -18,7 +15,7 @@ const supabase = createClient(
 );
 
 // Database setup
-let connectionString = process.env.DATABASE_URL.trim().replace(/^[\"']|[\"']$/g, '');
+let connectionString = process.env.DATABASE_URL.trim().replace(/^["']|["']$/g, '');
 connectionString = connectionString.replace(/[?&]sslmode=\w+/g, '');
 
 const pool = new Pool({
@@ -26,110 +23,86 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-const STORAGE_DIR = process.env.STORAGE_DIR || path.join(__dirname, '..', 'storage', 'research');
-const BUCKET_NAME = 'research-pdfs';
+const CONFIG = {
+  storageDir: process.env.STORAGE_DIR || path.join(__dirname, '..', 'storage', 'research'),
+};
 
 /**
- * Create storage bucket if it doesn't exist
+ * Upload PDF to Supabase Storage
  */
-async function ensureBucket() {
-  const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+async function uploadToSupabase(documentId, attachmentId, filename, filePath) {
+  console.log(`\nUploading ${filename} to Supabase Storage...`);
+  console.log(`  Document ID: ${documentId}`);
+  console.log(`  Attachment ID: ${attachmentId}`);
+  console.log(`  File path: ${filePath}`);
 
-  if (listError) {
-    console.error('Error listing buckets:', listError);
-    throw listError;
-  }
-
-  const bucketExists = buckets.some(b => b.name === BUCKET_NAME);
-
-  if (!bucketExists) {
-    console.log(`Creating bucket: ${BUCKET_NAME}`);
-    const { error: createError } = await supabase.storage.createBucket(BUCKET_NAME, {
-      public: false,
-      fileSizeLimit: 52428800, // 50MB
-    });
-
-    if (createError) {
-      console.error('Error creating bucket:', createError);
-      throw createError;
+  try {
+    // Read the file from local storage
+    const fullPath = path.join(CONFIG.storageDir, filePath);
+    if (!fs.existsSync(fullPath)) {
+      console.log(`  ✗ Local file not found: ${fullPath}`);
+      return false;
     }
-    console.log('✓ Bucket created');
-  } else {
-    console.log('✓ Bucket already exists');
+
+    const fileBuffer = fs.readFileSync(fullPath);
+    console.log(`  File size: ${Math.round(fileBuffer.length / 1024)}KB`);
+
+    // Upload to Supabase Storage
+    const { data, error } = await supabase.storage
+      .from('research-pdfs')
+      .upload(filePath, fileBuffer, {
+        contentType: 'application/pdf',
+        upsert: true // Overwrite if exists
+      });
+
+    if (error) {
+      console.log(`  ✗ Upload error: ${error.message}`);
+      return false;
+    }
+
+    console.log(`  ✓ Successfully uploaded to Supabase Storage`);
+    return true;
+  } catch (error) {
+    console.log(`  ✗ Error: ${error.message}`);
+    return false;
   }
-}
-
-/**
- * Upload a file to Supabase Storage
- */
-async function uploadFile(localPath, storagePath) {
-  const fileBuffer = fs.readFileSync(localPath);
-
-  const { data, error } = await supabase.storage
-    .from(BUCKET_NAME)
-    .upload(storagePath, fileBuffer, {
-      contentType: 'application/pdf',
-      upsert: true,
-    });
-
-  if (error) {
-    throw error;
-  }
-
-  return data;
 }
 
 /**
  * Main function
  */
 async function main() {
-  console.log('Upload PDFs to Supabase Storage\n');
+  console.log('Uploading PDFs for the last two articles to Supabase Storage...\n');
 
-  // Ensure bucket exists
-  await ensureBucket();
-
-  // Get all attachments
+  // Get the attachments for the last two articles
   const result = await pool.query(`
-    SELECT id, document_id, filename, file_path, file_size
-    FROM research_attachments
-    WHERE content_type = 'application/pdf'
-    ORDER BY document_id
+    SELECT a.id, a.document_id, a.filename, a.file_path, d.subject
+    FROM research_attachments a
+    JOIN research_documents d ON a.document_id = d.id
+    WHERE d.id IN ('cd711ec8-cd00-47ea-8bf9-999f58c0c7dc', '1bedf3c4-f52b-4f9f-b65c-41c3f17c0591')
+    ORDER BY d.received_date DESC
   `);
 
-  console.log(`\nFound ${result.rows.length} PDF attachments\n`);
+  console.log(`Found ${result.rows.length} attachments to upload\n`);
 
-  let uploadCount = 0;
-  let skipCount = 0;
-  let errorCount = 0;
+  let successCount = 0;
 
-  for (const attachment of result.rows) {
-    const localPath = path.join(STORAGE_DIR, attachment.file_path);
+  for (const row of result.rows) {
+    console.log(`Article: ${row.subject}`);
 
-    // Check if file exists locally
-    if (!fs.existsSync(localPath)) {
-      console.log(`✗ File not found: ${attachment.filename}`);
-      errorCount++;
-      continue;
-    }
+    const success = await uploadToSupabase(
+      row.document_id,
+      row.id,
+      row.filename,
+      row.file_path
+    );
 
-    try {
-      // Upload to Supabase
-      console.log(`Uploading: ${attachment.filename}`);
-      await uploadFile(localPath, attachment.file_path);
-
-      console.log(`  ✓ Uploaded (${Math.round(attachment.file_size / 1024)}KB)`);
-      uploadCount++;
-
-    } catch (error) {
-      console.log(`  ✗ Error: ${error.message}`);
-      errorCount++;
-    }
+    if (success) successCount++;
   }
 
   console.log(`\n\n=== Results ===`);
-  console.log(`✓ Uploaded: ${uploadCount} PDFs`);
-  console.log(`✗ Errors: ${errorCount} PDFs`);
-  console.log(`\nAll PDFs are now stored in Supabase Storage!`);
+  console.log(`✓ Successfully uploaded: ${successCount} PDFs`);
+  console.log(`✗ Failed: ${result.rows.length - successCount} PDFs`);
 
   await pool.end();
 }

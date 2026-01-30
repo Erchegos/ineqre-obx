@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Import OSE versions of dual-listed stocks
+ * Import OSE versions of dual-listed stocks with RAW + ADJUSTED prices
  * These stocks also trade on NYSE but we need the Norwegian versions too
  */
 import { Pool } from "pg";
@@ -56,7 +56,7 @@ const oseStocks: StockInfo[] = [
     asset_type: "equity"
   },
   {
-    ticker: "BWLP",
+    ticker: "BWLPG",
     usTicker: "BWLP.US",
     name: "BW LPG Ltd",
     sector: "Shipping",
@@ -74,10 +74,19 @@ const oseStocks: StockInfo[] = [
     asset_type: "equity"
   },
   {
-    ticker: "HAFN",
+    ticker: "HAFNI",
     usTicker: "HAFN.US",
     name: "Hafnia Ltd",
     sector: "Shipping",
+    exchange: "OSE",
+    currency: "NOK",
+    asset_type: "equity"
+  },
+  {
+    ticker: "FLNG",
+    usTicker: "FLNG.US",
+    name: "Flex LNG Ltd",
+    sector: "Shipping/LNG",
     exchange: "OSE",
     currency: "NOK",
     asset_type: "equity"
@@ -123,18 +132,18 @@ async function insertPriceData(ticker: string, bar: any) {
       bar.low,
       bar.close,
       Math.round(bar.volume),
-      bar.close,
+      bar.adjClose || bar.close, // Use adjClose if available, fallback to close
     ]
   );
 }
 
 async function main() {
   console.log("=".repeat(70));
-  console.log("IMPORTING OSE VERSIONS OF DUAL-LISTED STOCKS");
+  console.log("IMPORTING OSE DUAL-LISTED STOCKS (RAW + ADJUSTED PRICES)");
   console.log("=".repeat(70));
   console.log("\nNote: US versions should already have .US suffix\n");
 
-  const client = new TWSClient();
+  const client = new TWSClient({ requestTimeout: 120000 });
 
   try {
     await client.connect();
@@ -149,29 +158,64 @@ async function main() {
       console.log(`${"=".repeat(60)}\n`);
 
       try {
-        console.log(`Fetching ${stock.ticker} from OSE...`);
-        const oseData = await client.getHistoricalData(
+        // Step 1: Fetch RAW prices (TRADES)
+        console.log(`[1/3] Fetching RAW prices for ${stock.ticker} from OSE...`);
+        const rawData = await client.getHistoricalData(
           stock.ticker,
           "OSE",
           "10 Y",
           "1 day",
           SecType.STK,
-          "NOK"
+          "NOK",
+          false // adjusted = false → get raw TRADES data
         );
+        console.log(`✓ Fetched ${rawData.length} raw bars`);
 
-        console.log(`✓ Fetched ${oseData.length} bars for ${stock.ticker} (OSE)`);
+        if (rawData.length === 0) {
+          console.log(`⚠️  No data available for ${stock.ticker}`);
+          results.push({ ticker: stock.ticker, success: false, error: "No data available" });
+          continue;
+        }
+
+        // Step 2: Fetch ADJUSTED prices (ADJUSTED_LAST)
+        console.log(`[2/3] Fetching ADJUSTED prices for ${stock.ticker} from OSE...`);
+        const adjData = await client.getHistoricalData(
+          stock.ticker,
+          "OSE",
+          "10 Y",
+          "1 day",
+          SecType.STK,
+          "NOK",
+          true // adjusted = true → get ADJUSTED_LAST data
+        );
+        console.log(`✓ Fetched ${adjData.length} adjusted bars`);
+
+        // Step 3: Merge adjusted prices into raw data
+        const adjMap = new Map<string, number>();
+        for (const bar of adjData) {
+          adjMap.set(bar.time, bar.close); // adjusted close
+        }
+
+        for (const bar of rawData) {
+          const adjPrice = adjMap.get(bar.time);
+          (bar as any).adjClose = adjPrice !== undefined ? adjPrice : bar.close;
+        }
+
+        console.log(`✓ Merged ${rawData.length} raw bars with ${adjData.length} adjusted records`);
 
         // Insert stock master record
         await insertStock(stock);
         console.log(`✓ Inserted stock record: ${stock.ticker}`);
 
-        // Insert price data
-        for (const bar of oseData) {
+        // Insert price data with both raw close and adj_close
+        console.log(`[3/3] Inserting ${rawData.length} price records...`);
+        for (const bar of rawData) {
           await insertPriceData(stock.ticker, bar);
         }
-        console.log(`✓ Inserted ${oseData.length} price records for ${stock.ticker}\n`);
+        console.log(`✓ Inserted ${rawData.length} price records for ${stock.ticker}`);
+        console.log(`   → close (raw) and adj_close (dividend-adjusted)\n`);
 
-        results.push({ ticker: stock.ticker, success: true, bars: oseData.length });
+        results.push({ ticker: stock.ticker, success: true, bars: rawData.length });
 
       } catch (error: any) {
         console.error(`✗ Error fetching ${stock.ticker}:`, error.message);
@@ -180,7 +224,7 @@ async function main() {
       }
 
       // Rate limiting
-      await sleep(500);
+      await sleep(1000);
     }
 
     console.log("\n" + "=".repeat(70));
@@ -197,7 +241,7 @@ async function main() {
     if (successful.length > 0) {
       console.log("\n✓ Successfully imported OSE versions:");
       successful.forEach(r => {
-        console.log(`  ${r.ticker} (OSE, NOK): ${r.bars} bars`);
+        console.log(`  ${r.ticker} (OSE, NOK): ${r.bars} bars (raw + adjusted)`);
       });
     }
 

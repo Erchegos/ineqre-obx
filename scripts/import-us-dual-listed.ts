@@ -86,6 +86,14 @@ const usStocks: USStock[] = [
     exchange: "NYSE",
     currency: "USD",
     asset_type: "equity"
+  },
+  {
+    ticker: "FLNG.US",
+    name: "Flex LNG Ltd (Dual Listed US)",
+    sector: "Shipping/LNG",
+    exchange: "NYSE",
+    currency: "USD",
+    asset_type: "equity"
   }
 ];
 
@@ -128,15 +136,19 @@ async function insertPriceData(ticker: string, bar: any) {
       bar.low,
       bar.close,
       Math.round(bar.volume),
-      bar.close,
+      bar.adjClose || bar.close, // Use adjClose if available, fallback to close
     ]
   );
 }
 
 async function main() {
-  const client = new TWSClient();
+  // Use longer timeout for historical data requests (10 years of data can take time)
+  const client = new TWSClient({ requestTimeout: 120000 }); // 2 minutes
 
   try {
+    console.log("=".repeat(70));
+    console.log("IMPORTING US DUAL-LISTED STOCKS (RAW + ADJUSTED PRICES)");
+    console.log("=".repeat(70));
     console.log("Connecting to IB Gateway...");
     await client.connect();
     console.log("✓ Connected to IB Gateway\n");
@@ -153,30 +165,64 @@ async function main() {
         // For IB fetch, use plain ticker (IB doesn't recognize .US suffix)
         const ibTicker = stock.ticker.replace('.US', '');
 
-        // Fetch US version using SMART routing
-        console.log(`Fetching ${ibTicker} from US markets (storing as ${stock.ticker})...`);
-        const usData = await client.getHistoricalData(
+        // Step 1: Fetch RAW prices (TRADES)
+        console.log(`[1/3] Fetching RAW prices for ${ibTicker}...`);
+        const rawData = await client.getHistoricalData(
           ibTicker,
           "SMART",
           "10 Y",
           "1 day",
           SecType.STK,
-          stock.currency
+          stock.currency,
+          false // adjusted = false → get raw TRADES data
         );
+        console.log(`✓ Fetched ${rawData.length} raw bars`);
 
-        console.log(`✓ Fetched ${usData.length} bars for ${ibTicker}`);
+        if (rawData.length === 0) {
+          console.log(`⚠️  No data available for ${ibTicker}`);
+          results.push({ ticker: stock.ticker, success: false, error: "No data available" });
+          continue;
+        }
 
-        // Insert stock master record (with .US suffix)
+        // Step 2: Fetch ADJUSTED prices (ADJUSTED_LAST)
+        console.log(`[2/3] Fetching ADJUSTED prices for ${ibTicker}...`);
+        const adjData = await client.getHistoricalData(
+          ibTicker,
+          "SMART",
+          "10 Y",
+          "1 day",
+          SecType.STK,
+          stock.currency,
+          true // adjusted = true → get ADJUSTED_LAST data
+        );
+        console.log(`✓ Fetched ${adjData.length} adjusted bars`);
+
+        // Step 3: Merge adjusted prices into raw data
+        const adjMap = new Map<string, number>();
+        for (const bar of adjData) {
+          adjMap.set(bar.time, bar.close); // adjusted close
+        }
+
+        for (const bar of rawData) {
+          const adjPrice = adjMap.get(bar.time);
+          (bar as any).adjClose = adjPrice !== undefined ? adjPrice : bar.close;
+        }
+
+        console.log(`✓ Merged ${rawData.length} raw bars with ${adjData.length} adjusted records`);
+
+        // Insert stock master record
         await insertStock(stock);
         console.log(`✓ Inserted stock record: ${stock.ticker}`);
 
-        // Insert price data (with .US suffix)
-        for (const bar of usData) {
+        // Insert price data with both raw close and adj_close
+        console.log(`[3/3] Inserting ${rawData.length} price records...`);
+        for (const bar of rawData) {
           await insertPriceData(stock.ticker, bar);
         }
-        console.log(`✓ Inserted ${usData.length} price records for ${stock.ticker}\n`);
+        console.log(`✓ Inserted ${rawData.length} price records for ${stock.ticker}`);
+        console.log(`   → close (raw) and adj_close (dividend-adjusted)\n`);
 
-        results.push({ ticker: stock.ticker, success: true, bars: usData.length });
+        results.push({ ticker: stock.ticker, success: true, bars: rawData.length });
 
       } catch (error: any) {
         console.error(`✗ Error fetching ${stock.ticker}:`, error.message);
@@ -184,13 +230,13 @@ async function main() {
         continue;
       }
 
-      // Rate limiting
-      await sleep(500);
+      // Rate limiting between stocks
+      await sleep(1000);
     }
 
-    console.log("\n" + "=".repeat(60));
+    console.log("\n" + "=".repeat(70));
     console.log("IMPORT COMPLETE");
-    console.log("=".repeat(60));
+    console.log("=".repeat(70));
 
     const successful = results.filter(r => r.success);
     const failed = results.filter(r => !r.success);
@@ -202,7 +248,7 @@ async function main() {
     if (successful.length > 0) {
       console.log("\n✓ Successfully imported:");
       successful.forEach(r => {
-        console.log(`  ${r.ticker}: ${r.bars} bars`);
+        console.log(`  ${r.ticker}: ${r.bars} bars (raw + adjusted)`);
       });
     }
 

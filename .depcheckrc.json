@@ -1,0 +1,22 @@
+{
+  "ignoreMatches": [
+    "@types/*",
+    "typescript",
+    "turbo",
+    "eslint",
+    "prettier"
+  ],
+  "ignorePatterns": [
+    "node_modules",
+    ".next",
+    "dist",
+    "build",
+    ".turbo"
+  ],
+  "specials": [
+    "bin",
+    "eslint",
+    "webpack",
+    "babel"
+  ]
+}
