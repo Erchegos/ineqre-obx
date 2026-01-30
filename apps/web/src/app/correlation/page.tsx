@@ -680,7 +680,10 @@ export default function CorrelationPage() {
                   })}
                   {selectedSectors.size > 0 && (
                     <button
-                      onClick={() => setSelectedSectors(new Set())}
+                      onClick={() => {
+                        setSelectedSectors(new Set());
+                        setSelectedTickers([]);
+                      }}
                       style={{
                         padding: "4px 10px",
                         fontSize: 11.5,
@@ -692,7 +695,7 @@ export default function CorrelationPage() {
                         cursor: "pointer",
                       }}
                     >
-                      Clear
+                      Clear All
                     </button>
                   )}
                 </div>
