@@ -190,7 +190,13 @@ export default function CorrelationPage() {
 
         tickers.forEach((ticker, i) => {
           if (ticker === 'OBX') return;
-          const corr = values[i][obxIndex] as number;
+
+          const row = values[i];
+          if (!row) return;
+
+          const corr = row[obxIndex];
+          if (typeof corr !== 'number') return;
+
           let strength = '';
           if (Math.abs(corr) >= 0.7) strength = 'Strong';
           else if (Math.abs(corr) >= 0.4) strength = 'Moderate';
