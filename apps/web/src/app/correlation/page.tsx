@@ -172,7 +172,10 @@ export default function CorrelationPage() {
     const a = document.createElement('a');
     a.href = url;
     a.download = `correlation_${dataMode}_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   const currentDate = new Date().toISOString().split('T')[0];
