@@ -180,7 +180,7 @@ export default function CorrelationPage() {
 
       // Correlation with OBX Index (if OBX is in the data)
       const obxIndex = tickers.indexOf('OBX');
-      if (obxIndex !== -1) {
+      if (obxIndex !== -1 && obxIndex < values.length) {
         csvLines.push('=== CORRELATION WITH OBX INDEX ===');
         csvLines.push('(Each stock\'s correlation with the Oslo Børs Benchmark Index)');
         csvLines.push('');
@@ -188,14 +188,15 @@ export default function CorrelationPage() {
 
         const obxCorrelations: Array<{ ticker: string; corr: number; strength: string }> = [];
 
-        tickers.forEach((ticker, i) => {
-          if (ticker === 'OBX') return;
+        for (let i = 0; i < tickers.length && i < values.length; i++) {
+          const ticker = tickers[i];
+          if (ticker === 'OBX') continue;
 
           const row = values[i];
-          if (!row) return;
+          if (!row || !Array.isArray(row) || row.length <= obxIndex) continue;
 
           const corr = row[obxIndex];
-          if (typeof corr !== 'number') return;
+          if (typeof corr !== 'number' || isNaN(corr)) continue;
 
           let strength = '';
           if (Math.abs(corr) >= 0.7) strength = 'Strong';
@@ -204,7 +205,7 @@ export default function CorrelationPage() {
           else strength = 'Very Weak';
 
           obxCorrelations.push({ ticker, corr, strength });
-        });
+        }
 
         obxCorrelations
           .sort((a, b) => Math.abs(b.corr) - Math.abs(a.corr))
