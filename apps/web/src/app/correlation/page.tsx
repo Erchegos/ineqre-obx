@@ -156,26 +156,52 @@ export default function CorrelationPage() {
   }
 
   function exportToCSV() {
-    if (!correlationData?.matrix) return;
+    try {
+      console.log('Export CSV clicked');
+      console.log('Correlation data:', correlationData);
 
-    const rows = [
-      ['', ...correlationData.matrix.map((row: any) => row.ticker)],
-      ...correlationData.matrix.map((row: any, i: number) => [
-        row.ticker,
-        ...row.values.map((v: number) => v.toFixed(4))
-      ])
-    ];
+      if (!correlationData?.matrix) {
+        console.error('No correlation matrix data');
+        alert('No correlation data to export');
+        return;
+      }
 
-    const csv = rows.map(row => row.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `correlation_${dataMode}_${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+      console.log('Matrix data:', correlationData.matrix);
+
+      const rows = [
+        ['', ...correlationData.matrix.map((row: any) => row.ticker)],
+        ...correlationData.matrix.map((row: any, i: number) => [
+          row.ticker,
+          ...row.values.map((v: number) => v.toFixed(4))
+        ])
+      ];
+
+      console.log('CSV rows:', rows);
+
+      const csv = rows.map(row => row.join(',')).join('\n');
+      console.log('CSV content length:', csv.length);
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `correlation_${dataMode}_${new Date().toISOString().split('T')[0]}.csv`;
+
+      console.log('Triggering download:', a.download);
+
+      document.body.appendChild(a);
+      a.click();
+
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        console.log('Download triggered, cleanup complete');
+      }, 100);
+
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+      alert('Error exporting CSV: ' + error);
+    }
   }
 
   const currentDate = new Date().toISOString().split('T')[0];
