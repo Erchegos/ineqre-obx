@@ -163,22 +163,57 @@ export default function CorrelationPage() {
       }
 
       const { tickers, values } = correlationData.matrix;
+      const csvLines: string[] = [];
 
-      // Create CSV with header row and data rows
-      const rows = [
-        ['', ...tickers],
-        ...values.map((row: number[], i: number) => [
+      // Metadata header
+      csvLines.push('Correlation Matrix Export');
+      csvLines.push(`Date,${new Date().toISOString().split('T')[0]}`);
+      csvLines.push(`Period,${correlationData.startDate} to ${correlationData.endDate}`);
+      csvLines.push(`Observations,${correlationData.observations}`);
+      csvLines.push(`Data Mode,${dataMode === 'total_return' ? 'Total Return (Adjusted)' : 'Price (Raw)'}`);
+      csvLines.push(`Rolling Window,${rollingWindow} days`);
+      csvLines.push(`Lookback Period,${timeframe} days`);
+      csvLines.push('');
+      csvLines.push('Correlation Matrix');
+
+      // Matrix header row
+      csvLines.push(['Ticker', ...tickers].join(','));
+
+      // Matrix data rows
+      values.forEach((row: number[], i: number) => {
+        const rowData = [
           tickers[i],
           ...row.map((v: number) => v.toFixed(4))
-        ])
-      ];
+        ];
+        csvLines.push(rowData.join(','));
+      });
 
-      const csv = rows.map(row => row.join(',')).join('\n');
+      // Add average correlations if available
+      if (correlationData.averageCorrelations) {
+        csvLines.push('');
+        csvLines.push('Average Correlations');
+        csvLines.push('Ticker,Average Correlation');
+        correlationData.averageCorrelations.forEach((item: any) => {
+          csvLines.push(`${item.ticker},${item.avgCorrelation.toFixed(4)}`);
+        });
+      }
+
+      // Add regime distribution if available
+      if (correlationData.regimeDistribution) {
+        csvLines.push('');
+        csvLines.push('Market Regime Distribution');
+        csvLines.push('Regime,Percentage');
+        Object.entries(correlationData.regimeDistribution).forEach(([regime, pct]) => {
+          csvLines.push(`${regime},${(pct as number).toFixed(2)}%`);
+        });
+      }
+
+      const csv = csvLines.join('\n');
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `correlation_${dataMode}_${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = `correlation_matrix_${dataMode}_${timeframe}d_${new Date().toISOString().split('T')[0]}.csv`;
 
       document.body.appendChild(a);
       a.click();
