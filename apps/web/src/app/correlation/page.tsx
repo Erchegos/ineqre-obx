@@ -186,22 +186,24 @@ export default function CorrelationPage() {
         csvLines.push('');
         csvLines.push('Ticker,Correlation with OBX,Strength');
 
-        const obxCorrelations = tickers.map((ticker, i) => {
-          if (ticker === 'OBX') return null;
-          const corr = values[i][obxIndex];
+        const obxCorrelations: Array<{ ticker: string; corr: number; strength: string }> = [];
+
+        tickers.forEach((ticker, i) => {
+          if (ticker === 'OBX') return;
+          const corr = values[i][obxIndex] as number;
           let strength = '';
           if (Math.abs(corr) >= 0.7) strength = 'Strong';
           else if (Math.abs(corr) >= 0.4) strength = 'Moderate';
           else if (Math.abs(corr) >= 0.2) strength = 'Weak';
           else strength = 'Very Weak';
 
-          return { ticker, corr, strength };
-        }).filter(x => x !== null);
+          obxCorrelations.push({ ticker, corr, strength });
+        });
 
         obxCorrelations
-          .sort((a, b) => Math.abs(b!.corr) - Math.abs(a!.corr))
+          .sort((a, b) => Math.abs(b.corr) - Math.abs(a.corr))
           .forEach(item => {
-            csvLines.push(`${item!.ticker},${item!.corr.toFixed(4)},${item!.strength}`);
+            csvLines.push(`${item.ticker},${item.corr.toFixed(4)},${item.strength}`);
           });
 
         csvLines.push('');
