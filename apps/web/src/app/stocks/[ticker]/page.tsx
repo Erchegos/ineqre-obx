@@ -852,7 +852,7 @@ export default function StockTickerPage() {
               </div>
             )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 28 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 28 }}>
             <MetricCard label="Total Return" value={fmtPct(activeStats.totalReturn)} colorType={activeStats.totalReturn >= 0 ? "success" : "danger"} />
             <MetricCard label="Annualized Return" value={fmtPct(activeStats.annualizedReturn)} />
             <MetricCard label="Volatility (Ann.)" value={fmtPct(activeStats.volatility)} />
@@ -969,25 +969,25 @@ export default function StockTickerPage() {
                 </h2>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16 }}>
                   <div>
-                    <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Data Points</div>
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Data Points</div>
                     <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "monospace", color: "var(--foreground)" }}>
                       {stdChannelData.count}
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Window Size</div>
-                    <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "monospace", color: "#2962ff" }}>
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Window Size</div>
+                    <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "monospace", color: "var(--accent)" }}>
                       {stdChannelData.metadata.windowSize}
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>R² (Fit Quality)</div>
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>R² (Fit Quality)</div>
                     <div style={{
                       fontSize: 22,
                       fontWeight: 600,
                       fontFamily: "monospace",
                       color: stdChannelData.metadata.r2 > 0.8 ? "var(--success)"
-                        : stdChannelData.metadata.r2 > 0.6 ? "#26a69a"
+                        : stdChannelData.metadata.r2 > 0.6 ? "var(--success)"
                         : stdChannelData.metadata.r2 > 0.4 ? "var(--warning)"
                         : "var(--danger)"
                     }}>
@@ -998,25 +998,25 @@ export default function StockTickerPage() {
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Slope (Trend)</div>
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Slope (Trend)</div>
                     <div style={{
                       fontSize: 22,
                       fontWeight: 600,
                       fontFamily: "monospace",
                       color: stdChannelData.metadata.slope > 0 ? "var(--success)" : "var(--danger)"
                     }}>
-                      {stdChannelData.metadata.slope > 0 ? "↑" : "↓"} {Math.abs(stdChannelData.metadata.slope).toFixed(4)}
+                      {stdChannelData.metadata.slope > 0 ? "+" : ""}{stdChannelData.metadata.slope.toFixed(4)}
                     </div>
-                    <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2 }}>
+                    <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
                       {stdChannelData.metadata.slope > 0 ? "Uptrend" : "Downtrend"}
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Correlation (R)</div>
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Correlation (R)</div>
                     <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "monospace", color: "var(--foreground)" }}>
                       {stdChannelData.metadata.r.toFixed(4)}
                     </div>
-                    <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2, lineHeight: 1.4 }}>
+                    <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2, lineHeight: 1.4 }}>
                       Strength of linear trend
                     </div>
                   </div>
@@ -1066,14 +1066,14 @@ export default function StockTickerPage() {
 
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 16 }}>
                     <div>
-                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Current Price</div>
+                      <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Current Price</div>
                       <div style={{ fontSize: 20, fontWeight: 600, fontFamily: "monospace", color: "var(--foreground)" }}>
                         {meanReversalInfo.lastClose.toFixed(2)}
                       </div>
                     </div>
 
                     <div>
-                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Distance from Regression Line</div>
+                      <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Distance from Regression Line</div>
                       <div style={{
                         fontSize: 20,
                         fontWeight: 600,
@@ -1088,7 +1088,7 @@ export default function StockTickerPage() {
                     </div>
 
                     <div>
-                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Position Classification</div>
+                      <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Position Classification</div>
                       <div style={{
                         fontSize: 16,
                         fontWeight: 600,
@@ -1321,7 +1321,7 @@ export default function StockTickerPage() {
             </div>
 
             {returnStats && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 24, padding: 16, borderRadius: 3, border: "1px solid var(--border-subtle)", background: "var(--card-bg)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16, marginBottom: 24, padding: 16, borderRadius: 3, border: "1px solid var(--border-subtle)", background: "var(--card-bg)" }}>
                 <StatItem label="Win Rate" value={`${returnStats.winRate.toFixed(1)}%`} />
                 <StatItem label="Avg Gain" value={fmtPct(returnStats.avgGain, 3)} colorType="success" />
                 <StatItem label="Avg Loss" value={fmtPct(returnStats.avgLoss, 3)} colorType="danger" />
@@ -1329,12 +1329,12 @@ export default function StockTickerPage() {
                 <StatItem label="Worst Day" value={fmtPct(returnStats.worstDay, 3)} colorType="danger" />
                 <StatItem
                   label="Green Days"
-                  value={`${returnStats.positiveDays} ↑ ${((returnStats.positiveDays / returnStats.totalDays) * 100).toFixed(1)}%`}
+                  value={`${returnStats.positiveDays} (${((returnStats.positiveDays / returnStats.totalDays) * 100).toFixed(1)}%)`}
                   colorType="success"
                 />
                 <StatItem
                   label="Red Days"
-                  value={`${returnStats.negativeDays} ↓ ${((returnStats.negativeDays / returnStats.totalDays) * 100).toFixed(1)}%`}
+                  value={`${returnStats.negativeDays} (${((returnStats.negativeDays / returnStats.totalDays) * 100).toFixed(1)}%)`}
                   colorType="danger"
                 />
               </div>
@@ -1343,8 +1343,8 @@ export default function StockTickerPage() {
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
-                  <tr style={{ textAlign: "left" }}>
-                    <th style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--muted)" }}>Date</th>
+                  <tr>
+                    <th style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--muted)", textAlign: "left" }}>Date</th>
                     <th style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--muted)", textAlign: "right" }}>Close</th>
                     <th style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--muted)", textAlign: "right" }}>Adj Close</th>
                     <th style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--muted)", textAlign: "right" }}>Daily Return</th>
@@ -1356,7 +1356,10 @@ export default function StockTickerPage() {
                       const cumulativeReturn = arr.slice(idx).reduce((cum, ret) => cum * (1 + ret.return), 1) - 1;
                       const priceData = priceMap[r.date] || { close: 0, adj_close: 0 };
                       return (
-                        <tr key={r.date} style={{ borderTop: "1px solid var(--table-border)" }}>
+                        <tr key={r.date} style={{
+                          borderBottom: "1px solid var(--border)",
+                          backgroundColor: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)"
+                        }}>
                           <td style={{ padding: "10px 12px", color: "var(--foreground)" }}>{r.date}</td>
                           <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right" }}>{fmtNum(priceData.close)}</td>
                           <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right", color: "var(--muted-foreground)" }}>{fmtNum(priceData.adj_close ?? priceData.close)}</td>
