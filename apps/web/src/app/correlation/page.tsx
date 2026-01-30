@@ -165,48 +165,97 @@ export default function CorrelationPage() {
       const { tickers, values } = correlationData.matrix;
       const csvLines: string[] = [];
 
-      // Metadata header
-      csvLines.push('Correlation Matrix Export');
-      csvLines.push(`Date,${new Date().toISOString().split('T')[0]}`);
-      csvLines.push(`Period,${correlationData.startDate} to ${correlationData.endDate}`);
-      csvLines.push(`Observations,${correlationData.observations}`);
+      // Header Section
+      csvLines.push('=== CORRELATION MATRIX EXPORT ===');
+      csvLines.push('');
+      csvLines.push('EXPORT DETAILS');
+      csvLines.push(`Export Date,${new Date().toISOString().split('T')[0]}`);
+      csvLines.push(`Data Period,${correlationData.startDate} to ${correlationData.endDate}`);
+      csvLines.push(`Observations,${correlationData.observations} days`);
       csvLines.push(`Data Mode,${dataMode === 'total_return' ? 'Total Return (Adjusted)' : 'Price (Raw)'}`);
       csvLines.push(`Rolling Window,${rollingWindow} days`);
       csvLines.push(`Lookback Period,${timeframe} days`);
       csvLines.push('');
-      csvLines.push('Correlation Matrix');
+      csvLines.push('');
+
+      // Correlation with OBX Index (if OBX is in the data)
+      const obxIndex = tickers.indexOf('OBX');
+      if (obxIndex !== -1) {
+        csvLines.push('=== CORRELATION WITH OBX INDEX ===');
+        csvLines.push('(Each stock\'s correlation with the Oslo Børs Benchmark Index)');
+        csvLines.push('');
+        csvLines.push('Ticker,Correlation with OBX,Strength');
+
+        const obxCorrelations = tickers.map((ticker, i) => {
+          if (ticker === 'OBX') return null;
+          const corr = values[i][obxIndex];
+          let strength = '';
+          if (Math.abs(corr) >= 0.7) strength = 'Strong';
+          else if (Math.abs(corr) >= 0.4) strength = 'Moderate';
+          else if (Math.abs(corr) >= 0.2) strength = 'Weak';
+          else strength = 'Very Weak';
+
+          return { ticker, corr, strength };
+        }).filter(x => x !== null);
+
+        obxCorrelations
+          .sort((a, b) => Math.abs(b!.corr) - Math.abs(a!.corr))
+          .forEach(item => {
+            csvLines.push(`${item!.ticker},${item!.corr.toFixed(4)},${item!.strength}`);
+          });
+
+        csvLines.push('');
+        csvLines.push('');
+      }
+
+      // Full Correlation Matrix
+      csvLines.push('=== FULL CORRELATION MATRIX ===');
+      csvLines.push('');
 
       // Matrix header row
-      csvLines.push(['Ticker', ...tickers].join(','));
+      csvLines.push(['', ...tickers].join(','));
 
       // Matrix data rows
       values.forEach((row: number[], i: number) => {
         const rowData = [
-          tickers[i],
+          tickers[i] === 'OBX' ? 'OBX [INDEX]' : tickers[i],
           ...row.map((v: number) => v.toFixed(4))
         ];
         csvLines.push(rowData.join(','));
       });
 
-      // Add average correlations if available
+      csvLines.push('');
+      csvLines.push('');
+
+      // Average Correlations
       if (correlationData.averageCorrelations) {
+        csvLines.push('=== AVERAGE CORRELATIONS ===');
+        csvLines.push('(Mean correlation of each ticker with all other tickers)');
         csvLines.push('');
-        csvLines.push('Average Correlations');
-        csvLines.push('Ticker,Average Correlation');
-        correlationData.averageCorrelations.forEach((item: any) => {
-          csvLines.push(`${item.ticker},${item.avgCorrelation.toFixed(4)}`);
+        csvLines.push('Rank,Ticker,Average Correlation');
+        correlationData.averageCorrelations.forEach((item: any, idx: number) => {
+          const tickerLabel = item.ticker === 'OBX' ? 'OBX [INDEX]' : item.ticker;
+          csvLines.push(`${idx + 1},${tickerLabel},${item.avgCorrelation.toFixed(4)}`);
         });
+        csvLines.push('');
+        csvLines.push('');
       }
 
-      // Add regime distribution if available
+      // Market Regime Distribution
       if (correlationData.regimeDistribution) {
+        csvLines.push('=== MARKET REGIME DISTRIBUTION ===');
+        csvLines.push('(Based on rolling volatility analysis)');
         csvLines.push('');
-        csvLines.push('Market Regime Distribution');
         csvLines.push('Regime,Percentage');
         Object.entries(correlationData.regimeDistribution).forEach(([regime, pct]) => {
           csvLines.push(`${regime},${(pct as number).toFixed(2)}%`);
         });
+        csvLines.push('');
+        csvLines.push('');
       }
+
+      // Footer
+      csvLines.push('=== END OF REPORT ===');
 
       const csv = csvLines.join('\n');
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
