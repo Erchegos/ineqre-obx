@@ -13,6 +13,7 @@ interface LiquidityData {
   regime: 'Highly Liquid' | 'Liquid' | 'Moderate' | 'Illiquid' | 'Very Illiquid';
   avgDailyValue: number;
   avgDailyVolume: number;
+  currency: 'NOK' | 'USD' | 'EUR' | 'GBP';
   recentTrend: 'Improving' | 'Stable' | 'Deteriorating';
   warnings: string[];
   tradingImplications: string[];
@@ -210,7 +211,7 @@ export function LiquidityBadge({ ticker, defaultExpanded = false }: LiquidityBad
           Avg Daily Volume: <span style={{ fontFamily: 'monospace', color: '#fff' }}>{volumeFormatted}</span> shares
         </div>
         <div style={{ marginBottom: 4 }}>
-          Avg Daily Value: <span style={{ fontFamily: 'monospace', color: '#fff' }}>{valueInMillions}M NOK</span>
+          Avg Daily Value: <span style={{ fontFamily: 'monospace', color: '#fff' }}>{valueInMillions}M {data.currency}</span>
         </div>
         <div>
           Recent Trend: <span style={{

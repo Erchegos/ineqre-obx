@@ -17,7 +17,8 @@ export interface LiquidityMetrics {
   regime: 'Highly Liquid' | 'Liquid' | 'Moderate' | 'Illiquid' | 'Very Illiquid';
   volumePercentile: number;
   avgDailyVolume: number;
-  avgDailyValue: number; // Volume * Price (NOK)
+  avgDailyValue: number; // Volume * Price
+  currency: 'NOK' | 'USD' | 'EUR' | 'GBP';
   recentTrend: 'Improving' | 'Stable' | 'Deteriorating';
   warnings: string[];
   tradingImplications: string[];
@@ -33,10 +34,21 @@ function calculatePercentile(values: number[], percentile: number): number {
 }
 
 /**
+ * Detect currency from ticker
+ */
+function detectCurrency(ticker: string): 'NOK' | 'USD' | 'EUR' | 'GBP' {
+  if (ticker.endsWith('.US')) return 'USD';
+  if (ticker.endsWith('.L')) return 'GBP';
+  if (ticker.endsWith('.PA') || ticker.endsWith('.AS') || ticker.endsWith('.MI')) return 'EUR';
+  return 'NOK'; // Default to NOK for Oslo Børs
+}
+
+/**
  * Detect liquidity regime based on volume analysis
  */
 export function detectLiquidityRegime(
   volumeData: VolumeData[],
+  ticker: string,
   lookbackDays: number = 60
 ): LiquidityMetrics | null {
   if (volumeData.length < 30) {
@@ -82,26 +94,35 @@ export function detectLiquidityRegime(
     recentTrend = 'Stable';
   }
 
+  // Detect currency and adjust thresholds
+  const currency = detectCurrency(ticker);
+  const currencyMultiplier = currency === 'USD' ? 0.1 : 1; // USD is ~10x NOK
+
   // Classify regime based on average daily value and volume consistency
   let regime: 'Highly Liquid' | 'Liquid' | 'Moderate' | 'Illiquid' | 'Very Illiquid';
   const warnings: string[] = [];
   const tradingImplications: string[] = [];
 
-  // Classification criteria (calibrated for Oslo Børs)
-  if (avgDailyValue >= 10_000_000) { // 10M NOK+
+  // Classification criteria (adjusted by currency)
+  const threshold1 = 10_000_000 * currencyMultiplier; // 10M NOK or 1M USD
+  const threshold2 = 2_000_000 * currencyMultiplier;  // 2M NOK or 200K USD
+  const threshold3 = 500_000 * currencyMultiplier;    // 500K NOK or 50K USD
+  const threshold4 = 100_000 * currencyMultiplier;    // 100K NOK or 10K USD
+
+  if (avgDailyValue >= threshold1) {
     regime = 'Highly Liquid';
     tradingImplications.push('Suitable for large institutional orders');
     tradingImplications.push('Low market impact expected');
-  } else if (avgDailyValue >= 2_000_000) { // 2-10M NOK
+  } else if (avgDailyValue >= threshold2) {
     regime = 'Liquid';
     tradingImplications.push('Suitable for most institutional orders');
     tradingImplications.push('Moderate market impact on large trades');
-  } else if (avgDailyValue >= 500_000) { // 500K-2M NOK
+  } else if (avgDailyValue >= threshold3) {
     regime = 'Moderate';
     tradingImplications.push('Suitable for small to medium orders');
     tradingImplications.push('Consider VWAP execution for larger trades');
     warnings.push('Limited capacity for large institutional trades');
-  } else if (avgDailyValue >= 100_000) { // 100K-500K NOK
+  } else if (avgDailyValue >= threshold4) {
     regime = 'Illiquid';
     tradingImplications.push('Limit order sizes to avoid market impact');
     tradingImplications.push('Spread trading over multiple days');
@@ -131,6 +152,7 @@ export function detectLiquidityRegime(
     volumePercentile,
     avgDailyVolume,
     avgDailyValue,
+    currency,
     recentTrend,
     warnings,
     tradingImplications,
@@ -188,7 +210,7 @@ export function formatLiquidityDisplay(metrics: LiquidityMetrics): {
 
   return {
     badge: `${getRegimeIndicator(metrics.regime)} ${metrics.regime}`,
-    detail: `Avg Daily: ${volumeFormatted} shares (${valueInMillions}M NOK) • Trend: ${metrics.recentTrend}`,
+    detail: `Avg Daily: ${volumeFormatted} shares (${valueInMillions}M ${metrics.currency}) • Trend: ${metrics.recentTrend}`,
     color: getRegimeColor(metrics.regime),
   };
 }

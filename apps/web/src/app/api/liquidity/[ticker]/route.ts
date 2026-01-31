@@ -63,7 +63,7 @@ export async function GET(
     }));
 
     // Detect liquidity regime
-    const metrics = detectLiquidityRegime(volumeData, 60);
+    const metrics = detectLiquidityRegime(volumeData, ticker.toUpperCase(), 60);
 
     if (!metrics) {
       return secureJsonResponse(
