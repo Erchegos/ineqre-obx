@@ -606,7 +606,7 @@ export default function StockTickerPage() {
         <Link
           href={`/volatility/${ticker}`}
           style={{
-            padding: "8px 16px",
+            padding: "10px 14px",
             borderRadius: 4,
             background: "var(--card-bg)",
             border: "1px solid var(--card-border)",
@@ -614,19 +614,23 @@ export default function StockTickerPage() {
             fontSize: 13,
             fontWeight: 500,
             display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
+            flexDirection: "column",
+            alignItems: "flex-start",
+            gap: 2,
             textDecoration: "none",
             letterSpacing: "0.01em",
             transition: "all 0.15s",
           }}
         >
-          Volatility Analysis
+          <span>Volatility Analysis</span>
+          <span style={{ fontSize: 10, color: "var(--muted-foreground)", fontWeight: 400 }}>
+            Price risk metrics
+          </span>
         </Link>
         <Link
           href={`/montecarlo/${ticker}`}
           style={{
-            padding: "8px 16px",
+            padding: "10px 14px",
             borderRadius: 4,
             background: "var(--card-bg)",
             border: "1px solid var(--card-border)",
@@ -634,14 +638,18 @@ export default function StockTickerPage() {
             fontSize: 13,
             fontWeight: 500,
             display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
+            flexDirection: "column",
+            alignItems: "flex-start",
+            gap: 2,
             textDecoration: "none",
             letterSpacing: "0.01em",
             transition: "all 0.15s",
           }}
         >
-          Monte Carlo Simulation
+          <span>Monte Carlo Simulation</span>
+          <span style={{ fontSize: 10, color: "var(--muted-foreground)", fontWeight: 400 }}>
+            Future price scenarios
+          </span>
         </Link>
       </div>
 
@@ -660,7 +668,7 @@ export default function StockTickerPage() {
           <button
             onClick={() => setViewMode("historical")}
             style={{
-              padding: "8px 16px",
+              padding: "9px 16px",
               borderRadius: 4,
               border: "none",
               background: viewMode === "historical" ? "var(--accent)" : "transparent",
@@ -669,14 +677,21 @@ export default function StockTickerPage() {
               fontWeight: 500,
               cursor: "pointer",
               transition: "all 0.2s",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: 2,
             }}
           >
-            Historical Analysis
+            <span>Historical Analysis</span>
+            <span style={{ fontSize: 10, opacity: 0.7, fontWeight: 400 }}>
+              Returns & market beta
+            </span>
           </button>
           <button
             onClick={() => setViewMode("std_channel")}
             style={{
-              padding: "8px 16px",
+              padding: "9px 16px",
               borderRadius: 4,
               border: "none",
               background: viewMode === "std_channel" ? "#2962ff" : "transparent",
@@ -685,9 +700,16 @@ export default function StockTickerPage() {
               fontWeight: 500,
               cursor: "pointer",
               transition: "all 0.2s",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: 2,
             }}
           >
-            STD Channel Analysis
+            <span>STD Channel Analysis</span>
+            <span style={{ fontSize: 10, opacity: 0.7, fontWeight: 400 }}>
+              Trading bands
+            </span>
           </button>
         </div>
       </div>
