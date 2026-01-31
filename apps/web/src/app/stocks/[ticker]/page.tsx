@@ -624,7 +624,7 @@ export default function StockTickerPage() {
         >
           <span>Volatility Analysis</span>
           <span style={{ fontSize: 10, color: "var(--muted-foreground)", fontWeight: 400 }}>
-            Measures price fluctuation and risk using statistical variance
+            Variance • Standard deviation • Risk
           </span>
         </Link>
         <Link
@@ -648,7 +648,7 @@ export default function StockTickerPage() {
         >
           <span>Monte Carlo Simulation</span>
           <span style={{ fontSize: 10, color: "var(--muted-foreground)", fontWeight: 400 }}>
-            Probabilistic model of thousands of potential future price paths
+            Stochastic • Forecasting • Price paths
           </span>
         </Link>
       </div>
@@ -685,7 +685,7 @@ export default function StockTickerPage() {
           >
             <span>Historical Analysis</span>
             <span style={{ fontSize: 10, opacity: 0.7, fontWeight: 400 }}>
-              Past returns, drawdowns, and market correlation analysis
+              Returns • Drawdowns • Beta
             </span>
           </button>
           <button
@@ -708,7 +708,7 @@ export default function StockTickerPage() {
           >
             <span>STD Channel Analysis</span>
             <span style={{ fontSize: 10, opacity: 0.7, fontWeight: 400 }}>
-              Regression bands showing overbought/oversold levels
+              Regression • Bands • Mean reversion
             </span>
           </button>
         </div>
