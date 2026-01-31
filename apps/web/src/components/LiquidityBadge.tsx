@@ -7,7 +7,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 interface LiquidityData {
   regime: 'Highly Liquid' | 'Liquid' | 'Moderate' | 'Illiquid' | 'Very Illiquid';
@@ -28,6 +28,21 @@ export function LiquidityBadge({ ticker, defaultExpanded = false }: LiquidityBad
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Close on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setExpanded(false);
+      }
+    }
+
+    if (expanded) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [expanded]);
 
   useEffect(() => {
     async function fetchLiquidity() {
@@ -115,18 +130,51 @@ export function LiquidityBadge({ ticker, defaultExpanded = false }: LiquidityBad
     );
   }
 
-  // Expanded view with details
+  // Expanded view as floating popover
   return (
-    <div
-      style={{
-        backgroundColor: 'rgba(0,0,0,0.3)',
-        border: `1px solid ${color}`,
-        borderRadius: 8,
-        padding: 16,
-        position: 'relative',
-        minWidth: 320,
-      }}
-    >
+    <div ref={wrapperRef} style={{ position: 'relative', display: 'inline-block' }}>
+      {/* Compact badge */}
+      <div
+        onClick={() => setExpanded(false)}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '4px 10px',
+          backgroundColor: 'rgba(0,0,0,0.3)',
+          border: `1px solid ${color}`,
+          borderRadius: 4,
+          fontSize: 12,
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.5)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.3)';
+        }}
+      >
+        <span style={{ color }}>{indicator}</span>
+        <span style={{ color: '#fff', fontWeight: 500 }}>{data.regime}</span>
+        <span style={{ color: '#888', fontSize: 10, marginLeft: 2 }}>▲</span>
+      </div>
+
+      {/* Floating details panel */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 'calc(100% + 8px)',
+          left: 0,
+          zIndex: 1000,
+          backgroundColor: 'rgba(0,0,0,0.95)',
+          border: `1px solid ${color}`,
+          borderRadius: 8,
+          padding: 16,
+          minWidth: 360,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+        }}
+      >
       <button
         onClick={() => setExpanded(false)}
         style={{
@@ -199,6 +247,7 @@ export function LiquidityBadge({ ticker, defaultExpanded = false }: LiquidityBad
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }
