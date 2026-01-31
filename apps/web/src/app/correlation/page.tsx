@@ -5,6 +5,20 @@ import Link from "next/link";
 import CorrelationHeatmap from "@/components/CorrelationHeatmap";
 import RollingCorrelationChart from "@/components/RollingCorrelationChart";
 
+// Helper function to calculate significance stars for correlation
+function getSignificanceStars(correlation: number, n: number = 252): string {
+  // T-statistic for correlation: t = r * sqrt((n-2) / (1-r^2))
+  const r = correlation;
+  const tStat = Math.abs(r) * Math.sqrt((n - 2) / (1 - r * r));
+
+  // Approximate p-values based on t-statistic
+  // For large samples (n>120), use normal approximation
+  if (tStat > 3.29) return '***'; // p < 0.001
+  if (tStat > 2.58) return '**';  // p < 0.01
+  if (tStat > 1.96) return '*';   // p < 0.05
+  return '';                       // Not significant
+}
+
 const PRESET_GROUPS = {
   "Norwegian Equities": ["AKER", "DNB", "EQNR", "MOWI", "OBX"],
   "Energy Giants": ["EQNR", "AKRBP", "VAR", "OBX"],
@@ -1106,6 +1120,9 @@ export default function CorrelationPage() {
                                    item.avgCorrelation < 0.3 ? "var(--muted)" : "var(--foreground)"
                           }}>
                             {item.avgCorrelation.toFixed(2)}
+                            <span style={{ fontSize: 14, color: "#f59e0b", marginLeft: 4 }}>
+                              {getSignificanceStars(item.avgCorrelation)}
+                            </span>
                           </div>
                         </div>
                       )
