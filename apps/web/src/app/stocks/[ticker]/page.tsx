@@ -616,7 +616,7 @@ export default function StockTickerPage() {
             display: "inline-flex",
             flexDirection: "column",
             alignItems: "flex-start",
-            gap: 2,
+            gap: 4,
             textDecoration: "none",
             letterSpacing: "0.01em",
             transition: "all 0.15s",
@@ -624,7 +624,7 @@ export default function StockTickerPage() {
         >
           <span>Volatility Analysis</span>
           <span style={{ fontSize: 10, color: "var(--muted-foreground)", fontWeight: 400 }}>
-            Price risk metrics
+            Measures price fluctuation and risk using statistical variance
           </span>
         </Link>
         <Link
@@ -640,7 +640,7 @@ export default function StockTickerPage() {
             display: "inline-flex",
             flexDirection: "column",
             alignItems: "flex-start",
-            gap: 2,
+            gap: 4,
             textDecoration: "none",
             letterSpacing: "0.01em",
             transition: "all 0.15s",
@@ -648,7 +648,7 @@ export default function StockTickerPage() {
         >
           <span>Monte Carlo Simulation</span>
           <span style={{ fontSize: 10, color: "var(--muted-foreground)", fontWeight: 400 }}>
-            Future price scenarios
+            Probabilistic model of thousands of potential future price paths
           </span>
         </Link>
       </div>
@@ -680,12 +680,12 @@ export default function StockTickerPage() {
               display: "flex",
               flexDirection: "column",
               alignItems: "flex-start",
-              gap: 2,
+              gap: 3,
             }}
           >
             <span>Historical Analysis</span>
             <span style={{ fontSize: 10, opacity: 0.7, fontWeight: 400 }}>
-              Returns & market beta
+              Past returns, drawdowns, and market correlation analysis
             </span>
           </button>
           <button
@@ -703,12 +703,12 @@ export default function StockTickerPage() {
               display: "flex",
               flexDirection: "column",
               alignItems: "flex-start",
-              gap: 2,
+              gap: 3,
             }}
           >
             <span>STD Channel Analysis</span>
             <span style={{ fontSize: 10, opacity: 0.7, fontWeight: 400 }}>
-              Trading bands
+              Regression bands showing overbought/oversold levels
             </span>
           </button>
         </div>
