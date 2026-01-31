@@ -1,7 +1,12 @@
 // apps/web/scripts/ibkr-daily-update.ts
+import { config } from "dotenv";
+import { resolve } from "path";
 import { Client } from "pg";
 import { IBKRClient, ALL_TICKERS } from "@ineqre/ibkr";
 import type { PriceData } from "@ineqre/ibkr";
+
+// Load environment variables from .env.local
+config({ path: resolve(__dirname, "../.env.local") });
 
 const IBKR_BASE_URL = process.env.IBKR_GATEWAY_URL || "https://localhost:5000";
 const DATABASE_URL = process.env.DATABASE_URL;
