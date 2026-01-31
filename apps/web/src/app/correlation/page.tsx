@@ -51,6 +51,7 @@ export default function CorrelationPage() {
   const [correlationData, setCorrelationData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showCorrelationInfo, setShowCorrelationInfo] = useState(false);
 
   // Settings
   const [timeframe, setTimeframe] = useState(365);
@@ -1008,9 +1009,81 @@ export default function CorrelationPage() {
                   borderRadius: 4,
                   padding: 24
                 }}>
-                  <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                    Average Correlations
-                  </h2>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <h2 style={{ fontSize: 16, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", margin: 0 }}>
+                      Average Correlations
+                    </h2>
+                    <button
+                      onClick={() => setShowCorrelationInfo(!showCorrelationInfo)}
+                      style={{
+                        background: "transparent",
+                        border: "1px solid var(--border)",
+                        borderRadius: 4,
+                        padding: "6px 12px",
+                        fontSize: 12,
+                        color: "var(--foreground)",
+                        cursor: "pointer",
+                        fontWeight: 500,
+                        transition: "all 0.2s"
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "var(--hover-bg)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                      }}
+                    >
+                      {showCorrelationInfo ? "Hide" : "Show"} Explanation
+                    </button>
+                  </div>
+
+                  {showCorrelationInfo && (
+                    <div style={{
+                      background: "rgba(0,0,0,0.2)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 4,
+                      padding: 16,
+                      marginBottom: 20,
+                      fontSize: 13,
+                      lineHeight: 1.6
+                    }}>
+                      <div style={{ fontWeight: 600, marginBottom: 12, color: "var(--foreground)" }}>
+                        Understanding Correlations & Statistical Significance
+                      </div>
+
+                      <div style={{ marginBottom: 12 }}>
+                        <strong style={{ color: "var(--accent)" }}>Correlation:</strong> Measures how two stocks move together.
+                        <ul style={{ marginTop: 4, marginBottom: 0, paddingLeft: 20, color: "var(--muted-foreground)" }}>
+                          <li>+1.0 = Perfect positive correlation (move together)</li>
+                          <li>0.0 = No correlation (move independently)</li>
+                          <li>-1.0 = Perfect negative correlation (move opposite)</li>
+                          <li>&gt;0.7 = Strong • 0.4-0.7 = Moderate • &lt;0.4 = Weak</li>
+                        </ul>
+                      </div>
+
+                      <div style={{ marginBottom: 12 }}>
+                        <strong style={{ color: "var(--accent)" }}>Beta (β):</strong> Measures sensitivity to market (OBX) movements.
+                        <ul style={{ marginTop: 4, marginBottom: 0, paddingLeft: 20, color: "var(--muted-foreground)" }}>
+                          <li>β = 1.0 → Stock moves 1% for every 1% OBX move</li>
+                          <li>β &gt; 1.0 → More volatile than market (amplified moves)</li>
+                          <li>β &lt; 1.0 → Less volatile than market (dampened moves)</li>
+                          <li>β &lt; 0 → Moves opposite to market (rare)</li>
+                        </ul>
+                      </div>
+
+                      <div>
+                        <strong style={{ color: "var(--accent)" }}>Confidence Intervals (CI):</strong> Statistical reliability of estimates.
+                        <ul style={{ marginTop: 4, marginBottom: 0, paddingLeft: 20, color: "var(--muted-foreground)" }}>
+                          <li>95% CI: We're 95% confident true value is in this range</li>
+                          <li>Narrow CI = More precise estimate (more data)</li>
+                          <li>Wide CI = Less precise estimate (less data/more volatility)</li>
+                          <li>p-value &lt; 0.05 = Statistically significant (*)</li>
+                          <li>Significance: *** (p&lt;0.001), ** (p&lt;0.01), * (p&lt;0.05)</li>
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
                     {correlationData.averageCorrelations.map(
                       (item: { ticker: string; avgCorrelation: number }) => (
