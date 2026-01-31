@@ -20,13 +20,14 @@ interface LiquidityData {
 
 interface LiquidityBadgeProps {
   ticker: string;
-  expanded?: boolean;
+  defaultExpanded?: boolean;
 }
 
-export function LiquidityBadge({ ticker, expanded = false }: LiquidityBadgeProps) {
+export function LiquidityBadge({ ticker, defaultExpanded = false }: LiquidityBadgeProps) {
   const [data, setData] = useState<LiquidityData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(defaultExpanded);
 
   useEffect(() => {
     async function fetchLiquidity() {
@@ -84,9 +85,10 @@ export function LiquidityBadge({ ticker, expanded = false }: LiquidityBadgeProps
     : `${(data.avgDailyVolume / 1_000).toFixed(0)}K`;
 
   if (!expanded) {
-    // Compact badge
+    // Compact badge - clickable to expand
     return (
       <div
+        onClick={() => setExpanded(true)}
         style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -96,10 +98,19 @@ export function LiquidityBadge({ ticker, expanded = false }: LiquidityBadgeProps
           border: `1px solid ${color}`,
           borderRadius: 4,
           fontSize: 12,
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.5)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.3)';
         }}
       >
         <span style={{ color }}>{indicator}</span>
         <span style={{ color: '#fff', fontWeight: 500 }}>{data.regime}</span>
+        <span style={{ color: '#888', fontSize: 10, marginLeft: 2 }}>▼</span>
       </div>
     );
   }
@@ -112,8 +123,28 @@ export function LiquidityBadge({ ticker, expanded = false }: LiquidityBadgeProps
         border: `1px solid ${color}`,
         borderRadius: 8,
         padding: 16,
+        position: 'relative',
+        minWidth: 320,
       }}
     >
+      <button
+        onClick={() => setExpanded(false)}
+        style={{
+          position: 'absolute',
+          top: 12,
+          right: 12,
+          background: 'transparent',
+          border: 'none',
+          color: '#888',
+          cursor: 'pointer',
+          fontSize: 16,
+          padding: 4,
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = '#888'; }}
+      >
+        ✕
+      </button>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         <span style={{ color, fontSize: 18 }}>{indicator}</span>
         <div>

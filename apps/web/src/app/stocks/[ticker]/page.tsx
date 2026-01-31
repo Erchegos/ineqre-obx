@@ -9,6 +9,7 @@ import ResidualSquaresChart from "@/components/ResidualSquaresChart";
 import TimeframeSelector from "@/components/TimeframeSelector";
 import StockFundamentalsPanel from "@/components/StockFundamentalsPanel";
 import CandlestickChart from "@/components/CandlestickChart";
+import { LiquidityBadge } from "@/components/LiquidityBadge";
 
 type Stats = {
   totalReturn: number;
@@ -575,6 +576,7 @@ export default function StockTickerPage() {
         <h1 style={{ fontSize: 32, fontWeight: 600, margin: 0, letterSpacing: "-0.02em", color: "var(--foreground)" }}>
           {ticker || "?"}
         </h1>
+        {ticker && <LiquidityBadge ticker={ticker} />}
         <Link
           href="/stocks"
           style={{
