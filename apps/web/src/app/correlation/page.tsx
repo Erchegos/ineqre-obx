@@ -66,6 +66,10 @@ export default function CorrelationPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCorrelationInfo, setShowCorrelationInfo] = useState(false);
+  const [showRollingInfo, setShowRollingInfo] = useState(false);
+  const [rollingPairIndices, setRollingPairIndices] = useState<[number, number]>([0, 1]);
+  const [rollingChartData, setRollingChartData] = useState<any>(null);
+  const [rollingLoading, setRollingLoading] = useState(false);
 
   // Settings
   const [timeframe, setTimeframe] = useState(365);
@@ -161,6 +165,10 @@ export default function CorrelationPage() {
         setCorrelationData(null);
       } else {
         setCorrelationData(data);
+        // Initialize rolling chart with first two tickers
+        if (data.rollingCorrelations && data.rollingCorrelations.length > 0) {
+          setRollingChartData(data.rollingCorrelations);
+        }
       }
     } catch (e: any) {
       setError(e.message);
@@ -169,6 +177,42 @@ export default function CorrelationPage() {
       setLoading(false);
     }
   }
+
+  async function fetchRollingCorrelationForPair(idx1: number, idx2: number) {
+    if (selectedTickers.length < 2 || idx1 === idx2) return;
+
+    setRollingLoading(true);
+
+    try {
+      const ticker1 = selectedTickers[idx1];
+      const ticker2 = selectedTickers[idx2];
+
+      const params = new URLSearchParams({
+        tickers: `${ticker1},${ticker2}`,
+        limit: timeframe.toString(),
+        window: rollingWindow.toString(),
+        mode: dataMode,
+      });
+
+      const res = await fetch(`/api/correlation?${params}`);
+      const data = await res.json();
+
+      if (res.ok && data.rollingCorrelations) {
+        setRollingChartData(data.rollingCorrelations);
+      }
+    } catch (e: any) {
+      console.error("Failed to fetch rolling correlation:", e);
+    } finally {
+      setRollingLoading(false);
+    }
+  }
+
+  // Fetch rolling correlation when ticker pair selection changes
+  useEffect(() => {
+    if (selectedTickers.length >= 2 && rollingPairIndices[0] !== rollingPairIndices[1]) {
+      fetchRollingCorrelationForPair(rollingPairIndices[0], rollingPairIndices[1]);
+    }
+  }, [rollingPairIndices, timeframe, rollingWindow, dataMode]);
 
   function exportToCSV() {
     try {
@@ -1053,47 +1097,57 @@ export default function CorrelationPage() {
 
                   {showCorrelationInfo && (
                     <div style={{
-                      background: "rgba(0,0,0,0.2)",
+                      background: "var(--hover-bg)",
                       border: "1px solid var(--border)",
                       borderRadius: 4,
-                      padding: 16,
+                      padding: 20,
                       marginBottom: 20,
                       fontSize: 13,
-                      lineHeight: 1.6
+                      lineHeight: 1.7,
+                      color: "var(--foreground)"
                     }}>
-                      <div style={{ fontWeight: 600, marginBottom: 12, color: "var(--foreground)" }}>
-                        Understanding Correlations & Statistical Significance
+                      <div style={{ fontWeight: 700, marginBottom: 16, fontSize: 14, color: "var(--foreground)" }}>
+                        Understanding Correlation Metrics
                       </div>
 
-                      <div style={{ marginBottom: 12 }}>
-                        <strong style={{ color: "var(--accent)" }}>Correlation:</strong> Measures how two stocks move together.
-                        <ul style={{ marginTop: 4, marginBottom: 0, paddingLeft: 20, color: "var(--muted-foreground)" }}>
-                          <li>+1.0 = Perfect positive correlation (move together)</li>
-                          <li>0.0 = No correlation (move independently)</li>
-                          <li>-1.0 = Perfect negative correlation (move opposite)</li>
-                          <li>&gt;0.7 = Strong • 0.4-0.7 = Moderate • &lt;0.4 = Weak</li>
-                        </ul>
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ fontWeight: 600, marginBottom: 6, color: "var(--foreground)" }}>Correlation Coefficient</div>
+                        <div style={{ marginBottom: 8, color: "var(--foreground)" }}>
+                          Measures linear relationship strength between two assets. Range: -1.0 to +1.0
+                        </div>
+                        <div style={{ fontSize: 12, color: "var(--muted-foreground)", paddingLeft: 12 }}>
+                          <div>• +1.0: Perfect positive (move in lockstep)</div>
+                          <div>• 0.0: No linear relationship (independent)</div>
+                          <div>• -1.0: Perfect negative (mirror opposite)</div>
+                          <div style={{ marginTop: 4 }}>Interpretation: Strong (&gt;0.7), Moderate (0.4-0.7), Weak (&lt;0.4)</div>
+                        </div>
                       </div>
 
-                      <div style={{ marginBottom: 12 }}>
-                        <strong style={{ color: "var(--accent)" }}>Beta (β):</strong> Measures sensitivity to market (OBX) movements.
-                        <ul style={{ marginTop: 4, marginBottom: 0, paddingLeft: 20, color: "var(--muted-foreground)" }}>
-                          <li>β = 1.0 → Stock moves 1% for every 1% OBX move</li>
-                          <li>β &gt; 1.0 → More volatile than market (amplified moves)</li>
-                          <li>β &lt; 1.0 → Less volatile than market (dampened moves)</li>
-                          <li>β &lt; 0 → Moves opposite to market (rare)</li>
-                        </ul>
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ fontWeight: 600, marginBottom: 6, color: "var(--foreground)" }}>Beta (Market Sensitivity)</div>
+                        <div style={{ marginBottom: 8, color: "var(--foreground)" }}>
+                          Measures systematic risk relative to market (OBX) movements
+                        </div>
+                        <div style={{ fontSize: 12, color: "var(--muted-foreground)", paddingLeft: 12 }}>
+                          <div>• β = 1.0: Moves in line with market</div>
+                          <div>• β &gt; 1.0: Amplifies market moves (higher volatility)</div>
+                          <div>• β &lt; 1.0: Dampens market moves (defensive)</div>
+                          <div>• β &lt; 0: Inverse market relationship</div>
+                        </div>
                       </div>
 
                       <div>
-                        <strong style={{ color: "var(--accent)" }}>Confidence Intervals (CI):</strong> Statistical reliability of estimates.
-                        <ul style={{ marginTop: 4, marginBottom: 0, paddingLeft: 20, color: "var(--muted-foreground)" }}>
-                          <li>95% CI: We're 95% confident true value is in this range</li>
-                          <li>Narrow CI = More precise estimate (more data)</li>
-                          <li>Wide CI = Less precise estimate (less data/more volatility)</li>
-                          <li>p-value &lt; 0.05 = Statistically significant (*)</li>
-                          <li>Significance: *** (p&lt;0.001), ** (p&lt;0.01), * (p&lt;0.05)</li>
-                        </ul>
+                        <div style={{ fontWeight: 600, marginBottom: 6, color: "var(--foreground)" }}>Statistical Significance</div>
+                        <div style={{ marginBottom: 8, color: "var(--foreground)" }}>
+                          Stars (***) indicate reliability - not strength - of the correlation estimate
+                        </div>
+                        <div style={{ fontSize: 12, color: "var(--muted-foreground)", paddingLeft: 12 }}>
+                          <div>• *** p&lt;0.001: Highly significant (very low chance of randomness)</div>
+                          <div>• ** p&lt;0.01: Significant</div>
+                          <div>• * p&lt;0.05: Marginally significant</div>
+                          <div>• No stars: Could be random noise</div>
+                          <div style={{ marginTop: 4, fontStyle: "italic" }}>Note: High significance ≠ strong correlation. A 0.2 correlation can be highly significant with enough data.</div>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1133,7 +1187,7 @@ export default function CorrelationPage() {
             </div>
 
             {/* Rolling Correlation Chart */}
-            {correlationData.rollingCorrelations && correlationData.rollingCorrelations.length > 0 && (
+            {correlationData.rollingCorrelations && correlationData.rollingCorrelations.length > 0 && selectedTickers.length >= 2 && (
               <div style={{
                 background: "var(--card-bg)",
                 border: "1px solid var(--border)",
@@ -1145,12 +1199,150 @@ export default function CorrelationPage() {
                   <h2 style={{ fontSize: 16, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                     Rolling Correlation Time Series
                   </h2>
-                  <span style={{ fontSize: 13, padding: "4px 8px", background: "var(--hover-bg)", borderRadius: 3, fontWeight: 600 }}>
-                    {selectedTickers[0]} vs {selectedTickers[1]}
-                  </span>
+                  <button
+                    onClick={() => setShowRollingInfo(!showRollingInfo)}
+                    style={{
+                      background: "var(--hover-bg)",
+                      border: "1px solid var(--border)",
+                      fontSize: 11,
+                      color: "var(--accent)",
+                      cursor: "pointer",
+                      padding: "6px 12px",
+                      borderRadius: 3,
+                      fontWeight: 500
+                    }}
+                  >
+                    {showRollingInfo ? "Hide" : "Show"} Explanation
+                  </button>
                 </div>
-                <div style={{ height: 400 }}>
-                  <RollingCorrelationChart data={correlationData.rollingCorrelations} />
+
+                {showRollingInfo && (
+                  <div style={{
+                    background: "var(--hover-bg)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 4,
+                    padding: 16,
+                    marginBottom: 20,
+                    fontSize: 13,
+                    lineHeight: 1.6
+                  }}>
+                    <div style={{ fontWeight: 600, marginBottom: 8, color: "var(--foreground)" }}>
+                      What is Rolling Correlation?
+                    </div>
+                    <p style={{ margin: "0 0 12px 0", color: "var(--muted-foreground)" }}>
+                      Rolling correlation measures how the relationship between two assets changes over time.
+                      Instead of calculating a single correlation for the entire period, it uses a moving window
+                      (e.g., 60 days) to compute correlation at each point in time.
+                    </p>
+                    <div style={{ fontWeight: 600, marginBottom: 8, color: "var(--foreground)" }}>
+                      Why it Matters
+                    </div>
+                    <p style={{ margin: "0 0 12px 0", color: "var(--muted-foreground)" }}>
+                      • <strong>Dynamic Relationships:</strong> Correlations are not constant - they vary with market regimes,
+                      economic cycles, and company-specific events<br/>
+                      • <strong>Risk Management:</strong> Portfolio diversification depends on low correlations.
+                      If correlations spike during crises, your "diversified" portfolio may not protect you<br/>
+                      • <strong>Volatility Context:</strong> The background shading shows market volatility.
+                      High volatility periods often coincide with correlation changes
+                    </p>
+                    <div style={{ fontWeight: 600, marginBottom: 8, color: "var(--foreground)" }}>
+                      Interpretation
+                    </div>
+                    <p style={{ margin: 0, color: "var(--muted-foreground)" }}>
+                      • <strong>+1.0:</strong> Perfect positive correlation (assets move together)<br/>
+                      • <strong>0.0:</strong> No correlation (assets move independently)<br/>
+                      • <strong>-1.0:</strong> Perfect negative correlation (assets move in opposite directions)<br/>
+                      • <strong>Volatility spikes</strong> (purple shading) often trigger correlation regime changes
+                    </p>
+                  </div>
+                )}
+
+                {/* Ticker Pair Selector */}
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  marginBottom: 16,
+                  padding: "12px 16px",
+                  background: "var(--hover-bg)",
+                  borderRadius: 4,
+                  border: "1px solid var(--border)"
+                }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)" }}>
+                    Compare:
+                  </span>
+                  <select
+                    value={rollingPairIndices[0]}
+                    onChange={(e) => {
+                      const newIdx = parseInt(e.target.value);
+                      if (newIdx !== rollingPairIndices[1]) {
+                        setRollingPairIndices([newIdx, rollingPairIndices[1]]);
+                      }
+                    }}
+                    style={{
+                      padding: "6px 10px",
+                      fontSize: 13,
+                      fontWeight: 500,
+                      background: "var(--card-bg)",
+                      color: "var(--foreground)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 3,
+                      cursor: "pointer"
+                    }}
+                  >
+                    {selectedTickers.map((ticker, idx) => (
+                      <option key={ticker} value={idx}>
+                        {ticker}
+                      </option>
+                    ))}
+                  </select>
+                  <span style={{ fontSize: 14, color: "var(--muted-foreground)", fontWeight: 600 }}>vs</span>
+                  <select
+                    value={rollingPairIndices[1]}
+                    onChange={(e) => {
+                      const newIdx = parseInt(e.target.value);
+                      if (newIdx !== rollingPairIndices[0]) {
+                        setRollingPairIndices([rollingPairIndices[0], newIdx]);
+                      }
+                    }}
+                    style={{
+                      padding: "6px 10px",
+                      fontSize: 13,
+                      fontWeight: 500,
+                      background: "var(--card-bg)",
+                      color: "var(--foreground)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 3,
+                      cursor: "pointer"
+                    }}
+                  >
+                    {selectedTickers.map((ticker, idx) => (
+                      <option key={ticker} value={idx}>
+                        {ticker}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ height: 400, position: "relative" }}>
+                  {rollingLoading && (
+                    <div style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "rgba(0,0,0,0.5)",
+                      zIndex: 10,
+                      borderRadius: 4
+                    }}>
+                      <div style={{ color: "#fff", fontSize: 14 }}>Loading correlation data...</div>
+                    </div>
+                  )}
+                  <RollingCorrelationChart data={rollingChartData || correlationData.rollingCorrelations} />
                 </div>
               </div>
             )}

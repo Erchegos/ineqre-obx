@@ -110,7 +110,7 @@ export function LiquidityBadge({ ticker, defaultExpanded = false }: LiquidityBad
           alignItems: 'center',
           gap: 6,
           padding: '4px 10px',
-          backgroundColor: 'rgba(0,0,0,0.3)',
+          backgroundColor: 'var(--card-bg)',
           border: `1px solid ${color}`,
           borderRadius: 4,
           fontSize: 12,
@@ -118,15 +118,15 @@ export function LiquidityBadge({ ticker, defaultExpanded = false }: LiquidityBad
           transition: 'all 0.2s',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.5)';
+          e.currentTarget.style.backgroundColor = 'var(--hover-bg)';
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.3)';
+          e.currentTarget.style.backgroundColor = 'var(--card-bg)';
         }}
       >
         <span style={{ color }}>{indicator}</span>
-        <span style={{ color: '#fff', fontWeight: 500 }}>{data.regime}</span>
-        <span style={{ color: '#888', fontSize: 10, marginLeft: 2 }}>▼</span>
+        <span style={{ color: 'var(--foreground)', fontWeight: 500 }}>{data.regime}</span>
+        <span style={{ color: 'var(--muted-foreground)', fontSize: 10, marginLeft: 2 }}>▼</span>
       </div>
     );
   }
@@ -142,7 +142,7 @@ export function LiquidityBadge({ ticker, defaultExpanded = false }: LiquidityBad
           alignItems: 'center',
           gap: 6,
           padding: '4px 10px',
-          backgroundColor: 'rgba(0,0,0,0.3)',
+          backgroundColor: 'var(--card-bg)',
           border: `1px solid ${color}`,
           borderRadius: 4,
           fontSize: 12,
@@ -150,15 +150,15 @@ export function LiquidityBadge({ ticker, defaultExpanded = false }: LiquidityBad
           transition: 'all 0.2s',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.5)';
+          e.currentTarget.style.backgroundColor = 'var(--hover-bg)';
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.3)';
+          e.currentTarget.style.backgroundColor = 'var(--card-bg)';
         }}
       >
         <span style={{ color }}>{indicator}</span>
-        <span style={{ color: '#fff', fontWeight: 500 }}>{data.regime}</span>
-        <span style={{ color: '#888', fontSize: 10, marginLeft: 2 }}>▲</span>
+        <span style={{ color: 'var(--foreground)', fontWeight: 500 }}>{data.regime}</span>
+        <span style={{ color: 'var(--muted-foreground)', fontSize: 10, marginLeft: 2 }}>▲</span>
       </div>
 
       {/* Floating details panel */}
@@ -168,12 +168,12 @@ export function LiquidityBadge({ ticker, defaultExpanded = false }: LiquidityBad
           top: 'calc(100% + 8px)',
           left: 0,
           zIndex: 1000,
-          backgroundColor: 'rgba(0,0,0,0.95)',
-          border: `1px solid ${color}`,
-          borderRadius: 8,
-          padding: 16,
+          backgroundColor: 'var(--background)',
+          border: `2px solid ${color}`,
+          borderRadius: 6,
+          padding: 18,
           minWidth: 360,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+          boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
         }}
       >
       <button
@@ -184,39 +184,40 @@ export function LiquidityBadge({ ticker, defaultExpanded = false }: LiquidityBad
           right: 12,
           background: 'transparent',
           border: 'none',
-          color: '#888',
+          color: 'var(--muted-foreground)',
           cursor: 'pointer',
           fontSize: 16,
           padding: 4,
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = '#888'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--foreground)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--muted-foreground)'; }}
       >
         ✕
       </button>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         <span style={{ color, fontSize: 18 }}>{indicator}</span>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--foreground)' }}>
             {data.regime}
           </div>
-          <div style={{ fontSize: 11, color: '#888' }}>
+          <div style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
             Liquidity Classification
           </div>
         </div>
       </div>
 
-      <div style={{ fontSize: 12, color: '#ddd', marginBottom: 12 }}>
+      <div style={{ fontSize: 12, color: 'var(--foreground)', marginBottom: 12 }}>
         <div style={{ marginBottom: 4 }}>
-          Avg Daily Volume: <span style={{ fontFamily: 'monospace', color: '#fff' }}>{volumeFormatted}</span> shares
+          Avg Daily Volume: <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{volumeFormatted}</span> shares
         </div>
         <div style={{ marginBottom: 4 }}>
-          Avg Daily Value: <span style={{ fontFamily: 'monospace', color: '#fff' }}>{valueInMillions}M {data.currency}</span>
+          Avg Daily Value: <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{valueInMillions}M {data.currency}</span>
         </div>
         <div>
           Recent Trend: <span style={{
-            color: data.recentTrend === 'Improving' ? '#10b981' :
-                  data.recentTrend === 'Deteriorating' ? '#ef4444' : '#888'
+            color: data.recentTrend === 'Improving' ? 'var(--success)' :
+                  data.recentTrend === 'Deteriorating' ? 'var(--danger)' : 'var(--muted-foreground)',
+            fontWeight: 600
           }}>
             {data.recentTrend}
           </span>
@@ -225,11 +226,11 @@ export function LiquidityBadge({ ticker, defaultExpanded = false }: LiquidityBad
 
       {data.tradingImplications.length > 0 && (
         <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#888', marginBottom: 6 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 6 }}>
             TRADING IMPLICATIONS
           </div>
           {data.tradingImplications.map((implication, idx) => (
-            <div key={idx} style={{ fontSize: 11, color: '#bbb', marginBottom: 2 }}>
+            <div key={idx} style={{ fontSize: 11, color: 'var(--foreground)', marginBottom: 2 }}>
               • {implication}
             </div>
           ))}
@@ -238,11 +239,11 @@ export function LiquidityBadge({ ticker, defaultExpanded = false }: LiquidityBad
 
       {data.warnings.length > 0 && (
         <div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#f59e0b', marginBottom: 6 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warning)', marginBottom: 6 }}>
             WARNINGS
           </div>
           {data.warnings.map((warning, idx) => (
-            <div key={idx} style={{ fontSize: 11, color: '#f59e0b', marginBottom: 2 }}>
+            <div key={idx} style={{ fontSize: 11, color: 'var(--warning)', marginBottom: 2 }}>
               ⚠ {warning}
             </div>
           ))}

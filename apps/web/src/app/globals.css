@@ -2,7 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
+:root,
+:root[data-theme="light"] {
   /* Light mode colors */
   --background: #ffffff;
   --foreground: #0a0a0a;
@@ -26,9 +27,33 @@
   --table-hover: #f9fafb;
 }
 
+:root[data-theme="dark"] {
+  /* Dark mode colors */
+  --background: #0a0a0a;
+  --foreground: #ffffff;
+  --card-bg: rgba(255, 255, 255, 0.02);
+  --card-border: rgba(255, 255, 255, 0.08);
+  --muted: rgba(255, 255, 255, 0.5);
+  --muted-foreground: rgba(255, 255, 255, 0.4);
+  --accent: #3b82f6;
+  --accent-hover: #60a5fa;
+  --success: rgba(80, 180, 80, 0.9);
+  --danger: rgba(200, 80, 80, 0.9);
+  --warning: rgba(245, 158, 11, 0.9);
+  --border: rgba(255, 255, 255, 0.1);
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --hover-bg: rgba(255, 255, 255, 0.05);
+  --chart-line: #3b82f6;
+  --chart-grid: rgba(255, 255, 255, 0.1);
+  --input-bg: rgba(255, 255, 255, 0.05);
+  --input-border: rgba(255, 255, 255, 0.15);
+  --table-border: rgba(255, 255, 255, 0.05);
+  --table-hover: rgba(255, 255, 255, 0.02);
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
-    /* Dark mode colors */
+  :root:not([data-theme]) {
+    /* Dark mode colors when no manual theme is set */
     --background: #0a0a0a;
     --foreground: #ffffff;
     --card-bg: rgba(255, 255, 255, 0.02);

@@ -75,14 +75,15 @@ export default function RollingCorrelationChart({ data }: Props) {
               fontSize: 12,
             }}
             formatter={(value: any, name: string | undefined) => {
-              if (name === "correlation") {
-                return [value.toFixed(3), "Correlation"];
+              if (name === "Correlation") {
+                return [Number(value).toFixed(2), "Correlation"];
               }
-              if (name === "volatility") {
-                return [(value * 100).toFixed(2) + "%", "Volatility"];
+              if (name === "Volatility") {
+                return [(Number(value) * 100).toFixed(2) + "%", "Volatility"];
               }
               return [value, name || ""];
             }}
+            labelFormatter={(label: string) => `Date: ${label}`}
           />
           <Legend
             wrapperStyle={{ fontSize: 12 }}
@@ -94,18 +95,19 @@ export default function RollingCorrelationChart({ data }: Props) {
             yAxisId="right"
             type="monotone"
             dataKey="volatility"
-            fill="rgba(251, 191, 36, 0.2)"
-            stroke="none"
+            fill="rgba(139, 92, 246, 0.15)"
+            stroke="rgba(139, 92, 246, 0.4)"
+            strokeWidth={1}
             name="Volatility"
           />
-          
+
           {/* Correlation line */}
           <Line
             yAxisId="left"
             type="monotone"
             dataKey="correlation"
-            stroke="rgb(59, 130, 246)"
-            strokeWidth={2}
+            stroke="rgb(34, 197, 94)"
+            strokeWidth={2.5}
             dot={false}
             name="Correlation"
           />

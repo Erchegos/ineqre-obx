@@ -650,19 +650,25 @@ export default function StockTickerPage() {
         <span style={{ fontSize: 13, color: "var(--muted)", letterSpacing: "0.02em", textTransform: "uppercase" }}>
           Analysis Mode
         </span>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{
+          display: "inline-flex",
+          border: "1px solid var(--border)",
+          borderRadius: 6,
+          background: "var(--card-bg)",
+          padding: 2,
+        }}>
           <button
             onClick={() => setViewMode("historical")}
             style={{
               padding: "8px 16px",
               borderRadius: 4,
-              border: viewMode === "historical" ? "1px solid var(--accent)" : "1px solid var(--card-border)",
-              background: viewMode === "historical" ? "var(--accent)" : "var(--card-bg)",
+              border: "none",
+              background: viewMode === "historical" ? "var(--accent)" : "transparent",
               color: viewMode === "historical" ? "white" : "var(--foreground)",
               fontSize: 13,
               fontWeight: 500,
               cursor: "pointer",
-              transition: "all 0.15s",
+              transition: "all 0.2s",
             }}
           >
             Historical Analysis
@@ -672,13 +678,13 @@ export default function StockTickerPage() {
             style={{
               padding: "8px 16px",
               borderRadius: 4,
-              border: viewMode === "std_channel" ? "1px solid #2962ff" : "1px solid var(--card-border)",
-              background: viewMode === "std_channel" ? "#2962ff" : "var(--card-bg)",
+              border: "none",
+              background: viewMode === "std_channel" ? "#2962ff" : "transparent",
               color: viewMode === "std_channel" ? "white" : "var(--foreground)",
               fontSize: 13,
               fontWeight: 500,
               cursor: "pointer",
-              transition: "all 0.15s",
+              transition: "all 0.2s",
             }}
           >
             STD Channel Analysis
