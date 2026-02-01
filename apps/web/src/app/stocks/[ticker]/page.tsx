@@ -131,7 +131,7 @@ export default function StockTickerPage() {
   }, [params]);
 
   const initialLimit = useMemo(() => {
-    return clampInt(searchParams.get("limit"), 1260, 20, 5000); // Default to 5Y (1260 trading days)
+    return clampInt(searchParams.get("limit"), 1260, 20, 15000); // Default to 5Y (1260 trading days), max 15000 (~60 years)
   }, [searchParams]);
 
   const [limit, setLimit] = useState<number>(initialLimit);
@@ -151,6 +151,12 @@ export default function StockTickerPage() {
 
   const [returnsStartDate, setReturnsStartDate] = useState<string>("");
   const [returnsEndDate, setReturnsEndDate] = useState<string>("");
+
+  // Filter and sort state for Daily Returns table
+  const [returnFilter, setReturnFilter] = useState<"all" | "positive" | "negative" | "large_positive" | "large_negative" | "custom">("all");
+  const [customFilterThreshold, setCustomFilterThreshold] = useState<number>(5);
+  const [sortColumn, setSortColumn] = useState<"date" | "close" | "adj_close" | "return" | "cumulative">("date");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   // Residuals data
   const [residualsData, setResidualsData] = useState<Array<{
@@ -473,13 +479,29 @@ export default function StockTickerPage() {
   }, [data?.prices, data?.dateRange, chartMode]);
 
   const filteredReturns = useMemo(() => {
-    return activeReturns.filter(r => {
+    let filtered = activeReturns.filter(r => {
       const date = r.date;
       if (returnsStartDate && date < returnsStartDate) return false;
       if (returnsEndDate && date > returnsEndDate) return false;
       return true;
     });
-  }, [activeReturns, returnsStartDate, returnsEndDate]);
+
+    // Apply return filter
+    if (returnFilter === "positive") {
+      filtered = filtered.filter(r => r.return > 0);
+    } else if (returnFilter === "negative") {
+      filtered = filtered.filter(r => r.return < 0);
+    } else if (returnFilter === "large_positive") {
+      filtered = filtered.filter(r => r.return > 0.05); // > 5%
+    } else if (returnFilter === "large_negative") {
+      filtered = filtered.filter(r => r.return < -0.05); // < -5%
+    } else if (returnFilter === "custom") {
+      const threshold = customFilterThreshold / 100;
+      filtered = filtered.filter(r => Math.abs(r.return) >= threshold);
+    }
+
+    return filtered;
+  }, [activeReturns, returnsStartDate, returnsEndDate, returnFilter, customFilterThreshold]);
 
   const priceMap = useMemo(() => {
     if (!data?.prices) return {};
@@ -492,6 +514,62 @@ export default function StockTickerPage() {
   const returnStats = useMemo(() => {
     return calculateReturnStats(filteredReturns);
   }, [filteredReturns]);
+
+  // Sorted and filtered returns for table display
+  const sortedReturns = useMemo(() => {
+    const reversed = filteredReturns.slice().reverse(); // Newest first by default
+
+    // Calculate cumulative returns for sorting
+    const withCumulative = reversed.map((r, idx, arr) => {
+      const cumulativeReturn = arr.slice(idx).reduce((cum, ret) => cum * (1 + ret.return), 1) - 1;
+      const priceData = priceMap[r.date] || { close: 0, adj_close: 0 };
+      return {
+        ...r,
+        cumulative: cumulativeReturn,
+        close: priceData.close,
+        adj_close: priceData.adj_close ?? priceData.close,
+      };
+    });
+
+    // Sort by selected column
+    withCumulative.sort((a, b) => {
+      let aVal: number | string = 0;
+      let bVal: number | string = 0;
+
+      switch (sortColumn) {
+        case "date":
+          aVal = a.date;
+          bVal = b.date;
+          break;
+        case "close":
+          aVal = a.close;
+          bVal = b.close;
+          break;
+        case "adj_close":
+          aVal = a.adj_close;
+          bVal = b.adj_close;
+          break;
+        case "return":
+          aVal = a.return;
+          bVal = b.return;
+          break;
+        case "cumulative":
+          aVal = a.cumulative;
+          bVal = b.cumulative;
+          break;
+      }
+
+      if (typeof aVal === "string" && typeof bVal === "string") {
+        return sortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      } else {
+        const numA = typeof aVal === "number" ? aVal : 0;
+        const numB = typeof bVal === "number" ? bVal : 0;
+        return sortDirection === "asc" ? numA - numB : numB - numA;
+      }
+    });
+
+    return withCumulative;
+  }, [filteredReturns, priceMap, sortColumn, sortDirection]);
 
   // STD Channel chart data
   const stdChartData = useMemo(() => {
@@ -547,19 +625,32 @@ export default function StockTickerPage() {
 
 
   const handleDateRangePreset = (preset: string) => {
+    // When "All" is selected, fetch all available data
+    if (preset === "All") {
+      setLimit(15000); // Set to max limit to fetch all data
+      // Wait for data to load, then set date range
+      setTimeout(() => {
+        if (activeReturns && activeReturns.length > 0) {
+          setReturnsStartDate(activeReturns[0].date);
+          setReturnsEndDate(activeReturns[activeReturns.length - 1].date);
+        }
+      }, 100);
+      return;
+    }
+
     if (!activeReturns || activeReturns.length === 0) return;
     const endDate = activeReturns[activeReturns.length - 1].date;
     let startIdx = 0;
-    
+
     switch (preset) {
       case "1M": startIdx = Math.max(0, activeReturns.length - 21); break;
       case "3M": startIdx = Math.max(0, activeReturns.length - 63); break;
       case "6M": startIdx = Math.max(0, activeReturns.length - 126); break;
       case "1Y": startIdx = Math.max(0, activeReturns.length - 252); break;
       case "3Y": startIdx = Math.max(0, activeReturns.length - 756); break;
-      case "All": startIdx = 0; break;
+      case "5Y": startIdx = Math.max(0, activeReturns.length - 1260); break;
     }
-    
+
     setReturnsStartDate(activeReturns[startIdx].date);
     setReturnsEndDate(endDate);
   };
@@ -1403,14 +1494,13 @@ export default function StockTickerPage() {
             </h2>
             <p style={{ fontSize: 12, color: "var(--muted-foreground)", marginBottom: 16, lineHeight: 1.5 }}>
               <strong>Daily return time series with statistical measures.</strong> Each row shows the log return for that day,
-              with cumulative return calculated from the oldest date in the selected range. Use timeframe controls to analyze
-              different periods. Win rate, skewness, and kurtosis reveal return distribution characteristics.
+              with cumulative return calculated from the oldest date in the selected range. Win rate, skewness, and kurtosis reveal return distribution characteristics.
             </p>
 
             {/* Date Controls */}
-            <div style={{ marginBottom: 24, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
+            <div style={{ marginBottom: 16, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                {["1M", "3M", "6M", "1Y", "3Y", "All"].map(preset => (
+                {["1M", "3M", "6M", "1Y", "3Y", "5Y", "All"].map(preset => (
                   <button
                     key={preset}
                     onClick={() => handleDateRangePreset(preset)}
@@ -1425,6 +1515,126 @@ export default function StockTickerPage() {
                 <input type="date" value={returnsStartDate} onChange={(e) => setReturnsStartDate(e.target.value)} style={{ padding: "6px 10px", borderRadius: 3, border: "1px solid var(--input-border)", background: "var(--input-bg)", color: "var(--foreground)", fontSize: 12 }} />
                 <span style={{ color: "var(--muted)" }}>→</span>
                 <input type="date" value={returnsEndDate} onChange={(e) => setReturnsEndDate(e.target.value)} style={{ padding: "6px 10px", borderRadius: 3, border: "1px solid var(--input-border)", background: "var(--input-bg)", color: "var(--foreground)", fontSize: 12 }} />
+              </div>
+            </div>
+
+            {/* Filter Controls */}
+            <div style={{ marginBottom: 24, padding: 14, borderRadius: 4, border: "1px solid var(--border-subtle)", background: "var(--hover-bg)" }}>
+              <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", marginBottom: 10, fontWeight: 600 }}>Filter Returns</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                <button
+                  onClick={() => setReturnFilter("all")}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 3,
+                    border: "1px solid var(--input-border)",
+                    background: returnFilter === "all" ? "var(--accent)" : "var(--input-bg)",
+                    color: returnFilter === "all" ? "white" : "var(--foreground)",
+                    fontSize: 12,
+                    cursor: "pointer",
+                    fontWeight: 500
+                  }}
+                >
+                  All Days
+                </button>
+                <button
+                  onClick={() => setReturnFilter("positive")}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 3,
+                    border: "1px solid var(--input-border)",
+                    background: returnFilter === "positive" ? "var(--success)" : "var(--input-bg)",
+                    color: returnFilter === "positive" ? "white" : "var(--foreground)",
+                    fontSize: 12,
+                    cursor: "pointer",
+                    fontWeight: 500
+                  }}
+                >
+                  Positive Only
+                </button>
+                <button
+                  onClick={() => setReturnFilter("negative")}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 3,
+                    border: "1px solid var(--input-border)",
+                    background: returnFilter === "negative" ? "var(--danger)" : "var(--input-bg)",
+                    color: returnFilter === "negative" ? "white" : "var(--foreground)",
+                    fontSize: 12,
+                    cursor: "pointer",
+                    fontWeight: 500
+                  }}
+                >
+                  Negative Only
+                </button>
+                <button
+                  onClick={() => setReturnFilter("large_positive")}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 3,
+                    border: "1px solid var(--input-border)",
+                    background: returnFilter === "large_positive" ? "var(--success)" : "var(--input-bg)",
+                    color: returnFilter === "large_positive" ? "white" : "var(--foreground)",
+                    fontSize: 12,
+                    cursor: "pointer",
+                    fontWeight: 500
+                  }}
+                >
+                  &gt; +5%
+                </button>
+                <button
+                  onClick={() => setReturnFilter("large_negative")}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 3,
+                    border: "1px solid var(--input-border)",
+                    background: returnFilter === "large_negative" ? "var(--danger)" : "var(--input-bg)",
+                    color: returnFilter === "large_negative" ? "white" : "var(--foreground)",
+                    fontSize: 12,
+                    cursor: "pointer",
+                    fontWeight: 500
+                  }}
+                >
+                  &lt; -5%
+                </button>
+                <button
+                  onClick={() => setReturnFilter("custom")}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 3,
+                    border: "1px solid var(--input-border)",
+                    background: returnFilter === "custom" ? "var(--accent)" : "var(--input-bg)",
+                    color: returnFilter === "custom" ? "white" : "var(--foreground)",
+                    fontSize: 12,
+                    cursor: "pointer",
+                    fontWeight: 500
+                  }}
+                >
+                  Custom
+                </button>
+                {returnFilter === "custom" && (
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <span style={{ fontSize: 12, color: "var(--muted)" }}>|±| ≥</span>
+                    <input
+                      type="number"
+                      value={customFilterThreshold}
+                      onChange={(e) => setCustomFilterThreshold(parseFloat(e.target.value) || 0)}
+                      min="0"
+                      max="100"
+                      step="0.5"
+                      style={{
+                        width: "60px",
+                        padding: "6px 8px",
+                        borderRadius: 3,
+                        border: "1px solid var(--input-border)",
+                        background: "var(--input-bg)",
+                        color: "var(--foreground)",
+                        fontSize: 12
+                      }}
+                    />
+                    <span style={{ fontSize: 12, color: "var(--muted)" }}>%</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1452,35 +1662,70 @@ export default function StockTickerPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr>
-                    <th style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--muted)", textAlign: "left" }}>Date</th>
-                    <th style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--muted)", textAlign: "right" }}>Close</th>
-                    <th style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--muted)", textAlign: "right" }}>Adj Close</th>
-                    <th style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--muted)", textAlign: "right" }}>Daily Return</th>
-                    <th style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--muted)", textAlign: "right" }}>Cumulative</th>
+                    {[
+                      { key: "date" as const, label: "Date", align: "left" },
+                      { key: "close" as const, label: "Close", align: "right" },
+                      { key: "adj_close" as const, label: "Adj Close", align: "right" },
+                      { key: "return" as const, label: "Daily Return", align: "right" },
+                      { key: "cumulative" as const, label: "Cumulative", align: "right" }
+                    ].map(({ key, label, align }) => (
+                      <th
+                        key={key}
+                        onClick={() => {
+                          if (sortColumn === key) {
+                            setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+                          } else {
+                            setSortColumn(key);
+                            setSortDirection(key === "date" ? "desc" : "desc");
+                          }
+                        }}
+                        style={{
+                          padding: "10px 12px",
+                          borderBottom: "1px solid var(--border)",
+                          color: sortColumn === key ? "var(--accent)" : "var(--muted)",
+                          textAlign: align as any,
+                          cursor: "pointer",
+                          userSelect: "none",
+                          fontWeight: sortColumn === key ? 600 : 400,
+                          transition: "color 0.2s"
+                        }}
+                        onMouseEnter={(e) => {
+                          if (sortColumn !== key) e.currentTarget.style.color = "var(--foreground)";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (sortColumn !== key) e.currentTarget.style.color = "var(--muted)";
+                        }}
+                      >
+                        {label}
+                        {sortColumn === key && (
+                          <span style={{ marginLeft: 6, fontSize: 10 }}>
+                            {sortDirection === "asc" ? "↑" : "↓"}
+                          </span>
+                        )}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredReturns.slice().reverse().map((r, idx, arr) => {
-                      const cumulativeReturn = arr.slice(idx).reduce((cum, ret) => cum * (1 + ret.return), 1) - 1;
-                      const priceData = priceMap[r.date] || { close: 0, adj_close: 0 };
-                      return (
-                        <tr key={r.date} style={{
-                          borderBottom: "1px solid var(--border)",
-                          backgroundColor: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)"
-                        }}>
-                          <td style={{ padding: "10px 12px", color: "var(--foreground)" }}>{r.date}</td>
-                          <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right" }}>{fmtNum(priceData.close)}</td>
-                          <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right", color: "var(--muted-foreground)" }}>{fmtNum(priceData.adj_close ?? priceData.close)}</td>
-                          <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right", color: r.return > 0 ? "var(--success)" : r.return < 0 ? "var(--danger)" : "var(--foreground)" }}>{fmtPct(r.return, 4)}</td>
-                          <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right", color: cumulativeReturn > 0 ? "var(--success)" : cumulativeReturn < 0 ? "var(--danger)" : "var(--foreground)" }}>{fmtPct(cumulativeReturn, 2)}</td>
-                        </tr>
-                      );
-                    })}
+                  {sortedReturns.map((row, idx) => (
+                    <tr key={row.date} style={{
+                      borderBottom: "1px solid var(--border)",
+                      backgroundColor: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)"
+                    }}>
+                      <td style={{ padding: "10px 12px", color: "var(--foreground)" }}>{row.date}</td>
+                      <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right" }}>{fmtNum(row.close)}</td>
+                      <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right", color: "var(--muted-foreground)" }}>{fmtNum(row.adj_close)}</td>
+                      <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right", color: row.return > 0 ? "var(--success)" : row.return < 0 ? "var(--danger)" : "var(--foreground)" }}>{fmtPct(row.return, 4)}</td>
+                      <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right", color: row.cumulative > 0 ? "var(--success)" : row.cumulative < 0 ? "var(--danger)" : "var(--foreground)" }}>{fmtPct(row.cumulative, 2)}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
             <div style={{ marginTop: 12, fontSize: 11, color: "var(--muted-foreground)", textAlign: "right" }}>
-              Showing all {filteredReturns.length} days
+              Showing {sortedReturns.length} days
+              {returnFilter !== "all" && ` (filtered from ${activeReturns.length} total)`}
+              {sortColumn !== "date" && ` • Sorted by ${sortColumn === "return" ? "Daily Return" : sortColumn === "cumulative" ? "Cumulative" : sortColumn === "close" ? "Close" : "Adj Close"} ${sortDirection === "asc" ? "↑" : "↓"}`}
             </div>
           </div>
         </>
