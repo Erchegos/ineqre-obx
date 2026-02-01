@@ -1504,7 +1504,32 @@ export default function StockTickerPage() {
                   <button
                     key={preset}
                     onClick={() => handleDateRangePreset(preset)}
-                    style={{ padding: "6px 12px", borderRadius: 3, border: "1px solid var(--input-border)", background: "var(--input-bg)", color: "var(--foreground)", fontSize: 12, cursor: "pointer", fontWeight: 500 }}
+                    style={{
+                      padding: "6px 12px",
+                      borderRadius: 3,
+                      border: "1px solid var(--input-border)",
+                      background: "var(--input-bg)",
+                      color: "var(--foreground)",
+                      fontSize: 12,
+                      cursor: "pointer",
+                      fontWeight: 500,
+                      transition: "all 0.15s ease",
+                      transform: "scale(1)"
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "var(--hover-bg)";
+                      e.currentTarget.style.borderColor = "var(--accent)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "var(--input-bg)";
+                      e.currentTarget.style.borderColor = "var(--input-border)";
+                    }}
+                    onMouseDown={(e) => {
+                      e.currentTarget.style.transform = "scale(0.95)";
+                    }}
+                    onMouseUp={(e) => {
+                      e.currentTarget.style.transform = "scale(1)";
+                    }}
                   >
                     {preset}
                   </button>
@@ -1532,7 +1557,32 @@ export default function StockTickerPage() {
                     color: returnFilter === "all" ? "white" : "var(--foreground)",
                     fontSize: 12,
                     cursor: "pointer",
-                    fontWeight: 500
+                    fontWeight: 500,
+                    transition: "all 0.15s ease",
+                    transform: "scale(1)",
+                    boxShadow: returnFilter === "all" ? "0 2px 4px rgba(0,0,0,0.1)" : "none"
+                  }}
+                  onMouseEnter={(e) => {
+                    if (returnFilter === "all") {
+                      e.currentTarget.style.filter = "brightness(0.9)";
+                    } else {
+                      e.currentTarget.style.background = "var(--hover-bg)";
+                      e.currentTarget.style.borderColor = "var(--accent)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (returnFilter === "all") {
+                      e.currentTarget.style.filter = "brightness(1)";
+                    } else {
+                      e.currentTarget.style.background = "var(--input-bg)";
+                      e.currentTarget.style.borderColor = "var(--input-border)";
+                    }
+                  }}
+                  onMouseDown={(e) => {
+                    e.currentTarget.style.transform = "scale(0.95)";
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.transform = "scale(1)";
                   }}
                 >
                   All Days
@@ -1547,7 +1597,32 @@ export default function StockTickerPage() {
                     color: returnFilter === "positive" ? "white" : "var(--foreground)",
                     fontSize: 12,
                     cursor: "pointer",
-                    fontWeight: 500
+                    fontWeight: 500,
+                    transition: "all 0.15s ease",
+                    transform: "scale(1)",
+                    boxShadow: returnFilter === "positive" ? "0 2px 4px rgba(0,0,0,0.1)" : "none"
+                  }}
+                  onMouseEnter={(e) => {
+                    if (returnFilter === "positive") {
+                      e.currentTarget.style.filter = "brightness(0.9)";
+                    } else {
+                      e.currentTarget.style.background = "var(--hover-bg)";
+                      e.currentTarget.style.borderColor = "var(--success)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (returnFilter === "positive") {
+                      e.currentTarget.style.filter = "brightness(1)";
+                    } else {
+                      e.currentTarget.style.background = "var(--input-bg)";
+                      e.currentTarget.style.borderColor = "var(--input-border)";
+                    }
+                  }}
+                  onMouseDown={(e) => {
+                    e.currentTarget.style.transform = "scale(0.95)";
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.transform = "scale(1)";
                   }}
                 >
                   Positive Only
@@ -1562,7 +1637,32 @@ export default function StockTickerPage() {
                     color: returnFilter === "negative" ? "white" : "var(--foreground)",
                     fontSize: 12,
                     cursor: "pointer",
-                    fontWeight: 500
+                    fontWeight: 500,
+                    transition: "all 0.15s ease",
+                    transform: "scale(1)",
+                    boxShadow: returnFilter === "negative" ? "0 2px 4px rgba(0,0,0,0.1)" : "none"
+                  }}
+                  onMouseEnter={(e) => {
+                    if (returnFilter === "negative") {
+                      e.currentTarget.style.filter = "brightness(0.9)";
+                    } else {
+                      e.currentTarget.style.background = "var(--hover-bg)";
+                      e.currentTarget.style.borderColor = "var(--danger)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (returnFilter === "negative") {
+                      e.currentTarget.style.filter = "brightness(1)";
+                    } else {
+                      e.currentTarget.style.background = "var(--input-bg)";
+                      e.currentTarget.style.borderColor = "var(--input-border)";
+                    }
+                  }}
+                  onMouseDown={(e) => {
+                    e.currentTarget.style.transform = "scale(0.95)";
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.transform = "scale(1)";
                   }}
                 >
                   Negative Only
@@ -1577,7 +1677,32 @@ export default function StockTickerPage() {
                     color: returnFilter === "large_positive" ? "white" : "var(--foreground)",
                     fontSize: 12,
                     cursor: "pointer",
-                    fontWeight: 500
+                    fontWeight: 500,
+                    transition: "all 0.15s ease",
+                    transform: "scale(1)",
+                    boxShadow: returnFilter === "large_positive" ? "0 2px 4px rgba(0,0,0,0.1)" : "none"
+                  }}
+                  onMouseEnter={(e) => {
+                    if (returnFilter === "large_positive") {
+                      e.currentTarget.style.filter = "brightness(0.9)";
+                    } else {
+                      e.currentTarget.style.background = "var(--hover-bg)";
+                      e.currentTarget.style.borderColor = "var(--success)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (returnFilter === "large_positive") {
+                      e.currentTarget.style.filter = "brightness(1)";
+                    } else {
+                      e.currentTarget.style.background = "var(--input-bg)";
+                      e.currentTarget.style.borderColor = "var(--input-border)";
+                    }
+                  }}
+                  onMouseDown={(e) => {
+                    e.currentTarget.style.transform = "scale(0.95)";
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.transform = "scale(1)";
                   }}
                 >
                   &gt; +5%
@@ -1592,7 +1717,32 @@ export default function StockTickerPage() {
                     color: returnFilter === "large_negative" ? "white" : "var(--foreground)",
                     fontSize: 12,
                     cursor: "pointer",
-                    fontWeight: 500
+                    fontWeight: 500,
+                    transition: "all 0.15s ease",
+                    transform: "scale(1)",
+                    boxShadow: returnFilter === "large_negative" ? "0 2px 4px rgba(0,0,0,0.1)" : "none"
+                  }}
+                  onMouseEnter={(e) => {
+                    if (returnFilter === "large_negative") {
+                      e.currentTarget.style.filter = "brightness(0.9)";
+                    } else {
+                      e.currentTarget.style.background = "var(--hover-bg)";
+                      e.currentTarget.style.borderColor = "var(--danger)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (returnFilter === "large_negative") {
+                      e.currentTarget.style.filter = "brightness(1)";
+                    } else {
+                      e.currentTarget.style.background = "var(--input-bg)";
+                      e.currentTarget.style.borderColor = "var(--input-border)";
+                    }
+                  }}
+                  onMouseDown={(e) => {
+                    e.currentTarget.style.transform = "scale(0.95)";
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.transform = "scale(1)";
                   }}
                 >
                   &lt; -5%
@@ -1607,7 +1757,32 @@ export default function StockTickerPage() {
                     color: returnFilter === "custom" ? "white" : "var(--foreground)",
                     fontSize: 12,
                     cursor: "pointer",
-                    fontWeight: 500
+                    fontWeight: 500,
+                    transition: "all 0.15s ease",
+                    transform: "scale(1)",
+                    boxShadow: returnFilter === "custom" ? "0 2px 4px rgba(0,0,0,0.1)" : "none"
+                  }}
+                  onMouseEnter={(e) => {
+                    if (returnFilter === "custom") {
+                      e.currentTarget.style.filter = "brightness(0.9)";
+                    } else {
+                      e.currentTarget.style.background = "var(--hover-bg)";
+                      e.currentTarget.style.borderColor = "var(--accent)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (returnFilter === "custom") {
+                      e.currentTarget.style.filter = "brightness(1)";
+                    } else {
+                      e.currentTarget.style.background = "var(--input-bg)";
+                      e.currentTarget.style.borderColor = "var(--input-border)";
+                    }
+                  }}
+                  onMouseDown={(e) => {
+                    e.currentTarget.style.transform = "scale(0.95)";
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.transform = "scale(1)";
                   }}
                 >
                   Custom
