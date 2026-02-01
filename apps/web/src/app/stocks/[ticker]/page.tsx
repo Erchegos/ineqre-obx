@@ -663,38 +663,45 @@ export default function StockTickerPage() {
 
   return (
     <main style={{ padding: 24, maxWidth: 1400, margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 24 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1, flexWrap: "wrap" }}>
+      {/* Header Section */}
+      <div style={{ marginBottom: 24 }}>
+        <Link
+          href="/stocks"
+          style={{
+            display: "inline-block",
+            color: "var(--foreground)",
+            textDecoration: "none",
+            fontSize: 13,
+            fontWeight: 500,
+            padding: "8px 16px",
+            marginBottom: 20,
+            border: "1px solid var(--border)",
+            borderRadius: 4,
+            background: "var(--card-bg)",
+            transition: "all 0.15s ease"
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = "var(--accent)";
+            e.currentTarget.style.background = "var(--hover-bg)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = "var(--border)";
+            e.currentTarget.style.background = "var(--card-bg)";
+          }}
+        >
+          Asset List
+        </Link>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
           <h1 style={{ fontSize: 32, fontWeight: 600, margin: 0, letterSpacing: "-0.02em", color: "var(--foreground)" }}>
             {ticker || "?"}
           </h1>
           {ticker && <LiquidityBadge ticker={ticker} />}
-          <Link
-            href="/stocks"
-            style={{
-              display: "inline-block",
-              color: "var(--foreground)",
-              textDecoration: "none",
-              fontSize: 14,
-              fontWeight: 600,
-              padding: "8px 16px",
-              border: "1px solid var(--border)",
-              borderRadius: 2,
-              background: "var(--card-bg)",
-              transition: "all 0.15s ease"
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = "var(--accent)";
-              e.currentTarget.style.background = "var(--hover-bg)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = "var(--border)";
-              e.currentTarget.style.background = "var(--card-bg)";
-            }}
-          >
-            Asset List
-          </Link>
         </div>
+      </div>
+
+      {/* Navigation Buttons */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 24 }}>
+        <div style={{ flex: 1 }}></div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <Link
             href={`/volatility/${ticker}`}

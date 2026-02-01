@@ -345,7 +345,31 @@ export default function VolatilityPage() {
                 background: !isAdjusted ? "var(--foreground)" : "transparent",
                 color: !isAdjusted ? "var(--background)" : "var(--muted)",
                 cursor: "pointer",
-                transition: "all 0.15s",
+                transition: "all 0.15s ease",
+                transform: "scale(1)",
+                boxShadow: !isAdjusted ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
+              }}
+              onMouseEnter={(e) => {
+                if (!isAdjusted) {
+                  e.currentTarget.style.filter = "brightness(0.9)";
+                } else {
+                  e.currentTarget.style.background = "var(--hover-bg)";
+                  e.currentTarget.style.borderColor = "var(--accent)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isAdjusted) {
+                  e.currentTarget.style.filter = "brightness(1)";
+                } else {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.borderColor = "transparent";
+                }
+              }}
+              onMouseDown={(e) => {
+                e.currentTarget.style.transform = "scale(0.95)";
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.transform = "scale(1)";
               }}
             >
               Raw
@@ -361,7 +385,31 @@ export default function VolatilityPage() {
                 background: isAdjusted ? "var(--accent)" : "transparent",
                 color: isAdjusted ? "#fff" : "var(--muted)",
                 cursor: "pointer",
-                transition: "all 0.15s",
+                transition: "all 0.15s ease",
+                transform: "scale(1)",
+                boxShadow: isAdjusted ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
+              }}
+              onMouseEnter={(e) => {
+                if (isAdjusted) {
+                  e.currentTarget.style.filter = "brightness(0.9)";
+                } else {
+                  e.currentTarget.style.background = "var(--hover-bg)";
+                  e.currentTarget.style.borderColor = "var(--accent)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (isAdjusted) {
+                  e.currentTarget.style.filter = "brightness(1)";
+                } else {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.borderColor = "transparent";
+                }
+              }}
+              onMouseDown={(e) => {
+                e.currentTarget.style.transform = "scale(0.95)";
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.transform = "scale(1)";
               }}
             >
               Total Return
@@ -377,28 +425,52 @@ export default function VolatilityPage() {
               { l: "2Y", v: 504 },
               { l: "5Y", v: 1260 },
               { l: "All", v: 2000 },
-            ].map((tf) => (
-              <button
-                key={tf.v}
-                onClick={() => setLimit(tf.v)}
-                style={{
-                  padding: "6px 12px",
-                  borderRadius: 4,
-                  border:
-                    limit === tf.v
-                      ? "1px solid var(--accent)"
-                      : "1px solid var(--border)",
-                  background: limit === tf.v ? "var(--accent)" : "transparent",
-                  color: limit === tf.v ? "#fff" : "var(--muted)",
-                  fontSize: 11,
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  transition: "all 0.15s",
-                }}
-              >
-                {tf.l}
-              </button>
-            ))}
+            ].map((tf) => {
+              const isActive = limit === tf.v;
+              return (
+                <button
+                  key={tf.v}
+                  onClick={() => setLimit(tf.v)}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 4,
+                    border: `1px solid ${isActive ? "var(--accent)" : "var(--border)"}`,
+                    background: isActive ? "var(--accent)" : "transparent",
+                    color: isActive ? "#fff" : "var(--muted)",
+                    fontSize: 11,
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                    transform: "scale(1)",
+                    boxShadow: isActive ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (isActive) {
+                      e.currentTarget.style.filter = "brightness(0.9)";
+                    } else {
+                      e.currentTarget.style.background = "var(--hover-bg)";
+                      e.currentTarget.style.borderColor = "var(--accent)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (isActive) {
+                      e.currentTarget.style.filter = "brightness(1)";
+                    } else {
+                      e.currentTarget.style.background = "transparent";
+                      e.currentTarget.style.borderColor = "var(--border)";
+                    }
+                  }}
+                  onMouseDown={(e) => {
+                    e.currentTarget.style.transform = "scale(0.95)";
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.transform = "scale(1)";
+                  }}
+                >
+                  {tf.l}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>

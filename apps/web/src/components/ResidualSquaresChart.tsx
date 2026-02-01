@@ -184,26 +184,52 @@ export default function ResidualSquaresChart({
         }}
       >
         <div style={{ display: "flex", gap: 8 }}>
-          {["1M", "3M", "6M", "1Y", "3Y", "All"].map((p) => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              style={{
-                padding: "6px 12px",
-                borderRadius: 4,
-                border: "1px solid var(--border)",
-                background:
-                  period === p ? "var(--accent)" : "var(--card-bg)",
-                color: period === p ? "#fff" : "var(--foreground)",
-                fontSize: 12,
-                fontWeight: 500,
-                cursor: "pointer",
-                transition: "all 0.15s",
-              }}
-            >
-              {p}
-            </button>
-          ))}
+          {["1M", "3M", "6M", "1Y", "3Y", "All"].map((p) => {
+            const isActive = period === p;
+            return (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 4,
+                  border: `1px solid ${isActive ? "var(--accent)" : "var(--border)"}`,
+                  background: isActive ? "var(--accent)" : "var(--card-bg)",
+                  color: isActive ? "#fff" : "var(--foreground)",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  transform: "scale(1)",
+                  boxShadow: isActive ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
+                }}
+                onMouseEnter={(e) => {
+                  if (isActive) {
+                    e.currentTarget.style.filter = "brightness(0.9)";
+                  } else {
+                    e.currentTarget.style.background = "var(--hover-bg)";
+                    e.currentTarget.style.borderColor = "var(--accent)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (isActive) {
+                    e.currentTarget.style.filter = "brightness(1)";
+                  } else {
+                    e.currentTarget.style.background = "var(--card-bg)";
+                    e.currentTarget.style.borderColor = "var(--border)";
+                  }
+                }}
+                onMouseDown={(e) => {
+                  e.currentTarget.style.transform = "scale(0.95)";
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.transform = "scale(1)";
+                }}
+              >
+                {p}
+              </button>
+            );
+          })}
         </div>
         <div
           style={{
