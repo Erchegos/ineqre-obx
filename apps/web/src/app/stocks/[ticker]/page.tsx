@@ -684,7 +684,7 @@ export default function StockTickerPage() {
               transition: "all 0.15s ease"
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = "var(--foreground)";
+              e.currentTarget.style.borderColor = "var(--accent)";
               e.currentTarget.style.background = "var(--hover-bg)";
             }}
             onMouseLeave={(e) => {
@@ -942,7 +942,7 @@ export default function StockTickerPage() {
                 transition: "all 0.15s",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = "var(--foreground)";
+                e.currentTarget.style.borderColor = "var(--accent)";
                 e.currentTarget.style.background = "var(--hover-bg)";
               }}
               onMouseLeave={(e) => {
