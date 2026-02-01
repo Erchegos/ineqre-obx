@@ -450,7 +450,8 @@ export default function CorrelationPage() {
                   cursor: "pointer",
                   fontSize: 13,
                   fontWeight: 500,
-                  transition: "all 0.15s",
+                  transition: "all 0.15s ease",
+                  transform: "scale(1)",
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.borderColor = "var(--accent)";
@@ -459,6 +460,12 @@ export default function CorrelationPage() {
                 onMouseLeave={(e) => {
                   e.currentTarget.style.borderColor = "var(--border)";
                   e.currentTarget.style.background = "var(--card-bg)";
+                }}
+                onMouseDown={(e) => {
+                  e.currentTarget.style.transform = "scale(0.95)";
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.transform = "scale(1)";
                 }}
               >
                 {group}
@@ -501,7 +508,31 @@ export default function CorrelationPage() {
                       background: isSelected ? "var(--accent)" : "var(--card-bg)",
                       color: isSelected ? "#fff" : "var(--foreground)",
                       cursor: "pointer",
-                      transition: "all 0.15s"
+                      transition: "all 0.15s ease",
+                      transform: "scale(1)",
+                      boxShadow: isSelected ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (isSelected) {
+                        e.currentTarget.style.filter = "brightness(0.9)";
+                      } else {
+                        e.currentTarget.style.background = "var(--hover-bg)";
+                        e.currentTarget.style.borderColor = "var(--accent)";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (isSelected) {
+                        e.currentTarget.style.filter = "brightness(1)";
+                      } else {
+                        e.currentTarget.style.background = "var(--card-bg)";
+                        e.currentTarget.style.borderColor = "var(--border)";
+                      }
+                    }}
+                    onMouseDown={(e) => {
+                      e.currentTarget.style.transform = "scale(0.95)";
+                    }}
+                    onMouseUp={(e) => {
+                      e.currentTarget.style.transform = "scale(1)";
                     }}
                   >
                     {tf.label}
@@ -538,7 +569,31 @@ export default function CorrelationPage() {
                       background: isSelected ? "var(--accent)" : "var(--card-bg)",
                       color: isSelected ? "#fff" : "var(--foreground)",
                       cursor: "pointer",
-                      transition: "all 0.15s"
+                      transition: "all 0.15s ease",
+                      transform: "scale(1)",
+                      boxShadow: isSelected ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (isSelected) {
+                        e.currentTarget.style.filter = "brightness(0.9)";
+                      } else {
+                        e.currentTarget.style.background = "var(--hover-bg)";
+                        e.currentTarget.style.borderColor = "var(--accent)";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (isSelected) {
+                        e.currentTarget.style.filter = "brightness(1)";
+                      } else {
+                        e.currentTarget.style.background = "var(--card-bg)";
+                        e.currentTarget.style.borderColor = "var(--border)";
+                      }
+                    }}
+                    onMouseDown={(e) => {
+                      e.currentTarget.style.transform = "scale(0.95)";
+                    }}
+                    onMouseUp={(e) => {
+                      e.currentTarget.style.transform = "scale(1)";
                     }}
                   >
                     {rw.label}
@@ -571,7 +626,31 @@ export default function CorrelationPage() {
                   background: dataMode === "price" ? "var(--accent)" : "var(--card-bg)",
                   color: dataMode === "price" ? "#fff" : "var(--foreground)",
                   cursor: "pointer",
-                  transition: "all 0.15s"
+                  transition: "all 0.15s ease",
+                  transform: "scale(1)",
+                  boxShadow: dataMode === "price" ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
+                }}
+                onMouseEnter={(e) => {
+                  if (dataMode === "price") {
+                    e.currentTarget.style.filter = "brightness(0.9)";
+                  } else {
+                    e.currentTarget.style.background = "var(--hover-bg)";
+                    e.currentTarget.style.borderColor = "var(--accent)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (dataMode === "price") {
+                    e.currentTarget.style.filter = "brightness(1)";
+                  } else {
+                    e.currentTarget.style.background = "var(--card-bg)";
+                    e.currentTarget.style.borderColor = "var(--border)";
+                  }
+                }}
+                onMouseDown={(e) => {
+                  e.currentTarget.style.transform = "scale(0.95)";
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.transform = "scale(1)";
                 }}
               >
                 Price
@@ -588,7 +667,31 @@ export default function CorrelationPage() {
                   background: dataMode === "total_return" ? "var(--accent)" : "var(--card-bg)",
                   color: dataMode === "total_return" ? "#fff" : "var(--foreground)",
                   cursor: "pointer",
-                  transition: "all 0.15s"
+                  transition: "all 0.15s ease",
+                  transform: "scale(1)",
+                  boxShadow: dataMode === "total_return" ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
+                }}
+                onMouseEnter={(e) => {
+                  if (dataMode === "total_return") {
+                    e.currentTarget.style.filter = "brightness(0.9)";
+                  } else {
+                    e.currentTarget.style.background = "var(--hover-bg)";
+                    e.currentTarget.style.borderColor = "var(--accent)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (dataMode === "total_return") {
+                    e.currentTarget.style.filter = "brightness(1)";
+                  } else {
+                    e.currentTarget.style.background = "var(--card-bg)";
+                    e.currentTarget.style.borderColor = "var(--border)";
+                  }
+                }}
+                onMouseDown={(e) => {
+                  e.currentTarget.style.transform = "scale(0.95)";
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.transform = "scale(1)";
                 }}
               >
                 Total Return
@@ -619,7 +722,31 @@ export default function CorrelationPage() {
                   background: matrixMode === "correlation" ? "var(--accent)" : "var(--card-bg)",
                   color: matrixMode === "correlation" ? "#fff" : "var(--foreground)",
                   cursor: "pointer",
-                  transition: "all 0.15s"
+                  transition: "all 0.15s ease",
+                  transform: "scale(1)",
+                  boxShadow: matrixMode === "correlation" ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
+                }}
+                onMouseEnter={(e) => {
+                  if (matrixMode === "correlation") {
+                    e.currentTarget.style.filter = "brightness(0.9)";
+                  } else {
+                    e.currentTarget.style.background = "var(--hover-bg)";
+                    e.currentTarget.style.borderColor = "var(--accent)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (matrixMode === "correlation") {
+                    e.currentTarget.style.filter = "brightness(1)";
+                  } else {
+                    e.currentTarget.style.background = "var(--card-bg)";
+                    e.currentTarget.style.borderColor = "var(--border)";
+                  }
+                }}
+                onMouseDown={(e) => {
+                  e.currentTarget.style.transform = "scale(0.95)";
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.transform = "scale(1)";
                 }}
               >
                 Corr
@@ -636,7 +763,31 @@ export default function CorrelationPage() {
                   background: matrixMode === "covariance" ? "var(--accent)" : "var(--card-bg)",
                   color: matrixMode === "covariance" ? "#fff" : "var(--foreground)",
                   cursor: "pointer",
-                  transition: "all 0.15s"
+                  transition: "all 0.15s ease",
+                  transform: "scale(1)",
+                  boxShadow: matrixMode === "covariance" ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
+                }}
+                onMouseEnter={(e) => {
+                  if (matrixMode === "covariance") {
+                    e.currentTarget.style.filter = "brightness(0.9)";
+                  } else {
+                    e.currentTarget.style.background = "var(--hover-bg)";
+                    e.currentTarget.style.borderColor = "var(--accent)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (matrixMode === "covariance") {
+                    e.currentTarget.style.filter = "brightness(1)";
+                  } else {
+                    e.currentTarget.style.background = "var(--card-bg)";
+                    e.currentTarget.style.borderColor = "var(--border)";
+                  }
+                }}
+                onMouseDown={(e) => {
+                  e.currentTarget.style.transform = "scale(0.95)";
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.transform = "scale(1)";
                 }}
               >
                 Cov
@@ -668,7 +819,23 @@ export default function CorrelationPage() {
                   cursor: "pointer",
                   padding: "4px 8px",
                   borderRadius: 3,
-                  fontWeight: 500
+                  fontWeight: 500,
+                  transition: "all 0.15s ease",
+                  transform: "scale(1)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "var(--hover-bg)";
+                  e.currentTarget.style.borderColor = "var(--accent)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "none";
+                  e.currentTarget.style.borderColor = "var(--border)";
+                }}
+                onMouseDown={(e) => {
+                  e.currentTarget.style.transform = "scale(0.95)";
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.transform = "scale(1)";
                 }}
               >
                 {showTickerPanel ? "Hide" : "Show"} All

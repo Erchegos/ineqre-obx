@@ -342,18 +342,30 @@ export default function StocksPage() {
                   cursor: "pointer",
                   transition: "all 0.15s ease",
                   whiteSpace: "nowrap",
+                  transform: "scale(1)",
+                  boxShadow: isSelected ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
                 }}
                 onMouseEnter={(e) => {
-                  if (!isSelected) {
+                  if (isSelected) {
+                    e.currentTarget.style.filter = "brightness(0.9)";
+                  } else {
                     e.currentTarget.style.borderColor = "var(--accent)";
                     e.currentTarget.style.background = "var(--hover-bg)";
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isSelected) {
+                  if (isSelected) {
+                    e.currentTarget.style.filter = "brightness(1)";
+                  } else {
                     e.currentTarget.style.borderColor = "var(--border)";
                     e.currentTarget.style.background = "var(--card-bg)";
                   }
+                }}
+                onMouseDown={(e) => {
+                  e.currentTarget.style.transform = "scale(0.95)";
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.transform = "scale(1)";
                 }}
               >
                 {filter.label}
@@ -403,18 +415,30 @@ export default function StocksPage() {
                     cursor: "pointer",
                     transition: "all 0.15s ease",
                     whiteSpace: "nowrap",
+                    transform: "scale(1)",
+                    boxShadow: isSelected ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
                   }}
                   onMouseEnter={(e) => {
-                    if (!isSelected) {
+                    if (isSelected) {
+                      e.currentTarget.style.filter = "brightness(0.9)";
+                    } else {
                       e.currentTarget.style.borderColor = "var(--accent)";
                       e.currentTarget.style.background = "var(--hover-bg)";
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!isSelected) {
+                    if (isSelected) {
+                      e.currentTarget.style.filter = "brightness(1)";
+                    } else {
                       e.currentTarget.style.borderColor = "var(--border)";
                       e.currentTarget.style.background = "var(--card-bg)";
                     }
+                  }}
+                  onMouseDown={(e) => {
+                    e.currentTarget.style.transform = "scale(0.95)";
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.transform = "scale(1)";
                   }}
                 >
                   {ASSET_TYPE_LABELS[type]}

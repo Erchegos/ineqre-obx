@@ -60,35 +60,52 @@ export default function TimeframeSelector({
 
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-      {TIMEFRAMES.map((tf) => (
-        <button
-          key={tf.value}
-          onClick={() => handlePresetClick(tf.value)}
-          style={{
-            padding: "6px 12px",
-            borderRadius: 3,
-            border: `1px solid ${
-              !isCustomActive && selected === tf.value
-                ? "var(--accent)"
-                : "var(--input-border)"
-            }`,
-            background:
-              !isCustomActive && selected === tf.value
-                ? "var(--accent)"
-                : "var(--input-bg)",
-            color:
-              !isCustomActive && selected === tf.value
-                ? "#ffffff"
-                : "var(--foreground)",
-            fontSize: 12,
-            fontWeight: 500,
-            cursor: "pointer",
-            transition: "all 0.15s",
-          }}
-        >
-          {tf.label}
-        </button>
-      ))}
+      {TIMEFRAMES.map((tf) => {
+        const isActive = !isCustomActive && selected === tf.value;
+        return (
+          <button
+            key={tf.value}
+            onClick={() => handlePresetClick(tf.value)}
+            style={{
+              padding: "6px 12px",
+              borderRadius: 3,
+              border: `1px solid ${isActive ? "var(--accent)" : "var(--input-border)"}`,
+              background: isActive ? "var(--accent)" : "var(--input-bg)",
+              color: isActive ? "#ffffff" : "var(--foreground)",
+              fontSize: 12,
+              fontWeight: 500,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              transform: "scale(1)",
+              boxShadow: isActive ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
+            }}
+            onMouseEnter={(e) => {
+              if (isActive) {
+                e.currentTarget.style.filter = "brightness(0.9)";
+              } else {
+                e.currentTarget.style.background = "var(--hover-bg)";
+                e.currentTarget.style.borderColor = "var(--accent)";
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (isActive) {
+                e.currentTarget.style.filter = "brightness(1)";
+              } else {
+                e.currentTarget.style.background = "var(--input-bg)";
+                e.currentTarget.style.borderColor = "var(--input-border)";
+              }
+            }}
+            onMouseDown={(e) => {
+              e.currentTarget.style.transform = "scale(0.95)";
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.style.transform = "scale(1)";
+            }}
+          >
+            {tf.label}
+          </button>
+        );
+      })}
 
       {/* Custom Date Range Button */}
       <div style={{ position: "relative" }}>
@@ -103,10 +120,34 @@ export default function TimeframeSelector({
             fontSize: 12,
             fontWeight: 500,
             cursor: "pointer",
-            transition: "all 0.15s",
+            transition: "all 0.15s ease",
+            transform: "scale(1)",
             display: "flex",
             alignItems: "center",
             gap: 4,
+            boxShadow: isCustomActive ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
+          }}
+          onMouseEnter={(e) => {
+            if (isCustomActive) {
+              e.currentTarget.style.filter = "brightness(0.9)";
+            } else {
+              e.currentTarget.style.background = "var(--hover-bg)";
+              e.currentTarget.style.borderColor = "var(--accent)";
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (isCustomActive) {
+              e.currentTarget.style.filter = "brightness(1)";
+            } else {
+              e.currentTarget.style.background = "var(--input-bg)";
+              e.currentTarget.style.borderColor = "var(--input-border)";
+            }
+          }}
+          onMouseDown={(e) => {
+            e.currentTarget.style.transform = "scale(0.95)";
+          }}
+          onMouseUp={(e) => {
+            e.currentTarget.style.transform = "scale(1)";
           }}
         >
           <svg
@@ -209,6 +250,22 @@ export default function TimeframeSelector({
                   color: "#ffffff",
                   fontSize: 12,
                   cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  transform: "scale(1)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "#2a2a2a";
+                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.3)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "#252525";
+                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.2)";
+                }}
+                onMouseDown={(e) => {
+                  e.currentTarget.style.transform = "scale(0.95)";
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.transform = "scale(1)";
                 }}
               >
                 Cancel
@@ -221,12 +278,34 @@ export default function TimeframeSelector({
                   padding: "8px 12px",
                   borderRadius: 4,
                   border: "none",
-                  background:
-                    customStart && customEnd ? "var(--accent)" : "#444",
+                  background: customStart && customEnd ? "var(--accent)" : "#444",
                   color: "#ffffff",
                   fontSize: 12,
                   fontWeight: 500,
                   cursor: customStart && customEnd ? "pointer" : "not-allowed",
+                  transition: "all 0.15s ease",
+                  transform: "scale(1)",
+                  boxShadow: customStart && customEnd ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
+                }}
+                onMouseEnter={(e) => {
+                  if (customStart && customEnd) {
+                    e.currentTarget.style.filter = "brightness(0.9)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (customStart && customEnd) {
+                    e.currentTarget.style.filter = "brightness(1)";
+                  }
+                }}
+                onMouseDown={(e) => {
+                  if (customStart && customEnd) {
+                    e.currentTarget.style.transform = "scale(0.95)";
+                  }
+                }}
+                onMouseUp={(e) => {
+                  if (customStart && customEnd) {
+                    e.currentTarget.style.transform = "scale(1)";
+                  }
                 }}
               >
                 Apply
