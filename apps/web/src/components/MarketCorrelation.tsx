@@ -39,7 +39,7 @@ export default function MarketCorrelation({
           color: "var(--foreground)",
         }}
       >
-        Market Co-Movement Analysis
+        Market Sensitivity
       </h2>
 
       <div
@@ -50,12 +50,12 @@ export default function MarketCorrelation({
           border: "1px solid var(--border)",
         }}
       >
-        {/* Summary Metrics */}
+        {/* Beta Display */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-            gap: 20,
+            gridTemplateColumns: "1fr 1fr",
+            gap: 24,
             marginBottom: 20,
           }}
         >
@@ -70,36 +70,19 @@ export default function MarketCorrelation({
                 marginBottom: 8,
               }}
             >
-              Beta to OBX
+              Stock Beta
             </div>
             <div
               style={{
-                fontSize: 32,
+                fontSize: 48,
                 fontWeight: 700,
                 fontFamily: "monospace",
                 color: "var(--foreground)",
-                marginBottom: 8,
               }}
             >
               {betaText}
             </div>
-            <div
-              style={{
-                fontSize: 13,
-                color: "var(--muted-foreground)",
-                lineHeight: 1.5,
-              }}
-            >
-              {beta !== null
-                ? Math.abs(beta) < 0.2
-                  ? "Effectively zero systematic risk exposure"
-                  : Math.abs(beta) < 0.6
-                  ? "Moderate systematic risk exposure"
-                  : "High systematic risk exposure"
-                : "Insufficient data to calculate"}
-            </div>
           </div>
-
           <div>
             <div
               style={{
@@ -111,31 +94,17 @@ export default function MarketCorrelation({
                 marginBottom: 8,
               }}
             >
-              Average Correlation
+              Index Beta (OBX)
             </div>
             <div
               style={{
-                fontSize: 32,
+                fontSize: 48,
                 fontWeight: 700,
                 fontFamily: "monospace",
                 color: "var(--foreground)",
-                marginBottom: 8,
               }}
             >
-              {correlationText}
-            </div>
-            <div
-              style={{
-                fontSize: 13,
-                color: "var(--muted-foreground)",
-                lineHeight: 1.5,
-              }}
-            >
-              {Math.abs(avgCorrelation) < 0.2
-                ? "Near-zero correlation indicates independent volatility movements"
-                : Math.abs(avgCorrelation) < 0.5
-                ? "Moderate correlation shows some market influence"
-                : "High correlation indicates volatility closely tracks market"}
+              1.000
             </div>
           </div>
         </div>

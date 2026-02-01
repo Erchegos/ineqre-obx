@@ -131,7 +131,7 @@ export default function StockTickerPage() {
   }, [params]);
 
   const initialLimit = useMemo(() => {
-    return clampInt(searchParams.get("limit"), 1500, 20, 5000);
+    return clampInt(searchParams.get("limit"), 1260, 20, 5000); // Default to 5Y (1260 trading days)
   }, [searchParams]);
 
   const [limit, setLimit] = useState<number>(initialLimit);
@@ -572,85 +572,90 @@ export default function StockTickerPage() {
 
   return (
     <main style={{ padding: 24, maxWidth: 1400, margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
-        <h1 style={{ fontSize: 32, fontWeight: 600, margin: 0, letterSpacing: "-0.02em", color: "var(--foreground)" }}>
-          {ticker || "?"}
-        </h1>
-        {ticker && <LiquidityBadge ticker={ticker} />}
-        <Link
-          href="/stocks"
-          style={{
-            display: "inline-block",
-            color: "var(--foreground)",
-            textDecoration: "none",
-            fontSize: 14,
-            fontWeight: 600,
-            padding: "8px 16px",
-            border: "1px solid var(--border)",
-            borderRadius: 2,
-            background: "var(--card-bg)",
-            transition: "all 0.15s ease"
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = "var(--foreground)";
-            e.currentTarget.style.background = "var(--hover-bg)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = "var(--border)";
-            e.currentTarget.style.background = "var(--card-bg)";
-          }}
-        >
-          Asset List
-        </Link>
-        <div style={{ flex: 1 }} />
-        <Link
-          href={`/volatility/${ticker}`}
-          style={{
-            padding: "10px 14px",
-            borderRadius: 4,
-            background: "var(--card-bg)",
-            border: "1px solid var(--card-border)",
-            color: "var(--foreground)",
-            fontSize: 13,
-            fontWeight: 500,
-            display: "inline-flex",
-            flexDirection: "column",
-            alignItems: "flex-start",
-            gap: 4,
-            textDecoration: "none",
-            letterSpacing: "0.01em",
-            transition: "all 0.15s",
-          }}
-        >
-          <span>Volatility Analysis</span>
-          <span style={{ fontSize: 10, color: "var(--muted-foreground)", fontWeight: 400 }}>
-            Variance • Standard deviation • Risk
-          </span>
-        </Link>
-        <Link
-          href={`/montecarlo/${ticker}`}
-          style={{
-            padding: "10px 14px",
-            borderRadius: 4,
-            background: "var(--card-bg)",
-            border: "1px solid var(--card-border)",
-            color: "var(--foreground)",
-            fontSize: 13,
-            fontWeight: 500,
-            display: "inline-flex",
-            flexDirection: "column",
-            alignItems: "flex-start",
-            gap: 4,
-            textDecoration: "none",
-            letterSpacing: "0.01em",
-            transition: "all 0.15s",
-          }}
-        >
-          <span>Monte Carlo Simulation</span>
-          <span style={{ fontSize: 10, color: "var(--muted-foreground)", fontWeight: 400 }}>
-            Stochastic • Forecasting • Price paths
-          </span>
-        </Link>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1, flexWrap: "wrap" }}>
+          <h1 style={{ fontSize: 32, fontWeight: 600, margin: 0, letterSpacing: "-0.02em", color: "var(--foreground)" }}>
+            {ticker || "?"}
+          </h1>
+          {ticker && <LiquidityBadge ticker={ticker} />}
+          <Link
+            href="/stocks"
+            style={{
+              display: "inline-block",
+              color: "var(--foreground)",
+              textDecoration: "none",
+              fontSize: 14,
+              fontWeight: 600,
+              padding: "8px 16px",
+              border: "1px solid var(--border)",
+              borderRadius: 2,
+              background: "var(--card-bg)",
+              transition: "all 0.15s ease"
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = "var(--foreground)";
+              e.currentTarget.style.background = "var(--hover-bg)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = "var(--border)";
+              e.currentTarget.style.background = "var(--card-bg)";
+            }}
+          >
+            Asset List
+          </Link>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <Link
+            href={`/volatility/${ticker}`}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 4,
+              background: "var(--card-bg)",
+              border: "1px solid var(--card-border)",
+              color: "var(--foreground)",
+              fontSize: 13,
+              fontWeight: 500,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: 4,
+              textDecoration: "none",
+              letterSpacing: "0.01em",
+              transition: "all 0.15s",
+              minWidth: "220px",
+            }}
+          >
+            <span>Volatility Analysis</span>
+            <span style={{ fontSize: 10, color: "var(--muted-foreground)", fontWeight: 400 }}>
+              Variance • Standard deviation • Risk
+            </span>
+          </Link>
+          <Link
+            href={`/montecarlo/${ticker}`}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 4,
+              background: "var(--card-bg)",
+              border: "1px solid var(--card-border)",
+              color: "var(--foreground)",
+              fontSize: 13,
+              fontWeight: 500,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: 4,
+              textDecoration: "none",
+              letterSpacing: "0.01em",
+              transition: "all 0.15s",
+              minWidth: "220px",
+            }}
+          >
+            <span>Monte Carlo Simulation</span>
+            <span style={{ fontSize: 10, color: "var(--muted-foreground)", fontWeight: 400 }}>
+              Stochastic • Forecasting • Price paths
+            </span>
+          </Link>
+        </div>
       </div>
 
       {/* View Mode Toggle */}
@@ -883,13 +888,86 @@ export default function StockTickerPage() {
             )}
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 28 }}>
-            <MetricCard label="Total Return" value={fmtPct(activeStats.totalReturn)} colorType={activeStats.totalReturn >= 0 ? "success" : "danger"} />
-            <MetricCard label="Annualized Return" value={fmtPct(activeStats.annualizedReturn)} />
-            <MetricCard label="Volatility (Ann.)" value={fmtPct(activeStats.volatility)} />
-            <MetricCard label="Max Drawdown" value={fmtPct(activeStats.maxDrawdown)} colorType="danger" />
-            <MetricCard label="VaR (95%)" value={fmtPct(activeStats.var95)} />
-            <MetricCard label="CVaR (95%)" value={fmtPct(activeStats.cvar95)} />
-            <MetricCard label="Sharpe Ratio" value={fmtNum(activeStats.sharpeRatio, 3)} />
+            <MetricCard
+              label="Total Return"
+              value={fmtPct(activeStats.totalReturn)}
+              colorType={activeStats.totalReturn >= 0 ? "success" : "danger"}
+              subtitle={(() => {
+                // Calculate actual time period from date range
+                const startDate = data?.dateRange?.start;
+                const endDate = data?.dateRange?.end;
+                if (!startDate || !endDate) return "";
+
+                const start = new Date(startDate);
+                const end = new Date(endDate);
+                const days = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+                const years = days / 365.25;
+
+                if (years < 1) {
+                  const months = Math.round(years * 12);
+                  return `Over ${months} month${months !== 1 ? 's' : ''}`;
+                }
+
+                // Calculate CAGR (Compound Annual Growth Rate)
+                const cagr = ((Math.pow(1 + activeStats.totalReturn / 100, 1 / years) - 1) * 100);
+                return `${fmtPct(cagr)} CAGR (${years.toFixed(1)}y)`;
+              })()}
+            />
+            <MetricCard
+              label="Volatility (Ann.)"
+              value={fmtPct(activeStats.volatility)}
+              subtitle={(() => {
+                // Convert to daily volatility for context
+                const dailyVol = activeStats.volatility / Math.sqrt(252);
+                return `${fmtPct(dailyVol)} daily · ${(dailyVol * 100).toFixed(2)}% avg daily swing`;
+              })()}
+            />
+            <MetricCard
+              label="Max Drawdown"
+              value={fmtPct(activeStats.maxDrawdown)}
+              colorType="danger"
+              subtitle={(() => {
+                // Find when the max drawdown occurred
+                const drawdownPoint = activeDrawdown.reduce((min, curr) =>
+                  curr.drawdown < min.drawdown ? curr : min,
+                  activeDrawdown[0] || { drawdown: 0, date: "" }
+                );
+                if (!drawdownPoint?.date) return "Peak-to-trough decline";
+                const year = new Date(drawdownPoint.date).getFullYear();
+                return `Lowest point in ${year}`;
+              })()}
+            />
+            <div style={{ padding: 14, borderRadius: 3, border: "1px solid var(--card-border)", background: "var(--card-bg)" }}>
+              <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", marginBottom: 8 }}>
+                Risk Metrics (95%)
+              </div>
+              <div style={{ display: "flex", gap: 16, alignItems: "baseline" }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 9, color: "var(--muted-foreground)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>VaR</div>
+                  <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "monospace", color: "var(--foreground)" }}>
+                    {fmtPct(activeStats.var95)}
+                  </div>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 9, color: "var(--muted-foreground)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>CVaR</div>
+                  <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "monospace", color: "var(--foreground)" }}>
+                    {fmtPct(activeStats.cvar95)}
+                  </div>
+                </div>
+              </div>
+              <div style={{ fontSize: 10, color: "var(--muted-foreground)", marginTop: 8, lineHeight: 1.4 }}>
+                5% chance of losing {fmtPct(Math.abs(activeStats.var95))} or more
+              </div>
+            </div>
+            <MetricCard
+              label="Sharpe Ratio"
+              value={fmtNum(activeStats.sharpeRatio, 3)}
+              subtitle={(() => {
+                // Show return per unit of risk
+                const returnPerRisk = activeStats.sharpeRatio * activeStats.volatility;
+                return `${fmtPct(returnPerRisk)} excess return/year`;
+              })()}
+            />
           </div>
 
           {/* CHARTS SECTION */}
@@ -1418,7 +1496,7 @@ export default function StockTickerPage() {
 }
 
 // Subcomponents
-function MetricCard({ label, value, colorType, tooltip }: { label: string; value: string; colorType?: "success" | "danger" | "warning"; tooltip?: string }) {
+function MetricCard({ label, value, colorType, tooltip, subtitle }: { label: string; value: string; colorType?: "success" | "danger" | "warning"; tooltip?: string; subtitle?: string }) {
   const getColor = () => {
     if (colorType === "success") return "var(--success)";
     if (colorType === "danger") return "var(--danger)";
@@ -1431,7 +1509,8 @@ function MetricCard({ label, value, colorType, tooltip }: { label: string; value
         <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase" }}>{label}</div>
         {tooltip && <div style={{ cursor: "help", color: "var(--muted-foreground)" }} title={tooltip}>?</div>}
       </div>
-      <div style={{ fontSize: 22, fontWeight: 600, color: getColor(), fontFamily: "monospace" }}>{value}</div>
+      <div style={{ fontSize: 22, fontWeight: 600, color: getColor(), fontFamily: "monospace", marginBottom: subtitle ? 6 : 0 }}>{value}</div>
+      {subtitle && <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.4 }}>{subtitle}</div>}
     </div>
   );
 }

@@ -18,6 +18,7 @@ import SeasonalityChart from "@/components/SeasonalityChart";
 
 // --- Utilities ---
 import { getTradingImplications, getPortfolioImplications } from "@/lib/tradingImplications";
+import { computeReturns, computeCorrelation } from "@/lib/metrics";
 import type { VolatilityRegime } from "@/lib/regimeClassification";
 
 // --- Types ---
@@ -212,29 +213,22 @@ export default function VolatilityPage() {
   const avgCorrelation = useMemo(() => {
     if (!data || !marketData) return 0;
 
-    // Calculate rolling correlation (simplified version for summary)
-    const stockVols = data.series.map((s) => s.yangZhang ?? s.rolling20 ?? 0);
-    const marketVols = marketData.series.map((s) => s.yangZhang ?? s.rolling20 ?? 0);
+    // Calculate correlation between stock returns and market returns
+    // This is consistent with how beta is calculated
+    const stockPrices = data.series
+      .map((s) => s.close)
+      .filter((c): c is number => c !== null && c !== undefined && c > 0);
+    const marketPrices = marketData.series
+      .map((s) => s.close)
+      .filter((c): c is number => c !== null && c !== undefined && c > 0);
 
-    const minLength = Math.min(stockVols.length, marketVols.length);
-    if (minLength < 30) return 0;
+    if (stockPrices.length < 30 || marketPrices.length < 30) return 0;
 
-    // Simple correlation coefficient
-    const n = minLength;
-    const sumStock = stockVols.slice(0, n).reduce((a, b) => a + b, 0);
-    const sumMarket = marketVols.slice(0, n).reduce((a, b) => a + b, 0);
-    const sumStockSq = stockVols.slice(0, n).reduce((a, b) => a + b * b, 0);
-    const sumMarketSq = marketVols.slice(0, n).reduce((a, b) => a + b * b, 0);
-    const sumProduct = stockVols
-      .slice(0, n)
-      .reduce((a, b, i) => a + b * marketVols[i], 0);
+    const minLength = Math.min(stockPrices.length, marketPrices.length);
+    const stockReturns = computeReturns(stockPrices.slice(0, minLength));
+    const marketReturns = computeReturns(marketPrices.slice(0, minLength));
 
-    const numerator = n * sumProduct - sumStock * sumMarket;
-    const denominator = Math.sqrt(
-      (n * sumStockSq - sumStock * sumStock) * (n * sumMarketSq - sumMarket * sumMarket)
-    );
-
-    return denominator !== 0 ? numerator / denominator : 0;
+    return computeCorrelation(stockReturns, marketReturns);
   }, [data, marketData]);
 
   // Compute regime-related values (with safe fallbacks for when data is null)

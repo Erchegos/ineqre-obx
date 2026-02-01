@@ -15,71 +15,66 @@ type PriceRow = {
   adj_close: number;
 };
 
-// Fetch stock prices with dates
-async function fetchPricesWithDates(
+// Fetch aligned stock and market prices by date
+async function fetchAlignedPrices(
   ticker: string,
   limit: number,
   useAdjusted: boolean
-): Promise<{ dates: string[]; prices: number[] }> {
+): Promise<{
+  dates: string[];
+  stockPrices: number[];
+  marketPrices: number[];
+}> {
   const tableName = await getPriceTable();
 
+  // JOIN stock and OBX data by date to ensure alignment
   const q = `
-    SELECT date::date as date, close, adj_close
-    FROM ${tableName}
-    WHERE upper(ticker) = upper($1)
-      AND close IS NOT NULL
-      AND close > 0
-      AND source = 'ibkr'
-    ORDER BY date DESC
+    SELECT
+      s.date::date as date,
+      s.close as stock_close,
+      s.adj_close as stock_adj_close,
+      m.close as market_close,
+      m.adj_close as market_adj_close
+    FROM ${tableName} s
+    INNER JOIN ${tableName} m ON s.date = m.date
+    WHERE upper(s.ticker) = upper($1)
+      AND upper(m.ticker) = 'OBX'
+      AND s.close IS NOT NULL
+      AND s.close > 0
+      AND m.close IS NOT NULL
+      AND m.close > 0
+    ORDER BY s.date DESC
     LIMIT $2
   `;
 
   const result = await pool.query(q, [ticker, limit]);
 
-  const rows: PriceRow[] = result.rows
+  const rows = result.rows
     .map((r) => ({
       date:
         r.date instanceof Date
           ? r.date.toISOString().slice(0, 10)
           : String(r.date),
-      close: Number(r.close),
-      adj_close: r.adj_close ? Number(r.adj_close) : Number(r.close),
+      stockClose: Number(r.stock_close),
+      stockAdjClose: r.stock_adj_close
+        ? Number(r.stock_adj_close)
+        : Number(r.stock_close),
+      marketClose: Number(r.market_close),
+      marketAdjClose: r.market_adj_close
+        ? Number(r.market_adj_close)
+        : Number(r.market_close),
     }))
     .reverse(); // Oldest to newest
 
   const dates = rows.map((r) => r.date);
-  const prices = rows.map((r) => (useAdjusted ? r.adj_close : r.close));
+  const stockPrices = rows.map((r) =>
+    useAdjusted ? r.stockAdjClose : r.stockClose
+  );
+  const marketPrices = rows.map((r) =>
+    useAdjusted ? r.marketAdjClose : r.marketClose
+  );
 
-  return { dates, prices };
-}
-
-// Fetch market (OBX) prices
-async function fetchMarketPrices(
-  limit: number,
-  useAdjusted: boolean
-): Promise<number[]> {
-  const tableName = await getPriceTable();
-
-  const q = `
-    SELECT close, adj_close
-    FROM ${tableName}
-    WHERE upper(ticker) = 'OBX'
-      AND close IS NOT NULL
-      AND close > 0
-      AND source = 'ibkr'
-    ORDER BY date DESC
-    LIMIT $1
-  `;
-
-  const result = await pool.query(q, [limit]);
-
-  return result.rows
-    .map((r) => {
-      const rawClose = Number(r.close);
-      const adjClose = r.adj_close ? Number(r.adj_close) : rawClose;
-      return useAdjusted ? adjClose : rawClose;
-    })
-    .reverse(); // Oldest to newest
+  return { dates, stockPrices, marketPrices };
 }
 
 export async function GET(
@@ -94,52 +89,35 @@ export async function GET(
   const useAdjusted = searchParams.get("adjusted") !== "false";
 
   try {
-    // Fetch stock data with dates
-    const { dates, prices: stockPrices } = await fetchPricesWithDates(
+    // Fetch aligned stock and market data by date
+    const { dates, stockPrices, marketPrices } = await fetchAlignedPrices(
       ticker,
       limit,
       useAdjusted
     );
 
-    console.log(`[Residuals API] ${ticker}: Fetched ${stockPrices.length} stock prices`);
+    console.log(
+      `[Residuals API] ${ticker}: Fetched ${stockPrices.length} aligned price pairs`
+    );
 
     if (stockPrices.length < 2) {
-      console.warn(`[Residuals API] ${ticker}: Insufficient data (${stockPrices.length} prices)`);
+      console.warn(
+        `[Residuals API] ${ticker}: Insufficient data (${stockPrices.length} prices)`
+      );
       return NextResponse.json(
-        { error: `Insufficient data for residuals analysis. Found ${stockPrices.length} prices, need at least 2.` },
+        {
+          error: `Insufficient data for residuals analysis. Found ${stockPrices.length} overlapping dates with OBX, need at least 2.`,
+        },
         { status: 400 }
       );
     }
-
-    // Fetch market (OBX) prices
-    const marketPrices = await fetchMarketPrices(limit, useAdjusted);
-
-    console.log(`[Residuals API] ${ticker}: Fetched ${marketPrices.length} OBX market prices`);
-
-    // Align both series to the minimum available length
-    const minLength = Math.min(stockPrices.length, marketPrices.length);
-
-    if (minLength < 2) {
-      console.warn(`[Residuals API] ${ticker}: Insufficient overlapping data (${minLength} data points)`);
-      return NextResponse.json(
-        { error: `Insufficient overlapping data. Found ${stockPrices.length} stock prices and ${marketPrices.length} OBX prices. Need at least 2 overlapping points.` },
-        { status: 400 }
-      );
-    }
-
-    console.log(`[Residuals API] ${ticker}: Using ${minLength} overlapping data points`);
-
-    // Align both to the same length (take last N points)
-    const alignedStock = stockPrices.slice(-minLength);
-    const alignedMarket = marketPrices.slice(-minLength);
-    const alignedDates = dates.slice(-minLength);
 
     // Compute returns (log returns)
-    const stockReturns = computeReturns(alignedStock);
-    const marketReturns = computeReturns(alignedMarket);
+    const stockReturns = computeReturns(stockPrices);
+    const marketReturns = computeReturns(marketPrices);
 
     // Align dates (returns start from index 1)
-    const returnDates = alignedDates.slice(1);
+    const returnDates = dates.slice(1);
 
     // Compute OLS regression to get alpha, beta, R²
     const regression = computeOLSRegression(stockReturns, marketReturns);

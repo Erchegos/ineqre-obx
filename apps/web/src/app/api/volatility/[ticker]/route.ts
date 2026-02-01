@@ -94,27 +94,54 @@ async function fetchBars(ticker: string, limit: number, useAdjusted: boolean): P
   }).reverse(); // Return oldest -> newest for calculation
 }
 
-// Fetch market (OBX) prices for beta calculation
-async function fetchMarketBars(limit: number, useAdjusted: boolean): Promise<number[]> {
+// Fetch aligned stock and market bars for beta calculation
+async function fetchAlignedBarsForBeta(
+  ticker: string,
+  limit: number,
+  useAdjusted: boolean
+): Promise<{ stockPrices: number[]; marketPrices: number[] }> {
   const tableName = await getPriceTable();
 
+  // JOIN stock and OBX data by date to ensure alignment
   const q = `
-    SELECT close, adj_close
-    FROM ${tableName}
-    WHERE upper(ticker) = 'OBX'
-      AND close IS NOT NULL
-      AND close > 0
-    ORDER BY date DESC
-    LIMIT $1
+    SELECT
+      s.close as stock_close,
+      s.adj_close as stock_adj_close,
+      m.close as market_close,
+      m.adj_close as market_adj_close
+    FROM ${tableName} s
+    INNER JOIN ${tableName} m ON s.date = m.date
+    WHERE upper(s.ticker) = upper($1)
+      AND upper(m.ticker) = 'OBX'
+      AND s.close IS NOT NULL
+      AND s.close > 0
+      AND m.close IS NOT NULL
+      AND m.close > 0
+    ORDER BY s.date DESC
+    LIMIT $2
   `;
 
-  const result = await pool.query(q, [limit]);
+  const result = await pool.query(q, [ticker, limit]);
 
-  return result.rows.map((r) => {
-    const rawClose = Number(r.close);
-    const adjClose = r.adj_close ? Number(r.adj_close) : rawClose;
+  const rows = result.rows.reverse(); // Oldest to newest
+
+  const stockPrices = rows.map((r) => {
+    const rawClose = Number(r.stock_close);
+    const adjClose = r.stock_adj_close
+      ? Number(r.stock_adj_close)
+      : rawClose;
     return useAdjusted ? adjClose : rawClose;
-  }).reverse(); // Return oldest -> newest
+  });
+
+  const marketPrices = rows.map((r) => {
+    const rawClose = Number(r.market_close);
+    const adjClose = r.market_adj_close
+      ? Number(r.market_adj_close)
+      : rawClose;
+    return useAdjusted ? adjClose : rawClose;
+  });
+
+  return { stockPrices, marketPrices };
 }
 
 export async function GET(
@@ -153,12 +180,15 @@ export async function GET(
     // Get latest values
     const current = volSeries[volSeries.length - 1];
 
-    // Calculate Beta (vs OBX)
+    // Calculate Beta (vs OBX) with properly aligned data
     let beta = 0;
     try {
-      const marketPrices = await fetchMarketBars(limit, useAdjusted);
-      if (marketPrices.length > 0) {
-        const stockPrices = bars.map(b => b.close);
+      const { stockPrices, marketPrices } = await fetchAlignedBarsForBeta(
+        ticker,
+        limit,
+        useAdjusted
+      );
+      if (stockPrices.length > 0 && marketPrices.length > 0) {
         const stockReturns = computeReturns(stockPrices);
         const marketReturns = computeReturns(marketPrices);
         beta = computeBeta(stockReturns, marketReturns);
