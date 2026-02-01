@@ -226,3 +226,36 @@ export function computeResidualSquares(
     residual: residual,
   }));
 }
+
+/**
+ * Compute correlation coefficient between two return series
+ * Correlation = Covariance(x, y) / (StdDev(x) * StdDev(y))
+ */
+export function computeCorrelation(xReturns: number[], yReturns: number[]): number {
+  const n = Math.min(xReturns.length, yReturns.length);
+  if (n < 2) return 0;
+
+  const xMean = xReturns.slice(0, n).reduce((a, b) => a + b, 0) / n;
+  const yMean = yReturns.slice(0, n).reduce((a, b) => a + b, 0) / n;
+
+  let covariance = 0;
+  let xVariance = 0;
+  let yVariance = 0;
+
+  for (let i = 0; i < n; i++) {
+    const xDiff = xReturns[i] - xMean;
+    const yDiff = yReturns[i] - yMean;
+    covariance += xDiff * yDiff;
+    xVariance += xDiff * xDiff;
+    yVariance += yDiff * yDiff;
+  }
+
+  covariance /= n - 1;
+  xVariance /= n - 1;
+  yVariance /= n - 1;
+
+  const xStdDev = Math.sqrt(xVariance);
+  const yStdDev = Math.sqrt(yVariance);
+
+  return xStdDev > 0 && yStdDev > 0 ? covariance / (xStdDev * yStdDev) : 0;
+}
