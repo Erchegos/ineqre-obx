@@ -185,7 +185,11 @@ export async function GET(
     // For adjusted prices, find the first valid adj_close (>0) and only use data from that point
     // This avoids the spike caused by mixing close (when adj_close=0) with real adj_close values
     const firstValidAdjIndex = prices.findIndex(p => p.adj_close > 0 && p.adj_close !== p.close);
-    const hasValidAdjClose = firstValidAdjIndex >= 0;
+
+    // Check if we have enough valid adj_close data (at least 20 days)
+    // This prevents using adjusted data when only 1-2 days differ (noise)
+    const hasValidAdjClose = firstValidAdjIndex >= 0 &&
+                             (prices.length - firstValidAdjIndex) >= 20;
 
     // If no valid adj_close data exists, use close for both series
     const adjCloses = hasValidAdjClose
