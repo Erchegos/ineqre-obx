@@ -32,8 +32,8 @@ function calculateDistributionStats(returns: number[]) {
   return { mean, stdDev, skewness, kurtosis };
 }
 
-// Create probability density bins using kernel density estimation
-function createDensityData(returns: number[], bandwidth: number = 0.002) {
+// Create probability density bins using kernel density estimation with adaptive bandwidth
+function createDensityData(returns: number[]) {
   if (returns.length === 0) return [];
 
   const min = Math.min(...returns);
@@ -41,6 +41,27 @@ function createDensityData(returns: number[], bandwidth: number = 0.002) {
   const range = max - min;
   const numBins = 100;
   const binWidth = range / numBins;
+
+  // Calculate adaptive bandwidth using Silverman's rule of thumb
+  // bandwidth = 0.9 * min(std, IQR/1.34) * n^(-1/5)
+  const n = returns.length;
+  const mean = returns.reduce((a, b) => a + b, 0) / n;
+  const variance = returns.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n;
+  const std = Math.sqrt(variance);
+
+  // Calculate IQR (interquartile range)
+  const sorted = [...returns].sort((a, b) => a - b);
+  const q1 = sorted[Math.floor(n * 0.25)];
+  const q3 = sorted[Math.floor(n * 0.75)];
+  const iqr = q3 - q1;
+
+  // Silverman's rule with better handling for small samples
+  let bandwidth = 0.9 * Math.min(std, iqr / 1.34) * Math.pow(n, -0.2);
+
+  // Ensure bandwidth is reasonable (not too small or too large)
+  const minBandwidth = range / 100;
+  const maxBandwidth = range / 10;
+  bandwidth = Math.max(minBandwidth, Math.min(maxBandwidth, bandwidth));
 
   const densityData: Array<{ return: number; density: number }> = [];
 
@@ -54,7 +75,7 @@ function createDensityData(returns: number[], bandwidth: number = 0.002) {
       density += Math.exp(-0.5 * u * u) / Math.sqrt(2 * Math.PI);
     }
 
-    density = density / (returns.length * bandwidth);
+    density = density / (n * bandwidth);
     densityData.push({ return: x, density });
   }
 
@@ -125,8 +146,8 @@ export default function ReturnDistributionChart({
   // State to track guide visibility
   const [showGuide, setShowGuide] = useState<boolean>(false);
 
-  // State to track smoothing
-  const [smoothed, setSmoothed] = useState<boolean>(false);
+  // State to track smoothing (default to true for better UX)
+  const [smoothed, setSmoothed] = useState<boolean>(true);
 
   const toggleTimeframe = (label: string) => {
     setVisibleTimeframes((prev) => {
@@ -140,8 +161,8 @@ export default function ReturnDistributionChart({
     });
   };
 
-  // Apply moving average smoothing to data
-  const applySmoothing = (data: any[], keys: string[], windowSize: number = 5) => {
+  // Apply Gaussian-weighted moving average smoothing to data
+  const applySmoothing = (data: any[], keys: string[], windowSize: number = 8) => {
     if (data.length === 0) return data;
 
     const smoothed = data.map((point, idx) => {
@@ -149,16 +170,21 @@ export default function ReturnDistributionChart({
 
       keys.forEach(key => {
         let sum = 0;
-        let count = 0;
+        let weightSum = 0;
+
+        // Use Gaussian weights for smoother results
+        const sigma = windowSize / 3;
 
         for (let i = Math.max(0, idx - windowSize); i <= Math.min(data.length - 1, idx + windowSize); i++) {
           if (data[i][key] !== undefined) {
-            sum += data[i][key];
-            count++;
+            const distance = Math.abs(i - idx);
+            const weight = Math.exp(-0.5 * Math.pow(distance / sigma, 2));
+            sum += data[i][key] * weight;
+            weightSum += weight;
           }
         }
 
-        newPoint[key] = count > 0 ? sum / count : point[key];
+        newPoint[key] = weightSum > 0 ? sum / weightSum : point[key];
       });
 
       return newPoint;
@@ -198,7 +224,8 @@ export default function ReturnDistributionChart({
     // Apply smoothing if enabled
     if (smoothed) {
       const visibleKeys = Object.keys(distributionData).filter(label => visibleTimeframes.has(label));
-      return applySmoothing(rawData, visibleKeys, 8);
+      // Use larger window for better smoothing
+      return applySmoothing(rawData, visibleKeys, 12);
     }
 
     return rawData;

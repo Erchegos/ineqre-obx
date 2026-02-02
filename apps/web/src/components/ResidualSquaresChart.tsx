@@ -68,7 +68,14 @@ export default function ResidualSquaresChart({
 
     const days = periodDays[period] || data.length;
     const startIdx = Math.max(0, data.length - days);
-    const slicedData = data.slice(startIdx);
+    let slicedData = data.slice(startIdx);
+
+    // Filter out unrealistic returns (data errors, stock splits, etc.)
+    // Daily returns should be between -95% and +100%
+    slicedData = slicedData.filter(d => {
+      return d.stockReturn > -0.95 && d.stockReturn <= 1.0 &&
+             d.marketReturn > -0.95 && d.marketReturn <= 1.0;
+    });
 
     if (slicedData.length === 0) {
       return {

@@ -90,6 +90,7 @@ async function fetchPrices(
         AND close > 0
         AND date >= $2::date
         AND date <= $3::date
+        AND EXTRACT(DOW FROM (date AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Oslo')::date) NOT IN (0, 6)
       ORDER BY date ASC
     `;
     const result = await pool.query(q, [ticker, startDate, endDate]);
@@ -101,12 +102,15 @@ async function fetchPrices(
   }
 
   // Otherwise use limit (fetching most recent N rows)
+  // Exclude weekends (0=Sunday, 6=Saturday)
+  // Convert to Europe/Oslo timezone before checking day of week
   const q = `
     SELECT date::date as date, close, adj_close
     FROM public.${tableName}
     WHERE upper(ticker) = upper($1)
       AND close IS NOT NULL
       AND close > 0
+      AND EXTRACT(DOW FROM (date AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Oslo')::date) NOT IN (0, 6)
     ORDER BY date DESC
     LIMIT $2
   `;
@@ -123,7 +127,9 @@ async function fetchMarketPrices(limit: number): Promise<number[]> {
   const q = `
     SELECT close
     FROM public.${tableName}
-    WHERE upper(ticker) = 'OBX' AND close IS NOT NULL
+    WHERE upper(ticker) = 'OBX'
+      AND close IS NOT NULL
+      AND EXTRACT(DOW FROM (date AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Oslo')::date) NOT IN (0, 6)
     ORDER BY date DESC LIMIT $1
   `;
   const result = await pool.query(q, [limit]);

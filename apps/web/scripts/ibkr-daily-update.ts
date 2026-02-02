@@ -46,7 +46,7 @@ async function updateTicker(
   ibkr: IBKRClient,
   db: Client,
   ticker: string
-): Promise<{ success: boolean; date?: string; error?: string }> {
+): Promise<{ success: boolean; date?: string; count?: number; error?: string }> {
   try {
     const contract = await ibkr.searchContract(ticker, "OSE");
 
@@ -54,7 +54,7 @@ async function updateTicker(
       return { success: false, error: "Contract not found" };
     }
 
-    // Fetch last 5 days to ensure we catch the latest bar
+    // Fetch last 5 days to ensure we catch all recent data
     const histData = await ibkr.getHistoricalData(contract.conid, "5d", "1d");
 
     if (!histData || !histData.data || histData.data.length === 0) {
@@ -67,11 +67,13 @@ async function updateTicker(
       return { success: false, error: "No price data" };
     }
 
-    // Get the latest bar
-    const latestPrice = prices[prices.length - 1];
-    await upsertPrice(db, latestPrice);
+    // Upsert ALL bars from the last 5 days to backfill missing data
+    for (const price of prices) {
+      await upsertPrice(db, price);
+    }
 
-    return { success: true, date: latestPrice.date };
+    const latestPrice = prices[prices.length - 1];
+    return { success: true, date: latestPrice.date, count: prices.length };
   } catch (error: any) {
     return {
       success: false,
@@ -105,6 +107,7 @@ async function main() {
       ticker: string;
       success: boolean;
       date?: string;
+      count?: number;
       error?: string;
     }> = [];
 
@@ -114,7 +117,7 @@ async function main() {
       results.push({ ticker, ...result });
 
       if (result.success) {
-        console.log(`[${ticker}] ✓ Updated: ${result.date}`);
+        console.log(`[${ticker}] ✓ Updated: ${result.date} (${result.count} bars inserted)`);
       } else {
         console.log(`[${ticker}] ✗ Failed: ${result.error}`);
       }

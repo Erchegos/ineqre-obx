@@ -26,8 +26,11 @@ async function fetchAlignedPrices(
   marketPrices: number[];
 }> {
   const tableName = await getPriceTable();
+  console.log(`[Residuals DEBUG] Table: ${tableName}, Ticker: ${ticker}, Limit: ${limit}`);
 
   // JOIN stock and OBX data by date to ensure alignment
+  // Exclude weekends (0=Sunday, 6=Saturday)
+  // Convert to Europe/Oslo timezone before checking day of week
   const q = `
     SELECT
       s.date::date as date,
@@ -43,11 +46,18 @@ async function fetchAlignedPrices(
       AND s.close > 0
       AND m.close IS NOT NULL
       AND m.close > 0
+      AND EXTRACT(DOW FROM (s.date AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Oslo')::date) NOT IN (0, 6)
     ORDER BY s.date DESC
     LIMIT $2
   `;
 
+  console.log(`[Residuals DEBUG] Query includes weekend filter: ${q.includes('EXTRACT')}`);
   const result = await pool.query(q, [ticker, limit]);
+
+  // Debug: Check first few dates
+  if (result.rows.length > 0) {
+    console.log(`[Residuals DEBUG] First 3 dates from DB:`, result.rows.slice(0, 3).map((r: any) => r.date));
+  }
 
   const rows = result.rows
     .map((r) => ({
@@ -117,15 +127,39 @@ export async function GET(
     const marketReturns = computeReturns(marketPrices);
 
     // Align dates (returns start from index 1)
-    const returnDates = dates.slice(1);
+    let returnDates = dates.slice(1);
 
-    // Compute OLS regression to get alpha, beta, R²
-    const regression = computeOLSRegression(stockReturns, marketReturns);
+    // Filter out unrealistic returns (data errors, stock splits, etc.)
+    // Daily returns should be between -95% and +100%
+    const validIndices: number[] = [];
+    const filteredStockReturns: number[] = [];
+    const filteredMarketReturns: number[] = [];
+    const filteredDates: string[] = [];
 
-    // Compute residual squares
+    for (let i = 0; i < stockReturns.length; i++) {
+      const stockReturn = stockReturns[i];
+      const marketReturn = marketReturns[i];
+
+      // Keep only realistic returns
+      if (stockReturn > -0.95 && stockReturn <= 1.0 &&
+          marketReturn > -0.95 && marketReturn <= 1.0) {
+        validIndices.push(i);
+        filteredStockReturns.push(stockReturn);
+        filteredMarketReturns.push(marketReturn);
+        filteredDates.push(returnDates[i]);
+      }
+    }
+
+    // Use filtered data
+    returnDates = filteredDates;
+
+    // Compute OLS regression to get alpha, beta, R² using filtered data
+    const regression = computeOLSRegression(filteredStockReturns, filteredMarketReturns);
+
+    // Compute residual squares using filtered data
     const residualSquares = computeResidualSquares(
-      stockReturns,
-      marketReturns,
+      filteredStockReturns,
+      filteredMarketReturns,
       returnDates
     );
 
@@ -135,10 +169,10 @@ export async function GET(
       residualSquares.length;
 
     // Prepare returns data for scatter plot (stock return vs market return)
-    const returnsData = stockReturns.map((stockReturn, i) => ({
+    const returnsData = filteredStockReturns.map((stockReturn, i) => ({
       date: returnDates[i] || "",
       stockReturn: stockReturn,
-      marketReturn: marketReturns[i] || 0,
+      marketReturn: filteredMarketReturns[i] || 0,
       residual: regression.residuals[i] || 0,
       residualSquare: residualSquares[i]?.residualSquare || 0,
     }));
