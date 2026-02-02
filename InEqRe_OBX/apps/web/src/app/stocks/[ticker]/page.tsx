@@ -131,7 +131,7 @@ export default function StockTickerPage() {
   }, [params]);
 
   const initialLimit = useMemo(() => {
-    return clampInt(searchParams.get("limit"), 1500, 20, 5000);
+    return clampInt(searchParams.get("limit"), 1260, 20, 15000); // Default to 5Y (1260 trading days), max 15000 (~60 years)
   }, [searchParams]);
 
   const [limit, setLimit] = useState<number>(initialLimit);
@@ -151,6 +151,12 @@ export default function StockTickerPage() {
 
   const [returnsStartDate, setReturnsStartDate] = useState<string>("");
   const [returnsEndDate, setReturnsEndDate] = useState<string>("");
+
+  // Filter and sort state for Daily Returns table
+  const [returnFilter, setReturnFilter] = useState<"all" | "positive" | "negative" | "large_positive" | "large_negative" | "custom">("all");
+  const [customFilterThreshold, setCustomFilterThreshold] = useState<number>(5);
+  const [sortColumn, setSortColumn] = useState<"date" | "close" | "adj_close" | "return" | "cumulative">("date");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   // Residuals data
   const [residualsData, setResidualsData] = useState<Array<{
@@ -228,8 +234,10 @@ export default function StockTickerPage() {
         if (!cancelled) {
           setData(json);
           setLoading(false);
-          
-          if (json.returns?.adjusted?.length > 0) {
+
+          // Only set initial date range if not already set (first load)
+          // This prevents overriding user's date selection when refetching data
+          if (json.returns?.adjusted?.length > 0 && !returnsStartDate && !returnsEndDate) {
             const arr = json.returns.adjusted;
             const endDate = arr[arr.length - 1].date;
             const startDate = arr[Math.max(0, arr.length - 252)].date;
@@ -473,13 +481,29 @@ export default function StockTickerPage() {
   }, [data?.prices, data?.dateRange, chartMode]);
 
   const filteredReturns = useMemo(() => {
-    return activeReturns.filter(r => {
+    let filtered = activeReturns.filter(r => {
       const date = r.date;
       if (returnsStartDate && date < returnsStartDate) return false;
       if (returnsEndDate && date > returnsEndDate) return false;
       return true;
     });
-  }, [activeReturns, returnsStartDate, returnsEndDate]);
+
+    // Apply return filter
+    if (returnFilter === "positive") {
+      filtered = filtered.filter(r => r.return > 0);
+    } else if (returnFilter === "negative") {
+      filtered = filtered.filter(r => r.return < 0);
+    } else if (returnFilter === "large_positive") {
+      filtered = filtered.filter(r => r.return > 0.05); // > 5%
+    } else if (returnFilter === "large_negative") {
+      filtered = filtered.filter(r => r.return < -0.05); // < -5%
+    } else if (returnFilter === "custom") {
+      const threshold = customFilterThreshold / 100;
+      filtered = filtered.filter(r => Math.abs(r.return) >= threshold);
+    }
+
+    return filtered;
+  }, [activeReturns, returnsStartDate, returnsEndDate, returnFilter, customFilterThreshold]);
 
   const priceMap = useMemo(() => {
     if (!data?.prices) return {};
@@ -492,6 +516,62 @@ export default function StockTickerPage() {
   const returnStats = useMemo(() => {
     return calculateReturnStats(filteredReturns);
   }, [filteredReturns]);
+
+  // Sorted and filtered returns for table display
+  const sortedReturns = useMemo(() => {
+    const reversed = filteredReturns.slice().reverse(); // Newest first by default
+
+    // Calculate cumulative returns for sorting
+    const withCumulative = reversed.map((r, idx, arr) => {
+      const cumulativeReturn = arr.slice(idx).reduce((cum, ret) => cum * (1 + ret.return), 1) - 1;
+      const priceData = priceMap[r.date] || { close: 0, adj_close: 0 };
+      return {
+        ...r,
+        cumulative: cumulativeReturn,
+        close: priceData.close,
+        adj_close: priceData.adj_close ?? priceData.close,
+      };
+    });
+
+    // Sort by selected column
+    withCumulative.sort((a, b) => {
+      let aVal: number | string = 0;
+      let bVal: number | string = 0;
+
+      switch (sortColumn) {
+        case "date":
+          aVal = a.date;
+          bVal = b.date;
+          break;
+        case "close":
+          aVal = a.close;
+          bVal = b.close;
+          break;
+        case "adj_close":
+          aVal = a.adj_close;
+          bVal = b.adj_close;
+          break;
+        case "return":
+          aVal = a.return;
+          bVal = b.return;
+          break;
+        case "cumulative":
+          aVal = a.cumulative;
+          bVal = b.cumulative;
+          break;
+      }
+
+      if (typeof aVal === "string" && typeof bVal === "string") {
+        return sortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      } else {
+        const numA = typeof aVal === "number" ? aVal : 0;
+        const numB = typeof bVal === "number" ? bVal : 0;
+        return sortDirection === "asc" ? numA - numB : numB - numA;
+      }
+    });
+
+    return withCumulative;
+  }, [filteredReturns, priceMap, sortColumn, sortDirection]);
 
   // STD Channel chart data
   const stdChartData = useMemo(() => {
@@ -548,18 +628,30 @@ export default function StockTickerPage() {
 
   const handleDateRangePreset = (preset: string) => {
     if (!activeReturns || activeReturns.length === 0) return;
+
+    // When "All" is selected, show all available data
+    if (preset === "All") {
+      setReturnsStartDate(activeReturns[0].date);
+      setReturnsEndDate(activeReturns[activeReturns.length - 1].date);
+      // Also ensure we have enough data fetched
+      if (limit < 10000) {
+        setLimit(10000);
+      }
+      return;
+    }
+
     const endDate = activeReturns[activeReturns.length - 1].date;
     let startIdx = 0;
-    
+
     switch (preset) {
       case "1M": startIdx = Math.max(0, activeReturns.length - 21); break;
       case "3M": startIdx = Math.max(0, activeReturns.length - 63); break;
       case "6M": startIdx = Math.max(0, activeReturns.length - 126); break;
       case "1Y": startIdx = Math.max(0, activeReturns.length - 252); break;
       case "3Y": startIdx = Math.max(0, activeReturns.length - 756); break;
-      case "All": startIdx = 0; break;
+      case "5Y": startIdx = Math.max(0, activeReturns.length - 1260); break;
     }
-    
+
     setReturnsStartDate(activeReturns[startIdx].date);
     setReturnsEndDate(endDate);
   };
@@ -572,38 +664,45 @@ export default function StockTickerPage() {
 
   return (
     <main style={{ padding: 24, maxWidth: 1400, margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 24 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1, flexWrap: "wrap" }}>
+      {/* Header Section */}
+      <div style={{ marginBottom: 24 }}>
+        <Link
+          href="/stocks"
+          style={{
+            display: "inline-block",
+            color: "var(--foreground)",
+            textDecoration: "none",
+            fontSize: 13,
+            fontWeight: 500,
+            padding: "8px 16px",
+            marginBottom: 20,
+            border: "1px solid var(--border)",
+            borderRadius: 4,
+            background: "var(--card-bg)",
+            transition: "all 0.15s ease"
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = "var(--accent)";
+            e.currentTarget.style.background = "var(--hover-bg)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = "var(--border)";
+            e.currentTarget.style.background = "var(--card-bg)";
+          }}
+        >
+          Asset List
+        </Link>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
           <h1 style={{ fontSize: 32, fontWeight: 600, margin: 0, letterSpacing: "-0.02em", color: "var(--foreground)" }}>
             {ticker || "?"}
           </h1>
           {ticker && <LiquidityBadge ticker={ticker} />}
-          <Link
-            href="/stocks"
-            style={{
-              display: "inline-block",
-              color: "var(--foreground)",
-              textDecoration: "none",
-              fontSize: 14,
-              fontWeight: 600,
-              padding: "8px 16px",
-              border: "1px solid var(--border)",
-              borderRadius: 2,
-              background: "var(--card-bg)",
-              transition: "all 0.15s ease"
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = "var(--foreground)";
-              e.currentTarget.style.background = "var(--hover-bg)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = "var(--border)";
-              e.currentTarget.style.background = "var(--card-bg)";
-            }}
-          >
-            Asset List
-          </Link>
         </div>
+      </div>
+
+      {/* Navigation Buttons */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 24 }}>
+        <div style={{ flex: 1 }}></div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <Link
             href={`/volatility/${ticker}`}
@@ -851,7 +950,7 @@ export default function StockTickerPage() {
                 transition: "all 0.15s",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = "var(--foreground)";
+                e.currentTarget.style.borderColor = "var(--accent)";
                 e.currentTarget.style.background = "var(--hover-bg)";
               }}
               onMouseLeave={(e) => {
@@ -888,34 +987,86 @@ export default function StockTickerPage() {
             )}
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 28 }}>
-            <MetricCard label="Total Return" value={fmtPct(activeStats.totalReturn)} colorType={activeStats.totalReturn >= 0 ? "success" : "danger"} />
-            <MetricCard label="Volatility (Ann.)" value={fmtPct(activeStats.volatility)} />
-            <MetricCard label="Max Drawdown" value={fmtPct(activeStats.maxDrawdown)} colorType="danger" />
-            <div style={{
-              padding: 16,
-              borderRadius: 4,
-              background: "var(--card-bg)",
-              border: "1px solid var(--card-border)"
-            }}>
-              <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            <MetricCard
+              label="Total Return"
+              value={fmtPct(activeStats.totalReturn)}
+              colorType={activeStats.totalReturn >= 0 ? "success" : "danger"}
+              subtitle={(() => {
+                // Calculate actual time period from date range
+                const startDate = data?.dateRange?.start;
+                const endDate = data?.dateRange?.end;
+                if (!startDate || !endDate) return "";
+
+                const start = new Date(startDate);
+                const end = new Date(endDate);
+                const days = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+                const years = days / 365.25;
+
+                if (years < 1) {
+                  const months = Math.round(years * 12);
+                  return `Over ${months} month${months !== 1 ? 's' : ''}`;
+                }
+
+                // Calculate CAGR (Compound Annual Growth Rate)
+                const cagr = ((Math.pow(1 + activeStats.totalReturn / 100, 1 / years) - 1) * 100);
+                return `${fmtPct(cagr)} CAGR (${years.toFixed(1)}y)`;
+              })()}
+            />
+            <MetricCard
+              label="Volatility (Ann.)"
+              value={fmtPct(activeStats.volatility)}
+              subtitle={(() => {
+                // Convert to daily volatility for context
+                const dailyVol = activeStats.volatility / Math.sqrt(252);
+                return `${fmtPct(dailyVol)} daily · ${(dailyVol * 100).toFixed(2)}% avg daily swing`;
+              })()}
+            />
+            <MetricCard
+              label="Max Drawdown"
+              value={fmtPct(activeStats.maxDrawdown)}
+              colorType="danger"
+              subtitle={(() => {
+                // Find when the max drawdown occurred
+                const drawdownPoint = activeDrawdown.reduce((min, curr) =>
+                  curr.drawdown < min.drawdown ? curr : min,
+                  activeDrawdown[0] || { drawdown: 0, date: "" }
+                );
+                if (!drawdownPoint?.date) return "Peak-to-trough decline";
+                const year = new Date(drawdownPoint.date).getFullYear();
+                return `Lowest point in ${year}`;
+              })()}
+            />
+            <div style={{ padding: 14, borderRadius: 3, border: "1px solid var(--card-border)", background: "var(--card-bg)" }}>
+              <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", marginBottom: 8 }}>
                 Risk Metrics (95%)
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: 12, color: "var(--muted-foreground)" }}>VaR:</span>
-                  <span style={{ fontSize: 16, fontWeight: 600, fontFamily: "monospace", color: "var(--foreground)" }}>
+              <div style={{ display: "flex", gap: 16, alignItems: "baseline" }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 9, color: "var(--muted-foreground)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>VaR</div>
+                  <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "monospace", color: "var(--foreground)" }}>
                     {fmtPct(activeStats.var95)}
-                  </span>
+                  </div>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: 12, color: "var(--muted-foreground)" }}>CVaR:</span>
-                  <span style={{ fontSize: 16, fontWeight: 600, fontFamily: "monospace", color: "var(--foreground)" }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 9, color: "var(--muted-foreground)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>CVaR</div>
+                  <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "monospace", color: "var(--foreground)" }}>
                     {fmtPct(activeStats.cvar95)}
-                  </span>
+                  </div>
                 </div>
               </div>
+              <div style={{ fontSize: 10, color: "var(--muted-foreground)", marginTop: 8, lineHeight: 1.4 }}>
+                5% chance of losing {fmtPct(Math.abs(activeStats.var95))} or more
+              </div>
             </div>
-            <MetricCard label="Sharpe Ratio" value={fmtNum(activeStats.sharpeRatio, 3)} />
+            <MetricCard
+              label="Sharpe Ratio"
+              value={fmtNum(activeStats.sharpeRatio, 3)}
+              subtitle={(() => {
+                // Show return per unit of risk
+                const returnPerRisk = activeStats.sharpeRatio * activeStats.volatility;
+                return `${fmtPct(returnPerRisk)} excess return/year`;
+              })()}
+            />
           </div>
 
           {/* CHARTS SECTION */}
@@ -1351,18 +1502,42 @@ export default function StockTickerPage() {
             </h2>
             <p style={{ fontSize: 12, color: "var(--muted-foreground)", marginBottom: 16, lineHeight: 1.5 }}>
               <strong>Daily return time series with statistical measures.</strong> Each row shows the log return for that day,
-              with cumulative return calculated from the oldest date in the selected range. Use timeframe controls to analyze
-              different periods. Win rate, skewness, and kurtosis reveal return distribution characteristics.
+              with cumulative return calculated from the oldest date in the selected range. Win rate, skewness, and kurtosis reveal return distribution characteristics.
             </p>
 
             {/* Date Controls */}
-            <div style={{ marginBottom: 24, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
+            <div style={{ marginBottom: 16, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                {["1M", "3M", "6M", "1Y", "3Y", "All"].map(preset => (
+                {["1M", "3M", "6M", "1Y", "3Y", "5Y", "All"].map(preset => (
                   <button
                     key={preset}
                     onClick={() => handleDateRangePreset(preset)}
-                    style={{ padding: "6px 12px", borderRadius: 3, border: "1px solid var(--input-border)", background: "var(--input-bg)", color: "var(--foreground)", fontSize: 12, cursor: "pointer", fontWeight: 500 }}
+                    style={{
+                      padding: "6px 12px",
+                      borderRadius: 3,
+                      border: "1px solid var(--input-border)",
+                      background: "var(--input-bg)",
+                      color: "var(--foreground)",
+                      fontSize: 12,
+                      cursor: "pointer",
+                      fontWeight: 500,
+                      transition: "all 0.15s ease",
+                      transform: "scale(1)"
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "var(--hover-bg)";
+                      e.currentTarget.style.borderColor = "var(--accent)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "var(--input-bg)";
+                      e.currentTarget.style.borderColor = "var(--input-border)";
+                    }}
+                    onMouseDown={(e) => {
+                      e.currentTarget.style.transform = "scale(0.95)";
+                    }}
+                    onMouseUp={(e) => {
+                      e.currentTarget.style.transform = "scale(1)";
+                    }}
                   >
                     {preset}
                   </button>
@@ -1373,6 +1548,276 @@ export default function StockTickerPage() {
                 <input type="date" value={returnsStartDate} onChange={(e) => setReturnsStartDate(e.target.value)} style={{ padding: "6px 10px", borderRadius: 3, border: "1px solid var(--input-border)", background: "var(--input-bg)", color: "var(--foreground)", fontSize: 12 }} />
                 <span style={{ color: "var(--muted)" }}>→</span>
                 <input type="date" value={returnsEndDate} onChange={(e) => setReturnsEndDate(e.target.value)} style={{ padding: "6px 10px", borderRadius: 3, border: "1px solid var(--input-border)", background: "var(--input-bg)", color: "var(--foreground)", fontSize: 12 }} />
+              </div>
+            </div>
+
+            {/* Filter Controls */}
+            <div style={{ marginBottom: 24, padding: 14, borderRadius: 4, border: "1px solid var(--border-subtle)", background: "var(--hover-bg)" }}>
+              <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", marginBottom: 10, fontWeight: 600 }}>Filter Returns</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                <button
+                  onClick={() => setReturnFilter("all")}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 3,
+                    border: "1px solid var(--input-border)",
+                    background: returnFilter === "all" ? "var(--accent)" : "var(--input-bg)",
+                    color: returnFilter === "all" ? "white" : "var(--foreground)",
+                    fontSize: 12,
+                    cursor: "pointer",
+                    fontWeight: 500,
+                    transition: "all 0.15s ease",
+                    transform: "scale(1)",
+                    boxShadow: returnFilter === "all" ? "0 2px 4px rgba(0,0,0,0.1)" : "none"
+                  }}
+                  onMouseEnter={(e) => {
+                    if (returnFilter === "all") {
+                      e.currentTarget.style.filter = "brightness(0.9)";
+                    } else {
+                      e.currentTarget.style.background = "var(--hover-bg)";
+                      e.currentTarget.style.borderColor = "var(--accent)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (returnFilter === "all") {
+                      e.currentTarget.style.filter = "brightness(1)";
+                    } else {
+                      e.currentTarget.style.background = "var(--input-bg)";
+                      e.currentTarget.style.borderColor = "var(--input-border)";
+                    }
+                  }}
+                  onMouseDown={(e) => {
+                    e.currentTarget.style.transform = "scale(0.95)";
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.transform = "scale(1)";
+                  }}
+                >
+                  All Days
+                </button>
+                <button
+                  onClick={() => setReturnFilter("positive")}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 3,
+                    border: "1px solid var(--input-border)",
+                    background: returnFilter === "positive" ? "var(--success)" : "var(--input-bg)",
+                    color: returnFilter === "positive" ? "white" : "var(--foreground)",
+                    fontSize: 12,
+                    cursor: "pointer",
+                    fontWeight: 500,
+                    transition: "all 0.15s ease",
+                    transform: "scale(1)",
+                    boxShadow: returnFilter === "positive" ? "0 2px 4px rgba(0,0,0,0.1)" : "none"
+                  }}
+                  onMouseEnter={(e) => {
+                    if (returnFilter === "positive") {
+                      e.currentTarget.style.filter = "brightness(0.9)";
+                    } else {
+                      e.currentTarget.style.background = "var(--hover-bg)";
+                      e.currentTarget.style.borderColor = "var(--success)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (returnFilter === "positive") {
+                      e.currentTarget.style.filter = "brightness(1)";
+                    } else {
+                      e.currentTarget.style.background = "var(--input-bg)";
+                      e.currentTarget.style.borderColor = "var(--input-border)";
+                    }
+                  }}
+                  onMouseDown={(e) => {
+                    e.currentTarget.style.transform = "scale(0.95)";
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.transform = "scale(1)";
+                  }}
+                >
+                  Positive Only
+                </button>
+                <button
+                  onClick={() => setReturnFilter("negative")}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 3,
+                    border: "1px solid var(--input-border)",
+                    background: returnFilter === "negative" ? "var(--danger)" : "var(--input-bg)",
+                    color: returnFilter === "negative" ? "white" : "var(--foreground)",
+                    fontSize: 12,
+                    cursor: "pointer",
+                    fontWeight: 500,
+                    transition: "all 0.15s ease",
+                    transform: "scale(1)",
+                    boxShadow: returnFilter === "negative" ? "0 2px 4px rgba(0,0,0,0.1)" : "none"
+                  }}
+                  onMouseEnter={(e) => {
+                    if (returnFilter === "negative") {
+                      e.currentTarget.style.filter = "brightness(0.9)";
+                    } else {
+                      e.currentTarget.style.background = "var(--hover-bg)";
+                      e.currentTarget.style.borderColor = "var(--danger)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (returnFilter === "negative") {
+                      e.currentTarget.style.filter = "brightness(1)";
+                    } else {
+                      e.currentTarget.style.background = "var(--input-bg)";
+                      e.currentTarget.style.borderColor = "var(--input-border)";
+                    }
+                  }}
+                  onMouseDown={(e) => {
+                    e.currentTarget.style.transform = "scale(0.95)";
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.transform = "scale(1)";
+                  }}
+                >
+                  Negative Only
+                </button>
+                <button
+                  onClick={() => setReturnFilter("large_positive")}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 3,
+                    border: "1px solid var(--input-border)",
+                    background: returnFilter === "large_positive" ? "var(--success)" : "var(--input-bg)",
+                    color: returnFilter === "large_positive" ? "white" : "var(--foreground)",
+                    fontSize: 12,
+                    cursor: "pointer",
+                    fontWeight: 500,
+                    transition: "all 0.15s ease",
+                    transform: "scale(1)",
+                    boxShadow: returnFilter === "large_positive" ? "0 2px 4px rgba(0,0,0,0.1)" : "none"
+                  }}
+                  onMouseEnter={(e) => {
+                    if (returnFilter === "large_positive") {
+                      e.currentTarget.style.filter = "brightness(0.9)";
+                    } else {
+                      e.currentTarget.style.background = "var(--hover-bg)";
+                      e.currentTarget.style.borderColor = "var(--success)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (returnFilter === "large_positive") {
+                      e.currentTarget.style.filter = "brightness(1)";
+                    } else {
+                      e.currentTarget.style.background = "var(--input-bg)";
+                      e.currentTarget.style.borderColor = "var(--input-border)";
+                    }
+                  }}
+                  onMouseDown={(e) => {
+                    e.currentTarget.style.transform = "scale(0.95)";
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.transform = "scale(1)";
+                  }}
+                >
+                  &gt; +5%
+                </button>
+                <button
+                  onClick={() => setReturnFilter("large_negative")}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 3,
+                    border: "1px solid var(--input-border)",
+                    background: returnFilter === "large_negative" ? "var(--danger)" : "var(--input-bg)",
+                    color: returnFilter === "large_negative" ? "white" : "var(--foreground)",
+                    fontSize: 12,
+                    cursor: "pointer",
+                    fontWeight: 500,
+                    transition: "all 0.15s ease",
+                    transform: "scale(1)",
+                    boxShadow: returnFilter === "large_negative" ? "0 2px 4px rgba(0,0,0,0.1)" : "none"
+                  }}
+                  onMouseEnter={(e) => {
+                    if (returnFilter === "large_negative") {
+                      e.currentTarget.style.filter = "brightness(0.9)";
+                    } else {
+                      e.currentTarget.style.background = "var(--hover-bg)";
+                      e.currentTarget.style.borderColor = "var(--danger)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (returnFilter === "large_negative") {
+                      e.currentTarget.style.filter = "brightness(1)";
+                    } else {
+                      e.currentTarget.style.background = "var(--input-bg)";
+                      e.currentTarget.style.borderColor = "var(--input-border)";
+                    }
+                  }}
+                  onMouseDown={(e) => {
+                    e.currentTarget.style.transform = "scale(0.95)";
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.transform = "scale(1)";
+                  }}
+                >
+                  &lt; -5%
+                </button>
+                <button
+                  onClick={() => setReturnFilter("custom")}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 3,
+                    border: "1px solid var(--input-border)",
+                    background: returnFilter === "custom" ? "var(--accent)" : "var(--input-bg)",
+                    color: returnFilter === "custom" ? "white" : "var(--foreground)",
+                    fontSize: 12,
+                    cursor: "pointer",
+                    fontWeight: 500,
+                    transition: "all 0.15s ease",
+                    transform: "scale(1)",
+                    boxShadow: returnFilter === "custom" ? "0 2px 4px rgba(0,0,0,0.1)" : "none"
+                  }}
+                  onMouseEnter={(e) => {
+                    if (returnFilter === "custom") {
+                      e.currentTarget.style.filter = "brightness(0.9)";
+                    } else {
+                      e.currentTarget.style.background = "var(--hover-bg)";
+                      e.currentTarget.style.borderColor = "var(--accent)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (returnFilter === "custom") {
+                      e.currentTarget.style.filter = "brightness(1)";
+                    } else {
+                      e.currentTarget.style.background = "var(--input-bg)";
+                      e.currentTarget.style.borderColor = "var(--input-border)";
+                    }
+                  }}
+                  onMouseDown={(e) => {
+                    e.currentTarget.style.transform = "scale(0.95)";
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.transform = "scale(1)";
+                  }}
+                >
+                  Custom
+                </button>
+                {returnFilter === "custom" && (
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <span style={{ fontSize: 12, color: "var(--muted)" }}>|±| ≥</span>
+                    <input
+                      type="number"
+                      value={customFilterThreshold}
+                      onChange={(e) => setCustomFilterThreshold(parseFloat(e.target.value) || 0)}
+                      min="0"
+                      max="100"
+                      step="0.5"
+                      style={{
+                        width: "60px",
+                        padding: "6px 8px",
+                        borderRadius: 3,
+                        border: "1px solid var(--input-border)",
+                        background: "var(--input-bg)",
+                        color: "var(--foreground)",
+                        fontSize: 12
+                      }}
+                    />
+                    <span style={{ fontSize: 12, color: "var(--muted)" }}>%</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1400,35 +1845,70 @@ export default function StockTickerPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr>
-                    <th style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--muted)", textAlign: "left" }}>Date</th>
-                    <th style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--muted)", textAlign: "right" }}>Close</th>
-                    <th style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--muted)", textAlign: "right" }}>Adj Close</th>
-                    <th style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--muted)", textAlign: "right" }}>Daily Return</th>
-                    <th style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--muted)", textAlign: "right" }}>Cumulative</th>
+                    {[
+                      { key: "date" as const, label: "Date", align: "left" },
+                      { key: "close" as const, label: "Close", align: "right" },
+                      { key: "adj_close" as const, label: "Adj Close", align: "right" },
+                      { key: "return" as const, label: "Daily Return", align: "right" },
+                      { key: "cumulative" as const, label: "Cumulative", align: "right" }
+                    ].map(({ key, label, align }) => (
+                      <th
+                        key={key}
+                        onClick={() => {
+                          if (sortColumn === key) {
+                            setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+                          } else {
+                            setSortColumn(key);
+                            setSortDirection(key === "date" ? "desc" : "desc");
+                          }
+                        }}
+                        style={{
+                          padding: "10px 12px",
+                          borderBottom: "1px solid var(--border)",
+                          color: sortColumn === key ? "var(--accent)" : "var(--muted)",
+                          textAlign: align as any,
+                          cursor: "pointer",
+                          userSelect: "none",
+                          fontWeight: sortColumn === key ? 600 : 400,
+                          transition: "color 0.2s"
+                        }}
+                        onMouseEnter={(e) => {
+                          if (sortColumn !== key) e.currentTarget.style.color = "var(--foreground)";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (sortColumn !== key) e.currentTarget.style.color = "var(--muted)";
+                        }}
+                      >
+                        {label}
+                        {sortColumn === key && (
+                          <span style={{ marginLeft: 6, fontSize: 10 }}>
+                            {sortDirection === "asc" ? "↑" : "↓"}
+                          </span>
+                        )}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredReturns.slice().reverse().map((r, idx, arr) => {
-                      const cumulativeReturn = arr.slice(idx).reduce((cum, ret) => cum * (1 + ret.return), 1) - 1;
-                      const priceData = priceMap[r.date] || { close: 0, adj_close: 0 };
-                      return (
-                        <tr key={r.date} style={{
-                          borderBottom: "1px solid var(--border)",
-                          backgroundColor: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)"
-                        }}>
-                          <td style={{ padding: "10px 12px", color: "var(--foreground)" }}>{r.date}</td>
-                          <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right" }}>{fmtNum(priceData.close)}</td>
-                          <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right", color: "var(--muted-foreground)" }}>{fmtNum(priceData.adj_close ?? priceData.close)}</td>
-                          <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right", color: r.return > 0 ? "var(--success)" : r.return < 0 ? "var(--danger)" : "var(--foreground)" }}>{fmtPct(r.return, 4)}</td>
-                          <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right", color: cumulativeReturn > 0 ? "var(--success)" : cumulativeReturn < 0 ? "var(--danger)" : "var(--foreground)" }}>{fmtPct(cumulativeReturn, 2)}</td>
-                        </tr>
-                      );
-                    })}
+                  {sortedReturns.map((row, idx) => (
+                    <tr key={row.date} style={{
+                      borderBottom: "1px solid var(--border)",
+                      backgroundColor: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)"
+                    }}>
+                      <td style={{ padding: "10px 12px", color: "var(--foreground)" }}>{row.date}</td>
+                      <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right" }}>{fmtNum(row.close)}</td>
+                      <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right", color: "var(--muted-foreground)" }}>{fmtNum(row.adj_close)}</td>
+                      <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right", color: row.return > 0 ? "var(--success)" : row.return < 0 ? "var(--danger)" : "var(--foreground)" }}>{fmtPct(row.return, 4)}</td>
+                      <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right", color: row.cumulative > 0 ? "var(--success)" : row.cumulative < 0 ? "var(--danger)" : "var(--foreground)" }}>{fmtPct(row.cumulative, 2)}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
             <div style={{ marginTop: 12, fontSize: 11, color: "var(--muted-foreground)", textAlign: "right" }}>
-              Showing all {filteredReturns.length} days
+              Showing {sortedReturns.length} days
+              {returnFilter !== "all" && ` (filtered from ${activeReturns.length} total)`}
+              {sortColumn !== "date" && ` • Sorted by ${sortColumn === "return" ? "Daily Return" : sortColumn === "cumulative" ? "Cumulative" : sortColumn === "close" ? "Close" : "Adj Close"} ${sortDirection === "asc" ? "↑" : "↓"}`}
             </div>
           </div>
         </>
@@ -1444,7 +1924,7 @@ export default function StockTickerPage() {
 }
 
 // Subcomponents
-function MetricCard({ label, value, colorType, tooltip }: { label: string; value: string; colorType?: "success" | "danger" | "warning"; tooltip?: string }) {
+function MetricCard({ label, value, colorType, tooltip, subtitle }: { label: string; value: string; colorType?: "success" | "danger" | "warning"; tooltip?: string; subtitle?: string }) {
   const getColor = () => {
     if (colorType === "success") return "var(--success)";
     if (colorType === "danger") return "var(--danger)";
@@ -1457,7 +1937,8 @@ function MetricCard({ label, value, colorType, tooltip }: { label: string; value
         <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase" }}>{label}</div>
         {tooltip && <div style={{ cursor: "help", color: "var(--muted-foreground)" }} title={tooltip}>?</div>}
       </div>
-      <div style={{ fontSize: 22, fontWeight: 600, color: getColor(), fontFamily: "monospace" }}>{value}</div>
+      <div style={{ fontSize: 22, fontWeight: 600, color: getColor(), fontFamily: "monospace", marginBottom: subtitle ? 6 : 0 }}>{value}</div>
+      {subtitle && <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.4 }}>{subtitle}</div>}
     </div>
   );
 }

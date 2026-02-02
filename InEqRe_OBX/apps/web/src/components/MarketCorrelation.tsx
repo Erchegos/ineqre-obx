@@ -39,7 +39,7 @@ export default function MarketCorrelation({
           color: "var(--foreground)",
         }}
       >
-        Market Co-Movement Analysis
+        Market Sensitivity
       </h2>
 
       <div
@@ -50,12 +50,12 @@ export default function MarketCorrelation({
           border: "1px solid var(--border)",
         }}
       >
-        {/* Summary Metrics */}
+        {/* Beta Display */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-            gap: 20,
+            gridTemplateColumns: "1fr 1fr",
+            gap: 24,
             marginBottom: 20,
           }}
         >
@@ -70,36 +70,19 @@ export default function MarketCorrelation({
                 marginBottom: 8,
               }}
             >
-              Beta to OBX
+              Stock Beta
             </div>
             <div
               style={{
-                fontSize: 32,
+                fontSize: 48,
                 fontWeight: 700,
                 fontFamily: "monospace",
                 color: "var(--foreground)",
-                marginBottom: 8,
               }}
             >
               {betaText}
             </div>
-            <div
-              style={{
-                fontSize: 13,
-                color: "var(--muted-foreground)",
-                lineHeight: 1.5,
-              }}
-            >
-              {beta !== null
-                ? Math.abs(beta) < 0.2
-                  ? `When OBX ${beta >= 0 ? 'rises' : 'falls'} 1%, this stock ${beta >= 0 ? 'rises' : 'falls'} ${Math.abs(beta * 100).toFixed(2)}%. Price moves ${beta < 0 ? 'opposite to' : 'with'} market but independently.`
-                  : Math.abs(beta) < 0.6
-                  ? `When OBX ${beta >= 0 ? 'rises' : 'falls'} 1%, this stock ${beta >= 0 ? 'rises' : 'falls'} ${Math.abs(beta * 100).toFixed(2)}%. Moderate market sensitivity.`
-                  : `When OBX ${beta >= 0 ? 'rises' : 'falls'} 1%, this stock ${beta >= 0 ? 'rises' : 'falls'} ${Math.abs(beta * 100).toFixed(2)}%. High market sensitivity.`
-                : "Insufficient data to calculate"}
-            </div>
           </div>
-
           <div>
             <div
               style={{
@@ -111,74 +94,18 @@ export default function MarketCorrelation({
                 marginBottom: 8,
               }}
             >
-              Average Correlation
+              Index Beta (OBX)
             </div>
             <div
               style={{
-                fontSize: 32,
+                fontSize: 48,
                 fontWeight: 700,
                 fontFamily: "monospace",
                 color: "var(--foreground)",
-                marginBottom: 8,
               }}
             >
-              {correlationText}
+              1.000
             </div>
-            <div
-              style={{
-                fontSize: 13,
-                color: "var(--muted-foreground)",
-                lineHeight: 1.5,
-              }}
-            >
-              {Math.abs(avgCorrelation) < 0.2
-                ? `Stock returns ${avgCorrelation < 0 ? 'weakly move opposite to' : 'barely follow'} market returns. Price driven by company-specific factors.`
-                : Math.abs(avgCorrelation) < 0.5
-                ? `Stock returns ${avgCorrelation < 0 ? 'somewhat move opposite to' : 'partially follow'} market returns. Mixed market and company influence.`
-                : `Stock returns ${avgCorrelation < 0 ? 'strongly move opposite to' : 'closely follow'} market returns. Market sentiment drives price.`}
-            </div>
-          </div>
-        </div>
-
-        {/* Interpretation Guide */}
-        <div
-          style={{
-            padding: 16,
-            borderRadius: 6,
-            background: "var(--background)",
-            border: "1px solid var(--border)",
-            marginBottom: 20,
-          }}
-        >
-          <h3
-            style={{
-              fontSize: 13,
-              fontWeight: 700,
-              color: "var(--foreground)",
-              marginBottom: 8,
-            }}
-          >
-            How to Read These Metrics
-          </h3>
-          <div
-            style={{
-              fontSize: 13,
-              color: "var(--muted-foreground)",
-              lineHeight: 1.6,
-            }}
-          >
-            <strong style={{ color: "var(--foreground)" }}>Beta</strong> measures magnitude: how much the stock moves per 1% market move.{" "}
-            <strong style={{ color: "var(--foreground)" }}>Correlation</strong> measures consistency: how reliably stock and market move together.
-            {beta !== null && Math.abs(avgCorrelation) > 0.01 && (
-              <>
-                {" "}This stock is{" "}
-                {Math.abs(beta / avgCorrelation) > 1.5
-                  ? `${((Math.abs(beta / avgCorrelation) - 1) * 100).toFixed(0)}% more volatile than OBX`
-                  : Math.abs(beta / avgCorrelation) < 0.7
-                  ? `${((1 - Math.abs(beta / avgCorrelation)) * 100).toFixed(0)}% less volatile than OBX`
-                  : "similarly volatile to OBX"}.
-              </>
-            )}
           </div>
         </div>
 
