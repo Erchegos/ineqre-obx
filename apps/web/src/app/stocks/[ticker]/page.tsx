@@ -625,16 +625,12 @@ export default function StockTickerPage() {
 
 
   const handleDateRangePreset = (preset: string) => {
-    // When "All" is selected, fetch all available data
+    // When "All" is selected, just clear the date filters to show everything
     if (preset === "All") {
       setLimit(15000); // Set to max limit to fetch all data
-      // Wait for data to load, then set date range
-      setTimeout(() => {
-        if (activeReturns && activeReturns.length > 0) {
-          setReturnsStartDate(activeReturns[0].date);
-          setReturnsEndDate(activeReturns[activeReturns.length - 1].date);
-        }
-      }, 100);
+      // Clear date filters to show all data
+      setReturnsStartDate("");
+      setReturnsEndDate("");
       return;
     }
 
@@ -678,7 +674,8 @@ export default function StockTickerPage() {
             border: "1px solid var(--border)",
             borderRadius: 4,
             background: "var(--card-bg)",
-            transition: "all 0.15s ease"
+            transition: "all 0.15s ease",
+            transform: "scale(1)",
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.borderColor = "var(--accent)";
@@ -689,6 +686,12 @@ export default function StockTickerPage() {
             e.currentTarget.style.background = "var(--card-bg)";
           }}
         >
+          onMouseDown={(e) => {
+            e.currentTarget.style.transform = "scale(0.95)";
+          }}
+          onMouseUp={(e) => {
+            e.currentTarget.style.transform = "scale(1)";
+          }}
           Asset List
         </Link>
         <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
@@ -956,6 +959,12 @@ export default function StockTickerPage() {
                 e.currentTarget.style.borderColor = "var(--card-border)";
                 e.currentTarget.style.background = "var(--card-bg)";
               }}
+          onMouseDown={(e) => {
+            e.currentTarget.style.transform = "scale(0.95)";
+          }}
+          onMouseUp={(e) => {
+            e.currentTarget.style.transform = "scale(1)";
+          }}
             >
               Fundamental Details
             </button>
