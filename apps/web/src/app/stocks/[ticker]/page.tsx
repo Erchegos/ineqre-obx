@@ -685,13 +685,13 @@ export default function StockTickerPage() {
             e.currentTarget.style.borderColor = "var(--border)";
             e.currentTarget.style.background = "var(--card-bg)";
           }}
-        >
           onMouseDown={(e) => {
             e.currentTarget.style.transform = "scale(0.95)";
           }}
           onMouseUp={(e) => {
             e.currentTarget.style.transform = "scale(1)";
           }}
+        >
           Asset List
         </Link>
         <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
