@@ -83,19 +83,19 @@ async function fetchPrices(
   // If date range is provided, use that instead of limit
   if (startDate && endDate) {
     const q = `
-      SELECT date::date as date, close, adj_close
+      SELECT TO_CHAR(date, 'YYYY-MM-DD') as date, close, adj_close
       FROM public.${tableName}
       WHERE upper(ticker) = upper($1)
         AND close IS NOT NULL
         AND close > 0
         AND date >= $2::date
         AND date <= $3::date
-        AND EXTRACT(DOW FROM (date AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Oslo')::date) NOT IN (0, 6)
+        AND EXTRACT(DOW FROM date) NOT IN (0, 6)
       ORDER BY date ASC
     `;
     const result = await pool.query(q, [ticker, startDate, endDate]);
     return result.rows.map(r => ({
-      date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date),
+      date: String(r.date), // Already formatted as YYYY-MM-DD by TO_CHAR
       close: Number(r.close),
       adj_close: r.adj_close ? Number(r.adj_close) : Number(r.close),
     }));
@@ -103,20 +103,19 @@ async function fetchPrices(
 
   // Otherwise use limit (fetching most recent N rows)
   // Exclude weekends (0=Sunday, 6=Saturday)
-  // Convert to Europe/Oslo timezone before checking day of week
   const q = `
-    SELECT date::date as date, close, adj_close
+    SELECT TO_CHAR(date, 'YYYY-MM-DD') as date, close, adj_close
     FROM public.${tableName}
     WHERE upper(ticker) = upper($1)
       AND close IS NOT NULL
       AND close > 0
-      AND EXTRACT(DOW FROM (date AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Oslo')::date) NOT IN (0, 6)
+      AND EXTRACT(DOW FROM date) NOT IN (0, 6)
     ORDER BY date DESC
     LIMIT $2
   `;
   const result = await pool.query(q, [ticker, limit]);
   return result.rows.map(r => ({
-    date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date),
+    date: String(r.date), // Already formatted as YYYY-MM-DD by TO_CHAR
     close: Number(r.close),
     adj_close: r.adj_close ? Number(r.adj_close) : Number(r.close),
   })).reverse();
@@ -129,7 +128,7 @@ async function fetchMarketPrices(limit: number): Promise<number[]> {
     FROM public.${tableName}
     WHERE upper(ticker) = 'OBX'
       AND close IS NOT NULL
-      AND EXTRACT(DOW FROM (date AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Oslo')::date) NOT IN (0, 6)
+      AND EXTRACT(DOW FROM date::date) NOT IN (0, 6)
     ORDER BY date DESC LIMIT $1
   `;
   const result = await pool.query(q, [limit]);
@@ -140,8 +139,8 @@ async function getFullDateRange(ticker: string): Promise<{ start: string; end: s
   const tableName = await getPriceTable();
   const q = `
     SELECT
-      MIN(date::date) as start_date,
-      MAX(date::date) as end_date
+      TO_CHAR(MIN(date), 'YYYY-MM-DD') as start_date,
+      TO_CHAR(MAX(date), 'YYYY-MM-DD') as end_date
     FROM public.${tableName}
     WHERE upper(ticker) = upper($1)
       AND close IS NOT NULL
@@ -151,12 +150,8 @@ async function getFullDateRange(ticker: string): Promise<{ start: string; end: s
   if (result.rows.length === 0 || !result.rows[0].start_date) return null;
 
   return {
-    start: result.rows[0].start_date instanceof Date
-      ? result.rows[0].start_date.toISOString().slice(0, 10)
-      : String(result.rows[0].start_date),
-    end: result.rows[0].end_date instanceof Date
-      ? result.rows[0].end_date.toISOString().slice(0, 10)
-      : String(result.rows[0].end_date)
+    start: String(result.rows[0].start_date), // Already formatted as YYYY-MM-DD by TO_CHAR
+    end: String(result.rows[0].end_date) // Already formatted as YYYY-MM-DD by TO_CHAR
   };
 }
 
