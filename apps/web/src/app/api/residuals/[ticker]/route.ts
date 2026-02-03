@@ -30,10 +30,9 @@ async function fetchAlignedPrices(
 
   // JOIN stock and OBX data by date to ensure alignment
   // Exclude weekends (0=Sunday, 6=Saturday)
-  // Convert to Europe/Oslo timezone before checking day of week
   const q = `
     SELECT
-      s.date::date as date,
+      TO_CHAR(s.date, 'YYYY-MM-DD') as date,
       s.close as stock_close,
       s.adj_close as stock_adj_close,
       m.close as market_close,
@@ -46,7 +45,7 @@ async function fetchAlignedPrices(
       AND s.close > 0
       AND m.close IS NOT NULL
       AND m.close > 0
-      AND EXTRACT(DOW FROM (s.date AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Oslo')::date) NOT IN (0, 6)
+      AND EXTRACT(DOW FROM s.date) NOT IN (0, 6)
     ORDER BY s.date DESC
     LIMIT $2
   `;
@@ -61,10 +60,7 @@ async function fetchAlignedPrices(
 
   const rows = result.rows
     .map((r) => ({
-      date:
-        r.date instanceof Date
-          ? r.date.toISOString().slice(0, 10)
-          : String(r.date),
+      date: String(r.date), // Already formatted as YYYY-MM-DD by TO_CHAR
       stockClose: Number(r.stock_close),
       stockAdjClose: r.stock_adj_close
         ? Number(r.stock_adj_close)

@@ -43,6 +43,7 @@ export default function StocksPage() {
   );
   const [selectedSectors, setSelectedSectors] = useState<Set<string>>(new Set());
   const [tierFilter, setTierFilter] = useState<'all' | 'tierA' | 'tierAB' | 'strategy3y'>('all');
+  const [tickersWithFactors, setTickersWithFactors] = useState<Set<string>>(new Set());
 
   const fetchStocks = useCallback(async (assetTypes: Set<AssetType>) => {
     setLoading(true);
@@ -89,6 +90,32 @@ export default function StocksPage() {
   useEffect(() => {
     fetchStocks(selectedAssetTypes);
   }, [selectedAssetTypes, fetchStocks]);
+
+  // Check which stocks have factor data available (single efficient query)
+  useEffect(() => {
+    async function checkFactorData() {
+      if (stocks.length === 0) return;
+
+      try {
+        const res = await fetch("/api/factors/tickers", {
+          method: "GET",
+          headers: { accept: "application/json" },
+          cache: "no-store",
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.tickers) {
+            setTickersWithFactors(new Set(data.tickers));
+          }
+        }
+      } catch (e) {
+        // Silently skip on error
+      }
+    }
+
+    checkFactorData();
+  }, [stocks]);
 
   const toggleAssetType = (type: AssetType) => {
     setSelectedAssetTypes(prev => {
@@ -163,7 +190,7 @@ export default function StocksPage() {
     return sorted;
   }, [stocks, searchQuery, sortBy, sortOrder, selectedSectors, tierFilter]);
 
-  // Calculate tier counts for summary panel
+  // Calculate tier counts and ML predictions count for summary panel
   const tierCounts = useMemo(() => {
     const counts = { A: 0, B: 0, C: 0, F: 0 };
     stocks.forEach(stock => {
@@ -171,6 +198,10 @@ export default function StocksPage() {
     });
     return counts;
   }, [stocks]);
+
+  const mlCount = useMemo(() => {
+    return tickersWithFactors.size;
+  }, [tickersWithFactors]);
 
   const toggleSort = (column: keyof StockData) => {
     if (sortBy === column) {
@@ -309,7 +340,7 @@ export default function StocksPage() {
           </Link>
         </div>
         <p style={{ color: "var(--muted)", marginBottom: 16, fontSize: 14 }}>
-          Universe: {stocks.length} assets | Tier A: {tierCounts.A} | Tier B: {tierCounts.B} | Tier C: {tierCounts.C} | Tier F: {tierCounts.F}
+          Universe: {stocks.length} assets | Tier A: {tierCounts.A} | Tier B: {tierCounts.B} | Tier C: {tierCounts.C} | Tier F: {tierCounts.F} | <span style={{ color: '#10b981', fontWeight: 600 }}>ML Ready: {mlCount}</span>
           <span style={{ marginLeft: 16, fontSize: 13 }}>Source: Interactive Brokers</span>
         </p>
 
@@ -846,6 +877,19 @@ export default function StocksPage() {
                       }}>
                         {stock.ticker}
                       </span>
+                      {tickersWithFactors.has(stock.ticker) && (
+                        <span style={{
+                          fontSize: 9,
+                          fontWeight: 700,
+                          padding: "2px 5px",
+                          borderRadius: 2,
+                          background: '#10b981',
+                          color: '#fff',
+                          fontFamily: 'monospace',
+                        }}>
+                          ML
+                        </span>
+                      )}
                       {selectedAssetTypes.size > 1 && stock.asset_type !== 'equity' && (
                         <span style={{
                           fontSize: 10,
