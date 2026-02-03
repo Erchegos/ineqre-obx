@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ['pg', 'bcrypt', '@anthropic-ai/sdk'],
+  serverExternalPackages: ['pg', '@anthropic-ai/sdk'],
   eslint: {
     ignoreDuringBuilds: true,
   },
