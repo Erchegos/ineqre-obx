@@ -212,7 +212,7 @@ export async function calculateBetaAndIVOL(
     const marketQuery = `
       SELECT date, adj_close
       FROM prices_daily
-      WHERE ticker = 'OBX.OSE'
+      WHERE ticker = 'OBX'
         AND date <= $1
         AND adj_close IS NOT NULL
         AND adj_close > 0
@@ -224,27 +224,30 @@ export async function calculateBetaAndIVOL(
     if (marketResult.rows.length < windowDays * 0.8) return result;
 
     // Calculate returns for both stock and market
+    // Use ISO date strings as keys since pg returns Date objects (reference equality fails)
+    const toDateStr = (d: Date | string) => d instanceof Date ? d.toISOString().split('T')[0] : String(d);
+
     const stockReturns: { date: string; return: number }[] = [];
     for (let i = 0; i < stockResult.rows.length - 1; i++) {
-      const currPrice = stockResult.rows[i].adj_close;
-      const prevPrice = stockResult.rows[i + 1].adj_close;
+      const currPrice = parseFloat(stockResult.rows[i].adj_close);
+      const prevPrice = parseFloat(stockResult.rows[i + 1].adj_close);
       const ret = logReturn(prevPrice, currPrice);
       if (ret !== null) {
-        stockReturns.push({ date: stockResult.rows[i].date, return: ret });
+        stockReturns.push({ date: toDateStr(stockResult.rows[i].date), return: ret });
       }
     }
 
     const marketReturns: { date: string; return: number }[] = [];
     for (let i = 0; i < marketResult.rows.length - 1; i++) {
-      const currPrice = marketResult.rows[i].adj_close;
-      const prevPrice = marketResult.rows[i + 1].adj_close;
+      const currPrice = parseFloat(marketResult.rows[i].adj_close);
+      const prevPrice = parseFloat(marketResult.rows[i + 1].adj_close);
       const ret = logReturn(prevPrice, currPrice);
       if (ret !== null) {
-        marketReturns.push({ date: marketResult.rows[i].date, return: ret });
+        marketReturns.push({ date: toDateStr(marketResult.rows[i].date), return: ret });
       }
     }
 
-    // Match dates
+    // Match dates using string keys
     const marketReturnsByDate = new Map(marketReturns.map(r => [r.date, r.return]));
     const matched: { stock: number; market: number }[] = [];
 
@@ -281,6 +284,28 @@ export async function calculateBetaAndIVOL(
   }
 
   return result;
+}
+
+/**
+ * Calculate NOK trading volume (20-day average of close * volume)
+ * Requires price data with close and volume
+ */
+export function calculateNOKVolume(
+  prices: Array<{ date: string; close: number; volume: number }>,
+  targetIndex: number,
+  windowDays: number = 20
+): number | null {
+  const values: number[] = [];
+  for (let i = 0; i < windowDays; i++) {
+    const idx = targetIndex - i;
+    if (idx < 0) break;
+    const p = prices[idx];
+    if (p && p.close > 0 && p.volume > 0) {
+      values.push(p.close * p.volume);
+    }
+  }
+  if (values.length < windowDays * 0.8) return null;
+  return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
 /**

@@ -1,170 +1,103 @@
+/**
+ * POST /api/predictions/generate
+ *
+ * Generates 1-month forward return predictions using the 19-factor model.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * ACADEMIC REFERENCES
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ * [1] Gu, S., Kelly, B., & Xiu, D. (2020). "Empirical Asset Pricing via Machine
+ *     Learning." Review of Financial Studies, 33(5), 2223-2273.
+ *     - 19-factor specification and ML methodology
+ *     - Gradient Boosting + Random Forest ensemble
+ *
+ * [2] Medhat, M., & Schmeling, M. (2021). "Short-term Momentum."
+ *     Review of Financial Studies, 35(3), 1480-1526.
+ *     - Turnover interactions, size-conditional effects
+ *     - End-of-month filtering
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ * Key Features:
+ * - Cross-sectional z-score standardization
+ * - mom1m × NOKvol interaction terms (CRITICAL per Medhat & Schmeling)
+ * - Size regime classification
+ * - Regime-conditional ensemble weights
+ * - 60% GB + 40% RF ensemble (base weights)
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
+import {
+  RawFactors,
+  fetchCrossSectionalStats,
+  enhanceFactors,
+  computeEnsemblePrediction,
+  computeFeatureImportance,
+  computePercentiles,
+  computeConfidence,
+  getRegimeWeightAdjustments,
+  FACTOR_WEIGHTS_GB,
+  FACTOR_WEIGHTS_RF,
+} from "@/lib/factorAdvanced";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Research-backed factor weights for Oslo Bors equities.
- * Based on Fama-French, Jegadeesh-Titman, and volatility literature.
- * Weights represent expected monthly return contribution per unit of factor.
+ * Fetch raw factors for a ticker (technical + fundamentals)
  */
-const FACTOR_WEIGHTS_GB: Record<string, number> = {
-  mom1m: -0.15,    // Short-term reversal
-  mom6m: 0.25,     // Medium-term momentum (strongest signal)
-  mom11m: 0.20,    // Long-term momentum
-  mom36m: -0.05,   // Long-term reversal
-  chgmom: 0.10,    // Momentum acceleration
-  vol1m: -0.18,    // Short-term volatility (negative: low-vol premium)
-  vol3m: -0.12,    // Medium-term volatility
-  vol12m: -0.08,   // Long-term volatility (less weight, captured by others)
-  maxret: -0.10,   // Lottery demand (negative)
-  beta: -0.05,     // Low-beta anomaly
-  ivol: -0.15,     // Idiosyncratic volatility puzzle
-  bm: 0.10,        // Book-to-market value factor
-  nokvol: 0.03,    // NOK trading volume
-  ep: 0.08,        // Earnings yield
-  dy: 0.06,        // Dividend yield
-  sp: 0.04,        // Sales-to-price
-  sg: 0.02,        // Sales growth
-  mktcap: -0.03,   // Size premium (small caps outperform)
-  dum_jan: 0.02,   // January effect
-};
+async function fetchRawFactors(ticker: string): Promise<RawFactors | null> {
+  // Fetch latest technical factors
+  const techResult = await pool.query(
+    `SELECT
+      ticker, date::text as date,
+      mom1m, mom6m, mom11m, mom36m, chgmom,
+      vol1m, vol3m, vol12m, maxret, beta, ivol,
+      dum_jan
+    FROM factor_technical
+    WHERE ticker = $1
+    ORDER BY date DESC
+    LIMIT 1`,
+    [ticker]
+  );
 
-const FACTOR_WEIGHTS_RF: Record<string, number> = {
-  mom1m: -0.12,
-  mom6m: 0.22,
-  mom11m: 0.18,
-  mom36m: -0.04,
-  chgmom: 0.08,
-  vol1m: -0.20,
-  vol3m: -0.15,
-  vol12m: -0.10,
-  maxret: -0.08,
-  beta: -0.06,
-  ivol: -0.12,
-  bm: 0.12,
-  nokvol: 0.02,
-  ep: 0.10,
-  dy: 0.07,
-  sp: 0.05,
-  sg: 0.03,
-  mktcap: -0.04,
-  dum_jan: 0.03,
-};
+  if (techResult.rows.length === 0) return null;
+  const tech = techResult.rows[0];
 
-/**
- * Compute factor-weighted prediction from feature values.
- * Returns prediction as a decimal (e.g., 0.03 = 3%).
- */
-function computePrediction(
-  features: Record<string, number | null>,
-  weights: Record<string, number>
-): { prediction: number; contributions: Record<string, number> } {
-  const contributions: Record<string, number> = {};
-  let totalWeight = 0;
-  let weightedSum = 0;
-
-  for (const [factor, weight] of Object.entries(weights)) {
-    const value = features[factor];
-    if (value !== null && value !== undefined && !isNaN(value)) {
-      const contribution = value * weight;
-      contributions[factor] = contribution;
-      weightedSum += contribution;
-      totalWeight += Math.abs(weight);
-    }
-  }
-
-  // Normalize so prediction is in reasonable monthly return range
-  const prediction = totalWeight > 0 ? weightedSum / totalWeight : 0;
-
-  // Clamp to reasonable monthly return range [-15%, +15%]
-  const clamped = Math.max(-0.15, Math.min(0.15, prediction));
-
-  return { prediction: clamped, contributions };
-}
-
-/**
- * Compute feature importance from absolute contributions.
- */
-function computeFeatureImportance(
-  contributionsGB: Record<string, number>,
-  contributionsRF: Record<string, number>
-): Record<string, number> {
-  const importance: Record<string, number> = {};
-
-  // Combine absolute contributions from both models
-  const allFactors = new Set([
-    ...Object.keys(contributionsGB),
-    ...Object.keys(contributionsRF),
-  ]);
-
-  let totalImportance = 0;
-  for (const factor of allFactors) {
-    const gbAbs = Math.abs(contributionsGB[factor] || 0);
-    const rfAbs = Math.abs(contributionsRF[factor] || 0);
-    importance[factor] = gbAbs * 0.6 + rfAbs * 0.4;
-    totalImportance += importance[factor];
-  }
-
-  // Normalize to sum to 1.0
-  if (totalImportance > 0) {
-    for (const factor of Object.keys(importance)) {
-      importance[factor] /= totalImportance;
-    }
-  }
-
-  return importance;
-}
-
-/**
- * Generate percentiles using factor volatility to estimate uncertainty.
- */
-function computePercentiles(
-  ensemblePred: number,
-  vol1m: number | null,
-  vol12m: number | null
-): { p05: number; p25: number; p50: number; p75: number; p95: number } {
-  // Use available volatility to scale uncertainty, default to 20% annualized
-  const annualVol = vol12m || vol1m || 0.20;
-  const monthlyVol = annualVol / Math.sqrt(12);
-
-  // Z-scores for percentiles
-  const z05 = -1.645;
-  const z25 = -0.674;
-  const z75 = 0.674;
-  const z95 = 1.645;
+  // Fetch latest fundamentals (forward-filled)
+  const fundResult = await pool.query(
+    `SELECT bm, ep, dy, sp, sg, mktcap, nokvol
+    FROM factor_fundamentals
+    WHERE ticker = $1 AND date <= $2
+    ORDER BY date DESC LIMIT 1`,
+    [ticker, tech.date]
+  );
+  const fund = fundResult.rows[0] || {};
 
   return {
-    p05: ensemblePred + z05 * monthlyVol,
-    p25: ensemblePred + z25 * monthlyVol,
-    p50: ensemblePred,
-    p75: ensemblePred + z75 * monthlyVol,
-    p95: ensemblePred + z95 * monthlyVol,
+    ticker: tech.ticker,
+    date: tech.date,
+    mom1m: tech.mom1m ? parseFloat(tech.mom1m) : null,
+    mom6m: tech.mom6m ? parseFloat(tech.mom6m) : null,
+    mom11m: tech.mom11m ? parseFloat(tech.mom11m) : null,
+    mom36m: tech.mom36m ? parseFloat(tech.mom36m) : null,
+    chgmom: tech.chgmom ? parseFloat(tech.chgmom) : null,
+    vol1m: tech.vol1m ? parseFloat(tech.vol1m) : null,
+    vol3m: tech.vol3m ? parseFloat(tech.vol3m) : null,
+    vol12m: tech.vol12m ? parseFloat(tech.vol12m) : null,
+    maxret: tech.maxret ? parseFloat(tech.maxret) : null,
+    beta: tech.beta ? parseFloat(tech.beta) : null,
+    ivol: tech.ivol ? parseFloat(tech.ivol) : null,
+    dum_jan: tech.dum_jan || 0,
+    bm: fund.bm ? parseFloat(fund.bm) : null,
+    ep: fund.ep ? parseFloat(fund.ep) : null,
+    dy: fund.dy ? parseFloat(fund.dy) : null,
+    sp: fund.sp ? parseFloat(fund.sp) : null,
+    sg: fund.sg ? parseFloat(fund.sg) : null,
+    mktcap: fund.mktcap ? parseFloat(fund.mktcap) : null,
+    nokvol: fund.nokvol ? parseFloat(fund.nokvol) : null,
   };
-}
-
-/**
- * Compute confidence score based on factor coverage and agreement.
- */
-function computeConfidence(
-  features: Record<string, number | null>,
-  gbPred: number,
-  rfPred: number
-): number {
-  // Factor 1: Coverage (how many factors are non-null)
-  const totalFactors = Object.keys(FACTOR_WEIGHTS_GB).length;
-  const availableFactors = Object.values(features).filter(
-    (v) => v !== null && v !== undefined && !isNaN(v as number)
-  ).length;
-  const coverage = availableFactors / totalFactors;
-
-  // Factor 2: Model agreement (closer predictions = higher confidence)
-  const predDiff = Math.abs(gbPred - rfPred);
-  const agreement = Math.max(0, 1 - predDiff * 10); // Penalize divergence
-
-  // Weighted combination
-  const confidence = coverage * 0.6 + agreement * 0.4;
-  return Math.max(0.3, Math.min(0.95, confidence));
 }
 
 export async function POST(req: NextRequest) {
@@ -177,90 +110,57 @@ export async function POST(req: NextRequest) {
 
     const tickerUpper = ticker.toUpperCase().trim();
 
-    // 1. Fetch latest factors for the ticker
-    const factorResult = await pool.query(
-      `SELECT
-        ticker, date::text as date,
-        mom1m, mom6m, mom11m, mom36m, chgmom,
-        vol1m, vol3m, vol12m, maxret, beta, ivol,
-        dum_jan
-      FROM factor_technical
-      WHERE ticker = $1
-      ORDER BY date DESC
-      LIMIT 1`,
-      [tickerUpper]
-    );
+    // 1. Fetch raw factors
+    const rawFactors = await fetchRawFactors(tickerUpper);
 
-    if (factorResult.rows.length === 0) {
+    if (!rawFactors) {
       return NextResponse.json(
         { error: `No factor data available for ${tickerUpper}` },
         { status: 404 }
       );
     }
 
-    const factors = factorResult.rows[0];
+    // 2. Fetch cross-sectional statistics for z-score calculation
+    const crossSectional = await fetchCrossSectionalStats(rawFactors.date);
 
-    // Fetch fundamentals (optional)
-    const fundamentalResult = await pool.query(
-      `SELECT bm, nokvol, ep, dy, sp, sg, mktcap
-      FROM factor_fundamentals
-      WHERE ticker = $1 AND date <= $2
-      ORDER BY date DESC LIMIT 1`,
-      [tickerUpper, factors.date]
-    );
-    const fundamentals = fundamentalResult.rows[0] || {};
+    // 3. Enhance factors with z-scores, interactions, and regimes
+    const enhancedFactors = enhanceFactors(rawFactors, crossSectional);
 
-    // 2. Build feature vector
-    const features: Record<string, number | null> = {
-      mom1m: factors.mom1m ? parseFloat(factors.mom1m) : null,
-      mom6m: factors.mom6m ? parseFloat(factors.mom6m) : null,
-      mom11m: factors.mom11m ? parseFloat(factors.mom11m) : null,
-      mom36m: factors.mom36m ? parseFloat(factors.mom36m) : null,
-      chgmom: factors.chgmom ? parseFloat(factors.chgmom) : null,
-      vol1m: factors.vol1m ? parseFloat(factors.vol1m) : null,
-      vol3m: factors.vol3m ? parseFloat(factors.vol3m) : null,
-      vol12m: factors.vol12m ? parseFloat(factors.vol12m) : null,
-      maxret: factors.maxret ? parseFloat(factors.maxret) : null,
-      beta: factors.beta ? parseFloat(factors.beta) : null,
-      ivol: factors.ivol ? parseFloat(factors.ivol) : null,
-      bm: fundamentals.bm ? parseFloat(fundamentals.bm) : null,
-      nokvol: fundamentals.nokvol ? parseFloat(fundamentals.nokvol) : null,
-      ep: fundamentals.ep ? parseFloat(fundamentals.ep) : null,
-      dy: fundamentals.dy ? parseFloat(fundamentals.dy) : null,
-      sp: fundamentals.sp ? parseFloat(fundamentals.sp) : null,
-      sg: fundamentals.sg ? parseFloat(fundamentals.sg) : null,
-      mktcap: fundamentals.mktcap ? parseFloat(fundamentals.mktcap) : null,
-      dum_jan: factors.dum_jan || 0,
-    };
+    // 4. Compute ensemble prediction with regime-adjusted weights
+    const baseEnsemble = computeEnsemblePrediction(enhancedFactors);
 
-    // 3. Compute predictions from both models
-    const { prediction: gbPred, contributions: gbContrib } = computePrediction(
-      features,
-      FACTOR_WEIGHTS_GB
-    );
-    const { prediction: rfPred, contributions: rfContrib } = computePrediction(
-      features,
-      FACTOR_WEIGHTS_RF
+    // 5. Get regime-specific weight adjustments
+    const { gbWeight, rfWeight } = getRegimeWeightAdjustments(
+      enhancedFactors.sizeRegime,
+      enhancedFactors.turnoverRegime
     );
 
-    // Ensemble: 60% GB + 40% RF
-    const ensemblePred = gbPred * 0.6 + rfPred * 0.4;
+    // Recalculate ensemble with adjusted weights
+    const adjustedEnsemble = baseEnsemble.gb * gbWeight + baseEnsemble.rf * rfWeight;
 
-    // 4. Compute feature importance
-    const featureImportance = computeFeatureImportance(gbContrib, rfContrib);
+    // 6. Compute feature importance
+    const featureImportance = computeFeatureImportance(
+      baseEnsemble.contributions.gb,
+      baseEnsemble.contributions.rf
+    );
 
-    // 5. Compute percentiles using volatility
+    // 7. Compute percentiles with regime-adjusted volatility
     const percentiles = computePercentiles(
-      ensemblePred,
-      features.vol1m,
-      features.vol12m
+      adjustedEnsemble,
+      enhancedFactors.vol1m,
+      enhancedFactors.vol12m,
+      enhancedFactors.sizeRegime
     );
 
-    // 6. Compute confidence
-    const confidenceScore = computeConfidence(features, gbPred, rfPred);
+    // 8. Compute confidence score
+    const confidenceScore = computeConfidence(
+      enhancedFactors,
+      baseEnsemble.gb,
+      baseEnsemble.rf
+    );
 
-    // 7. Build prediction object
-    const predictionDate = factors.date;
+    // 9. Build prediction object
+    const predictionDate = rawFactors.date;
     const targetDate = new Date(predictionDate);
     targetDate.setMonth(targetDate.getMonth() + 1);
     const targetDateStr = targetDate.toISOString().split("T")[0];
@@ -269,15 +169,33 @@ export async function POST(req: NextRequest) {
       ticker: tickerUpper,
       prediction_date: predictionDate,
       target_date: targetDateStr,
-      ensemble_prediction: ensemblePred,
-      gb_prediction: gbPred,
-      rf_prediction: rfPred,
+      ensemble_prediction: adjustedEnsemble,
+      gb_prediction: baseEnsemble.gb,
+      rf_prediction: baseEnsemble.rf,
       percentiles,
       feature_importance: featureImportance,
       confidence_score: confidenceScore,
+      // Enhanced metadata
+      methodology: {
+        model_version: "v2.0_19factor_enhanced",
+        uses_interaction_terms: enhancedFactors.mom1m_x_nokvol !== null,
+        uses_zscore_standardization: true,
+        size_regime: enhancedFactors.sizeRegime,
+        turnover_regime: enhancedFactors.turnoverRegime,
+        ensemble_weights: { gb: gbWeight, rf: rfWeight },
+      },
+      factors_summary: {
+        mom1m_z: enhancedFactors.mom1m_z,
+        mom6m_z: enhancedFactors.mom6m_z,
+        mom1m_x_nokvol: enhancedFactors.mom1m_x_nokvol,
+        beta_z: enhancedFactors.beta_z,
+        vol1m_z: enhancedFactors.vol1m_z,
+        bm_z: enhancedFactors.bm_z,
+        mktcap_z: enhancedFactors.mktcap_z,
+      },
     };
 
-    // 8. Store prediction in database
+    // 10. Store prediction in database
     const insertQuery = `
       INSERT INTO ml_predictions (
         ticker, prediction_date, target_date,
@@ -310,7 +228,7 @@ export async function POST(req: NextRequest) {
       prediction.percentiles.p95,
       JSON.stringify(prediction.feature_importance),
       prediction.confidence_score,
-      "v1.0_factor_model",
+      "v2.0_19factor_enhanced",
     ]);
 
     return NextResponse.json({
