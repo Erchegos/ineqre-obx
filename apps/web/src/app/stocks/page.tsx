@@ -42,7 +42,7 @@ export default function StocksPage() {
     new Set(['equity']) // Default to equities only
   );
   const [selectedSectors, setSelectedSectors] = useState<Set<string>>(new Set());
-  const [tierFilter, setTierFilter] = useState<'all' | 'tierA' | 'tierAB' | 'strategy3y'>('all');
+  const [tierFilter, setTierFilter] = useState<'all' | 'tierA' | 'tierAB' | 'ml'>('all');
   const [tickersWithFactors, setTickersWithFactors] = useState<Set<string>>(new Set());
 
   const fetchStocks = useCallback(async (assetTypes: Set<AssetType>) => {
@@ -149,8 +149,8 @@ export default function StocksPage() {
       filtered = filtered.filter(stock => stock.dataTier === 'A');
     } else if (tierFilter === 'tierAB') {
       filtered = filtered.filter(stock => stock.dataTier === 'A' || stock.dataTier === 'B');
-    } else if (tierFilter === 'strategy3y') {
-      filtered = filtered.filter(stock => stock.rows >= 756); // 3+ years
+    } else if (tierFilter === 'ml') {
+      filtered = filtered.filter(stock => tickersWithFactors.has(stock.ticker));
     }
 
     // Filter by sector
@@ -188,7 +188,7 @@ export default function StocksPage() {
     });
 
     return sorted;
-  }, [stocks, searchQuery, sortBy, sortOrder, selectedSectors, tierFilter]);
+  }, [stocks, searchQuery, sortBy, sortOrder, selectedSectors, tierFilter, tickersWithFactors]);
 
   // Calculate tier counts and ML predictions count for summary panel
   const tierCounts = useMemo(() => {
@@ -355,7 +355,7 @@ export default function StocksPage() {
             { key: 'all', label: 'All' },
             { key: 'tierA', label: 'Tier A Only' },
             { key: 'tierAB', label: 'A+B Only' },
-            { key: 'strategy3y', label: 'Strategy Ready (3Y+)' },
+            { key: 'ml', label: 'ML Ready' },
           ].map((filter) => {
             const isSelected = tierFilter === filter.key;
             return (
