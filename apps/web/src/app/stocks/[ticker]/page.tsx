@@ -278,14 +278,18 @@ export default function StockTickerPage() {
       setStockMetaLoading(true);
 
       try {
-        // Check if factor data exists for this ticker
-        const factorRes = await fetch(`/api/factors/${ticker}?type=technical&limit=1`, {
+        // Check if this ticker has COMPLETE factor data (ML Ready)
+        const factorRes = await fetch(`/api/factors/tickers`, {
           method: "GET",
           headers: { accept: "application/json" },
           cache: "no-store",
         });
 
-        const factorExists = factorRes.ok && (await factorRes.json()).count > 0;
+        let factorExists = false;
+        if (factorRes.ok) {
+          const factorData = await factorRes.json();
+          factorExists = factorData.success && factorData.tickers?.includes(ticker);
+        }
 
         // Get stock metadata
         const res = await fetch(`/api/stocks`, {

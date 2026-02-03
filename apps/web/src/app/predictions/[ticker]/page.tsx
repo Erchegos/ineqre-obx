@@ -31,12 +31,29 @@ export default function PredictionsPage() {
 
   const [prediction, setPrediction] = useState<Prediction | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dataComplete, setDataComplete] = useState(true);
 
   useEffect(() => {
     if (!ticker) return;
 
     const fetchOrGenerate = async () => {
       try {
+        // First check if this ticker has complete factor data
+        const tickersRes = await fetch("/api/factors/tickers", {
+          method: "GET",
+          headers: { accept: "application/json" },
+          cache: "no-store",
+        });
+
+        if (tickersRes.ok) {
+          const tickersData = await tickersRes.json();
+          if (tickersData.success && !tickersData.tickers?.includes(ticker)) {
+            setDataComplete(false);
+            setLoading(false);
+            return;
+          }
+        }
+
         // Try to fetch existing prediction
         const response = await fetch(`/api/predictions/${ticker}`);
         if (response.ok) {
@@ -142,6 +159,60 @@ export default function PredictionsPage() {
         </div>
       </div>
 
+      {/* Incomplete data guard */}
+      {!loading && !dataComplete && (
+        <div
+          style={{
+            padding: 32,
+            borderRadius: 2,
+            border: "1px solid var(--warning)",
+            background: "var(--warning-bg)",
+            textAlign: "center",
+            marginBottom: 16,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              marginBottom: 12,
+              color: "var(--warning)",
+              fontFamily: "monospace",
+            }}
+          >
+            INCOMPLETE FACTOR DATA
+          </div>
+          <div style={{ fontSize: 12, color: "var(--muted)", fontFamily: "monospace", lineHeight: 1.8, maxWidth: 600, margin: "0 auto" }}>
+            <div style={{ marginBottom: 8 }}>
+              {ticker} is missing key factors required for the 19-factor prediction model
+              (beta, IVOL, fundamentals, or NOK volume).
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              ML predictions are restricted to stocks with complete data to ensure accuracy.
+            </div>
+            <Link
+              href={`/stocks/${ticker}`}
+              style={{
+                display: "inline-block",
+                fontSize: 11,
+                color: "var(--accent)",
+                textDecoration: "none",
+                fontFamily: "monospace",
+                fontWeight: 600,
+                padding: "8px 16px",
+                border: "1px solid var(--accent)",
+                borderRadius: 2,
+                background: "var(--input-bg)",
+              }}
+            >
+              ← BACK TO {ticker}
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {dataComplete && (
+        <>
       {/* Two Column Layout */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
         {/* Left Column: Prediction */}
@@ -299,6 +370,8 @@ export default function PredictionsPage() {
           </div>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }
