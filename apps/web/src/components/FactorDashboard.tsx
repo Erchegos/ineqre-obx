@@ -35,6 +35,7 @@ const FACTORS = [
   { key: "mom11m", label: "11M Momentum", category: "MOM", unit: "%" },
   { key: "mom36m", label: "36M Momentum", category: "MOM", unit: "%" },
   { key: "chgmom", label: "Momentum Change", category: "MOM", unit: "%" },
+  { key: "dum_jan", label: "January", category: "MOM", unit: "" },
   { key: "vol1m", label: "1M Volatility", category: "VOL", unit: "%" },
   { key: "vol3m", label: "3M Volatility", category: "VOL", unit: "%" },
   { key: "vol12m", label: "12M Volatility", category: "VOL", unit: "%" },
@@ -48,7 +49,6 @@ const FACTORS = [
   { key: "sg", label: "Sales Growth", category: "FUND", unit: "%" },
   { key: "mktcap", label: "Market Cap", category: "FUND", unit: "M" },
   { key: "nokvol", label: "NOK Volume", category: "FUND", unit: "M" },
-  { key: "dum_jan", label: "January", category: "SEAS", unit: "" },
 ];
 
 function formatValue(value: string | number | null, unit: string): string {
@@ -178,7 +178,6 @@ export default function FactorDashboard({ ticker }: Props) {
     { key: "MOM", label: "Momentum", factors: FACTORS.filter((f) => f.category === "MOM") },
     { key: "VOL", label: "Volatility & Risk", factors: FACTORS.filter((f) => f.category === "VOL") },
     { key: "FUND", label: "Fundamentals", factors: FACTORS.filter((f) => f.category === "FUND") },
-    { key: "SEAS", label: "Seasonality", factors: FACTORS.filter((f) => f.category === "SEAS") },
   ];
 
   return (
@@ -210,7 +209,7 @@ export default function FactorDashboard({ ticker }: Props) {
 
       {/* Factor Tables */}
       <div style={{ padding: 12 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
           {categories.map((cat) => (
             <div
               key={cat.key}
