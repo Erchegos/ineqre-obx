@@ -1,8 +1,11 @@
-import { Pool } from "pg";
+// Use require() for pg to avoid Node 24 ESM resolution error
+// (pg lacks "exports" field, breaking strict ESM resolve)
+import type { Pool as PoolType } from "pg";
+const { Pool } = require("pg") as typeof import("pg");
 import { drizzle } from "drizzle-orm/node-postgres";
 
 const globalForDb = globalThis as unknown as {
-  pool: Pool | undefined;
+  pool: PoolType | undefined;
   db: ReturnType<typeof drizzle> | undefined;
 };
 
@@ -46,7 +49,7 @@ function createPool() {
 }
 
 // Export a getter function instead of calling it at module load time
-export function getPool(): Pool {
+export function getPool(): PoolType {
   if (!globalForDb.pool) {
     globalForDb.pool = createPool();
   }
@@ -54,7 +57,7 @@ export function getPool(): Pool {
 }
 
 // Lazy getter for pool - don't initialize until accessed
-export const pool = new Proxy({} as Pool, {
+export const pool = new Proxy({} as PoolType, {
   get(target, prop) {
     const actualPool = getPool();
     const value = (actualPool as any)[prop];
