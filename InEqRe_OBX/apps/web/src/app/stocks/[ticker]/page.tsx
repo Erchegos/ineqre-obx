@@ -152,6 +152,11 @@ export default function StockTickerPage() {
   const [returnsStartDate, setReturnsStartDate] = useState<string>("");
   const [returnsEndDate, setReturnsEndDate] = useState<string>("");
 
+  // Stock metadata for ML predictions eligibility
+  const [totalRows, setTotalRows] = useState<number>(0);
+  const [stockMetaLoading, setStockMetaLoading] = useState<boolean>(true);
+  const [hasFactorData, setHasFactorData] = useState<boolean>(false);
+
   // Filter and sort state for Daily Returns table
   const [returnFilter, setReturnFilter] = useState<"all" | "positive" | "negative" | "large_positive" | "large_negative" | "custom">("all");
   const [customFilterThreshold, setCustomFilterThreshold] = useState<number>(5);
@@ -234,10 +239,8 @@ export default function StockTickerPage() {
         if (!cancelled) {
           setData(json);
           setLoading(false);
-
-          // Only set initial date range if not already set (first load)
-          // This prevents overriding user's date selection when refetching data
-          if (json.returns?.adjusted?.length > 0 && !returnsStartDate && !returnsEndDate) {
+          
+          if (json.returns?.adjusted?.length > 0) {
             const arr = json.returns.adjusted;
             const endDate = arr[arr.length - 1].date;
             const startDate = arr[Math.max(0, arr.length - 252)].date;
@@ -259,6 +262,70 @@ export default function StockTickerPage() {
       cancelled = true;
     };
   }, [ticker, limit, customDateRange]);
+
+  // Fetch stock metadata and check if factor data exists
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchStockMeta() {
+      if (!ticker) {
+        setStockMetaLoading(false);
+        setTotalRows(0);
+        setHasFactorData(false);
+        return;
+      }
+
+      setStockMetaLoading(true);
+
+      try {
+        // Check if factor data exists for this ticker
+        const factorRes = await fetch(`/api/factors/${ticker}?type=technical&limit=1`, {
+          method: "GET",
+          headers: { accept: "application/json" },
+          cache: "no-store",
+        });
+
+        const factorExists = factorRes.ok && (await factorRes.json()).count > 0;
+
+        // Get stock metadata
+        const res = await fetch(`/api/stocks`, {
+          method: "GET",
+          headers: { accept: "application/json" },
+          cache: "no-store",
+        });
+
+        if (!res.ok) {
+          console.warn("Failed to fetch stock metadata");
+          setTotalRows(0);
+          setHasFactorData(false);
+          return;
+        }
+
+        const stocks = await res.json();
+        const stock = stocks.find((s: any) => s.ticker === ticker);
+
+        if (!cancelled) {
+          setTotalRows(stock?.rows || 0);
+          setHasFactorData(factorExists);
+        }
+      } catch (e) {
+        console.warn("Error fetching stock metadata:", e);
+        if (!cancelled) {
+          setTotalRows(0);
+          setHasFactorData(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setStockMetaLoading(false);
+        }
+      }
+    }
+
+    fetchStockMeta();
+    return () => {
+      cancelled = true;
+    };
+  }, [ticker]);
 
   // Fetch residuals data
   useEffect(() => {
@@ -627,19 +694,16 @@ export default function StockTickerPage() {
 
 
   const handleDateRangePreset = (preset: string) => {
-    if (!activeReturns || activeReturns.length === 0) return;
-
-    // When "All" is selected, show all available data
+    // When "All" is selected, just clear the date filters to show everything
     if (preset === "All") {
-      setReturnsStartDate(activeReturns[0].date);
-      setReturnsEndDate(activeReturns[activeReturns.length - 1].date);
-      // Also ensure we have enough data fetched
-      if (limit < 10000) {
-        setLimit(10000);
-      }
+      setLimit(15000); // Set to max limit to fetch all data
+      // Clear date filters to show all data
+      setReturnsStartDate("");
+      setReturnsEndDate("");
       return;
     }
 
+    if (!activeReturns || activeReturns.length === 0) return;
     const endDate = activeReturns[activeReturns.length - 1].date;
     let startIdx = 0;
 
@@ -666,95 +730,98 @@ export default function StockTickerPage() {
     <main style={{ padding: 24, maxWidth: 1400, margin: "0 auto" }}>
       {/* Header Section */}
       <div style={{ marginBottom: 24 }}>
-        <Link
-          href="/stocks"
-          style={{
-            display: "inline-block",
-            color: "var(--foreground)",
-            textDecoration: "none",
-            fontSize: 13,
-            fontWeight: 500,
-            padding: "8px 16px",
-            marginBottom: 20,
-            border: "1px solid var(--border)",
-            borderRadius: 4,
-            background: "var(--card-bg)",
-            transition: "all 0.15s ease"
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = "var(--accent)";
-            e.currentTarget.style.background = "var(--hover-bg)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = "var(--border)";
-            e.currentTarget.style.background = "var(--card-bg)";
-          }}
-        >
-          Asset List
-        </Link>
-        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-          <h1 style={{ fontSize: 32, fontWeight: 600, margin: 0, letterSpacing: "-0.02em", color: "var(--foreground)" }}>
-            {ticker || "?"}
-          </h1>
-          {ticker && <LiquidityBadge ticker={ticker} />}
+        {/* Terminal-style Header */}
+      <div
+        style={{
+          padding: "10px 12px",
+          background: "var(--terminal-bg)",
+          border: "1px solid var(--terminal-border)",
+          borderRadius: 2,
+          marginBottom: 16,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: "monospace", color: "var(--foreground)" }}>
+              {ticker || "?"}
+            </h1>
+            {ticker && <LiquidityBadge ticker={ticker} />}
+          </div>
+          <Link
+            href="/stocks"
+            style={{
+              fontSize: 10,
+              color: "var(--accent)",
+              textDecoration: "none",
+              fontFamily: "monospace",
+              fontWeight: 600,
+              padding: "4px 10px",
+              border: "1px solid var(--border)",
+              borderRadius: 2,
+              background: "var(--input-bg)",
+            }}
+          >
+            ← BACK TO ASSET LIST
+          </Link>
         </div>
-      </div>
 
-      {/* Navigation Buttons */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 24 }}>
-        <div style={{ flex: 1 }}></div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {/* Navigation Links */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <Link
             href={`/volatility/${ticker}`}
             style={{
-              padding: "10px 14px",
-              borderRadius: 4,
+              padding: "6px 10px",
+              borderRadius: 2,
               background: "var(--card-bg)",
-              border: "1px solid var(--card-border)",
+              border: "1px solid var(--border)",
               color: "var(--foreground)",
-              fontSize: 13,
-              fontWeight: 500,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-start",
-              gap: 4,
+              fontSize: 10,
+              fontWeight: 600,
               textDecoration: "none",
-              letterSpacing: "0.01em",
+              fontFamily: "monospace",
               transition: "all 0.15s",
-              minWidth: "220px",
             }}
           >
-            <span>Volatility Analysis</span>
-            <span style={{ fontSize: 10, color: "var(--muted-foreground)", fontWeight: 400 }}>
-              Variance • Standard deviation • Risk
-            </span>
+            VOLATILITY ANALYSIS
           </Link>
           <Link
             href={`/montecarlo/${ticker}`}
             style={{
-              padding: "10px 14px",
-              borderRadius: 4,
+              padding: "6px 10px",
+              borderRadius: 2,
               background: "var(--card-bg)",
-              border: "1px solid var(--card-border)",
+              border: "1px solid var(--border)",
               color: "var(--foreground)",
-              fontSize: 13,
-              fontWeight: 500,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-start",
-              gap: 4,
+              fontSize: 10,
+              fontWeight: 600,
               textDecoration: "none",
-              letterSpacing: "0.01em",
+              fontFamily: "monospace",
               transition: "all 0.15s",
-              minWidth: "220px",
             }}
           >
-            <span>Monte Carlo Simulation</span>
-            <span style={{ fontSize: 10, color: "var(--muted-foreground)", fontWeight: 400 }}>
-              Stochastic • Forecasting • Price paths
-            </span>
+            MONTE CARLO SIMULATION
           </Link>
+          {totalRows >= 756 && hasFactorData && (
+            <Link
+              href={`/predictions/${ticker}`}
+              style={{
+                padding: "6px 10px",
+                borderRadius: 2,
+                background: "var(--card-bg)",
+                border: "1px solid var(--border)",
+                color: "var(--foreground)",
+                fontSize: 10,
+                fontWeight: 600,
+                textDecoration: "none",
+                fontFamily: "monospace",
+                transition: "all 0.15s",
+              }}
+            >
+              ML PREDICTIONS
+            </Link>
+          )}
         </div>
+      </div>
       </div>
 
       {/* View Mode Toggle */}
@@ -957,6 +1024,12 @@ export default function StockTickerPage() {
                 e.currentTarget.style.borderColor = "var(--card-border)";
                 e.currentTarget.style.background = "var(--card-bg)";
               }}
+          onMouseDown={(e) => {
+            e.currentTarget.style.transform = "scale(0.95)";
+          }}
+          onMouseUp={(e) => {
+            e.currentTarget.style.transform = "scale(1)";
+          }}
             >
               Fundamental Details
             </button>
