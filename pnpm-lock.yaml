@@ -10,7 +10,7 @@ importers:
     dependencies:
       '@anthropic-ai/sdk':
         specifier: ^0.71.2
-        version: 0.71.2
+        version: 0.71.2(zod@3.25.76)
       '@supabase/supabase-js':
         specifier: ^2.89.0
         version: 2.90.0
@@ -87,6 +87,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@anthropic-ai/sdk':
+        specifier: ^0.71.2
+        version: 0.71.2(zod@3.25.76)
       '@ineqre/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -205,7 +208,7 @@ packages:
     engines: {node: '>=10'}
     dev: true
 
-  /@anthropic-ai/sdk@0.71.2:
+  /@anthropic-ai/sdk@0.71.2(zod@3.25.76):
     resolution: {integrity: sha512-TGNDEUuEstk/DKu0/TflXAEt+p+p/WhTlFzEnoosvbaDU2LTjm42igSdlL0VijrKpWejtOKxX0b8A7uc+XiSAQ==}
     hasBin: true
     peerDependencies:
@@ -215,6 +218,7 @@ packages:
         optional: true
     dependencies:
       json-schema-to-ts: 3.1.1
+      zod: 3.25.76
     dev: false
 
   /@babel/code-frame@7.27.1:

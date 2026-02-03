@@ -13,6 +13,7 @@
     "ibkr:update": "tsx scripts/ibkr-daily-update.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.2",
     "@ineqre/db": "workspace:*",
     "@ineqre/ibkr": "workspace:*",
     "@supabase/supabase-js": "^2.89.0",
