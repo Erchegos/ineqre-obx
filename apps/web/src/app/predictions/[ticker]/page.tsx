@@ -166,7 +166,7 @@ export default function PredictionsPage() {
       </div>
 
       {/* Bottom Info Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
         {/* Methodology */}
         <div
           style={{
@@ -207,6 +207,58 @@ export default function PredictionsPage() {
             <div>
               <span style={{ color: "var(--foreground)", fontWeight: 600 }}>CONFIDENCE:</span> Percentiles
               estimated from ensemble tree variance
+            </div>
+          </div>
+        </div>
+
+        {/* Academic References */}
+        <div
+          style={{
+            padding: 12,
+            borderRadius: 2,
+            border: "1px solid var(--terminal-border)",
+            background: "var(--terminal-bg)",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              marginBottom: 10,
+              color: "var(--foreground)",
+              fontFamily: "monospace",
+            }}
+          >
+            ACADEMIC REFERENCES
+          </div>
+          <div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "monospace", lineHeight: 1.6 }}>
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ color: "var(--foreground)", fontWeight: 600, marginBottom: 2 }}>
+                Gu, Kelly & Xiu (2020)
+              </div>
+              <div style={{ fontStyle: "italic", marginBottom: 2 }}>
+                "Empirical Asset Pricing via Machine Learning"
+              </div>
+              <div style={{ fontSize: 8 }}>
+                Review of Financial Studies, 33(5), 2223-2273
+              </div>
+              <div style={{ fontSize: 8, color: "var(--accent)", marginTop: 2 }}>
+                → 19-factor specification, ML ensemble methodology
+              </div>
+            </div>
+            <div>
+              <div style={{ color: "var(--foreground)", fontWeight: 600, marginBottom: 2 }}>
+                Medhat & Schmeling (2021)
+              </div>
+              <div style={{ fontStyle: "italic", marginBottom: 2 }}>
+                "Short-term Momentum"
+              </div>
+              <div style={{ fontSize: 8 }}>
+                Review of Financial Studies, 35(3), 1480-1526
+              </div>
+              <div style={{ fontSize: 8, color: "var(--accent)", marginTop: 2 }}>
+                → Turnover interactions, size-conditional effects
+              </div>
             </div>
           </div>
         </div>
