@@ -2,7 +2,7 @@ import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 
 const globalForDb = globalThis as unknown as {
-  pool: Pool | undefined;
+  pool: InstanceType<typeof Pool> | undefined;
   db: ReturnType<typeof drizzle> | undefined;
 };
 
@@ -46,7 +46,7 @@ function createPool() {
 }
 
 // Export a getter function instead of calling it at module load time
-export function getPool(): Pool {
+export function getPool(): InstanceType<typeof Pool> {
   if (!globalForDb.pool) {
     globalForDb.pool = createPool();
   }
@@ -54,7 +54,7 @@ export function getPool(): Pool {
 }
 
 // Lazy getter for pool - don't initialize until accessed
-export const pool = new Proxy({} as Pool, {
+export const pool = new Proxy({} as InstanceType<typeof Pool>, {
   get(target, prop) {
     const actualPool = getPool();
     const value = (actualPool as any)[prop];

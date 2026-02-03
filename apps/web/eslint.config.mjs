@@ -1,9 +1,6 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
-import unusedImports from "eslint-plugin-unused-imports";
-import typescriptEslint from "@typescript-eslint/eslint-plugin";
-import typescriptParser from "@typescript-eslint/parser";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -17,34 +14,10 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
   ]),
 
-  // Unused imports and dead code detection
+  // Rules using plugins already provided by eslint-config-next/typescript
   {
     files: ["**/*.{ts,tsx,js,jsx}"],
-    plugins: {
-      "unused-imports": unusedImports,
-      "@typescript-eslint": typescriptEslint,
-    },
-    languageOptions: {
-      parser: typescriptParser,
-      parserOptions: {
-        ecmaVersion: "latest",
-        sourceType: "module",
-      },
-    },
     rules: {
-      // Unused imports
-      "unused-imports/no-unused-imports": "warn",
-      "unused-imports/no-unused-vars": [
-        "warn",
-        {
-          "vars": "all",
-          "varsIgnorePattern": "^_",
-          "args": "after-used",
-          "argsIgnorePattern": "^_"
-        }
-      ],
-
-      // Dead code detection
       "@typescript-eslint/no-unused-vars": [
         "warn",
         {
@@ -53,11 +26,7 @@ const eslintConfig = defineConfig([
           "caughtErrorsIgnorePattern": "^_"
         }
       ],
-
-      // No unused expressions (catches commented-out code patterns)
       "no-unused-expressions": "warn",
-
-      // No unreachable code
       "no-unreachable": "error",
     }
   }

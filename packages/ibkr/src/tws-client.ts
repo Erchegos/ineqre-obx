@@ -377,15 +377,17 @@ export class TWSClient {
       barSize?: BarSizeSetting;
       secType?: SecType;
       currency?: string;
+      adjusted?: boolean;
     } = {}
   ): Promise<PriceData[]> {
     const {
       barSize = BarSizeSetting.DAYS_ONE,
       secType = SecType.STK,
       currency = "NOK",
+      adjusted = true, // Default to adjusted prices
     } = options;
 
-    console.log(`Importing ${symbol} from ${exchange}...`);
+    console.log(`Importing ${symbol} from ${exchange} (${adjusted ? 'adjusted' : 'raw'})...`);
 
     const bars = await this.getHistoricalData(
       symbol,
@@ -393,7 +395,8 @@ export class TWSClient {
       duration,
       barSize,
       secType,
-      currency
+      currency,
+      adjusted
     );
 
     const priceData = this.convertToPriceData(symbol, bars);
