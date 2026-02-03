@@ -22,9 +22,11 @@ export async function GET(
         p05, p25, p50, p75, p95,
         feature_importance,
         confidence_score,
+        model_version,
         created_at
       FROM ml_predictions
       WHERE ticker = $1
+        AND model_version = 'v2.0_19factor_enhanced'
       ORDER BY prediction_date DESC
       LIMIT 10
     `;
