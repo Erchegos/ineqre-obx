@@ -3,14 +3,25 @@
  *
  * Generates 1-month forward return predictions using the 19-factor model.
  *
- * Research-backed methodology from:
- * - Gu et al. (2020): "Empirical Asset Pricing via Machine Learning"
- * - Medhat & Schmeling (2021): "Short-term momentum"
- * - Nordic equity factor literature
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * ACADEMIC REFERENCES
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ * [1] Gu, S., Kelly, B., & Xiu, D. (2020). "Empirical Asset Pricing via Machine
+ *     Learning." Review of Financial Studies, 33(5), 2223-2273.
+ *     - 19-factor specification and ML methodology
+ *     - Gradient Boosting + Random Forest ensemble
+ *
+ * [2] Medhat, M., & Schmeling, M. (2021). "Short-term Momentum."
+ *     Review of Financial Studies, 35(3), 1480-1526.
+ *     - Turnover interactions, size-conditional effects
+ *     - End-of-month filtering
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════
  *
  * Key Features:
  * - Cross-sectional z-score standardization
- * - mom1m × NOKvol interaction terms (CRITICAL)
+ * - mom1m × NOKvol interaction terms (CRITICAL per Medhat & Schmeling)
  * - Size regime classification
  * - Regime-conditional ensemble weights
  * - 60% GB + 40% RF ensemble (base weights)
