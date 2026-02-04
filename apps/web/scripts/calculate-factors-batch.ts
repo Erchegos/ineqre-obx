@@ -145,8 +145,10 @@ async function calculateFactorsForTicker(
         continue;
       }
 
-      // Calculate beta/IVOL only every 5 days to save time
-      const shouldCalculateBeta = i % BETA_CALC_INTERVAL === 0;
+      // Calculate beta/IVOL every 5 days to save time, but ALWAYS on the last 5 dates
+      // so the most recent factor row always has beta/ivol populated
+      const isRecentDate = i >= prices.length - 5;
+      const shouldCalculateBeta = isRecentDate || i % BETA_CALC_INTERVAL === 0;
 
       const factorData = await calculateTechnicalFactorsForDate(
         ticker,
