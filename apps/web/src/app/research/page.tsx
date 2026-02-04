@@ -23,6 +23,7 @@ type StockInfo = { ticker: string; name: string };
 
 type DocMeta = {
   ticker: string | null;
+  tickers: string[];  // all tickers mentioned (for BørsXtra multi-company docs)
   rating: 'Buy' | 'Hold' | 'Sell' | null;
   category: 'company' | 'morning' | 'sector' | null;
 };
@@ -528,6 +529,26 @@ export default function ResearchPortalPage() {
     setDocuments([]);
   };
 
+  // Build company name → ticker lookup from stocks list
+  const nameToTicker = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of stocksList) {
+      // Add ticker itself
+      map.set(s.ticker.toUpperCase(), s.ticker);
+      if (!s.name) continue;
+      const name = s.name.toUpperCase();
+      // Full name: "Aker BP ASA" → AKRBP
+      map.set(name, s.ticker);
+      // Without suffix: "Aker BP" → AKRBP
+      const short = name.replace(/\s+(ASA|AS|A\/S|LTD|LIMITED|SA|SE|NV|OYJ|HOLDING|HOLDINGS|CORP|CORPORATION)\b\.?/gi, '').trim();
+      if (short && short !== name) map.set(short, s.ticker);
+      // Also strip "P/F" prefix for Faroese companies
+      const noPrefix = short.replace(/^P\/F\s+/i, '').trim();
+      if (noPrefix !== short) map.set(noPrefix, s.ticker);
+    }
+    return map;
+  }, [stocksList]);
+
   // Compute metadata (ticker, rating, category) for each document
   const docMeta = useMemo(() => {
     const meta = new Map<string, DocMeta>();
@@ -536,15 +557,14 @@ export default function ResearchPortalPage() {
 
     for (const doc of documents) {
       const subjectUp = doc.subject.toUpperCase();
-      const summaryUp = (doc.ai_summary || '').toUpperCase();
-      const text = subjectUp + ' ' + summaryUp;
+      const subjectLow = doc.subject.toLowerCase();
+      const isBorsXtra = /børsxtra|borsxtra/i.test(subjectLow);
 
       // Extract ticker: use DB value if set, otherwise match from subject
       let ticker: string | null = doc.ticker;
       if (!ticker) {
         for (const s of sortedTickers) {
           const t = s.ticker.toUpperCase();
-          // Skip very short tickers (2-3 chars) that are common words
           const re = new RegExp('\\b' + t.replace('.', '\\.') + '\\b');
           if (re.test(subjectUp)) {
             ticker = s.ticker;
@@ -552,6 +572,37 @@ export default function ResearchPortalPage() {
           }
         }
       }
+
+      // For BørsXtra: extract ALL company tickers from the AI summary
+      const tickers: string[] = [];
+      if (isBorsXtra && doc.ai_summary) {
+        const companyMatches = doc.ai_summary.matchAll(/\*\*(.+?)\*\*:/g);
+        for (const cm of companyMatches) {
+          const companyName = cm[1].trim().toUpperCase();
+          // Try exact match in name lookup
+          const found = nameToTicker.get(companyName);
+          if (found) {
+            if (!tickers.includes(found)) tickers.push(found);
+            continue;
+          }
+          // Try matching against ticker symbols directly
+          for (const s of sortedTickers) {
+            if (companyName === s.ticker.toUpperCase()) {
+              if (!tickers.includes(s.ticker)) tickers.push(s.ticker);
+              break;
+            }
+            // Partial name match: "Aker BP" in "Aker BP ASA"
+            const sName = (s.name || '').toUpperCase();
+            if (sName.startsWith(companyName) || companyName.startsWith(sName.replace(/\s+(ASA|LTD|SE|A\/S)$/i, '').trim())) {
+              if (!tickers.includes(s.ticker)) tickers.push(s.ticker);
+              break;
+            }
+          }
+        }
+      }
+
+      // If single-company doc, add its ticker to tickers array too
+      if (ticker && !tickers.includes(ticker)) tickers.unshift(ticker);
 
       // Extract rating from AI summary
       let rating: DocMeta['rating'] = null;
@@ -563,7 +614,6 @@ export default function ResearchPortalPage() {
 
       // Classify category from subject
       let category: DocMeta['category'] = null;
-      const subjectLow = doc.subject.toLowerCase();
       if (/morning comment|daily|high yield daily|shipping daily/.test(subjectLow)) {
         category = 'morning';
       } else if (/oil\s*&?\s*gas|shipping|energy|sector|macro|borsxtra|børsxtra/.test(subjectLow)) {
@@ -572,16 +622,18 @@ export default function ResearchPortalPage() {
         category = 'company';
       }
 
-      meta.set(doc.id, { ticker, rating, category });
+      meta.set(doc.id, { ticker: ticker || (tickers[0] ?? null), tickers, rating, category });
     }
     return meta;
-  }, [documents, stocksList]);
+  }, [documents, stocksList, nameToTicker]);
 
   // Get tickers that appear in documents, with counts
   const tickerOptions = useMemo(() => {
     const counts = new Map<string, number>();
     for (const [, m] of docMeta) {
-      if (m.ticker) counts.set(m.ticker, (counts.get(m.ticker) || 0) + 1);
+      for (const t of m.tickers) {
+        counts.set(t, (counts.get(t) || 0) + 1);
+      }
     }
     return Array.from(counts.entries())
       .sort((a, b) => b[1] - a[1])
@@ -604,7 +656,7 @@ export default function ResearchPortalPage() {
 
     const meta = docMeta.get(doc.id);
     const matchesSource = selectedSource === 'all' || doc.source === selectedSource;
-    const matchesTicker = selectedTicker === 'all' || meta?.ticker === selectedTicker;
+    const matchesTicker = selectedTicker === 'all' || (meta?.tickers?.includes(selectedTicker) ?? false);
     const matchesSearch = !searchTerm ||
       doc.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (doc.ticker && doc.ticker.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -950,26 +1002,34 @@ export default function ResearchPortalPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
                     {(() => {
                       const meta = docMeta.get(doc.id);
-                      const displayTicker = meta?.ticker || doc.ticker;
+                      const displayTickers = meta?.tickers?.length ? meta.tickers : (meta?.ticker ? [meta.ticker] : (doc.ticker ? [doc.ticker] : []));
                       const ratingColor = meta?.rating === 'Buy' ? '#22c55e' : meta?.rating === 'Sell' ? '#ef4444' : meta?.rating === 'Hold' ? '#f59e0b' : null;
+                      // Show max 5 ticker badges, then "+N more"
+                      const maxBadges = 5;
+                      const shownTickers = displayTickers.slice(0, maxBadges);
+                      const extraCount = displayTickers.length - maxBadges;
                       return (
                         <>
-                          {displayTicker && (
+                          {shownTickers.map(t => (
                             <span
+                              key={t}
                               style={{
-                                padding: '4px 10px',
+                                padding: '3px 8px',
                                 background: '#0066CC',
                                 color: '#fff',
-                                fontSize: 12,
+                                fontSize: 11,
                                 fontWeight: 700,
-                                borderRadius: 6,
+                                borderRadius: 5,
                                 letterSpacing: '0.5px',
                                 cursor: 'pointer',
                               }}
-                              onClick={() => setSelectedTicker(displayTicker)}
+                              onClick={() => setSelectedTicker(t)}
                             >
-                              {displayTicker}
+                              {t}
                             </span>
+                          ))}
+                          {extraCount > 0 && (
+                            <span style={{ fontSize: 11, color: '#888' }}>+{extraCount} more</span>
                           )}
                           {meta?.rating && ratingColor && (
                             <span style={{
