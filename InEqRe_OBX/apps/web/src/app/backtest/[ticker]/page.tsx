@@ -445,7 +445,7 @@ export default function TickerBacktestPage() {
               />
               <Tooltip
                 contentStyle={tooltipStyle}
-                formatter={(value: any, name: string) => [
+                formatter={(value: any, name?: string) => [
                   `${Number(value).toFixed(2)}%`,
                   name === "predicted" ? "Predicted" : "Actual",
                 ]}
