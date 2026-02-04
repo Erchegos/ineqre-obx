@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 type ResearchDocument = {
   id: string;
@@ -19,6 +19,14 @@ type ResearchDocument = {
   }[];
 };
 
+type StockInfo = { ticker: string; name: string };
+
+type DocMeta = {
+  ticker: string | null;
+  rating: 'Buy' | 'Hold' | 'Sell' | null;
+  category: 'company' | 'morning' | 'sector' | null;
+};
+
 export default function ResearchPortalPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
@@ -26,10 +34,13 @@ export default function ResearchPortalPage() {
   const [error, setError] = useState('');
   const [documents, setDocuments] = useState<ResearchDocument[]>([]);
   const [selectedSource, setSelectedSource] = useState<string>('all');
+  const [selectedTicker, setSelectedTicker] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedDocs, setExpandedDocs] = useState<Set<string>>(new Set());
   const [selectedDocument, setSelectedDocument] = useState<ResearchDocument | null>(null);
   const [pdfCheckStatus, setPdfCheckStatus] = useState<Map<string, boolean>>(new Map());
+  const [stocksList, setStocksList] = useState<StockInfo[]>([]);
 
   const toggleExpanded = (docId: string) => {
     setExpandedDocs(prev => {
@@ -259,6 +270,12 @@ export default function ResearchPortalPage() {
         setIsAuthenticated(false);
       }
     }
+
+    // Fetch stocks list for ticker dropdown (public endpoint)
+    fetch('/api/stocks')
+      .then(r => r.ok ? r.json() : [])
+      .then((data: StockInfo[]) => setStocksList(data))
+      .catch(() => {});
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -448,19 +465,98 @@ export default function ResearchPortalPage() {
     setDocuments([]);
   };
 
-  // Filter documents - exclude those without content
-  const filteredDocuments = documents.filter(doc => {
-    // Filter out documents with no content
-    if (!doc.body_text && !doc.ai_summary) {
-      return false;
-    }
+  // Compute metadata (ticker, rating, category) for each document
+  const docMeta = useMemo(() => {
+    const meta = new Map<string, DocMeta>();
+    // Sort tickers longest-first to avoid AKER matching before AKERBP
+    const sortedTickers = [...stocksList].sort((a, b) => b.ticker.length - a.ticker.length);
 
+    for (const doc of documents) {
+      const subjectUp = doc.subject.toUpperCase();
+      const summaryUp = (doc.ai_summary || '').toUpperCase();
+      const text = subjectUp + ' ' + summaryUp;
+
+      // Extract ticker: use DB value if set, otherwise match from subject
+      let ticker: string | null = doc.ticker;
+      if (!ticker) {
+        for (const s of sortedTickers) {
+          const t = s.ticker.toUpperCase();
+          // Skip very short tickers (2-3 chars) that are common words
+          const re = new RegExp('\\b' + t.replace('.', '\\.') + '\\b');
+          if (re.test(subjectUp)) {
+            ticker = s.ticker;
+            break;
+          }
+        }
+      }
+
+      // Extract rating from AI summary
+      let rating: DocMeta['rating'] = null;
+      const ratingMatch = doc.ai_summary?.match(/\*\*Rating:\*\*\s*(Buy|Hold|Sell)/i);
+      if (ratingMatch) {
+        const r = ratingMatch[1].charAt(0).toUpperCase() + ratingMatch[1].slice(1).toLowerCase();
+        rating = r as DocMeta['rating'];
+      }
+
+      // Classify category from subject
+      let category: DocMeta['category'] = null;
+      const subjectLow = doc.subject.toLowerCase();
+      if (/morning comment|daily|high yield daily|shipping daily/.test(subjectLow)) {
+        category = 'morning';
+      } else if (/oil\s*&?\s*gas|shipping|energy|sector|macro|borsxtra|børsxtra/.test(subjectLow)) {
+        category = 'sector';
+      } else if (/update|newsflash|quarterly|preview|review|initiated|upgrade|downgrade|reiterat/.test(subjectLow)) {
+        category = 'company';
+      }
+
+      meta.set(doc.id, { ticker, rating, category });
+    }
+    return meta;
+  }, [documents, stocksList]);
+
+  // Get tickers that appear in documents, with counts
+  const tickerOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const [, m] of docMeta) {
+      if (m.ticker) counts.set(m.ticker, (counts.get(m.ticker) || 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([ticker, count]) => ({ ticker, count }));
+  }, [docMeta]);
+
+  // Count documents by category and rating for chip badges
+  const filterCounts = useMemo(() => {
+    const counts = { company: 0, morning: 0, sector: 0, Buy: 0, Hold: 0, Sell: 0 };
+    for (const [, m] of docMeta) {
+      if (m.category) counts[m.category]++;
+      if (m.rating) counts[m.rating]++;
+    }
+    return counts;
+  }, [docMeta]);
+
+  // Filter documents
+  const filteredDocuments = documents.filter(doc => {
+    if (!doc.body_text && !doc.ai_summary) return false;
+
+    const meta = docMeta.get(doc.id);
     const matchesSource = selectedSource === 'all' || doc.source === selectedSource;
+    const matchesTicker = selectedTicker === 'all' || meta?.ticker === selectedTicker;
     const matchesSearch = !searchTerm ||
       doc.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (doc.ticker && doc.ticker.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (meta?.ticker && meta.ticker.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (doc.body_text && doc.body_text.toLowerCase().includes(searchTerm.toLowerCase()));
-    return matchesSource && matchesSearch;
+
+    // Category filter: 'all', 'company', 'morning', 'sector', 'Buy', 'Hold', 'Sell'
+    let matchesCategory = true;
+    if (selectedCategory === 'company' || selectedCategory === 'morning' || selectedCategory === 'sector') {
+      matchesCategory = meta?.category === selectedCategory;
+    } else if (selectedCategory === 'Buy' || selectedCategory === 'Hold' || selectedCategory === 'Sell') {
+      matchesCategory = meta?.rating === selectedCategory;
+    }
+
+    return matchesSource && matchesTicker && matchesSearch && matchesCategory;
   });
 
   // Get unique sources
@@ -631,48 +727,129 @@ export default function ResearchPortalPage() {
       </div>
 
       {/* Filters */}
-      <div style={{
-        display: 'flex',
-        gap: 12,
-        marginBottom: 24,
-        flexWrap: 'wrap'
-      }}>
-        <input
-          type="text"
-          placeholder="Search by ticker, subject, or content..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          style={{
-            flex: 1,
-            minWidth: 300,
-            padding: '10px 14px',
-            border: '1px solid var(--input-border)',
-            borderRadius: 8,
-            background: 'var(--input-bg)',
-            color: 'var(--foreground)',
-            fontSize: 14,
-          }}
-        />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
+        {/* Row 1: Search + Dropdowns */}
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <input
+            type="text"
+            placeholder="Search by ticker, subject, or content..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              flex: 1,
+              minWidth: 280,
+              padding: '10px 14px',
+              border: '1px solid var(--input-border)',
+              borderRadius: 8,
+              background: 'var(--input-bg)',
+              color: 'var(--foreground)',
+              fontSize: 14,
+            }}
+          />
 
-        <select
-          value={selectedSource}
-          onChange={(e) => setSelectedSource(e.target.value)}
-          style={{
-            padding: '10px 14px',
-            border: '1px solid var(--input-border)',
-            borderRadius: 8,
-            background: 'var(--input-bg)',
-            color: 'var(--foreground)',
-            fontSize: 14,
-            cursor: 'pointer',
-            minWidth: 180,
-          }}
-        >
-          <option value="all">All Sources</option>
-          {sources.map(source => (
-            <option key={source} value={source}>{source}</option>
-          ))}
-        </select>
+          <select
+            value={selectedTicker}
+            onChange={(e) => setSelectedTicker(e.target.value)}
+            style={{
+              padding: '10px 14px',
+              border: '1px solid var(--input-border)',
+              borderRadius: 8,
+              background: 'var(--input-bg)',
+              color: 'var(--foreground)',
+              fontSize: 14,
+              cursor: 'pointer',
+              minWidth: 160,
+            }}
+          >
+            <option value="all">All Tickers</option>
+            {tickerOptions.map(({ ticker, count }) => (
+              <option key={ticker} value={ticker}>{ticker} ({count})</option>
+            ))}
+          </select>
+
+          <select
+            value={selectedSource}
+            onChange={(e) => setSelectedSource(e.target.value)}
+            style={{
+              padding: '10px 14px',
+              border: '1px solid var(--input-border)',
+              borderRadius: 8,
+              background: 'var(--input-bg)',
+              color: 'var(--foreground)',
+              fontSize: 14,
+              cursor: 'pointer',
+              minWidth: 160,
+            }}
+          >
+            <option value="all">All Sources</option>
+            {sources.map(source => (
+              <option key={source} value={source}>{source}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Row 2: Filter chips */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          {[
+            { key: 'all', label: 'All', color: undefined },
+            { key: 'company', label: 'Company Reports', color: undefined },
+            { key: 'morning', label: 'Morning / Daily', color: undefined },
+            { key: 'sector', label: 'Sector / Macro', color: undefined },
+          ].map(chip => {
+            const isActive = selectedCategory === chip.key;
+            const count = chip.key === 'all' ? documents.filter(d => d.body_text || d.ai_summary).length : filterCounts[chip.key as keyof typeof filterCounts] || 0;
+            return (
+              <button
+                key={chip.key}
+                onClick={() => setSelectedCategory(chip.key)}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: 13,
+                  fontWeight: isActive ? 600 : 400,
+                  border: `1px solid ${isActive ? '#0066CC' : 'var(--border)'}`,
+                  borderRadius: 20,
+                  background: isActive ? 'rgba(0, 102, 204, 0.1)' : 'transparent',
+                  color: isActive ? '#3b82f6' : 'var(--muted-foreground)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {chip.label} <span style={{ opacity: 0.6, fontSize: 11 }}>{count}</span>
+              </button>
+            );
+          })}
+
+          <span style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 4px' }} />
+
+          {[
+            { key: 'Buy', label: 'Buy', color: '#22c55e' },
+            { key: 'Hold', label: 'Hold', color: '#f59e0b' },
+            { key: 'Sell', label: 'Sell', color: '#ef4444' },
+          ].map(chip => {
+            const isActive = selectedCategory === chip.key;
+            const count = filterCounts[chip.key as keyof typeof filterCounts] || 0;
+            return (
+              <button
+                key={chip.key}
+                onClick={() => setSelectedCategory(isActive ? 'all' : chip.key)}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: 13,
+                  fontWeight: isActive ? 600 : 400,
+                  border: `1px solid ${isActive ? chip.color : 'var(--border)'}`,
+                  borderRadius: 20,
+                  background: isActive ? `${chip.color}18` : 'transparent',
+                  color: isActive ? chip.color : 'var(--muted-foreground)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+              >
+                <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: chip.color, marginRight: 6 }} />
+                {chip.label} <span style={{ opacity: 0.6, fontSize: 11 }}>{count}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Documents List */}
@@ -707,20 +884,46 @@ export default function ResearchPortalPage() {
               {/* Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 16 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
-                    {doc.ticker && (
-                      <span style={{
-                        padding: '4px 10px',
-                        background: '#0066CC',
-                        color: '#fff',
-                        fontSize: 12,
-                        fontWeight: 700,
-                        borderRadius: 6,
-                        letterSpacing: '0.5px',
-                      }}>
-                        {doc.ticker}
-                      </span>
-                    )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                    {(() => {
+                      const meta = docMeta.get(doc.id);
+                      const displayTicker = meta?.ticker || doc.ticker;
+                      const ratingColor = meta?.rating === 'Buy' ? '#22c55e' : meta?.rating === 'Sell' ? '#ef4444' : meta?.rating === 'Hold' ? '#f59e0b' : null;
+                      return (
+                        <>
+                          {displayTicker && (
+                            <span
+                              style={{
+                                padding: '4px 10px',
+                                background: '#0066CC',
+                                color: '#fff',
+                                fontSize: 12,
+                                fontWeight: 700,
+                                borderRadius: 6,
+                                letterSpacing: '0.5px',
+                                cursor: 'pointer',
+                              }}
+                              onClick={() => setSelectedTicker(displayTicker)}
+                            >
+                              {displayTicker}
+                            </span>
+                          )}
+                          {meta?.rating && ratingColor && (
+                            <span style={{
+                              padding: '3px 8px',
+                              fontSize: 11,
+                              fontWeight: 700,
+                              borderRadius: 4,
+                              background: `${ratingColor}18`,
+                              color: ratingColor,
+                              border: `1px solid ${ratingColor}40`,
+                            }}>
+                              {meta.rating}
+                            </span>
+                          )}
+                        </>
+                      );
+                    })()}
                     <span style={{
                       fontSize: 12,
                       color: 'var(--muted-foreground)',
