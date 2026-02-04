@@ -334,7 +334,7 @@ export default function TickerBacktestPage() {
                 background: "var(--input-bg)",
               }}
             >
-              ALL STOCKS &rarr;
+              BACKTEST ALL STOCKS &rarr;
             </Link>
           </div>
         </div>

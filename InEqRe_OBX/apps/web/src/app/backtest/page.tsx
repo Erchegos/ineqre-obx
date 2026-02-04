@@ -299,7 +299,7 @@ export default function BacktestPage() {
               background: "var(--input-bg)",
             }}
           >
-            &larr; HOME
+            &larr; BACK TO STOCKS
           </Link>
         </div>
       </div>
