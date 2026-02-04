@@ -128,7 +128,8 @@ export default function ResearchPortalPage() {
         if (match) {
           const [, header, rest] = match;
           if (header === 'Key Points' || header === 'Estimates' || header === 'Price Target Changes') {
-            if (!compact) {
+            // Always show Price Target Changes header; hide Key Points/Estimates in compact
+            if (!compact || header === 'Price Target Changes') {
               elements.push(
                 <div key={i} style={{
                   fontSize: 11,
@@ -161,7 +162,67 @@ export default function ResearchPortalPage() {
         }
       }
 
-      // Bullet points
+      // BørsXtra-style price target bullet: - **Company**: Broker action target to NOK X (Y), Rating
+      const ptMatch = line.match(/^- \*\*(.+?)\*\*:\s*(.+)/);
+      if (ptMatch && /target|kursmål|reiterat|downgrad|upgrad|initiat|cut|øker|kutter/i.test(ptMatch[2])) {
+        const [, company, details] = ptMatch;
+        // Extract rating from end if present
+        const ratingPart = details.match(/(Buy|Hold|Sell|Kjøp|Nøytral|Selg)\s*$/i);
+        const ratingText = ratingPart ? ratingPart[1] : null;
+        const ratingColor = ratingText && /buy|kjøp/i.test(ratingText) ? '#22c55e'
+          : ratingText && /sell|selg/i.test(ratingText) ? '#ef4444'
+          : ratingText ? '#f59e0b' : null;
+        // Extract broker name (first word(s) before action verb)
+        const brokerMatch = details.match(/^([\w\s]+?)\s+(downgrad|upgrad|increas|cut|reiterat|initiat|øker|kutter|gjentar|set)/i);
+        const broker = brokerMatch ? brokerMatch[1].trim() : null;
+        const action = broker ? details.substring(broker.length).replace(/,\s*(Buy|Hold|Sell|Kjøp|Nøytral|Selg)\s*$/i, '').trim() : details.replace(/,\s*(Buy|Hold|Sell|Kjøp|Nøytral|Selg)\s*$/i, '').trim();
+
+        elements.push(
+          <div key={i} style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            flexWrap: 'wrap',
+            fontSize: compact ? 12 : 13,
+            padding: compact ? '4px 0' : '5px 0',
+            borderBottom: '1px solid rgba(255,255,255,0.05)',
+          }}>
+            <span style={{
+              fontWeight: 700,
+              color: '#3b82f6',
+              minWidth: compact ? 80 : 100,
+              flexShrink: 0,
+            }}>{company}</span>
+            {broker && (
+              <span style={{
+                fontSize: compact ? 10 : 11,
+                padding: '2px 6px',
+                background: 'rgba(255,255,255,0.08)',
+                borderRadius: 4,
+                color: '#aaa',
+                fontWeight: 500,
+                flexShrink: 0,
+              }}>{broker}</span>
+            )}
+            <span style={{ color: 'var(--foreground)', flex: 1 }}>{action}</span>
+            {ratingText && ratingColor && (
+              <span style={{
+                fontSize: compact ? 10 : 11,
+                fontWeight: 700,
+                padding: '2px 8px',
+                borderRadius: 4,
+                background: `${ratingColor}18`,
+                color: ratingColor,
+                border: `1px solid ${ratingColor}40`,
+                flexShrink: 0,
+              }}>{ratingText}</span>
+            )}
+          </div>
+        );
+        continue;
+      }
+
+      // Regular bullet points
       if (line.startsWith('- ')) {
         const bulletText = line.substring(2);
         const bulletHtml = bulletText.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
