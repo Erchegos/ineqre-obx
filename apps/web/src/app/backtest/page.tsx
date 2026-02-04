@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import {
   AreaChart,
   Area,
@@ -126,8 +125,6 @@ const GLOSSARY = [
 ];
 
 export default function BacktestPage() {
-  const searchParams = useSearchParams();
-  const fromTicker = searchParams.get("from");
   const [run, setRun] = useState<BacktestRun | null>(null);
   const [monthly, setMonthly] = useState<MonthlyData[]>([]);
   const [loading, setLoading] = useState(true);
