@@ -195,7 +195,7 @@ async function getMessages(auth) {
 
   const response = await gmail.users.messages.list({
     userId: 'me',
-    q: 'from:noreply@research.paretosec.com after:2026/01/01',
+    q: 'from:noreply@research.paretosec.com newer_than:7d',
     maxResults: 500,
   });
 
@@ -319,43 +319,65 @@ async function main() {
 
       const messageId = searchResponse.data.messages[0].id;
 
-      // Get full message with raw content
+      // Get message with 'full' format (Gmail decodes MIME parts for us)
       const fullMessage = await gmail.users.messages.get({
         userId: 'me',
         id: messageId,
-        format: 'raw',
+        format: 'full',
       });
 
-      // Decode the raw message
-      const rawEmail = Buffer.from(fullMessage.data.raw, 'base64url').toString('utf-8');
+      // Extract decoded HTML body from MIME parts
+      let htmlBody = '';
+      function extractHtml(parts) {
+        if (!parts) return;
+        for (const part of parts) {
+          if (part.mimeType === 'text/html' && part.body && part.body.data) {
+            htmlBody = Buffer.from(part.body.data, 'base64').toString('utf-8');
+            return;
+          }
+          if (part.parts) extractHtml(part.parts);
+        }
+      }
+      extractHtml([fullMessage.data.payload]);
 
-      // Extract PDF URL from email body
+      // Extract PDF URL from decoded HTML
       let pdfUrl = null;
 
-      // Method 1: FactSet hosting link (quoted-printable encoded with line breaks)
-      // The URL spans multiple lines with = at the end of each line
-      const factsetMatch = rawEmail.match(/href=3D["']([^"']*parp\.hosting[^"']{0,2000})["']/i);
+      // Method 1: FactSet hosting link
+      const factsetMatch = htmlBody.match(/href=["']([^"']*parp\.hosting\.factset\.com[^"']*)["']/i);
       if (factsetMatch) {
-        // Decode the quoted-printable URL
-        // Order matters: remove line breaks, decode hex, THEN decode =3D
         pdfUrl = factsetMatch[1]
-          .replace(/=\r?\n/g, '')  // Remove soft line breaks (= at end of line)
-          .replace(/=([0-9A-F]{2})/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16))) // Decode =XX to chars
-          .replace(/=3D/gi, '=');   // Finally convert remaining =3D to =
-
-        console.log(`  Decoded URL length: ${pdfUrl.length} chars`);
+          .replace(/&amp;/g, '&')   // Decode HTML entities
+          .replace(/&#x3D;/gi, '=') // Decode HTML hex entities
+          .replace(/&#61;/g, '=');   // Decode HTML decimal entities
+        console.log(`  FactSet URL found (${pdfUrl.length} chars)`);
       }
 
       // Method 2: Direct research.paretosec.com link
       if (!pdfUrl) {
-        const directMatch = rawEmail.match(/href=["']([^"']*research\.paretosec\.com[^"']*)["']/i);
-        if (directMatch) pdfUrl = directMatch[1];
+        const directMatch = htmlBody.match(/href=["']([^"']*research\.paretosec\.com[^"']*)["']/i);
+        if (directMatch) {
+          pdfUrl = directMatch[1].replace(/&amp;/g, '&');
+        }
       }
 
-      // Method 3: Plain FactSet URL
+      // Method 3: Fallback - search raw message if HTML parsing failed
       if (!pdfUrl) {
-        const plainMatch = rawEmail.match(/https:\/\/parp\.hosting\.factset\.com[^\s"'<>]+/i);
-        if (plainMatch) pdfUrl = plainMatch[0];
+        const rawMessage = await gmail.users.messages.get({
+          userId: 'me',
+          id: messageId,
+          format: 'raw',
+        });
+        const rawEmail = Buffer.from(rawMessage.data.raw, 'base64url').toString('utf-8');
+
+        const rawMatch = rawEmail.match(/href=3D["']([^"']*parp\.hosting[^"']{0,2000})["']/i);
+        if (rawMatch) {
+          pdfUrl = rawMatch[1]
+            .replace(/=\r?\n/g, '')
+            .replace(/=([0-9A-F]{2})/gi, (m, hex) => String.fromCharCode(parseInt(hex, 16)))
+            .replace(/&amp;/g, '&');
+          console.log(`  FactSet URL found via raw fallback (${pdfUrl.length} chars)`);
+        }
       }
 
       if (!pdfUrl) {
