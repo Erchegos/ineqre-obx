@@ -633,15 +633,17 @@ async function main() {
     // Select inbox
     await imap.mailboxOpen('INBOX');
 
-    console.log('Searching for research emails from 2026...');
+    // Search last 3 days to avoid hitting the batch limit with old emails
+    const sinceDate = new Date();
+    sinceDate.setDate(sinceDate.getDate() - 3);
+    console.log(`Searching for research emails since ${sinceDate.toISOString().split('T')[0]}...`);
     let processed = 0;
     let totalCount = 0;
 
     // Search for each sender separately (IMAP limitation)
     for (const sender of CONFIG.senderFilters) {
       const searchCriteria = {
-        since: new Date('2026-01-01'),
-        before: new Date('2027-01-01'),
+        since: sinceDate,
         from: sender
       };
 
