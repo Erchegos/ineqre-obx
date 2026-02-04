@@ -140,22 +140,56 @@ export default function PredictionsPage() {
               MACHINE LEARNING FORECASTS • ENSEMBLE MODELS • FACTOR ANALYSIS
             </div>
           </div>
-          <Link
-            href={`/stocks/${ticker}`}
-            style={{
-              fontSize: 10,
-              color: "var(--accent)",
-              textDecoration: "none",
-              fontFamily: "monospace",
-              fontWeight: 600,
-              padding: "6px 12px",
-              border: "1px solid var(--accent)",
-              borderRadius: 2,
-              background: "var(--input-bg)",
-            }}
-          >
-            ← BACK TO STOCK
-          </Link>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Link
+              href={`/stocks/${ticker}`}
+              style={{
+                fontSize: 10,
+                color: "var(--accent)",
+                textDecoration: "none",
+                fontFamily: "monospace",
+                fontWeight: 600,
+                padding: "6px 12px",
+                border: "1px solid var(--accent)",
+                borderRadius: 2,
+                background: "var(--input-bg)",
+              }}
+            >
+              &larr; BACK TO STOCK
+            </Link>
+            <Link
+              href={`/backtest/${ticker}`}
+              style={{
+                fontSize: 10,
+                color: "var(--success)",
+                textDecoration: "none",
+                fontFamily: "monospace",
+                fontWeight: 600,
+                padding: "6px 12px",
+                border: "1px solid var(--success)",
+                borderRadius: 2,
+                background: "var(--input-bg)",
+              }}
+            >
+              BACKTEST &rarr;
+            </Link>
+            <Link
+              href="/backtest"
+              style={{
+                fontSize: 10,
+                color: "var(--muted)",
+                textDecoration: "none",
+                fontFamily: "monospace",
+                fontWeight: 600,
+                padding: "6px 12px",
+                border: "1px solid var(--border)",
+                borderRadius: 2,
+                background: "var(--input-bg)",
+              }}
+            >
+              ALL STOCKS
+            </Link>
+          </div>
         </div>
       </div>
 
