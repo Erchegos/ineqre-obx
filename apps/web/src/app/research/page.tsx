@@ -72,6 +72,122 @@ export default function ResearchPortalPage() {
     return cleaned.trim();
   };
 
+  // Render AI summary with structured formatting
+  const renderSummary = (text: string, compact: boolean = false): React.ReactNode => {
+    const lines = text.split('\n').filter(l => l.trim());
+    const elements: React.ReactNode[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+
+      // Header line: **Rating:** Buy | **Target Price:** NOK 46 | ...
+      if (line.startsWith('**Rating:') || line.startsWith('**Target')) {
+        const parts = line.split('|').map(p => p.trim());
+        elements.push(
+          <div key={i} style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 12,
+            marginBottom: compact ? 8 : 12,
+            paddingBottom: compact ? 8 : 10,
+            borderBottom: '1px solid var(--border)',
+          }}>
+            {parts.map((part, j) => {
+              const match = part.match(/\*\*(.+?):\*\*\s*(.*)/);
+              if (!match) return null;
+              const [, label, value] = match;
+              const color = label === 'Rating'
+                ? (value.toLowerCase().includes('buy') ? '#22c55e' : value.toLowerCase().includes('sell') ? '#ef4444' : '#f59e0b')
+                : 'var(--foreground)';
+              return (
+                <span key={j} style={{ fontSize: compact ? 12 : 13, whiteSpace: 'nowrap' }}>
+                  <span style={{ color: '#888', fontWeight: 500 }}>{label}: </span>
+                  <span style={{ color, fontWeight: 700 }}>{value}</span>
+                </span>
+              );
+            })}
+          </div>
+        );
+        continue;
+      }
+
+      // Section headers: **Thesis:**, **Key Points:**, **Estimates:**
+      if (/^\*\*(Thesis|Key Points|Estimates|Catalysts|Risks|Valuation):?\*\*/.test(line)) {
+        const match = line.match(/^\*\*(.+?):?\*\*\s*(.*)/);
+        if (match) {
+          const [, header, rest] = match;
+          if (header === 'Key Points' || header === 'Estimates') {
+            if (!compact) {
+              elements.push(
+                <div key={i} style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: '#888',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  marginTop: 10,
+                  marginBottom: 4,
+                }}>
+                  {header}
+                </div>
+              );
+            }
+          } else {
+            // Thesis - render inline
+            elements.push(
+              <p key={i} style={{
+                fontSize: compact ? 13 : 14,
+                lineHeight: 1.6,
+                color: 'var(--foreground)',
+                margin: compact ? '0 0 6px' : '0 0 8px',
+                fontStyle: 'italic',
+              }}>
+                {rest}
+              </p>
+            );
+          }
+          continue;
+        }
+      }
+
+      // Bullet points
+      if (line.startsWith('- ')) {
+        elements.push(
+          <div key={i} style={{
+            display: 'flex',
+            gap: 8,
+            fontSize: compact ? 12 : 13,
+            lineHeight: 1.5,
+            color: 'var(--foreground)',
+            marginBottom: 3,
+            paddingLeft: 2,
+          }}>
+            <span style={{ color: '#888', flexShrink: 0 }}>•</span>
+            <span>{line.substring(2)}</span>
+          </div>
+        );
+        continue;
+      }
+
+      // Regular text (fallback for bold inline)
+      const rendered = line.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+      if (rendered !== line) {
+        elements.push(
+          <p key={i} style={{ fontSize: compact ? 13 : 14, lineHeight: 1.6, margin: '0 0 6px' }}
+            dangerouslySetInnerHTML={{ __html: rendered }} />
+        );
+      } else {
+        elements.push(
+          <p key={i} style={{ fontSize: compact ? 13 : 14, lineHeight: 1.6, margin: '0 0 6px', color: 'var(--foreground)' }}>
+            {line}
+          </p>
+        );
+      }
+    }
+
+    return <>{elements}</>;
+  };
+
   // Highlight search term in text
   const highlightText = (text: string, search: string): React.ReactNode => {
     if (!search.trim()) return text;
@@ -646,7 +762,7 @@ export default function ResearchPortalPage() {
                       lineHeight: 1.6,
                       color: 'var(--foreground)',
                     }}>
-                      {highlightText(doc.ai_summary, searchTerm)}
+                      {renderSummary(doc.ai_summary, true)}
                     </div>
                   ) : (
                     <>
@@ -801,9 +917,8 @@ export default function ResearchPortalPage() {
                         fontSize: 14,
                         lineHeight: 1.7,
                         color: 'var(--foreground)',
-                        whiteSpace: 'pre-wrap',
                       }}>
-                        {doc.ai_summary}
+                        {renderSummary(doc.ai_summary, false)}
                       </div>
                     </div>
                   )}
