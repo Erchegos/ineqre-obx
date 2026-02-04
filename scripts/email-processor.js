@@ -216,14 +216,28 @@ async function generateAISummary(bodyText, subject) {
     return null;
   }
 
-  const prompt = `Analyze this financial research report and write a professional summary (2-3 paragraphs) covering:
+  const prompt = `Summarize this equity research report. Output ONLY the summary — no disclaimers, legal text, confidentiality notices, or boilerplate.
 
-- Investment thesis and recommendation
-- Key financial metrics, estimates, or valuation
-- Significant events, catalysts, or changes
-- Target price or rating if mentioned
+Format:
+**Rating:** [Buy/Hold/Sell] | **Target Price:** [price in currency] | **Share Price:** [current price]
 
-Write directly in a professional tone without meta-commentary.
+**Thesis:** [1-2 sentences on the core investment case]
+
+**Key Points:**
+- [Most important takeaway with specific numbers]
+- [Second key point — earnings, margins, guidance, etc.]
+- [Third key point — catalysts, risks, or sector dynamics]
+- [Additional points if material — max 6 bullets total]
+
+**Estimates:** [Key estimate changes if any — EPS, revenue, EBITDA revisions]
+
+Rules:
+- Include company name and ticker prominently
+- Keep all numbers, percentages, and financial metrics
+- Mention peer companies or sector names when relevant (helps search)
+- No legal disclaimers, confidentiality notices, or analyst disclosures
+- No "this report does not provide" or "please refer to" language
+- Be concise — entire output under 250 words
 
 Report: ${subject}
 
@@ -240,26 +254,18 @@ ${cleanedText.substring(0, 15000)}`;
       }]
     });
 
-    // Clean any residual prompt language
     let summary = message.content[0].text;
 
-    // Remove "Summary:" at the start
-    summary = summary.replace(/^Summary:\s*\n+/i, '');
+    // Remove any preamble the model might add
+    summary = summary.replace(/^(Here is|Below is|Summary of)[^:]*:\s*\n*/i, '');
 
-    // Remove prompt language
-    summary = summary.replace(/^Here is (a|the) (concise,?\s*)?(professional\s*)?summary[^:]*:\s*/i, '');
-    summary = summary.replace(/^Based on the (content|report)[^:]*:\s*/i, '');
+    // Strip any disclaimers/legal text that slipped through
+    summary = summary.split(/\n*(This (message|report|document) is confidential|Please refer to|Disclaimer|Legal Notice|Important (Notice|Disclosure))/i)[0];
 
-    // Remove section headers at start of lines
-    summary = summary.replace(/^(Main Investment Thesis\/Recommendation|Main Investment Thesis or Key Recommendation|Main Thesis and Recommendation|Main Thesis and Recommendations|Key Financial(s| Metrics)( and Estimates)?|Significant Events(, Catalysts,? or Changes)?|Target Price or Rating|Target Price\/Rating|Catalysts and Key Events|Key Points?|Important Financial (Metrics|Information)):\s*/gim, '');
+    // Clean up whitespace
+    summary = summary.replace(/\n{3,}/g, '\n\n').trim();
 
-    // Remove section headers in the middle of text
-    summary = summary.replace(/\n\s*(Main Investment Thesis\/Recommendation|Main Investment Thesis or Key Recommendation|Main Thesis and Recommendation|Main Thesis and Recommendations|Key Financial(s| Metrics)(,? and Estimates|, Estimates,? and Valuation)?|Significant Events(, Catalysts,? (or|and) Changes)?|Target Price or Rating|Target Price\/Rating|Catalysts and Key Events|Key Points?|Important Financial (Metrics|Information)):\s*/gim, '\n');
-
-    // Remove multiple consecutive newlines
-    summary = summary.replace(/\n{3,}/g, '\n\n');
-
-    return summary.trim();
+    return summary;
   } catch (error) {
     console.error(`  ❌ Claude API error: ${error.message}`);
     return null;
