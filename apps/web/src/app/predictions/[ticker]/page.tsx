@@ -187,7 +187,7 @@ export default function PredictionsPage() {
                 background: "var(--input-bg)",
               }}
             >
-              ALL STOCKS
+              BACKTEST ALL STOCKS
             </Link>
           </div>
         </div>
