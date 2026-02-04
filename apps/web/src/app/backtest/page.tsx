@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   AreaChart,
   Area,
@@ -125,6 +126,8 @@ const GLOSSARY = [
 ];
 
 export default function BacktestPage() {
+  const searchParams = useSearchParams();
+  const fromTicker = searchParams.get("from");
   const [run, setRun] = useState<BacktestRun | null>(null);
   const [monthly, setMonthly] = useState<MonthlyData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -286,7 +289,7 @@ export default function BacktestPage() {
             </div>
           </div>
           <Link
-            href="/"
+            href={fromTicker ? `/backtest/${fromTicker}` : "/"}
             style={{
               fontSize: 10,
               color: "var(--accent)",
@@ -299,7 +302,7 @@ export default function BacktestPage() {
               background: "var(--input-bg)",
             }}
           >
-            &larr; BACK
+            &larr; {fromTicker ? `BACK TO ${fromTicker}` : "BACK"}
           </Link>
         </div>
       </div>

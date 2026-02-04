@@ -321,7 +321,7 @@ export default function TickerBacktestPage() {
               &larr; BACK TO STOCK
             </Link>
             <Link
-              href="/backtest"
+              href={`/backtest?from=${ticker}`}
               style={{
                 fontSize: 10,
                 color: "var(--success)",
