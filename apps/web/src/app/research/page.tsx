@@ -122,12 +122,12 @@ export default function ResearchPortalPage() {
         continue;
       }
 
-      // Section headers: **Thesis:**, **Key Points:**, **Estimates:**
-      if (/^\*\*(Thesis|Key Points|Estimates|Catalysts|Risks|Valuation):?\*\*/.test(line)) {
+      // Section headers: **Thesis:**, **Key Points:**, **Estimates:**, **Price Target Changes:**, **Market:**
+      if (/^\*\*(Thesis|Key Points|Estimates|Catalysts|Risks|Valuation|Price Target Changes|Market):?\*\*/.test(line)) {
         const match = line.match(/^\*\*(.+?):?\*\*\s*(.*)/);
         if (match) {
           const [, header, rest] = match;
-          if (header === 'Key Points' || header === 'Estimates') {
+          if (header === 'Key Points' || header === 'Estimates' || header === 'Price Target Changes') {
             if (!compact) {
               elements.push(
                 <div key={i} style={{
@@ -163,6 +163,8 @@ export default function ResearchPortalPage() {
 
       // Bullet points
       if (line.startsWith('- ')) {
+        const bulletText = line.substring(2);
+        const bulletHtml = bulletText.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
         elements.push(
           <div key={i} style={{
             display: 'flex',
@@ -174,7 +176,7 @@ export default function ResearchPortalPage() {
             paddingLeft: 2,
           }}>
             <span style={{ color: '#888', flexShrink: 0 }}>•</span>
-            <span>{line.substring(2)}</span>
+            <span dangerouslySetInnerHTML={{ __html: bulletHtml }} />
           </div>
         );
         continue;
