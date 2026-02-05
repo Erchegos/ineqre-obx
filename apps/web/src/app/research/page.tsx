@@ -558,8 +558,10 @@ export default function ResearchPortalPage() {
     // Sort tickers longest-first to avoid AKER matching before AKERBP
     const sortedTickers = [...stocksList].sort((a, b) => b.ticker.length - a.ticker.length);
     // Build name entries sorted longest-first for subject matching
+    // Exclude bare ticker symbols — those are matched case-sensitively in the second pass
+    const tickerSet = new Set(stocksList.map(s => s.ticker.toUpperCase()));
     const nameEntries = Array.from(nameToTicker.entries())
-      .filter(([name]) => name.length >= 3)
+      .filter(([name]) => name.length >= 3 && !tickerSet.has(name))
       .sort((a, b) => b[0].length - a[0].length);
 
     for (const doc of documents) {
