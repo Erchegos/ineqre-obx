@@ -57,7 +57,7 @@ async function generateSummary(bodyText, subject) {
   if (!cleanedText || cleanedText.length < 100) return null;
 
   const isBorsXtra = /børsxtra|borsxtra/i.test(subject);
-  const isSectorUpdate = !isBorsXtra && /^(seafood|energy daily|fig weekly|morning comment|high yield|shipping daily)|price update|weekly market|market analysis/i.test(subject);
+  const isSectorUpdate = !isBorsXtra && /seafood|energy daily|fig weekly|morning comment|high yield|shipping daily|price update|weekly market|market analysis|oil\s*&\s*gas\s*-/i.test(subject);
 
   let prompt;
   if (isBorsXtra) {
