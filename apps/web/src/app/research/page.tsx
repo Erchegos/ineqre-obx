@@ -557,21 +557,37 @@ export default function ResearchPortalPage() {
     const meta = new Map<string, DocMeta>();
     // Sort tickers longest-first to avoid AKER matching before AKERBP
     const sortedTickers = [...stocksList].sort((a, b) => b.ticker.length - a.ticker.length);
+    // Build name entries sorted longest-first for subject matching
+    const nameEntries = Array.from(nameToTicker.entries())
+      .filter(([name]) => name.length >= 3)
+      .sort((a, b) => b[0].length - a[0].length);
 
     for (const doc of documents) {
-      const subjectUp = doc.subject.toUpperCase();
       const subjectLow = doc.subject.toLowerCase();
       const isBorsXtra = /børsxtra|borsxtra/i.test(subjectLow);
 
       // Extract ticker: use DB value if set, otherwise match from subject
       let ticker: string | null = doc.ticker;
       if (!ticker) {
-        for (const s of sortedTickers) {
-          const t = s.ticker.toUpperCase();
-          const re = new RegExp('\\b' + t.replace('.', '\\.') + '\\b');
-          if (re.test(subjectUp)) {
-            ticker = s.ticker;
+        // First pass: match company names case-insensitively (longer names first)
+        const subjectUp = doc.subject.toUpperCase();
+        for (const [name, t] of nameEntries) {
+          const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          if (new RegExp('\\b' + escaped + '\\b').test(subjectUp)) {
+            ticker = t;
             break;
+          }
+        }
+        // Second pass: match ticker symbols case-sensitively on original text
+        // (prevents common words like "next", "all" from matching tickers)
+        if (!ticker) {
+          for (const s of sortedTickers) {
+            const t = s.ticker.toUpperCase();
+            const re = new RegExp('\\b' + t.replace('.', '\\.') + '\\b');
+            if (re.test(doc.subject)) {
+              ticker = s.ticker;
+              break;
+            }
           }
         }
       }
