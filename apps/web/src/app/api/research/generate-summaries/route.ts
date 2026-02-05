@@ -58,15 +58,56 @@ async function generateSummary(
   subject: string
 ): Promise<string | null> {
   const cleanedText = cleanBodyText(bodyText);
+  if (!cleanedText || cleanedText.length < 100) return null;
 
-  const prompt = `Analyze this financial research report and write a professional summary (2-3 paragraphs) covering:
+  const isBorsXtra = /børsxtra|borsxtra/i.test(subject);
 
-- Investment thesis and recommendation
-- Key financial metrics, estimates, or valuation
-- Significant events, catalysts, or changes
-- Target price or rating if mentioned
+  const prompt = isBorsXtra
+    ? `Extract ALL broker rating and price target changes from this Norwegian market newsletter. Output ONLY the structured list below — no commentary, disclaimers, or boilerplate.
 
-Write directly in a professional tone without meta-commentary.
+Format — one line per company, then a brief market summary:
+
+**Price Target Changes:**
+- **[COMPANY]**: [Broker] [action] target to NOK [new] ([old]), [Buy/Hold/Sell]
+- **[COMPANY]**: [Broker] [action] target to NOK [new] ([old]), [Buy/Hold/Sell]
+[...continue for ALL companies mentioned with target/rating changes...]
+
+**Market:** [1-2 sentences on market open, oil price, key macro moves]
+
+Rules:
+- List EVERY company with a price target or rating change — do not skip any
+- Keep original NOK/USD amounts and old values in parentheses
+- Note upgrades/downgrades explicitly (e.g. "upgraded from Hold to Buy")
+- Use Norwegian broker short names: Pareto, DNB Carnegie, Arctic, SB1M, Clarksons, Fearnley, Nordea, SEB, Danske Bank, ABG
+- Company names in Norwegian style (e.g. Aker BP, Kongsberg Gruppen, Nordic Semiconductor)
+- No disclaimers or legal text
+
+Newsletter: ${subject}
+
+Content:
+${cleanedText.substring(0, 15000)}`
+    : `Summarize this equity research report. Output ONLY the summary — no disclaimers, legal text, confidentiality notices, or boilerplate.
+
+Format:
+**Rating:** [Buy/Hold/Sell] | **Target Price:** [price in currency] | **Share Price:** [current price]
+
+**Thesis:** [1-2 sentences on the core investment case]
+
+**Key Points:**
+- [Most important takeaway with specific numbers]
+- [Second key point — earnings, margins, guidance, etc.]
+- [Third key point — catalysts, risks, or sector dynamics]
+- [Additional points if material — max 6 bullets total]
+
+**Estimates:** [Key estimate changes if any — EPS, revenue, EBITDA revisions]
+
+Rules:
+- Include company name and ticker prominently
+- Keep all numbers, percentages, and financial metrics
+- Mention peer companies or sector names when relevant (helps search)
+- No legal disclaimers, confidentiality notices, or analyst disclosures
+- No "this report does not provide" or "please refer to" language
+- Be concise — entire output under 250 words
 
 Report: ${subject}
 
@@ -76,7 +117,7 @@ ${cleanedText.substring(0, 15000)}`;
   try {
     const message = await anthropic.messages.create({
       model: "claude-3-haiku-20240307",
-      max_tokens: 1024,
+      max_tokens: isBorsXtra ? 2048 : 1024,
       messages: [
         {
           role: "user",
@@ -91,24 +132,11 @@ ${cleanedText.substring(0, 15000)}`;
     }
     let summary = firstBlock.text;
 
-    // Remove prompt language
-    summary = summary.replace(/^Summary:\s*\n+/i, "");
-    summary = summary.replace(
-      /^Here is (a|the) (concise,?\s*)?(professional\s*)?summary[^:]*:\s*/i,
-      ""
-    );
-    summary = summary.replace(/^Based on the (content|report)[^:]*:\s*/i, "");
+    // Remove any preamble the model might add
+    summary = summary.replace(/^(Here is|Below is|Summary of)[^:]*:\s*\n*/i, "");
 
-    // Remove section headers
-    summary = summary.replace(
-      /^(Investment Thesis and Recommendation|Main Investment Thesis\/Recommendation|Main Investment Thesis or Key Recommendation|Main Thesis and Recommendation|Main Thesis and Recommendations|Key Financial(s| Metrics)( and Estimates)?|Significant Events(, Catalysts,? or Changes)?|Target Price or Rating|Target Price\/Rating|Catalysts and Key Events|Key Points?|Important Financial (Metrics|Information)):\s*/gim,
-      ""
-    );
-
-    summary = summary.replace(
-      /\n\s*(Investment Thesis and Recommendation|Main Investment Thesis\/Recommendation|Main Investment Thesis or Key Recommendation|Main Thesis and Recommendation|Main Thesis and Recommendations|Key Financial(s| Metrics)(,? and Estimates|, Estimates,? and Valuation)?|Significant Events(, Catalysts,? (or|and) Changes)?|Target Price or Rating|Target Price\/Rating|Catalysts and Key Events|Key Points?|Important Financial (Metrics|Information)):\s*/gim,
-      "\n"
-    );
+    // Strip any disclaimers/legal text that slipped through
+    summary = summary.split(/\n*(This (message|report|document) is confidential|Please refer to|Disclaimer|Legal Notice|Important (Notice|Disclosure))/i)[0];
 
     summary = summary.replace(/\n{3,}/g, "\n\n");
 
