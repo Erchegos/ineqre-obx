@@ -59,7 +59,7 @@ export default function HomePage() {
             letterSpacing: "0.1em",
             textTransform: "uppercase"
           }}>
-            InEqRe / v2.0 / Oslo Børs
+            InEqRe / v2.1 / Oslo Børs
           </div>
           <h1 style={{
             fontSize: 42,
@@ -73,7 +73,7 @@ export default function HomePage() {
           </h1>
           <p style={{ fontSize: 15, color: "var(--muted-foreground)", lineHeight: 1.7, maxWidth: 720 }}>
             A quantitative equity research platform for Oslo Børs.
-            Automated research aggregation with AI summarization, volatility modeling, Monte Carlo simulation, and correlation analysis.
+            Automated research aggregation with AI summarization, machine learning price predictions, factor-based backtesting, volatility modeling, and correlation analysis.
           </p>
         </header>
 
@@ -159,6 +159,12 @@ export default function HomePage() {
             <Capability title="Time Series Analysis">
               Log-return decomposition, autocorrelation function (ACF) diagnostics, monthly seasonality patterns with bar chart visualization. Rolling 30-day volatility correlation with OBX market index for co-movement analysis.
             </Capability>
+            <Capability title="ML Price Predictions">
+              Ridge regression models trained on 17 predictive factors across momentum, mean reversion, volatility, and market regime categories. Walk-forward validation with expanding training windows. Daily signal generation (-1 to +1) with probability-weighted directional forecasts. Python ML service with scikit-learn integration.
+            </Capability>
+            <Capability title="Factor Backtesting">
+              Historical strategy backtesting with configurable signal thresholds and holding periods. Performance attribution by factor category (momentum, mean reversion, volatility). Cumulative return charts, hit rate analysis, and Sharpe ratio calculation. Per-ticker drill-down with trade-level detail.
+            </Capability>
             <Capability title="Data Infrastructure">
               PostgreSQL 17 with Drizzle ORM and type-safe schema definitions. Real-time OHLCV ingestion via Interactive Brokers TWS API with 160K+ daily data points. Supabase storage for PDF attachments (year/month/document_id structure) and connection pooling for serverless edge deployment.
             </Capability>
@@ -211,7 +217,7 @@ export default function HomePage() {
           fontFamily: "monospace"
         }}>
           <p style={{ marginBottom: 8, lineHeight: 1.6 }}>
-            <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Tech Stack:</strong> Next.js 16 · TypeScript · PostgreSQL · Drizzle ORM · Interactive Brokers API · ImapFlow
+            <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Tech Stack:</strong> Next.js 16 · TypeScript · PostgreSQL · Drizzle ORM · Python · scikit-learn · Interactive Brokers API · Anthropic Claude API
           </p>
           <p style={{ lineHeight: 1.6 }}>
             <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Architecture:</strong> Server-side compute · Connection pooling · Transaction pooler (Supabase) · JWT authentication · Local file storage · Vercel edge deployment

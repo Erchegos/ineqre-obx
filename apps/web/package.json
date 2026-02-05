@@ -10,12 +10,14 @@
     "typecheck": "tsc --noEmit",
     "ibkr:resolve": "tsx scripts/ibkr-resolve-contracts.ts",
     "ibkr:backfill": "tsx scripts/ibkr-historical-backfill.ts",
-    "ibkr:update": "tsx scripts/ibkr-daily-update.ts",
+    "ibkr:update": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/ibkr-daily-update.ts",
     "ml:pipeline": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/ml-daily-pipeline.ts",
     "ml:pipeline:dry": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/ml-daily-pipeline.ts --dry-run",
     "ml:factors": "tsx scripts/calculate-factors-batch.ts",
     "ml:beta": "tsx scripts/backfill-beta-ivol.ts",
-    "ml:predict": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/regenerate-predictions.ts"
+    "ml:predict": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/regenerate-predictions.ts",
+    "ibkr:scan-universe": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/scan-ose-universe.ts",
+    "import:new-tickers": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/import-new-tickers.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
