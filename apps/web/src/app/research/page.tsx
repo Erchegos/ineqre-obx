@@ -167,9 +167,10 @@ export default function ResearchPortalPage() {
       const ptMatch = line.match(/^- \*\*(.+?)\*\*:\s*(.+)/);
       if (ptMatch && /target|kursmål|reiterat|downgrad|upgrad|initiat|cut|adjust|øker|kutter/i.test(ptMatch[2])) {
         const [, company, details] = ptMatch;
-        // Extract rating from end if present (handle plural "Buys"/"Holds"/"Sells")
-        const ratingPart = details.match(/(Buys?|Holds?|Sells?|Kjøp|Nøytral|Selg)\s*$/i);
-        const ratingRaw = ratingPart ? ratingPart[1] : null;
+        // Extract rating: check end of line first, then "downgraded/upgraded to X" pattern
+        const ratingEnd = details.match(/(Buys?|Holds?|Sells?|Kjøp|Nøytral|Selg)\s*$/i);
+        const ratingMid = !ratingEnd ? details.match(/(?:downgrad|upgrad|initiat)\w*\s+(?:from\s+\w+\s+)?to\s+(Buy|Hold|Sell|Kjøp|Nøytral|Selg)/i) : null;
+        const ratingRaw = ratingEnd ? ratingEnd[1] : ratingMid ? ratingMid[1] : null;
         // Normalize plural to singular
         const ratingText = ratingRaw ? ratingRaw.replace(/s$/i, '') : null;
         const ratingColor = ratingText && /buy|kjøp/i.test(ratingText) ? '#22c55e'
