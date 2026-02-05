@@ -31,12 +31,29 @@ export default function PredictionsPage() {
 
   const [prediction, setPrediction] = useState<Prediction | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dataComplete, setDataComplete] = useState(true);
 
   useEffect(() => {
     if (!ticker) return;
 
     const fetchOrGenerate = async () => {
       try {
+        // First check if this ticker has complete factor data
+        const tickersRes = await fetch("/api/factors/tickers", {
+          method: "GET",
+          headers: { accept: "application/json" },
+          cache: "no-store",
+        });
+
+        if (tickersRes.ok) {
+          const tickersData = await tickersRes.json();
+          if (tickersData.success && !tickersData.tickers?.includes(ticker)) {
+            setDataComplete(false);
+            setLoading(false);
+            return;
+          }
+        }
+
         // Try to fetch existing prediction
         const response = await fetch(`/api/predictions/${ticker}`);
         if (response.ok) {
@@ -170,12 +187,66 @@ export default function PredictionsPage() {
                 background: "var(--input-bg)",
               }}
             >
-              ALL STOCKS
+              BACKTEST ALL STOCKS
             </Link>
           </div>
         </div>
       </div>
 
+      {/* Incomplete data guard */}
+      {!loading && !dataComplete && (
+        <div
+          style={{
+            padding: 32,
+            borderRadius: 2,
+            border: "1px solid var(--warning)",
+            background: "var(--warning-bg)",
+            textAlign: "center",
+            marginBottom: 16,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              marginBottom: 12,
+              color: "var(--warning)",
+              fontFamily: "monospace",
+            }}
+          >
+            INCOMPLETE FACTOR DATA
+          </div>
+          <div style={{ fontSize: 12, color: "var(--muted)", fontFamily: "monospace", lineHeight: 1.8, maxWidth: 600, margin: "0 auto" }}>
+            <div style={{ marginBottom: 8 }}>
+              {ticker} is missing key factors required for the 19-factor prediction model
+              (beta, IVOL, fundamentals, or NOK volume).
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              ML predictions are restricted to stocks with complete data to ensure accuracy.
+            </div>
+            <Link
+              href={`/stocks/${ticker}`}
+              style={{
+                display: "inline-block",
+                fontSize: 11,
+                color: "var(--accent)",
+                textDecoration: "none",
+                fontFamily: "monospace",
+                fontWeight: 600,
+                padding: "8px 16px",
+                border: "1px solid var(--accent)",
+                borderRadius: 2,
+                background: "var(--input-bg)",
+              }}
+            >
+              ← BACK TO {ticker}
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {dataComplete && (
+        <>
       {/* Two Column Layout */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
         {/* Left Column: Prediction */}
@@ -200,7 +271,7 @@ export default function PredictionsPage() {
       </div>
 
       {/* Bottom Info Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
         {/* Methodology */}
         <div
           style={{
@@ -245,6 +316,58 @@ export default function PredictionsPage() {
           </div>
         </div>
 
+        {/* Academic References */}
+        <div
+          style={{
+            padding: 12,
+            borderRadius: 2,
+            border: "1px solid var(--terminal-border)",
+            background: "var(--terminal-bg)",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              marginBottom: 10,
+              color: "var(--foreground)",
+              fontFamily: "monospace",
+            }}
+          >
+            ACADEMIC REFERENCES
+          </div>
+          <div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "monospace", lineHeight: 1.6 }}>
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ color: "var(--foreground)", fontWeight: 600, marginBottom: 2 }}>
+                Gu, Kelly & Xiu (2020)
+              </div>
+              <div style={{ fontStyle: "italic", marginBottom: 2 }}>
+                "Empirical Asset Pricing via Machine Learning"
+              </div>
+              <div style={{ fontSize: 8 }}>
+                Review of Financial Studies, 33(5), 2223-2273
+              </div>
+              <div style={{ fontSize: 8, color: "var(--accent)", marginTop: 2 }}>
+                → 19-factor specification, ML ensemble methodology
+              </div>
+            </div>
+            <div>
+              <div style={{ color: "var(--foreground)", fontWeight: 600, marginBottom: 2 }}>
+                Medhat & Schmeling (2021)
+              </div>
+              <div style={{ fontStyle: "italic", marginBottom: 2 }}>
+                "Short-term Momentum"
+              </div>
+              <div style={{ fontSize: 8 }}>
+                Review of Financial Studies, 35(3), 1480-1526
+              </div>
+              <div style={{ fontSize: 8, color: "var(--accent)", marginTop: 2 }}>
+                → Turnover interactions, size-conditional effects
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Risk Disclaimer */}
         <div
           style={{
@@ -281,6 +404,8 @@ export default function PredictionsPage() {
           </div>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }

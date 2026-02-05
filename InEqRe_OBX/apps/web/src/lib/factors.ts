@@ -384,8 +384,8 @@ export async function insertTechnicalFactors(
           vol3m = EXCLUDED.vol3m,
           vol12m = EXCLUDED.vol12m,
           maxret = EXCLUDED.maxret,
-          beta = EXCLUDED.beta,
-          ivol = EXCLUDED.ivol,
+          beta = COALESCE(EXCLUDED.beta, factor_technical.beta),
+          ivol = COALESCE(EXCLUDED.ivol, factor_technical.ivol),
           dum_jan = EXCLUDED.dum_jan
         `,
         [

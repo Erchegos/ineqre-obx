@@ -305,7 +305,7 @@ export default function TickerBacktestPage() {
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <Link
-              href={`/stocks/${ticker}`}
+              href={`/predictions/${ticker}`}
               style={{
                 fontSize: 10,
                 color: "var(--accent)",
@@ -318,10 +318,10 @@ export default function TickerBacktestPage() {
                 background: "var(--input-bg)",
               }}
             >
-              &larr; BACK TO STOCK
+              &larr; BACK TO PREDICTIONS
             </Link>
             <Link
-              href="/backtest"
+              href={`/backtest?from=${ticker}`}
               style={{
                 fontSize: 10,
                 color: "var(--success)",

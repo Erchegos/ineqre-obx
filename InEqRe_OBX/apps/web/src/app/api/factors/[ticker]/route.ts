@@ -32,7 +32,7 @@ export async function GET(
 
     // Validate ticker
     const ticker = rawTicker.toUpperCase().trim();
-    if (!/^[A-Z0-9]{1,10}$/.test(ticker)) {
+    if (!/^[A-Z0-9.]{1,10}$/.test(ticker)) {
       return NextResponse.json(
         { error: "Invalid ticker format" },
         { status: 400 }

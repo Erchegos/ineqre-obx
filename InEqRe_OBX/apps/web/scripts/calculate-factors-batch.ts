@@ -145,8 +145,10 @@ async function calculateFactorsForTicker(
         continue;
       }
 
-      // Calculate beta/IVOL only every 5 days to save time
-      const shouldCalculateBeta = i % BETA_CALC_INTERVAL === 0;
+      // Calculate beta/IVOL every 5 days to save time, but ALWAYS on the last 5 dates
+      // so the most recent factor row always has beta/ivol populated
+      const isRecentDate = i >= prices.length - 5;
+      const shouldCalculateBeta = isRecentDate || i % BETA_CALC_INTERVAL === 0;
 
       const factorData = await calculateTechnicalFactorsForDate(
         ticker,
@@ -289,7 +291,10 @@ async function main() {
     console.log(`Completed at: ${new Date().toISOString()}`);
     console.log('='.repeat(80));
 
-    process.exit(results.failed > 0 ? 1 : 0);
+    // Only fail if ALL stocks failed or majority failed (individual failures
+    // are expected for stocks with insufficient data)
+    const failRate = results.failed / stocks.length;
+    process.exit(failRate > 0.5 ? 1 : 0);
   } catch (error: any) {
     console.error('\n✗ Fatal error:', error.message);
     console.error(error.stack);

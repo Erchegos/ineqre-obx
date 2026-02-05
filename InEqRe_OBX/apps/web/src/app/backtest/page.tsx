@@ -285,22 +285,41 @@ export default function BacktestPage() {
               {run.n_months} MONTHS &bull; {run.n_total_predictions.toLocaleString()} PREDICTIONS &bull; WALK-FORWARD OUT-OF-SAMPLE
             </div>
           </div>
-          <Link
-            href="/"
-            style={{
-              fontSize: 10,
-              color: "var(--accent)",
-              textDecoration: "none",
-              fontFamily: "monospace",
-              fontWeight: 600,
-              padding: "6px 12px",
-              border: "1px solid var(--accent)",
-              borderRadius: 2,
-              background: "var(--input-bg)",
-            }}
-          >
-            &larr; BACK TO STOCKS
-          </Link>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => window.history.back()}
+              style={{
+                fontSize: 10,
+                color: "var(--accent)",
+                textDecoration: "none",
+                fontFamily: "monospace",
+                fontWeight: 600,
+                padding: "6px 12px",
+                border: "1px solid var(--accent)",
+                borderRadius: 2,
+                background: "var(--input-bg)",
+                cursor: "pointer",
+              }}
+            >
+              &larr; BACK TO STOCK BACKTEST
+            </button>
+            <Link
+              href="/"
+              style={{
+                fontSize: 10,
+                color: "var(--muted)",
+                textDecoration: "none",
+                fontFamily: "monospace",
+                fontWeight: 600,
+                padding: "6px 12px",
+                border: "1px solid var(--border)",
+                borderRadius: 2,
+                background: "var(--input-bg)",
+              }}
+            >
+              HOME
+            </Link>
+          </div>
         </div>
       </div>
 
