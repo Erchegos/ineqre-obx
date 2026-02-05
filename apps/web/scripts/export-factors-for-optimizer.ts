@@ -151,27 +151,34 @@ async function exportTickerFactors(ticker: string, outputDir: string): Promise<n
   const csvLines = [headers.join(",")];
 
   for (const row of result.rows) {
+    // Helper to safely format numeric values (PostgreSQL may return strings)
+    const fmt = (val: any, decimals: number = 6): string => {
+      if (val === null || val === undefined) return "";
+      const num = typeof val === "string" ? parseFloat(val) : val;
+      return isNaN(num) ? "" : num.toFixed(decimals);
+    };
+
     const values = [
       row.date,
-      row.actual_return?.toFixed(6) ?? "",
-      row.mom1m?.toFixed(6) ?? "",
-      row.mom6m?.toFixed(6) ?? "",
-      row.mom11m?.toFixed(6) ?? "",
-      row.mom36m?.toFixed(6) ?? "",
-      row.chgmom?.toFixed(6) ?? "",
-      row.vol1m?.toFixed(6) ?? "",
-      row.vol3m?.toFixed(6) ?? "",
-      row.vol12m?.toFixed(6) ?? "",
-      row.maxret?.toFixed(6) ?? "",
-      row.beta?.toFixed(6) ?? "",
-      row.ivol?.toFixed(6) ?? "",
-      row.bm?.toFixed(6) ?? "",
-      row.ep?.toFixed(6) ?? "",
-      row.dy?.toFixed(6) ?? "",
-      row.sp?.toFixed(6) ?? "",
-      row.sg?.toFixed(6) ?? "",
-      row.mktcap?.toFixed(2) ?? "",
-      row.nokvol?.toFixed(2) ?? "",
+      fmt(row.actual_return, 6),
+      fmt(row.mom1m, 6),
+      fmt(row.mom6m, 6),
+      fmt(row.mom11m, 6),
+      fmt(row.mom36m, 6),
+      fmt(row.chgmom, 6),
+      fmt(row.vol1m, 6),
+      fmt(row.vol3m, 6),
+      fmt(row.vol12m, 6),
+      fmt(row.maxret, 6),
+      fmt(row.beta, 6),
+      fmt(row.ivol, 6),
+      fmt(row.bm, 6),
+      fmt(row.ep, 6),
+      fmt(row.dy, 6),
+      fmt(row.sp, 6),
+      fmt(row.sg, 6),
+      fmt(row.mktcap, 2),
+      fmt(row.nokvol, 2),
       row.dum_jan?.toString() ?? "0"
     ];
     csvLines.push(values.join(","));
