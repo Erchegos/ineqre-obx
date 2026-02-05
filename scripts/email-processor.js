@@ -216,11 +216,13 @@ async function generateAISummary(bodyText, subject) {
     return null;
   }
 
-  // Use a special prompt for BørsXtra market digests (many price target changes per email)
+  // Detect report type for prompt selection
   const isBorsXtra = /børsxtra|borsxtra/i.test(subject);
+  const isSectorUpdate = !isBorsXtra && /^(seafood|energy daily|fig weekly|morning comment|high yield|shipping daily)|price update|weekly market|market analysis/i.test(subject);
 
-  const prompt = isBorsXtra
-    ? `Extract ALL broker rating and price target changes from this Norwegian market newsletter. Output ONLY the structured list below — no commentary, disclaimers, or boilerplate.
+  let prompt;
+  if (isBorsXtra) {
+    prompt = `Extract ALL broker rating and price target changes from this Norwegian market newsletter. Output ONLY the structured list below — no commentary, disclaimers, or boilerplate.
 
 Format — one line per company, then a brief market summary:
 
@@ -242,8 +244,31 @@ Rules:
 Newsletter: ${subject}
 
 Content:
-${cleanedText.substring(0, 15000)}`
-    : `Summarize this equity research report. Output ONLY the summary — no disclaimers, legal text, confidentiality notices, or boilerplate.
+${cleanedText.substring(0, 15000)}`;
+  } else if (isSectorUpdate) {
+    prompt = `Summarize this market/sector update. Output ONLY the summary — no disclaimers, legal text, or boilerplate.
+
+Format:
+**Key Takeaway:** [1-2 sentences on the most important insight]
+
+**Key Points:**
+- [Most important data point or development]
+- [Second key point]
+- [Additional points if material — max 5 bullets total]
+
+Rules:
+- Focus on market data, prices, trends, and sector dynamics
+- Keep all numbers, percentages, and financial metrics
+- Do NOT include Rating, Target Price, or Share Price headers
+- No legal disclaimers or boilerplate
+- Be concise — entire output under 200 words
+
+Report: ${subject}
+
+Content:
+${cleanedText.substring(0, 15000)}`;
+  } else {
+    prompt = `Summarize this equity research report. Output ONLY the summary — no disclaimers, legal text, confidentiality notices, or boilerplate.
 
 Format:
 **Rating:** [Buy/Hold/Sell] | **Target Price:** [price in currency] | **Share Price:** [current price]
@@ -270,6 +295,7 @@ Report: ${subject}
 
 Content:
 ${cleanedText.substring(0, 15000)}`;
+  }
 
   try {
     const message = await anthropic.messages.create({

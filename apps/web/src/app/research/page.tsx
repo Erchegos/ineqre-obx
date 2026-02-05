@@ -123,8 +123,8 @@ export default function ResearchPortalPage() {
         continue;
       }
 
-      // Section headers: **Thesis:**, **Key Points:**, **Estimates:**, **Price Target Changes:**, **Market:**
-      if (/^\*\*(Thesis|Key Points|Estimates|Catalysts|Risks|Valuation|Price Target Changes|Market):?\*\*/.test(line)) {
+      // Section headers: **Thesis:**, **Key Points:**, **Estimates:**, **Price Target Changes:**, **Market:**, **Key Takeaway:**
+      if (/^\*\*(Thesis|Key Takeaway|Key Points|Estimates|Catalysts|Risks|Valuation|Price Target Changes|Market):?\*\*/.test(line)) {
         const match = line.match(/^\*\*(.+?):?\*\*\s*(.*)/);
         if (match) {
           const [, header, rest] = match;
@@ -637,7 +637,7 @@ export default function ResearchPortalPage() {
       let category: DocMeta['category'] = null;
       if (/morning comment|daily|high yield daily|shipping daily/.test(subjectLow)) {
         category = 'morning';
-      } else if (/oil\s*&?\s*gas|shipping|energy|sector|macro|borsxtra|børsxtra/.test(subjectLow)) {
+      } else if (/oil\s*&?\s*gas|shipping|energy|sector|macro|borsxtra|børsxtra|seafood|fig weekly/.test(subjectLow)) {
         category = 'sector';
       } else if (/update|newsflash|quarterly|preview|review|initiated|upgrade|downgrade|reiterat/.test(subjectLow)) {
         category = 'company';
