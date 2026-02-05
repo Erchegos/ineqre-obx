@@ -16,6 +16,7 @@ import {
   ReferenceLine,
   Cell,
 } from "recharts";
+import ModelModeToggle from "@/components/ModelModeToggle";
 
 type Prediction = {
   prediction_date: string;
@@ -44,6 +45,36 @@ type Summary = {
   avg_quintile: number;
   avg_confidence: number;
   size_regime: string;
+};
+
+type OptimizerData = {
+  hasOptimized: boolean;
+  config?: {
+    factors: string[];
+    gb_weight: number;
+    rf_weight: number;
+    n_factors: number;
+    optimization_method: string;
+    optimized_at: string;
+  };
+  performance?: {
+    optimized: {
+      hit_rate: number;
+      mae: number;
+      r2: number;
+      ic: number;
+      sharpe: number;
+    };
+    default_baseline: {
+      hit_rate: number;
+      mae: number;
+      r2: number;
+    };
+    improvement: {
+      hit_rate_delta: number;
+      mae_delta: number;
+    };
+  };
 };
 
 const cardStyle = {
@@ -77,12 +108,12 @@ const subLabelStyle = {
 
 const tooltipStyle = {
   background: "var(--terminal-bg)",
-  border: "1px solid var(--terminal-border)",
-  borderRadius: 2,
-  fontSize: 10,
+  border: "1px solid var(--accent)",
+  borderRadius: 4,
+  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+  fontSize: 11,
   fontFamily: "monospace",
-  padding: "6px 8px",
-  color: "var(--foreground)",
+  padding: "8px 12px",
 };
 
 const chartCardStyle = {
@@ -124,6 +155,21 @@ export default function TickerBacktestPage() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<"default" | "optimized">("default");
+  const [optimizerData, setOptimizerData] = useState<OptimizerData | null>(null);
+
+  // Fetch optimizer config on mount
+  useEffect(() => {
+    if (!ticker) return;
+    fetch(`/api/optimizer-config/${ticker}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success) {
+          setOptimizerData(data);
+        }
+      })
+      .catch(() => {});
+  }, [ticker]);
 
   useEffect(() => {
     if (!ticker) return;
@@ -144,6 +190,9 @@ export default function TickerBacktestPage() {
     }
     fetchData();
   }, [ticker]);
+
+  const hasOptimized = optimizerData?.hasOptimized ?? false;
+  const optPerf = optimizerData?.performance;
 
   if (loading) {
     return (
@@ -214,7 +263,8 @@ export default function TickerBacktestPage() {
     return val.slice(2, 7);
   };
 
-  const hitColor =
+  // Color helpers for default mode
+  const defaultHitColor =
     summary.hit_rate > 0.55
       ? "var(--success)"
       : summary.hit_rate > 0.5
@@ -227,6 +277,10 @@ export default function TickerBacktestPage() {
       : summary.avg_quintile > 2.8
         ? "var(--foreground)"
         : "var(--danger)";
+
+  // Optimized mode: use optimizer's precomputed metrics
+  const optHitRate = optPerf?.optimized.hit_rate ?? 0;
+  const optHitColor = optHitRate > 55 ? "var(--success)" : optHitRate > 50 ? "var(--warning)" : "var(--danger)";
 
   return (
     <div
@@ -252,7 +306,7 @@ export default function TickerBacktestPage() {
           style={{
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "center",
+            alignItems: "flex-start",
           }}
         >
           <div>
@@ -260,13 +314,13 @@ export default function TickerBacktestPage() {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 16,
-                marginBottom: 4,
+                gap: 12,
+                marginBottom: 8,
               }}
             >
               <h1
                 style={{
-                  fontSize: 20,
+                  fontSize: 18,
                   fontWeight: 700,
                   color: "var(--foreground)",
                   fontFamily: "monospace",
@@ -281,7 +335,7 @@ export default function TickerBacktestPage() {
                     fontSize: 11,
                     fontWeight: 700,
                     fontFamily: "monospace",
-                    padding: "2px 8px",
+                    padding: "3px 10px",
                     background: "var(--accent)",
                     color: "#ffffff",
                     borderRadius: 2,
@@ -292,15 +346,23 @@ export default function TickerBacktestPage() {
                 </span>
               )}
             </div>
-            <div
-              style={{
-                fontSize: 10,
-                color: "var(--muted)",
-                fontFamily: "monospace",
-              }}
-            >
-              {summary.n_predictions} REALIZED PREDICTIONS &bull;{" "}
-              {summary.n_total} TOTAL &bull; WALK-FORWARD OUT-OF-SAMPLE
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <ModelModeToggle
+                mode={mode}
+                onChange={setMode}
+                hasOptimized={hasOptimized}
+              />
+              <div
+                style={{
+                  fontSize: 10,
+                  color: "var(--muted)",
+                  fontFamily: "monospace",
+                }}
+              >
+                {mode === "optimized" && optPerf
+                  ? `OPTIMIZER WALK-FORWARD • ${optPerf.optimized.hit_rate.toFixed(1)}% HIT RATE • ${optimizerData?.config?.n_factors} FACTORS`
+                  : `${summary.n_predictions} REALIZED PREDICTIONS • ${summary.n_total} TOTAL • WALK-FORWARD OUT-OF-SAMPLE`}
+              </div>
             </div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
@@ -340,65 +402,163 @@ export default function TickerBacktestPage() {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          gap: 8,
-          marginBottom: 16,
-        }}
-      >
-        <div style={{ ...cardStyle, borderColor: hitColor, borderWidth: 2 }}>
-          <div style={labelStyle}>HIT RATE</div>
-          <div style={{ ...valueStyle, color: hitColor }}>
-            {(summary.hit_rate * 100).toFixed(1)}%
-          </div>
-          <div style={subLabelStyle}>DIRECTION ACCURACY</div>
-        </div>
+      {/* Summary Cards - switches between default and optimized */}
+      {mode === "optimized" && optPerf ? (
+        <>
+          {/* Optimized mode: 5 cards with optimizer's precomputed metrics */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(5, 1fr)",
+              gap: 8,
+              marginBottom: 8,
+            }}
+          >
+            <div style={{ ...cardStyle, borderColor: optHitColor, borderWidth: 2 }}>
+              <div style={labelStyle}>HIT RATE</div>
+              <div style={{ ...valueStyle, color: optHitColor }}>
+                {optPerf.optimized.hit_rate.toFixed(1)}%
+              </div>
+              <div style={subLabelStyle}>DIRECTION ACCURACY</div>
+            </div>
 
+            <div style={{ ...cardStyle, borderColor: "var(--info)", borderWidth: 2 }}>
+              <div style={labelStyle}>MAE</div>
+              <div style={{ ...valueStyle, color: "var(--info)" }}>
+                {optPerf.optimized.mae.toFixed(2)}%
+              </div>
+              <div style={subLabelStyle}>MEAN ABSOLUTE ERROR</div>
+            </div>
+
+            <div style={{ ...cardStyle, borderColor: optPerf.optimized.r2 > 0 ? "var(--success)" : "var(--muted)", borderWidth: 2 }}>
+              <div style={labelStyle}>R²</div>
+              <div style={{ ...valueStyle, color: optPerf.optimized.r2 > 0 ? "var(--success)" : "var(--muted)" }}>
+                {optPerf.optimized.r2.toFixed(3)}
+              </div>
+              <div style={subLabelStyle}>EXPLAINED VARIANCE</div>
+            </div>
+
+            <div style={{ ...cardStyle, borderColor: "#8b5cf6", borderWidth: 2 }}>
+              <div style={labelStyle}>IC</div>
+              <div style={{ ...valueStyle, color: "#8b5cf6" }}>
+                {optPerf.optimized.ic.toFixed(3)}
+              </div>
+              <div style={subLabelStyle}>INFORMATION COEFF</div>
+            </div>
+
+            <div style={{ ...cardStyle, borderColor: optPerf.optimized.sharpe > 1 ? "var(--success)" : "var(--warning)", borderWidth: 2 }}>
+              <div style={labelStyle}>SHARPE</div>
+              <div style={{ ...valueStyle, color: optPerf.optimized.sharpe > 1 ? "var(--success)" : "var(--warning)" }}>
+                {optPerf.optimized.sharpe.toFixed(2)}
+              </div>
+              <div style={subLabelStyle}>RISK-ADJ RETURN</div>
+            </div>
+          </div>
+
+          {/* Improvement comparison banner */}
+          <div
+            style={{
+              marginBottom: 16,
+              padding: "8px 12px",
+              background: "rgba(245, 158, 11, 0.1)",
+              border: "1px solid #f59e0b",
+              borderRadius: 2,
+              fontFamily: "monospace",
+              fontSize: 10,
+              display: "flex",
+              alignItems: "center",
+              gap: 24,
+            }}
+          >
+            <span style={{ color: "#f59e0b", fontWeight: 700 }}>
+              IMPROVEMENT vs DEFAULT:
+            </span>
+            <span>
+              <span style={{ color: "var(--foreground)", fontWeight: 600 }}>Hit Rate</span>{" "}
+              <span style={{ color: optPerf.improvement.hit_rate_delta > 0 ? "var(--success)" : "var(--danger)" }}>
+                {optPerf.improvement.hit_rate_delta > 0 ? "+" : ""}
+                {optPerf.improvement.hit_rate_delta.toFixed(1)}pp
+              </span>
+              <span style={{ color: "var(--muted)", marginLeft: 4 }}>
+                ({optPerf.default_baseline.hit_rate.toFixed(1)}% → {optPerf.optimized.hit_rate.toFixed(1)}%)
+              </span>
+            </span>
+            <span>
+              <span style={{ color: "var(--foreground)", fontWeight: 600 }}>MAE</span>{" "}
+              <span style={{ color: optPerf.improvement.mae_delta > 0 ? "var(--success)" : "var(--danger)" }}>
+                {optPerf.improvement.mae_delta > 0 ? "-" : "+"}
+                {Math.abs(optPerf.improvement.mae_delta).toFixed(2)}%
+              </span>
+            </span>
+            <span>
+              <span style={{ color: "var(--foreground)", fontWeight: 600 }}>R²</span>{" "}
+              <span style={{ color: "var(--success)" }}>
+                +{(optPerf.optimized.r2 - optPerf.default_baseline.r2).toFixed(3)}
+              </span>
+            </span>
+          </div>
+        </>
+      ) : (
+        /* Default mode: original 4 cards */
         <div
           style={{
-            ...cardStyle,
-            borderColor: "var(--info)",
-            borderWidth: 2,
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: 8,
+            marginBottom: 16,
           }}
         >
-          <div style={labelStyle}>MAE</div>
-          <div style={{ ...valueStyle, color: "var(--info)" }}>
-            {(summary.mae * 100).toFixed(2)}%
+          <div style={{ ...cardStyle, borderColor: defaultHitColor, borderWidth: 2 }}>
+            <div style={labelStyle}>HIT RATE</div>
+            <div style={{ ...valueStyle, color: defaultHitColor }}>
+              {(summary.hit_rate * 100).toFixed(1)}%
+            </div>
+            <div style={subLabelStyle}>DIRECTION ACCURACY</div>
           </div>
-          <div style={subLabelStyle}>MEAN ABSOLUTE ERROR</div>
-        </div>
 
-        <div
-          style={{
-            ...cardStyle,
-            borderColor: quintileColor,
-            borderWidth: 2,
-          }}
-        >
-          <div style={labelStyle}>AVG QUINTILE</div>
-          <div style={{ ...valueStyle, color: quintileColor }}>
-            {summary.avg_quintile.toFixed(1)}
+          <div
+            style={{
+              ...cardStyle,
+              borderColor: "var(--info)",
+              borderWidth: 2,
+            }}
+          >
+            <div style={labelStyle}>MAE</div>
+            <div style={{ ...valueStyle, color: "var(--info)" }}>
+              {(summary.mae * 100).toFixed(2)}%
+            </div>
+            <div style={subLabelStyle}>MEAN ABSOLUTE ERROR</div>
           </div>
-          <div style={subLabelStyle}>PREDICTED RANK (1-5)</div>
-        </div>
 
-        <div
-          style={{
-            ...cardStyle,
-            borderColor: "var(--accent)",
-            borderWidth: 2,
-          }}
-        >
-          <div style={labelStyle}>CONFIDENCE</div>
-          <div style={{ ...valueStyle, color: "var(--accent)" }}>
-            {(summary.avg_confidence * 100).toFixed(0)}%
+          <div
+            style={{
+              ...cardStyle,
+              borderColor: quintileColor,
+              borderWidth: 2,
+            }}
+          >
+            <div style={labelStyle}>AVG QUINTILE</div>
+            <div style={{ ...valueStyle, color: quintileColor }}>
+              {summary.avg_quintile.toFixed(1)}
+            </div>
+            <div style={subLabelStyle}>PREDICTED RANK (1-5)</div>
           </div>
-          <div style={subLabelStyle}>AVG MODEL CONFIDENCE</div>
+
+          <div
+            style={{
+              ...cardStyle,
+              borderColor: "var(--accent)",
+              borderWidth: 2,
+            }}
+          >
+            <div style={labelStyle}>CONFIDENCE</div>
+            <div style={{ ...valueStyle, color: "var(--accent)" }}>
+              {(summary.avg_confidence * 100).toFixed(0)}%
+            </div>
+            <div style={subLabelStyle}>AVG MODEL CONFIDENCE</div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Charts */}
       <div
@@ -446,10 +606,10 @@ export default function TickerBacktestPage() {
               <Tooltip
                 contentStyle={tooltipStyle}
                 formatter={(value: any, name?: string) => [
-                  `${Number(value).toFixed(2)}%`,
-                  name === "predicted" ? "Predicted" : "Actual",
+                  <span key="val" style={{ color: "#10b981" }}>{Number(value).toFixed(2)}%</span>,
+                  <span key="label" style={{ color: "var(--foreground)" }}>{name === "predicted" ? "Predicted" : "Actual"}</span>,
                 ]}
-                labelFormatter={(label: string) => label}
+                labelFormatter={(label: string) => <span style={{ color: "var(--foreground)", fontWeight: 600 }}>{label}</span>}
               />
               <Bar dataKey="predicted" fill="#3b82f6" opacity={0.7} radius={[1, 1, 0, 0]} />
               <Bar dataKey="actual" radius={[1, 1, 0, 0]}>
@@ -521,10 +681,10 @@ export default function TickerBacktestPage() {
               <Tooltip
                 contentStyle={tooltipStyle}
                 formatter={(value: any) => [
-                  `${Number(value).toFixed(1)}%`,
-                  "Cumulative",
+                  <span key="val" style={{ color: "#10b981" }}>{Number(value).toFixed(1)}%</span>,
+                  <span key="label" style={{ color: "var(--foreground)" }}>Cumulative</span>,
                 ]}
-                labelFormatter={(label: string) => label}
+                labelFormatter={(label: string) => <span style={{ color: "var(--foreground)", fontWeight: 600 }}>{label}</span>}
               />
               <Line
                 type="monotone"

@@ -169,19 +169,18 @@ export default function FeatureImportance({ featureImportance, title }: Props) {
             <Tooltip
               contentStyle={{
                 background: "var(--terminal-bg)",
-                border: "1px solid var(--border)",
-                borderRadius: 2,
-                fontSize: 10,
+                border: "1px solid var(--accent)",
+                borderRadius: 4,
+                fontSize: 11,
                 fontFamily: "monospace",
-                padding: "6px 8px",
-                color: "var(--foreground)",
+                padding: "8px 12px",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
               }}
-              labelStyle={{ color: "var(--foreground)", fontWeight: 600 }}
-              itemStyle={{ color: "var(--foreground)" }}
               formatter={(value: any, name: any, props: any) => [
-                `${value.toFixed(2)}%`,
-                props.payload.category,
+                <span key="val" style={{ color: "#10b981" }}>{value.toFixed(2)}%</span>,
+                <span key="label" style={{ color: "var(--foreground)" }}>{props.payload.category}</span>,
               ]}
+              labelFormatter={(label) => <span style={{ color: "var(--foreground)", fontWeight: 600 }}>{label}</span>}
             />
             <Bar dataKey="importance" radius={[0, 2, 2, 0]}>
               {data.map((entry, index) => (

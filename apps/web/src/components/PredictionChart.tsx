@@ -29,10 +29,18 @@ type Prediction = {
   };
   feature_importance: Record<string, number>;
   confidence_score: number;
+  methodology?: {
+    model_version: string;
+    ensemble_weights?: { gb: number; rf: number };
+    is_optimized?: boolean;
+    n_factors?: number;
+    selected_factors?: string[];
+  };
 };
 
 type Props = {
   ticker: string;
+  mode?: "default" | "optimized";
 };
 
 function formatPercent(value: number): string {
@@ -47,7 +55,7 @@ function formatDate(dateStr: string): string {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
-export default function PredictionChart({ ticker }: Props) {
+export default function PredictionChart({ ticker, mode = "default" }: Props) {
   const [prediction, setPrediction] = useState<Prediction | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +69,7 @@ export default function PredictionChart({ ticker }: Props) {
       const response = await fetch("/api/predictions/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticker }),
+        body: JSON.stringify({ ticker, mode }),
       });
 
       if (!response.ok) {
@@ -87,7 +95,8 @@ export default function PredictionChart({ ticker }: Props) {
 
       try {
         // Try to fetch existing prediction
-        const response = await fetch(`/api/predictions/${ticker}`);
+        const modeParam = mode === "optimized" ? "?mode=optimized" : "";
+        const response = await fetch(`/api/predictions/${ticker}${modeParam}`);
 
         if (response.ok) {
           const result = await response.json();
@@ -102,7 +111,7 @@ export default function PredictionChart({ ticker }: Props) {
         const genResponse = await fetch("/api/predictions/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ticker }),
+          body: JSON.stringify({ ticker, mode }),
         });
 
         if (genResponse.ok) {
@@ -123,7 +132,7 @@ export default function PredictionChart({ ticker }: Props) {
     }
 
     fetchOrGenerate();
-  }, [ticker]);
+  }, [ticker, mode]);
 
   if (loading) {
     return (
@@ -302,12 +311,11 @@ export default function PredictionChart({ ticker }: Props) {
           <div
             style={{
               padding: 10,
-              background: ensemblePct >= 0 ? "var(--success-bg)" : "var(--danger-bg)",
-              border: `2px solid ${ensemblePct >= 0 ? "var(--success)" : "var(--danger)"}`,
+              background: ensemblePct >= 0 ? "#10b981" : "#ef4444",
               borderRadius: 2,
             }}
           >
-            <div style={{ fontSize: 9, color: "var(--muted)", marginBottom: 2, fontFamily: "monospace", fontWeight: 600 }}>
+            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.8)", marginBottom: 2, fontFamily: "monospace", fontWeight: 600 }}>
               PREDICTION
             </div>
             <div
@@ -315,14 +323,14 @@ export default function PredictionChart({ ticker }: Props) {
                 fontSize: 22,
                 fontWeight: 700,
                 fontFamily: "monospace",
-                color: ensemblePct >= 0 ? "var(--success)" : "var(--danger)",
+                color: "#ffffff",
                 letterSpacing: "-0.5px",
               }}
             >
               {ensemblePct >= 0 ? "+" : ""}
               {ensemblePct.toFixed(2)}%
             </div>
-            <div style={{ fontSize: 8, color: "var(--muted)", marginTop: 2, fontFamily: "monospace", fontWeight: 600 }}>
+            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.7)", marginTop: 2, fontFamily: "monospace", fontWeight: 600 }}>
               ENSEMBLE
             </div>
           </div>
@@ -331,18 +339,18 @@ export default function PredictionChart({ ticker }: Props) {
           <div
             style={{
               padding: 10,
-              background: "var(--card-bg)",
-              border: "1px solid var(--border)",
+              background: "var(--terminal-bg)",
+              border: "1px solid var(--terminal-border)",
               borderRadius: 2,
             }}
           >
             <div style={{ fontSize: 9, color: "var(--muted)", marginBottom: 2, fontFamily: "monospace", fontWeight: 600 }}>
               90% CI
             </div>
-            <div style={{ fontSize: 14, fontWeight: 600, fontFamily: "monospace", color: "var(--foreground)" }}>
+            <div style={{ fontSize: 14, fontWeight: 600, fontFamily: "monospace", color: p05 >= 0 ? "#10b981" : "#ef4444" }}>
               {p05 >= 0 ? "+" : ""}{p05.toFixed(1)}%
             </div>
-            <div style={{ fontSize: 14, fontWeight: 600, fontFamily: "monospace", color: "var(--foreground)" }}>
+            <div style={{ fontSize: 14, fontWeight: 600, fontFamily: "monospace", color: p95 >= 0 ? "#10b981" : "#ef4444" }}>
               {p95 >= 0 ? "+" : ""}{p95.toFixed(1)}%
             </div>
           </div>
@@ -351,18 +359,17 @@ export default function PredictionChart({ ticker }: Props) {
           <div
             style={{
               padding: 10,
-              background: "var(--warning-bg)",
-              border: "2px solid var(--warning)",
+              background: "#f59e0b",
               borderRadius: 2,
             }}
           >
-            <div style={{ fontSize: 9, color: "var(--muted)", marginBottom: 2, fontFamily: "monospace", fontWeight: 600 }}>
+            <div style={{ fontSize: 9, color: "rgba(0,0,0,0.7)", marginBottom: 2, fontFamily: "monospace", fontWeight: 600 }}>
               UNCERTAINTY
             </div>
-            <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "monospace", color: "var(--warning)" }}>
+            <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "monospace", color: "#000000" }}>
               ±{range90.toFixed(1)}%
             </div>
-            <div style={{ fontSize: 8, color: "var(--muted)", marginTop: 2, fontFamily: "monospace", fontWeight: 600 }}>
+            <div style={{ fontSize: 8, color: "rgba(0,0,0,0.6)", marginTop: 2, fontFamily: "monospace", fontWeight: 600 }}>
               90% RANGE
             </div>
           </div>
@@ -371,18 +378,17 @@ export default function PredictionChart({ ticker }: Props) {
           <div
             style={{
               padding: 10,
-              background: "var(--info-bg)",
-              border: "2px solid var(--info)",
+              background: "#06b6d4",
               borderRadius: 2,
             }}
           >
-            <div style={{ fontSize: 9, color: "var(--muted)", marginBottom: 2, fontFamily: "monospace", fontWeight: 600 }}>
+            <div style={{ fontSize: 9, color: "rgba(0,0,0,0.7)", marginBottom: 2, fontFamily: "monospace", fontWeight: 600 }}>
               CONFIDENCE
             </div>
-            <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "monospace", color: "var(--info)" }}>
+            <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "monospace", color: "#000000" }}>
               {(prediction.confidence_score * 100).toFixed(1)}%
             </div>
-            <div style={{ fontSize: 8, color: "var(--muted)", marginTop: 2, fontFamily: "monospace", fontWeight: 600 }}>
+            <div style={{ fontSize: 8, color: "rgba(0,0,0,0.6)", marginTop: 2, fontFamily: "monospace", fontWeight: 600 }}>
               SCORE
             </div>
           </div>
@@ -419,16 +425,20 @@ export default function PredictionChart({ ticker }: Props) {
               <Tooltip
                 contentStyle={{
                   background: "var(--terminal-bg)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 2,
-                  fontSize: 10,
+                  border: "1px solid var(--accent)",
+                  borderRadius: 4,
+                  fontSize: 11,
                   fontFamily: "monospace",
-                  padding: "6px 8px",
-                  color: "var(--foreground)",
+                  padding: "8px 12px",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
                 }}
                 labelStyle={{ color: "var(--foreground)", fontWeight: 600 }}
-                itemStyle={{ color: "var(--foreground)" }}
-                formatter={(value: any) => [`${value.toFixed(2)}%`, "Return"]}
+                itemStyle={{ color: "#10b981", fontWeight: 600 }}
+                formatter={(value: any) => [
+                  <span key="val" style={{ color: "#10b981" }}>{value.toFixed(2)}%</span>,
+                  <span key="label" style={{ color: "var(--foreground)" }}>Return</span>
+                ]}
+                labelFormatter={(label) => <span style={{ color: "var(--foreground)", fontWeight: 600 }}>{label}</span>}
               />
               <ReferenceLine y={0} stroke="var(--foreground)" strokeWidth={1} strokeOpacity={0.3} />
               <Bar dataKey="value" radius={[2, 2, 0, 0]}>
@@ -457,13 +467,13 @@ export default function PredictionChart({ ticker }: Props) {
               MODEL COMPONENTS
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-              <span style={{ fontSize: 10, color: "var(--muted)", fontFamily: "monospace" }}>GB (60%)</span>
+              <span style={{ fontSize: 10, color: "var(--muted)", fontFamily: "monospace" }}>GB ({Math.round((prediction.methodology?.ensemble_weights?.gb ?? 0.6) * 100)}%)</span>
               <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "monospace", color: getColor(prediction.gb_prediction * 100) }}>
                 {formatPercent(prediction.gb_prediction)}
               </span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 10, color: "var(--muted)", fontFamily: "monospace" }}>RF (40%)</span>
+              <span style={{ fontSize: 10, color: "var(--muted)", fontFamily: "monospace" }}>RF ({Math.round((prediction.methodology?.ensemble_weights?.rf ?? 0.4) * 100)}%)</span>
               <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "monospace", color: getColor(prediction.rf_prediction * 100) }}>
                 {formatPercent(prediction.rf_prediction)}
               </span>
