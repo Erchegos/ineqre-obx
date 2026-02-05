@@ -165,18 +165,20 @@ export default function ResearchPortalPage() {
 
       // BørsXtra-style price target bullet: - **Company**: Broker action target to NOK X (Y), Rating
       const ptMatch = line.match(/^- \*\*(.+?)\*\*:\s*(.+)/);
-      if (ptMatch && /target|kursmål|reiterat|downgrad|upgrad|initiat|cut|øker|kutter/i.test(ptMatch[2])) {
+      if (ptMatch && /target|kursmål|reiterat|downgrad|upgrad|initiat|cut|adjust|øker|kutter/i.test(ptMatch[2])) {
         const [, company, details] = ptMatch;
-        // Extract rating from end if present
-        const ratingPart = details.match(/(Buy|Hold|Sell|Kjøp|Nøytral|Selg)\s*$/i);
-        const ratingText = ratingPart ? ratingPart[1] : null;
+        // Extract rating from end if present (handle plural "Buys"/"Holds"/"Sells")
+        const ratingPart = details.match(/(Buys?|Holds?|Sells?|Kjøp|Nøytral|Selg)\s*$/i);
+        const ratingRaw = ratingPart ? ratingPart[1] : null;
+        // Normalize plural to singular
+        const ratingText = ratingRaw ? ratingRaw.replace(/s$/i, '') : null;
         const ratingColor = ratingText && /buy|kjøp/i.test(ratingText) ? '#22c55e'
           : ratingText && /sell|selg/i.test(ratingText) ? '#ef4444'
           : ratingText ? '#f59e0b' : null;
         // Extract broker name (first word(s) before action verb)
-        const brokerMatch = details.match(/^([\w\s]+?)\s+(downgrad|upgrad|increas|cut|reiterat|initiat|øker|kutter|gjentar|set)/i);
+        const brokerMatch = details.match(/^([\w\s]+?)\s+(downgrad|upgrad|increas|cut|adjust|reiterat|initiat|øker|kutter|gjentar|set)/i);
         const broker = brokerMatch ? brokerMatch[1].trim() : null;
-        const action = broker ? details.substring(broker.length).replace(/,\s*(Buy|Hold|Sell|Kjøp|Nøytral|Selg)\s*$/i, '').trim() : details.replace(/,\s*(Buy|Hold|Sell|Kjøp|Nøytral|Selg)\s*$/i, '').trim();
+        const action = broker ? details.substring(broker.length).replace(/,\s*(Buys?|Holds?|Sells?|Kjøp|Nøytral|Selg)\s*$/i, '').trim() : details.replace(/,\s*(Buys?|Holds?|Sells?|Kjøp|Nøytral|Selg)\s*$/i, '').trim();
 
         elements.push(
           <div key={i} style={{
