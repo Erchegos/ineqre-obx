@@ -634,12 +634,15 @@ export default function ResearchPortalPage() {
       }
 
       // Classify category from subject
+      // Order: morning dailies → company-specific → sector/macro → generic "update"
       let category: DocMeta['category'] = null;
-      if (/morning comment|daily|high yield daily|shipping daily/.test(subjectLow)) {
+      if (/morning comment|high yield daily|high yield weekly|shipping daily|energy daily/.test(subjectLow)) {
         category = 'morning';
-      } else if (/oil\s*&?\s*gas|shipping|energy|sector|macro|borsxtra|børsxtra|seafood|fig weekly/.test(subjectLow)) {
+      } else if (/newsflash|quarterly|preview|review|initiated|upgrade|downgrade|reiterat/.test(subjectLow)) {
+        category = 'company';
+      } else if (/oil\s*&?\s*gas\s*-|børsxtra|borsxtra|seafood price|seafood weekly|fig weekly|weekly market|market analysis/.test(subjectLow)) {
         category = 'sector';
-      } else if (/update|newsflash|quarterly|preview|review|initiated|upgrade|downgrade|reiterat/.test(subjectLow)) {
+      } else if (/update/.test(subjectLow)) {
         category = 'company';
       }
 
