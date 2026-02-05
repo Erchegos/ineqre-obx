@@ -50,7 +50,13 @@ const TICKER_TO_YAHOO: Record<string, string> = {
   VAR: 'VAR.OL', VEI: 'VEI.OL', VEND: 'VEND.OL', WAWI: 'WAWI.OL',
   WWI: 'WWI.OL', WWIB: 'WWIB.OL', YAR: 'YAR.OL',
 
+  // New tickers (2026-02-05)
+  DNO: 'DNO.OL', BNOR: 'BNOR.OL', ELO: 'ELO.OL', EPR: 'EPR.OL',
+  GIGA: 'GIGA.OL', HSHP: 'HSHP.OL', LINK: 'LINK.OL', PEN: 'PEN.OL',
+  PLSV: 'PLSV.OL',
+
   // US-listed / dual-listed
+  NORCO: 'NCLH',
   'BORR.US': 'BORR', 'BWLP.US': 'BWLP', 'ECO.US': 'ECO',
   'EQNR.US': 'EQNR', 'FLNG.US': 'FLNG', 'FRO.US': 'FRO',
   'HAFN.US': 'HAFN',

@@ -113,6 +113,18 @@ const STOCKS = {
   'WWIB': 'WWIB.OL',
   'YAR': 'YAR.OL',
 
+  // --- New tickers (2026-02-05) ---
+  'DNO': 'DNO.OL',
+  'BNOR': 'BNOR.OL',
+  'ELO': 'ELO.OL',
+  'EPR': 'EPR.OL',
+  'GIGA': 'GIGA.OL',
+  'HSHP': 'HSHP.OL',
+  'LINK': 'LINK.OL',
+  'NORCO': 'NCLH',
+  'PEN': 'PEN.OL',
+  'PLSV': 'PLSV.OL',
+
   // --- Dual-Listed US Stocks ---
   'BORR.US': 'BORR',
   'BWLP.US': 'BWLP',

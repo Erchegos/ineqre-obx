@@ -59,7 +59,7 @@ export default function HomePage() {
             letterSpacing: "0.1em",
             textTransform: "uppercase"
           }}>
-            InEqRe / v2.1 / Oslo Børs
+            Ola Slettebak / InEqRe v2.1 / Oslo Børs
           </div>
           <h1 style={{
             fontSize: 42,
@@ -165,9 +165,6 @@ export default function HomePage() {
             <Capability title="Factor Backtesting">
               Historical strategy backtesting with configurable signal thresholds and holding periods. Performance attribution by factor category (momentum, mean reversion, volatility). Cumulative return charts, hit rate analysis, and Sharpe ratio calculation. Per-ticker drill-down with trade-level detail.
             </Capability>
-            <Capability title="Data Infrastructure">
-              PostgreSQL 17 with Drizzle ORM and type-safe schema definitions. Real-time OHLCV ingestion via Interactive Brokers TWS API with 160K+ daily data points. Supabase storage for PDF attachments (year/month/document_id structure) and connection pooling for serverless edge deployment.
-            </Capability>
           </div>
         </section>
 
@@ -217,10 +214,13 @@ export default function HomePage() {
           fontFamily: "monospace"
         }}>
           <p style={{ marginBottom: 8, lineHeight: 1.6 }}>
-            <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Tech Stack:</strong> Next.js 16 · TypeScript · PostgreSQL · Drizzle ORM · Python · scikit-learn · Interactive Brokers API · Anthropic Claude API
+            <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Tech Stack:</strong> Next.js 16 · TypeScript · PostgreSQL 17 · Drizzle ORM · Python · scikit-learn · Interactive Brokers TWS API · Anthropic Claude API
+          </p>
+          <p style={{ marginBottom: 8, lineHeight: 1.6 }}>
+            <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Architecture:</strong> Server-side compute · Connection pooling · Transaction pooler (Supabase) · JWT authentication · Vercel edge deployment
           </p>
           <p style={{ lineHeight: 1.6 }}>
-            <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Architecture:</strong> Server-side compute · Connection pooling · Transaction pooler (Supabase) · JWT authentication · Local file storage · Vercel edge deployment
+            <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Data:</strong> Real-time OHLCV ingestion via IBKR · 160K+ daily data points · Supabase storage for PDF attachments
           </p>
         </footer>
 
