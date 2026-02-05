@@ -1,0 +1,73 @@
+{
+  "ticker": "DNB",
+  "optimized_at": "2026-02-05T19:17:57.077304",
+  "optimization_method": "optuna_bayesian",
+  "config": {
+    "factors": [
+      "mom1m",
+      "maxret",
+      "beta",
+      "vol12m",
+      "vol3m",
+      "ivol"
+    ],
+    "gb_weight": 0.4,
+    "rf_weight": 0.6,
+    "gb_params": {
+      "n_estimators": 200,
+      "max_depth": 7,
+      "learning_rate": 0.0687692105262956,
+      "subsample": 0.9,
+      "min_samples_leaf": 40
+    },
+    "rf_params": {
+      "n_estimators": 150,
+      "max_depth": 11,
+      "min_samples_leaf": 10,
+      "max_features": "log2"
+    }
+  },
+  "performance": {
+    "optimized": {
+      "hit_rate": 68.15286624203821,
+      "mae": 5.024003315512105,
+      "r2": 0.05216078507082933,
+      "avg_quintile": 3.107843137254902,
+      "ic": 0.15530361761112388,
+      "sharpe": 1.4296313117009476
+    },
+    "default_baseline": {
+      "hit_rate": 62.42038216560509,
+      "mae": 5.129223536734789,
+      "r2": -0.029473891144647046,
+      "avg_quintile": 3.0588235294117645
+    },
+    "improvement": {
+      "hit_rate_delta": 5.732484076433124,
+      "mae_delta": 0.10522022122268382
+    }
+  },
+  "factor_changes": {
+    "dropped": [
+      "mom6m",
+      "mom11m",
+      "mom36m",
+      "chgmom",
+      "vol1m",
+      "bm",
+      "ep",
+      "dy",
+      "sp",
+      "sg",
+      "mktcap",
+      "nokvol",
+      "dum_jan"
+    ],
+    "added": [],
+    "n_factors": 6
+  },
+  "metadata": {
+    "n_predictions": 157,
+    "training_periods": 0
+  }
+}

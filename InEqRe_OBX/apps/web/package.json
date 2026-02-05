@@ -17,7 +17,10 @@
     "ml:beta": "tsx scripts/backfill-beta-ivol.ts",
     "ml:predict": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/regenerate-predictions.ts",
     "ibkr:scan-universe": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/scan-ose-universe.ts",
-    "import:new-tickers": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/import-new-tickers.ts"
+    "import:new-tickers": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/import-new-tickers.ts",
+    "daily-update": "bash scripts/daily-update.sh",
+    "daily-update:yahoo": "bash scripts/daily-update.sh --yahoo",
+    "daily-update:ibkr": "bash scripts/daily-update.sh --ibkr"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

@@ -2,6 +2,7 @@
  * POST /api/predictions/generate
  *
  * Generates 1-month forward return predictions using the 19-factor model.
+ * Supports both default and optimizer-tuned modes.
  *
  * ═══════════════════════════════════════════════════════════════════════════════
  * ACADEMIC REFERENCES
@@ -25,6 +26,7 @@
  * - Size regime classification
  * - Regime-conditional ensemble weights
  * - 60% GB + 40% RF ensemble (base weights)
+ * - Optional per-ticker optimized factor subset + ensemble weights
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -33,14 +35,17 @@ import {
   RawFactors,
   fetchCrossSectionalStats,
   enhanceFactors,
+  computeEnhancedPrediction,
   computeEnsemblePrediction,
   computeFeatureImportance,
   computePercentiles,
   computeConfidence,
   getRegimeWeightAdjustments,
-  FACTOR_WEIGHTS_GB,
-  FACTOR_WEIGHTS_RF,
 } from "@/lib/factorAdvanced";
+import {
+  loadOptimizerConfig,
+  getOptimizedFactorWeights,
+} from "@/lib/optimizerConfig";
 
 export const dynamic = "force-dynamic";
 
@@ -102,13 +107,29 @@ async function fetchRawFactors(ticker: string): Promise<RawFactors | null> {
 
 export async function POST(req: NextRequest) {
   try {
-    const { ticker } = await req.json();
+    const body = await req.json();
+    const { ticker, mode } = body;
 
     if (!ticker) {
       return NextResponse.json({ error: "Ticker is required" }, { status: 400 });
     }
 
     const tickerUpper = ticker.toUpperCase().trim();
+    const isOptimized = mode === "optimized";
+
+    // Load optimizer config if optimized mode requested
+    let optimizerConfig = null;
+    let optimizedWeights = null;
+    if (isOptimized) {
+      optimizerConfig = loadOptimizerConfig(tickerUpper);
+      if (!optimizerConfig) {
+        return NextResponse.json(
+          { error: `No optimized config for ${tickerUpper}` },
+          { status: 404 }
+        );
+      }
+      optimizedWeights = getOptimizedFactorWeights(optimizerConfig);
+    }
 
     // 1. Fetch raw factors
     const rawFactors = await fetchRawFactors(tickerUpper);
@@ -126,22 +147,56 @@ export async function POST(req: NextRequest) {
     // 3. Enhance factors with z-scores, interactions, and regimes
     const enhancedFactors = enhanceFactors(rawFactors, crossSectional);
 
-    // 4. Compute ensemble prediction with regime-adjusted weights
-    const baseEnsemble = computeEnsemblePrediction(enhancedFactors);
+    let gbPred: number;
+    let rfPred: number;
+    let adjustedEnsemble: number;
+    let gbWeight: number;
+    let rfWeight: number;
+    let gbContributions: Record<string, number>;
+    let rfContributions: Record<string, number>;
+    let modelVersion: string;
 
-    // 5. Get regime-specific weight adjustments
-    const { gbWeight, rfWeight } = getRegimeWeightAdjustments(
-      enhancedFactors.sizeRegime,
-      enhancedFactors.turnoverRegime
-    );
+    if (isOptimized && optimizedWeights && optimizerConfig) {
+      // ── Optimized path: use filtered factor weights + optimizer ensemble ──
+      const gbResult = computeEnhancedPrediction(
+        enhancedFactors,
+        optimizedWeights.gbWeights
+      );
+      const rfResult = computeEnhancedPrediction(
+        enhancedFactors,
+        optimizedWeights.rfWeights
+      );
 
-    // Recalculate ensemble with adjusted weights
-    const adjustedEnsemble = baseEnsemble.gb * gbWeight + baseEnsemble.rf * rfWeight;
+      gbPred = gbResult.prediction;
+      rfPred = rfResult.prediction;
+      gbWeight = optimizerConfig.config.gb_weight;
+      rfWeight = optimizerConfig.config.rf_weight;
+      adjustedEnsemble = gbPred * gbWeight + rfPred * rfWeight;
+      gbContributions = gbResult.contributions;
+      rfContributions = rfResult.contributions;
+      modelVersion = "v2.1_optimized";
+    } else {
+      // ── Default path: full 19-factor model ──
+      const baseEnsemble = computeEnsemblePrediction(enhancedFactors);
+      const regimeWeights = getRegimeWeightAdjustments(
+        enhancedFactors.sizeRegime,
+        enhancedFactors.turnoverRegime
+      );
+
+      gbPred = baseEnsemble.gb;
+      rfPred = baseEnsemble.rf;
+      gbWeight = regimeWeights.gbWeight;
+      rfWeight = regimeWeights.rfWeight;
+      adjustedEnsemble = gbPred * gbWeight + rfPred * rfWeight;
+      gbContributions = baseEnsemble.contributions.gb;
+      rfContributions = baseEnsemble.contributions.rf;
+      modelVersion = "v2.0_19factor_enhanced";
+    }
 
     // 6. Compute feature importance
     const featureImportance = computeFeatureImportance(
-      baseEnsemble.contributions.gb,
-      baseEnsemble.contributions.rf
+      gbContributions,
+      rfContributions
     );
 
     // 7. Compute percentiles with regime-adjusted volatility
@@ -155,8 +210,8 @@ export async function POST(req: NextRequest) {
     // 8. Compute confidence score
     const confidenceScore = computeConfidence(
       enhancedFactors,
-      baseEnsemble.gb,
-      baseEnsemble.rf
+      gbPred,
+      rfPred
     );
 
     // 9. Build prediction object
@@ -170,19 +225,25 @@ export async function POST(req: NextRequest) {
       prediction_date: predictionDate,
       target_date: targetDateStr,
       ensemble_prediction: adjustedEnsemble,
-      gb_prediction: baseEnsemble.gb,
-      rf_prediction: baseEnsemble.rf,
+      gb_prediction: gbPred,
+      rf_prediction: rfPred,
       percentiles,
       feature_importance: featureImportance,
       confidence_score: confidenceScore,
-      // Enhanced metadata
       methodology: {
-        model_version: "v2.0_19factor_enhanced",
+        model_version: modelVersion,
         uses_interaction_terms: enhancedFactors.mom1m_x_nokvol !== null,
         uses_zscore_standardization: true,
         size_regime: enhancedFactors.sizeRegime,
         turnover_regime: enhancedFactors.turnoverRegime,
         ensemble_weights: { gb: gbWeight, rf: rfWeight },
+        is_optimized: isOptimized,
+        n_factors: isOptimized && optimizerConfig
+          ? optimizerConfig.config.factors.length
+          : 19,
+        selected_factors: isOptimized && optimizerConfig
+          ? optimizerConfig.config.factors
+          : undefined,
       },
       factors_summary: {
         mom1m_z: enhancedFactors.mom1m_z,
@@ -228,7 +289,7 @@ export async function POST(req: NextRequest) {
       prediction.percentiles.p95,
       JSON.stringify(prediction.feature_importance),
       prediction.confidence_score,
-      "v2.0_19factor_enhanced",
+      modelVersion,
     ]);
 
     return NextResponse.json({

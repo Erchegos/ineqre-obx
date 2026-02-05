@@ -11,6 +11,10 @@ export async function GET(
     const { ticker: rawTicker } = await params;
     const ticker = rawTicker.toUpperCase().trim();
 
+    const mode = req.nextUrl.searchParams.get("mode");
+    const modelVersion =
+      mode === "optimized" ? "v2.1_optimized" : "v2.0_19factor_enhanced";
+
     const query = `
       SELECT
         ticker,
@@ -26,12 +30,12 @@ export async function GET(
         created_at
       FROM ml_predictions
       WHERE ticker = $1
-        AND model_version = 'v2.0_19factor_enhanced'
+        AND model_version = $2
       ORDER BY prediction_date DESC
       LIMIT 10
     `;
 
-    const result = await pool.query(query, [ticker]);
+    const result = await pool.query(query, [ticker, modelVersion]);
 
     // Transform to match component expectations
     const predictions = result.rows.map((row) => ({
