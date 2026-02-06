@@ -406,10 +406,24 @@ async function processEmail(message, imap) {
             .replace(/=3D/gi, '=');  // Decode equals signs only
         }
 
-        // Method 2: Direct research.paretosec.com link
+        // Method 2: Direct research.paretosec.com link (try both encoded and decoded)
         if (!reportUrl) {
-          const directMatch = rawEmail.match(/href=["']([^"']*research\.paretosec\.com[^"']*)["']/i);
-          if (directMatch) reportUrl = directMatch[1];
+          const directMatch = rawEmail.match(/href=3D["']([^"']*research\.paretosec\.com[^"']*)["']/i);
+          if (directMatch) {
+            reportUrl = directMatch[1]
+              .replace(/=\r?\n/g, '')
+              .replace(/=3D/gi, '=');
+          }
+        }
+
+        // Method 3: Any parp.hosting.factset.com link (backup pattern)
+        if (!reportUrl) {
+          const parpMatch = rawEmail.match(/href=3D["']([^"']*parp\.hosting[^"']*)["']/i);
+          if (parpMatch) {
+            reportUrl = parpMatch[1]
+              .replace(/=\r?\n/g, '')
+              .replace(/=3D/gi, '=');
+          }
         }
 
         // Find actual HTML content - look for <!DOCTYPE or <html or <table (Pareto emails)
