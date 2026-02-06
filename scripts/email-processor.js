@@ -218,7 +218,7 @@ async function generateAISummary(bodyText, subject) {
 
   // Detect report type for prompt selection
   const isBorsXtra = /børsxtra|borsxtra/i.test(subject);
-  const isSectorUpdate = !isBorsXtra && /seafood|energy daily|fig weekly|morning comment|high yield|shipping daily|price update|weekly market|market analysis|oil\s*&\s*gas\s*-/i.test(subject);
+  const isSectorUpdate = !isBorsXtra && /seafood|energy daily|fig weekly|morning comment|high yield|shipping daily|price update|weekly market|market analysis|oil\s*&\s*gas\s*-|real estate weekly/i.test(subject);
 
   let prompt;
   if (isBorsXtra) {
@@ -399,11 +399,11 @@ async function processEmail(message, imap) {
         // Method 1: FactSet hosting link (quoted-printable encoded)
         const factsetMatch = rawEmail.match(/href=3D["']([^"']*parp\.hosting\.factset\.com[^"']*)["']/i);
         if (factsetMatch) {
-          // Decode the quoted-printable URL
+          // Decode the quoted-printable URL - only decode =3D and soft breaks
+          // Do NOT apply generic hex decoding as it corrupts URL parameters
           reportUrl = factsetMatch[1]
             .replace(/=\r?\n/g, '')  // Remove soft line breaks
-            .replace(/=3D/gi, '=')
-            .replace(/=([0-9A-F]{2})/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16)));
+            .replace(/=3D/gi, '=');  // Decode equals signs only
         }
 
         // Method 2: Direct research.paretosec.com link

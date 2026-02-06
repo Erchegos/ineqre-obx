@@ -29,11 +29,10 @@ const CONFIG = {
 function extractPdfUrlFromHtml(html) {
   if (!html) return null;
 
-  // Decode quoted-printable encoding
+  // Decode quoted-printable encoding for searching, but be careful with URLs
   const decoded = html
     .replace(/=\r?\n/g, '')  // Remove soft line breaks
-    .replace(/=3D/gi, '=')
-    .replace(/=([0-9A-F]{2})/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16)));
+    .replace(/=3D/gi, '=');  // Decode equals signs only - do NOT decode other hex sequences
 
   // Try multiple patterns for PDF links
   const patterns = [
@@ -52,12 +51,9 @@ function extractPdfUrlFromHtml(html) {
     if (match) {
       let url = match[1];
 
-      // Clean up URL
+      // Clean up URL - only decode =3D and soft breaks, NOT generic hex
       url = url.replace(/=\r?\n/g, '');  // Remove line breaks
-      url = url.replace(/=3D/gi, '=');
-      url = url.replace(/=([0-9A-F]{2})/gi, (match, hex) =>
-        String.fromCharCode(parseInt(hex, 16))
-      );
+      url = url.replace(/=3D/gi, '=');   // Decode equals signs only
 
       // Validate URL
       if (url.startsWith('http://') || url.startsWith('https://')) {
