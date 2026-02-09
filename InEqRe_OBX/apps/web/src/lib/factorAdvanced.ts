@@ -460,6 +460,68 @@ export function computeEnsemblePrediction(
 }
 
 /**
+ * Compute ensemble prediction using custom factor weights from optimizer config.
+ * Only uses the factors specified in selectedFactors array.
+ */
+export function computeEnsemblePredictionWithConfig(
+  factors: EnhancedFactors,
+  selectedFactors: string[],
+  gbWeight: number,
+  rfWeight: number
+): {
+  ensemble: number;
+  gb: number;
+  rf: number;
+  contributions: { gb: Record<string, number>; rf: Record<string, number> };
+} {
+  // Filter weights to only selected factors and their derived terms
+  const selectedSet = new Set(selectedFactors);
+
+  const filterWeights = (weights: Record<string, number>): Record<string, number> => {
+    const filtered: Record<string, number> = {};
+    for (const [factor, weight] of Object.entries(weights)) {
+      // Direct match
+      if (selectedSet.has(factor)) {
+        filtered[factor] = weight;
+        continue;
+      }
+      // Interaction terms: keep if base factor is selected
+      const interactionMatch = factor.match(/^(\w+?)_x_/);
+      if (interactionMatch && selectedSet.has(interactionMatch[1])) {
+        filtered[factor] = weight;
+        continue;
+      }
+      // Regime-conditional terms
+      const regimeMatch = factor.match(/^(\w+?)_(highTurnover|lowTurnover|largecap|smallcap)$/);
+      if (regimeMatch && selectedSet.has(regimeMatch[1])) {
+        filtered[factor] = weight;
+        continue;
+      }
+    }
+    return filtered;
+  };
+
+  const filteredGBWeights = filterWeights(FACTOR_WEIGHTS_GB);
+  const filteredRFWeights = filterWeights(FACTOR_WEIGHTS_RF);
+
+  const gbResult = computeEnhancedPrediction(factors, filteredGBWeights);
+  const rfResult = computeEnhancedPrediction(factors, filteredRFWeights);
+
+  // Use custom ensemble weights from optimizer
+  const ensemble = gbResult.prediction * gbWeight + rfResult.prediction * rfWeight;
+
+  return {
+    ensemble,
+    gb: gbResult.prediction,
+    rf: rfResult.prediction,
+    contributions: {
+      gb: gbResult.contributions,
+      rf: rfResult.contributions,
+    },
+  };
+}
+
+/**
  * Compute feature importance from absolute contributions
  */
 export function computeFeatureImportance(

@@ -157,6 +157,7 @@ export default function TickerBacktestPage() {
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<"default" | "optimized">("default");
   const [optimizerData, setOptimizerData] = useState<OptimizerData | null>(null);
+  const [strategy, setStrategy] = useState<"long-short" | "long-only">("long-only");
 
   // Fetch optimizer config on mount
   useEffect(() => {
@@ -175,8 +176,12 @@ export default function TickerBacktestPage() {
     if (!ticker) return;
 
     async function fetchData() {
+      setLoading(true);
+      setError(null);
       try {
-        const res = await fetch(`/api/backtest/${ticker}`);
+        // Pass model_type to get optimized predictions when in optimized mode
+        const modelType = mode === "optimized" ? "optimized" : "default";
+        const res = await fetch(`/api/backtest/${ticker}?model_type=${modelType}`);
         if (!res.ok) throw new Error("Failed to fetch backtest data");
         const data = await res.json();
         if (!data.success) throw new Error(data.error || "No data");
@@ -189,7 +194,7 @@ export default function TickerBacktestPage() {
       }
     }
     fetchData();
-  }, [ticker]);
+  }, [ticker, mode]);
 
   const hasOptimized = optimizerData?.hasOptimized ?? false;
   const optPerf = optimizerData?.performance;
@@ -243,11 +248,23 @@ export default function TickerBacktestPage() {
     };
   });
 
-  // Cumulative return if following model signal
+  // Cumulative return if following model signal (trading strategy)
   const cumData = withActual.map((p, i) => {
     const cumReturn = withActual
       .slice(0, i + 1)
-      .reduce((sum, r) => sum + (r.actual_return as number), 0);
+      .reduce((sum, r) => {
+        const actualRet = r.actual_return as number;
+        const predicted = r.ensemble_prediction;
+        let strategyReturn: number;
+        if (strategy === "long-only") {
+          // Long only: go long when prediction > 0, stay flat otherwise
+          strategyReturn = predicted >= 0 ? actualRet : 0;
+        } else {
+          // Long/short: go long when prediction > 0, short when < 0
+          strategyReturn = predicted >= 0 ? actualRet : -actualRet;
+        }
+        return sum + strategyReturn;
+      }, 0);
     const month =
       typeof p.prediction_date === "string"
         ? p.prediction_date.slice(0, 7)
@@ -497,6 +514,20 @@ export default function TickerBacktestPage() {
               </span>
             </span>
           </div>
+          <div
+            style={{
+              marginBottom: 8,
+              padding: "6px 12px",
+              background: "rgba(16, 185, 129, 0.1)",
+              border: "1px solid var(--success)",
+              borderRadius: 2,
+              fontFamily: "monospace",
+              fontSize: 9,
+              color: "var(--success)",
+            }}
+          >
+            Charts and predictions below use the optimized factor selection ({optimizerData?.config?.n_factors} factors).
+          </div>
         </>
       ) : (
         /* Default mode: original 4 cards */
@@ -646,9 +677,48 @@ export default function TickerBacktestPage() {
           </div>
         </div>
 
-        {/* Cumulative Return */}
+        {/* Cumulative Strategy Return */}
         <div style={chartCardStyle}>
-          <div style={sectionTitle}>CUMULATIVE RETURN (ACTUAL)</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div style={sectionTitle}>
+              CUMULATIVE STRATEGY RETURN ({strategy === "long-only" ? "LONG ONLY" : "LONG/SHORT"})
+            </div>
+            <div style={{ display: "flex", gap: 0 }}>
+              <button
+                onClick={() => setStrategy("long-only")}
+                style={{
+                  fontSize: 8,
+                  fontWeight: 600,
+                  fontFamily: "monospace",
+                  padding: "3px 8px",
+                  cursor: "pointer",
+                  border: "1px solid var(--border)",
+                  borderRadius: "2px 0 0 2px",
+                  background: strategy === "long-only" ? "var(--success)" : "var(--input-bg)",
+                  color: strategy === "long-only" ? "#000" : "var(--muted)",
+                }}
+              >
+                LONG
+              </button>
+              <button
+                onClick={() => setStrategy("long-short")}
+                style={{
+                  fontSize: 8,
+                  fontWeight: 600,
+                  fontFamily: "monospace",
+                  padding: "3px 8px",
+                  cursor: "pointer",
+                  border: "1px solid var(--border)",
+                  borderLeft: "none",
+                  borderRadius: "0 2px 2px 0",
+                  background: strategy === "long-short" ? "var(--accent)" : "var(--input-bg)",
+                  color: strategy === "long-short" ? "#fff" : "var(--muted)",
+                }}
+              >
+                L/S
+              </button>
+            </div>
+          </div>
           <ResponsiveContainer width="100%" height={280}>
             <LineChart
               data={cumData}
@@ -681,8 +751,8 @@ export default function TickerBacktestPage() {
               <Tooltip
                 contentStyle={tooltipStyle}
                 formatter={(value: any) => [
-                  <span key="val" style={{ color: "#10b981" }}>{Number(value).toFixed(1)}%</span>,
-                  <span key="label" style={{ color: "var(--foreground)" }}>Cumulative</span>,
+                  <span key="val" style={{ color: Number(value) >= 0 ? "#10b981" : "#ef4444" }}>{Number(value).toFixed(1)}%</span>,
+                  <span key="label" style={{ color: "var(--foreground)" }}>Strategy Return</span>,
                 ]}
                 labelFormatter={(label: string) => <span style={{ color: "var(--foreground)", fontWeight: 600 }}>{label}</span>}
               />
@@ -696,6 +766,19 @@ export default function TickerBacktestPage() {
               />
             </LineChart>
           </ResponsiveContainer>
+          <div
+            style={{
+              fontSize: 8,
+              fontFamily: "monospace",
+              color: "var(--muted)",
+              marginTop: 6,
+              textAlign: "center",
+            }}
+          >
+            {strategy === "long-only"
+              ? "STRATEGY: LONG IF PREDICTED > 0, FLAT IF PREDICTED < 0"
+              : "STRATEGY: LONG IF PREDICTED > 0, SHORT IF PREDICTED < 0"}
+          </div>
         </div>
       </div>
 
