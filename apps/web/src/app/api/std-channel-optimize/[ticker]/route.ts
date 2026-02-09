@@ -278,7 +278,7 @@ export async function GET(
 
     // Parameter grid for optimization
     const entrySigmas = [2.0, 2.5, 3.0, 3.5, 4.0];
-    const stopSigmas = [3.0, 4.0, 5.0, 6.0];
+    const stopSigmas = [3.0, 3.5, 4.0, 4.5]; // Max 4.5σ - tighter risk control
     const maxDaysList = [5, 7, 10, 14, 21, 30];
     const minR2s = [0.3, 0.5, 0.7];
     const windowSizes = [126, 189, 252];
