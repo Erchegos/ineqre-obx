@@ -77,6 +77,36 @@ type StdChannelResponse = {
   data: StdChannelData[];
 };
 
+type StdChannelOptimizeResult = {
+  params: {
+    entrySigma: number;
+    stopSigma: number;
+    maxDays: number;
+    minR2: number;
+    windowSize: number;
+  };
+  totalTrades: number;
+  winRate: number;
+  totalReturn: number;
+  sharpe: number;
+  profitFactor: number;
+  maxDrawdown: number;
+  avgReturn: number;
+  avgHoldingDays: number;
+  exitBreakdown: { target: number; time: number; stop: number };
+  score: number;
+};
+
+type StdChannelOptimizeResponse = {
+  success: boolean;
+  ticker: string;
+  tested: number;
+  dataPoints: number;
+  dateRange: { start: string; end: string };
+  results: StdChannelOptimizeResult[];
+  best: StdChannelOptimizeResult | null;
+};
+
 function calculateReturnStats(returns: Array<{ date: string; return: number }>) {
   if (!returns || returns.length === 0) return null;
 
@@ -193,6 +223,13 @@ export default function StockTickerPage() {
   const [fixedWindow, setFixedWindow] = useState<number | null>(null);
   const [showMethodology, setShowMethodology] = useState<boolean>(false);
 
+  // STD Channel Backtest Optimizer
+  const [stdBacktestData, setStdBacktestData] = useState<StdChannelOptimizeResponse | null>(null);
+  const [stdBacktestLoading, setStdBacktestLoading] = useState<boolean>(false);
+  const [stdBacktestError, setStdBacktestError] = useState<string | null>(null);
+  const [showOptimizer, setShowOptimizer] = useState<boolean>(false);
+  const [optimizerProgress, setOptimizerProgress] = useState<number>(0);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -278,12 +315,19 @@ export default function StockTickerPage() {
       setStockMetaLoading(true);
 
       try {
-        // Check if this ticker has COMPLETE factor data (ML Ready)
-        const factorRes = await fetch(`/api/factors/tickers`, {
-          method: "GET",
-          headers: { accept: "application/json" },
-          cache: "no-store",
-        });
+        // Run both API calls in PARALLEL for faster load
+        const [factorRes, stocksRes] = await Promise.all([
+          fetch(`/api/factors/tickers`, {
+            method: "GET",
+            headers: { accept: "application/json" },
+            cache: "no-store",
+          }),
+          fetch(`/api/stocks`, {
+            method: "GET",
+            headers: { accept: "application/json" },
+            cache: "no-store",
+          }),
+        ]);
 
         let factorExists = false;
         if (factorRes.ok) {
@@ -291,21 +335,14 @@ export default function StockTickerPage() {
           factorExists = factorData.success && factorData.tickers?.includes(ticker);
         }
 
-        // Get stock metadata
-        const res = await fetch(`/api/stocks`, {
-          method: "GET",
-          headers: { accept: "application/json" },
-          cache: "no-store",
-        });
-
-        if (!res.ok) {
+        if (!stocksRes.ok) {
           console.warn("Failed to fetch stock metadata");
           setTotalRows(0);
           setHasFactorData(false);
           return;
         }
 
-        const stocks = await res.json();
+        const stocks = await stocksRes.json();
         const stock = stocks.find((s: any) => s.ticker === ticker);
 
         if (!cancelled) {
@@ -449,6 +486,56 @@ export default function StockTickerPage() {
       cancelled = true;
     };
   }, [ticker, viewMode, k1, k2, minWindow, maxWindow, step, fixedWindow]);
+
+  // Function to run STD Channel optimizer for this ticker
+  const runStdChannelOptimizer = async () => {
+    if (!ticker) return;
+
+    setStdBacktestLoading(true);
+    setStdBacktestError(null);
+    setShowOptimizer(true);
+
+    try {
+      const res = await fetch(`/api/std-channel-optimize/${encodeURIComponent(ticker)}`, {
+        method: "GET",
+        headers: { accept: "application/json" },
+        cache: "no-store",
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: res.statusText }));
+        setStdBacktestError(errorData.error || res.statusText);
+        setStdBacktestData(null);
+      } else {
+        const json = await res.json();
+        setStdBacktestData(json);
+      }
+    } catch (e: any) {
+      setStdBacktestError(e?.message || "Failed to run optimizer");
+      setStdBacktestData(null);
+    }
+
+    setStdBacktestLoading(false);
+  };
+
+  // Optimizer progress animation - very fast and smooth
+  useEffect(() => {
+    if (!stdBacktestLoading) return;
+
+    setOptimizerProgress(0);
+
+    const interval = setInterval(() => {
+      setOptimizerProgress(prev => {
+        // Very fast: reach 90% in ~1.5 seconds
+        if (prev < 70) return prev + 6;
+        if (prev < 88) return prev + 3;
+        if (prev < 96) return prev + 1;
+        return Math.min(prev + 0.3, 99);
+      });
+    }, 40);
+
+    return () => clearInterval(interval);
+  }, [stdBacktestLoading]);
 
   const activeStats = useMemo(() => {
     if (!data?.summary) return null;
@@ -731,7 +818,7 @@ export default function StockTickerPage() {
   };
 
   return (
-    <main style={{ padding: 24, maxWidth: 1400, margin: "0 auto" }}>
+    <main style={{ padding: 24, maxWidth: 1400, margin: "0 auto", minHeight: "100vh", background: "var(--background)", color: "var(--foreground)" }}>
       {/* Header Section */}
       <div style={{ marginBottom: 24 }}>
         {/* Terminal-style Header */}
@@ -805,7 +892,7 @@ export default function StockTickerPage() {
           >
             MONTE CARLO SIMULATION
           </Link>
-          {totalRows >= 756 && hasFactorData && (
+          {(stockMetaLoading || (totalRows >= 756 && hasFactorData)) && (
             <Link
               href={`/predictions/${ticker}`}
               style={{
@@ -824,6 +911,23 @@ export default function StockTickerPage() {
               ML PREDICTIONS
             </Link>
           )}
+          <Link
+            href="/std-channel-strategy"
+            style={{
+              padding: "6px 10px",
+              borderRadius: 2,
+              background: "var(--card-bg)",
+              border: "1px solid var(--border)",
+              color: "var(--foreground)",
+              fontSize: 10,
+              fontWeight: 600,
+              textDecoration: "none",
+              fontFamily: "monospace",
+              transition: "all 0.15s",
+            }}
+          >
+            STD OPTIMIZER (ALL STOCKS)
+          </Link>
         </div>
       </div>
       </div>
@@ -1305,6 +1409,242 @@ export default function StockTickerPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* STD Channel Backtest Optimizer */}
+              <div style={{
+                padding: 20,
+                borderRadius: 4,
+                border: "1px solid var(--card-border)",
+                background: "var(--card-bg)",
+                marginBottom: 20,
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                  <div>
+                    <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4, color: "var(--foreground)" }}>
+                      Mean Reversion Backtest
+                    </h2>
+                    <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
+                      Optimized parameters for {ticker} using slope-aligned mean reversion
+                    </div>
+                  </div>
+                  <button
+                    onClick={runStdChannelOptimizer}
+                    disabled={stdBacktestLoading}
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: 4,
+                      border: "none",
+                      background: stdBacktestLoading ? "var(--muted)" : "#f59e0b",
+                      color: "#fff",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      cursor: stdBacktestLoading ? "not-allowed" : "pointer",
+                      opacity: stdBacktestLoading ? 0.7 : 1,
+                    }}
+                  >
+                    {stdBacktestLoading ? "Optimizing..." : showOptimizer && stdBacktestData ? "Re-Optimize" : "Find Optimal Parameters"}
+                  </button>
+                </div>
+
+                {/* Optimizer Results */}
+                {showOptimizer && (
+                  <div>
+                    {stdBacktestLoading && (
+                      <div style={{
+                        padding: 20,
+                        background: "linear-gradient(135deg, var(--card-bg) 0%, #1a1a2e 100%)",
+                        borderRadius: 6,
+                        border: "1px solid var(--accent)",
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                          <div style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: "50%",
+                            background: "linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}>
+                            <div style={{
+                              width: 16,
+                              height: 16,
+                              borderRadius: "50%",
+                              border: "2px solid rgba(255,255,255,0.3)",
+                              borderTopColor: "#fff",
+                            }} />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, color: "var(--foreground)" }}>
+                              Optimizing {ticker}
+                            </div>
+                            <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 8 }}>
+                              Testing ~270 parameter combinations...
+                            </div>
+                            <div style={{
+                              height: 4,
+                              background: "var(--border)",
+                              borderRadius: 2,
+                              overflow: "hidden",
+                            }}>
+                              <div style={{
+                                height: "100%",
+                                width: `${optimizerProgress}%`,
+                                background: "linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%)",
+                                borderRadius: 2,
+                                transition: "width 0.15s ease-out",
+                              }} />
+                            </div>
+                            <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4, fontFamily: "monospace" }}>
+                              {optimizerProgress.toFixed(0)}% complete
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {stdBacktestError && (
+                      <div style={{ padding: 12, background: "var(--danger-bg)", border: "1px solid var(--danger)", borderRadius: 4, color: "var(--danger)", fontSize: 12 }}>
+                        {stdBacktestError}
+                      </div>
+                    )}
+
+                    {stdBacktestData && stdBacktestData.best && (
+                      <>
+                        {/* Best Result Summary */}
+                        <div style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(6, 1fr)",
+                          gap: 12,
+                          marginBottom: 16,
+                        }}>
+                          <div style={{ background: "rgba(16, 185, 129, 0.1)", padding: 12, borderRadius: 4, border: "1px solid rgba(16, 185, 129, 0.2)" }}>
+                            <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", marginBottom: 4 }}>Total Return</div>
+                            <div style={{ fontSize: 20, fontWeight: 700, color: "#10b981", fontFamily: "monospace" }}>
+                              {(stdBacktestData.best.totalReturn * 100).toFixed(0)}%
+                            </div>
+                            <div style={{ fontSize: 10, color: "var(--muted-foreground)" }}>{stdBacktestData.best.totalTrades} trades</div>
+                          </div>
+                          <div style={{ background: "var(--hover-bg)", padding: 12, borderRadius: 4 }}>
+                            <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", marginBottom: 4 }}>Win Rate</div>
+                            <div style={{ fontSize: 20, fontWeight: 700, color: stdBacktestData.best.winRate >= 0.5 ? "#10b981" : "#ef4444", fontFamily: "monospace" }}>
+                              {(stdBacktestData.best.winRate * 100).toFixed(0)}%
+                            </div>
+                          </div>
+                          <div style={{ background: "var(--hover-bg)", padding: 12, borderRadius: 4 }}>
+                            <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", marginBottom: 4 }}>Sharpe</div>
+                            <div style={{ fontSize: 20, fontWeight: 700, color: stdBacktestData.best.sharpe >= 1 ? "#10b981" : "var(--foreground)", fontFamily: "monospace" }}>
+                              {stdBacktestData.best.sharpe.toFixed(2)}
+                            </div>
+                          </div>
+                          <div style={{ background: "var(--hover-bg)", padding: 12, borderRadius: 4 }}>
+                            <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", marginBottom: 4 }}>Profit Factor</div>
+                            <div style={{ fontSize: 20, fontWeight: 700, color: "var(--foreground)", fontFamily: "monospace" }}>
+                              {stdBacktestData.best.profitFactor > 10 ? ">10" : stdBacktestData.best.profitFactor.toFixed(2)}
+                            </div>
+                          </div>
+                          <div style={{ background: "rgba(239, 68, 68, 0.1)", padding: 12, borderRadius: 4, border: "1px solid rgba(239, 68, 68, 0.2)" }}>
+                            <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", marginBottom: 4 }}>Max Drawdown</div>
+                            <div style={{ fontSize: 20, fontWeight: 700, color: "#ef4444", fontFamily: "monospace" }}>
+                              -{(stdBacktestData.best.maxDrawdown * 100).toFixed(1)}%
+                            </div>
+                          </div>
+                          <div style={{ background: "var(--hover-bg)", padding: 12, borderRadius: 4 }}>
+                            <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", marginBottom: 4 }}>Avg Hold</div>
+                            <div style={{ fontSize: 20, fontWeight: 700, color: "var(--foreground)", fontFamily: "monospace" }}>
+                              {stdBacktestData.best.avgHoldingDays.toFixed(0)}d
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Best Parameters */}
+                        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+                          <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                            <strong style={{ color: "var(--foreground)" }}>Best Parameters:</strong>{" "}
+                            Entry {stdBacktestData.best.params.entrySigma}σ, Stop {stdBacktestData.best.params.stopSigma}σ,
+                            Max {stdBacktestData.best.params.maxDays}d, R² ≥ {stdBacktestData.best.params.minR2},
+                            Window {stdBacktestData.best.params.windowSize}
+                          </div>
+                          <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                            <strong style={{ color: "var(--foreground)" }}>Data:</strong>{" "}
+                            {stdBacktestData.dateRange.start} to {stdBacktestData.dateRange.end} ({stdBacktestData.dataPoints} days)
+                          </div>
+                        </div>
+
+                        {/* Exit Breakdown */}
+                        <div style={{ display: "flex", gap: 16, fontSize: 11 }}>
+                          <span style={{ color: "#10b981" }}>
+                            ● Target: {((stdBacktestData.best.exitBreakdown.target / stdBacktestData.best.totalTrades) * 100).toFixed(0)}%
+                          </span>
+                          <span style={{ color: "#3b82f6" }}>
+                            ● Time: {((stdBacktestData.best.exitBreakdown.time / stdBacktestData.best.totalTrades) * 100).toFixed(0)}%
+                          </span>
+                          <span style={{ color: "#ef4444" }}>
+                            ● Stop: {((stdBacktestData.best.exitBreakdown.stop / stdBacktestData.best.totalTrades) * 100).toFixed(0)}%
+                          </span>
+                        </div>
+
+                        {/* All Results Table (collapsed by default, expandable) */}
+                        {stdBacktestData.results.length > 1 && (
+                          <details style={{ marginTop: 16 }}>
+                            <summary style={{ cursor: "pointer", fontSize: 12, color: "var(--accent)", fontWeight: 500 }}>
+                              Show all {stdBacktestData.results.length} optimized parameter sets
+                            </summary>
+                            <div style={{ overflowX: "auto", marginTop: 12 }}>
+                              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                                <thead>
+                                  <tr style={{ color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--border)" }}>
+                                    <th style={{ padding: "6px 8px", fontWeight: 500 }}>Entry σ</th>
+                                    <th style={{ padding: "6px 8px", fontWeight: 500 }}>Stop σ</th>
+                                    <th style={{ padding: "6px 8px", fontWeight: 500 }}>Max Days</th>
+                                    <th style={{ padding: "6px 8px", fontWeight: 500 }}>Min R²</th>
+                                    <th style={{ padding: "6px 8px", fontWeight: 500 }}>Window</th>
+                                    <th style={{ padding: "6px 8px", fontWeight: 500, textAlign: "right" }}>Trades</th>
+                                    <th style={{ padding: "6px 8px", fontWeight: 500, textAlign: "right" }}>Win %</th>
+                                    <th style={{ padding: "6px 8px", fontWeight: 500, textAlign: "right" }}>Return</th>
+                                    <th style={{ padding: "6px 8px", fontWeight: 500, textAlign: "right" }}>Sharpe</th>
+                                    <th style={{ padding: "6px 8px", fontWeight: 500, textAlign: "right" }}>Max DD</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {stdBacktestData.results.map((r, idx) => (
+                                    <tr key={idx} style={{ borderBottom: "1px solid var(--table-border)", background: idx === 0 ? "#2a2a1a" : "#141414" }}>
+                                      <td style={{ padding: "8px", fontFamily: "monospace" }}>{r.params.entrySigma}</td>
+                                      <td style={{ padding: "8px", fontFamily: "monospace" }}>{r.params.stopSigma}</td>
+                                      <td style={{ padding: "8px", fontFamily: "monospace" }}>{r.params.maxDays}</td>
+                                      <td style={{ padding: "8px", fontFamily: "monospace" }}>{r.params.minR2}</td>
+                                      <td style={{ padding: "8px", fontFamily: "monospace" }}>{r.params.windowSize}</td>
+                                      <td style={{ padding: "8px", textAlign: "right", fontFamily: "monospace" }}>{r.totalTrades}</td>
+                                      <td style={{ padding: "8px", textAlign: "right", fontFamily: "monospace", color: r.winRate >= 0.5 ? "#10b981" : "#ef4444" }}>
+                                        {(r.winRate * 100).toFixed(0)}%
+                                      </td>
+                                      <td style={{ padding: "8px", textAlign: "right", fontFamily: "monospace", color: r.totalReturn > 0 ? "#10b981" : "#ef4444" }}>
+                                        {(r.totalReturn * 100).toFixed(0)}%
+                                      </td>
+                                      <td style={{ padding: "8px", textAlign: "right", fontFamily: "monospace" }}>{r.sharpe.toFixed(2)}</td>
+                                      <td style={{ padding: "8px", textAlign: "right", fontFamily: "monospace", color: "#ef4444" }}>
+                                        -{(r.maxDrawdown * 100).toFixed(0)}%
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </details>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Initial state - show hint */}
+                {!showOptimizer && (
+                  <div style={{ fontSize: 12, color: "var(--muted-foreground)", fontStyle: "italic" }}>
+                    Click &quot;Find Optimal Parameters&quot; to test ~270 parameter combinations and find the best STD Channel mean reversion strategy for {ticker}.
+                  </div>
+                )}
               </div>
 
               {/* Chart */}
