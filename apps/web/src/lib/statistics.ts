@@ -338,3 +338,263 @@ export function formatCorrelationDisplay(
 
   return `${corr.toFixed(4)}${stats.significance !== 'ns' ? stats.significance : ''}`;
 }
+
+// ============================================================================
+// Risk-Adjusted Performance Metrics
+// ============================================================================
+
+/**
+ * Calculate Sharpe Ratio
+ *
+ * Sharpe = (mean return - risk-free rate) / std dev
+ * Annualized: multiply by sqrt(periods per year)
+ *
+ * @param returns Array of periodic returns (e.g., monthly)
+ * @param riskFreeRate Annual risk-free rate (default 4%)
+ * @param periodsPerYear Number of periods per year (default 12 for monthly)
+ * @returns Annualized Sharpe ratio
+ */
+export function calculateSharpeRatio(
+  returns: number[],
+  riskFreeRate: number = 0.04,
+  periodsPerYear: number = 12
+): number {
+  if (returns.length < 3) return 0;
+
+  const meanReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
+  const periodicRf = riskFreeRate / periodsPerYear;
+  const excessReturn = meanReturn - periodicRf;
+
+  const variance = returns.reduce((sum, r) => sum + Math.pow(r - meanReturn, 2), 0) / (returns.length - 1);
+  const stdDev = Math.sqrt(variance);
+
+  if (stdDev === 0) return 0;
+
+  return (excessReturn / stdDev) * Math.sqrt(periodsPerYear);
+}
+
+/**
+ * Calculate Sortino Ratio
+ *
+ * Sortino = (mean return - target return) / downside deviation
+ * Only penalizes downside volatility, not upside variance.
+ *
+ * @param returns Array of periodic returns
+ * @param targetReturn Target/minimum acceptable return (default 0)
+ * @param periodsPerYear Number of periods per year (default 12 for monthly)
+ * @returns Annualized Sortino ratio
+ */
+export function calculateSortinoRatio(
+  returns: number[],
+  targetReturn: number = 0,
+  periodsPerYear: number = 12
+): number {
+  if (returns.length < 3) return 0;
+
+  const meanReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
+  const periodicTarget = targetReturn / periodsPerYear;
+
+  // Calculate downside deviation (only negative deviations from target)
+  const downsideReturns = returns.filter(r => r < periodicTarget);
+
+  if (downsideReturns.length === 0) {
+    // No downside returns - return high positive value
+    return meanReturn > periodicTarget ? 999 : 0;
+  }
+
+  const downsideVariance = downsideReturns.reduce(
+    (sum, r) => sum + Math.pow(r - periodicTarget, 2),
+    0
+  ) / downsideReturns.length;
+
+  const downsideDeviation = Math.sqrt(downsideVariance);
+
+  if (downsideDeviation === 0) return 0;
+
+  const excessReturn = meanReturn - periodicTarget;
+  return (excessReturn / downsideDeviation) * Math.sqrt(periodsPerYear);
+}
+
+/**
+ * Calculate Maximum Drawdown
+ *
+ * Maximum peak-to-trough decline during the period.
+ *
+ * @param returns Array of periodic returns
+ * @returns Maximum drawdown (negative number, e.g., -0.25 = -25%)
+ */
+export function calculateMaxDrawdown(returns: number[]): number {
+  if (returns.length === 0) return 0;
+
+  let peak = 1;
+  let maxDrawdown = 0;
+  let cumulativeValue = 1;
+
+  for (const ret of returns) {
+    cumulativeValue *= (1 + ret);
+    peak = Math.max(peak, cumulativeValue);
+    const drawdown = (cumulativeValue - peak) / peak;
+    maxDrawdown = Math.min(maxDrawdown, drawdown);
+  }
+
+  return maxDrawdown;
+}
+
+/**
+ * Calculate Calmar Ratio
+ *
+ * Calmar = Annualized return / |Max drawdown|
+ * Measures return per unit of drawdown risk.
+ *
+ * @param returns Array of periodic returns
+ * @param periodsPerYear Number of periods per year (default 12 for monthly)
+ * @returns Calmar ratio
+ */
+export function calculateCalmarRatio(
+  returns: number[],
+  periodsPerYear: number = 12
+): number {
+  if (returns.length < 3) return 0;
+
+  const maxDD = calculateMaxDrawdown(returns);
+
+  if (maxDD === 0) return 0;
+
+  // Calculate annualized return
+  const cumulativeReturn = returns.reduce((prod, r) => prod * (1 + r), 1) - 1;
+  const periods = returns.length;
+  const annualizedReturn = Math.pow(1 + cumulativeReturn, periodsPerYear / periods) - 1;
+
+  return annualizedReturn / Math.abs(maxDD);
+}
+
+/**
+ * Calculate drawdown series and related metrics
+ *
+ * @param returns Array of periodic returns
+ * @returns Drawdown analysis
+ */
+export function calculateDrawdownAnalysis(returns: number[]): {
+  drawdownSeries: number[];
+  maxDrawdown: number;
+  maxDrawdownDuration: number;
+  currentDrawdown: number;
+  averageDrawdown: number;
+} {
+  if (returns.length === 0) {
+    return {
+      drawdownSeries: [],
+      maxDrawdown: 0,
+      maxDrawdownDuration: 0,
+      currentDrawdown: 0,
+      averageDrawdown: 0,
+    };
+  }
+
+  const drawdownSeries: number[] = [];
+  let peak = 1;
+  let cumulativeValue = 1;
+  let maxDrawdown = 0;
+  let maxDrawdownDuration = 0;
+  let currentDrawdownDuration = 0;
+
+  for (const ret of returns) {
+    cumulativeValue *= (1 + ret);
+    peak = Math.max(peak, cumulativeValue);
+    const drawdown = (cumulativeValue - peak) / peak;
+    drawdownSeries.push(drawdown);
+    maxDrawdown = Math.min(maxDrawdown, drawdown);
+
+    if (drawdown < 0) {
+      currentDrawdownDuration++;
+      maxDrawdownDuration = Math.max(maxDrawdownDuration, currentDrawdownDuration);
+    } else {
+      currentDrawdownDuration = 0;
+    }
+  }
+
+  const currentDrawdown = drawdownSeries[drawdownSeries.length - 1];
+  const negativeDrawdowns = drawdownSeries.filter(d => d < 0);
+  const averageDrawdown = negativeDrawdowns.length > 0
+    ? negativeDrawdowns.reduce((a, b) => a + b, 0) / negativeDrawdowns.length
+    : 0;
+
+  return {
+    drawdownSeries,
+    maxDrawdown,
+    maxDrawdownDuration,
+    currentDrawdown,
+    averageDrawdown,
+  };
+}
+
+/**
+ * Calculate comprehensive risk-adjusted metrics
+ */
+export interface RiskAdjustedMetrics {
+  sharpeRatio: number;
+  sortinoRatio: number;
+  calmarRatio: number;
+  maxDrawdown: number;
+  maxDrawdownDuration: number;
+  annualizedReturn: number;
+  annualizedVolatility: number;
+  hitRate: number;
+  profitFactor: number;
+}
+
+export function calculateRiskAdjustedMetrics(
+  returns: number[],
+  riskFreeRate: number = 0.04,
+  periodsPerYear: number = 12
+): RiskAdjustedMetrics {
+  if (returns.length < 3) {
+    return {
+      sharpeRatio: 0,
+      sortinoRatio: 0,
+      calmarRatio: 0,
+      maxDrawdown: 0,
+      maxDrawdownDuration: 0,
+      annualizedReturn: 0,
+      annualizedVolatility: 0,
+      hitRate: 0,
+      profitFactor: 0,
+    };
+  }
+
+  const sharpeRatio = calculateSharpeRatio(returns, riskFreeRate, periodsPerYear);
+  const sortinoRatio = calculateSortinoRatio(returns, 0, periodsPerYear);
+  const calmarRatio = calculateCalmarRatio(returns, periodsPerYear);
+
+  const ddAnalysis = calculateDrawdownAnalysis(returns);
+
+  // Annualized return
+  const cumulativeReturn = returns.reduce((prod, r) => prod * (1 + r), 1) - 1;
+  const annualizedReturn = Math.pow(1 + cumulativeReturn, periodsPerYear / returns.length) - 1;
+
+  // Annualized volatility
+  const meanReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
+  const variance = returns.reduce((sum, r) => sum + Math.pow(r - meanReturn, 2), 0) / (returns.length - 1);
+  const annualizedVolatility = Math.sqrt(variance * periodsPerYear);
+
+  // Hit rate (% of positive returns)
+  const positiveReturns = returns.filter(r => r > 0).length;
+  const hitRate = positiveReturns / returns.length;
+
+  // Profit factor (sum of gains / sum of losses)
+  const gains = returns.filter(r => r > 0).reduce((a, b) => a + b, 0);
+  const losses = Math.abs(returns.filter(r => r < 0).reduce((a, b) => a + b, 0));
+  const profitFactor = losses > 0 ? gains / losses : gains > 0 ? 999 : 0;
+
+  return {
+    sharpeRatio,
+    sortinoRatio,
+    calmarRatio,
+    maxDrawdown: ddAnalysis.maxDrawdown,
+    maxDrawdownDuration: ddAnalysis.maxDrawdownDuration,
+    annualizedReturn,
+    annualizedVolatility,
+    hitRate,
+    profitFactor,
+  };
+}

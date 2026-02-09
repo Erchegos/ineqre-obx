@@ -105,11 +105,13 @@ export default function PriceChart({
 
               return (
                 <div style={{
-                  backgroundColor: "var(--card-bg)",
+                  backgroundColor: "rgba(24, 24, 27, 0.95)",
                   border: "1px solid var(--card-border)",
                   borderRadius: "4px",
                   padding: "10px 12px",
                   fontSize: "13px",
+                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.4)",
+                  backdropFilter: "blur(8px)",
                 }}>
                   <div style={{ color: "var(--muted)", marginBottom: "8px", fontWeight: 600 }}>
                     {label}
