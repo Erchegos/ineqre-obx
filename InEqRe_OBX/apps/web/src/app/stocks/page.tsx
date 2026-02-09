@@ -44,6 +44,7 @@ export default function StocksPage() {
   const [selectedSectors, setSelectedSectors] = useState<Set<string>>(new Set());
   const [tierFilter, setTierFilter] = useState<'all' | 'tierA' | 'tierAB' | 'ml'>('all');
   const [tickersWithFactors, setTickersWithFactors] = useState<Set<string>>(new Set());
+  const [tickersWithOptimizer, setTickersWithOptimizer] = useState<Set<string>>(new Set());
 
   const fetchStocks = useCallback(async (assetTypes: Set<AssetType>) => {
     setLoading(true);
@@ -91,22 +92,37 @@ export default function StocksPage() {
     fetchStocks(selectedAssetTypes);
   }, [selectedAssetTypes, fetchStocks]);
 
-  // Check which stocks have factor data available (single efficient query)
+  // Check which stocks have factor data and optimizer configs available
   useEffect(() => {
-    async function checkFactorData() {
+    async function checkFactorAndOptimizerData() {
       if (stocks.length === 0) return;
 
       try {
-        const res = await fetch("/api/factors/tickers", {
-          method: "GET",
-          headers: { accept: "application/json" },
-          cache: "no-store",
-        });
+        // Fetch both in parallel
+        const [factorRes, optimizerRes] = await Promise.all([
+          fetch("/api/factors/tickers", {
+            method: "GET",
+            headers: { accept: "application/json" },
+            cache: "no-store",
+          }),
+          fetch("/api/optimizer-config/tickers", {
+            method: "GET",
+            headers: { accept: "application/json" },
+            cache: "no-store",
+          }),
+        ]);
 
-        if (res.ok) {
-          const data = await res.json();
+        if (factorRes.ok) {
+          const data = await factorRes.json();
           if (data.success && data.tickers) {
             setTickersWithFactors(new Set(data.tickers));
+          }
+        }
+
+        if (optimizerRes.ok) {
+          const data = await optimizerRes.json();
+          if (data.success && data.tickers) {
+            setTickersWithOptimizer(new Set(data.tickers));
           }
         }
       } catch (e) {
@@ -114,7 +130,7 @@ export default function StocksPage() {
       }
     }
 
-    checkFactorData();
+    checkFactorAndOptimizerData();
   }, [stocks]);
 
   const toggleAssetType = (type: AssetType) => {
@@ -202,6 +218,10 @@ export default function StocksPage() {
   const mlCount = useMemo(() => {
     return tickersWithFactors.size;
   }, [tickersWithFactors]);
+
+  const optCount = useMemo(() => {
+    return tickersWithOptimizer.size;
+  }, [tickersWithOptimizer]);
 
   const toggleSort = (column: keyof StockData) => {
     if (sortBy === column) {
@@ -340,7 +360,7 @@ export default function StocksPage() {
           </Link>
         </div>
         <p style={{ color: "var(--muted)", marginBottom: 16, fontSize: 14 }}>
-          Universe: {stocks.length} assets | Tier A: {tierCounts.A} | Tier B: {tierCounts.B} | Tier C: {tierCounts.C} | Tier F: {tierCounts.F} | <span style={{ color: '#10b981', fontWeight: 600 }}>ML Ready: {mlCount}</span>
+          Universe: {stocks.length} assets | Tier A: {tierCounts.A} | Tier B: {tierCounts.B} | Tier C: {tierCounts.C} | Tier F: {tierCounts.F} | <span style={{ color: '#10b981', fontWeight: 600 }}>ML Ready: {mlCount}</span> | <span style={{ color: '#8b5cf6', fontWeight: 600 }}>Optimized: {optCount}</span>
           <span style={{ marginLeft: 16, fontSize: 13 }}>Source: Interactive Brokers</span>
         </p>
 
@@ -888,6 +908,19 @@ export default function StocksPage() {
                           fontFamily: 'monospace',
                         }}>
                           ML
+                        </span>
+                      )}
+                      {tickersWithOptimizer.has(stock.ticker) && (
+                        <span style={{
+                          fontSize: 9,
+                          fontWeight: 700,
+                          padding: "2px 5px",
+                          borderRadius: 2,
+                          background: '#8b5cf6',
+                          color: '#fff',
+                          fontFamily: 'monospace',
+                        }}>
+                          OPT
                         </span>
                       )}
                       {selectedAssetTypes.size > 1 && stock.asset_type !== 'equity' && (

@@ -311,11 +311,12 @@ export default function PredictionChart({ ticker, mode = "default" }: Props) {
           <div
             style={{
               padding: 10,
-              background: ensemblePct >= 0 ? "#10b981" : "#ef4444",
+              background: "var(--terminal-bg)",
+              border: `1px solid ${ensemblePct >= 0 ? "#10b981" : "#ef4444"}`,
               borderRadius: 2,
             }}
           >
-            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.8)", marginBottom: 2, fontFamily: "monospace", fontWeight: 600 }}>
+            <div style={{ fontSize: 9, color: "var(--muted)", marginBottom: 2, fontFamily: "monospace", fontWeight: 600 }}>
               PREDICTION
             </div>
             <div
@@ -323,14 +324,14 @@ export default function PredictionChart({ ticker, mode = "default" }: Props) {
                 fontSize: 22,
                 fontWeight: 700,
                 fontFamily: "monospace",
-                color: "#ffffff",
+                color: ensemblePct >= 0 ? "#10b981" : "#ef4444",
                 letterSpacing: "-0.5px",
               }}
             >
               {ensemblePct >= 0 ? "+" : ""}
               {ensemblePct.toFixed(2)}%
             </div>
-            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.7)", marginTop: 2, fontFamily: "monospace", fontWeight: 600 }}>
+            <div style={{ fontSize: 8, color: "var(--muted)", marginTop: 2, fontFamily: "monospace", fontWeight: 600 }}>
               ENSEMBLE
             </div>
           </div>
@@ -359,17 +360,18 @@ export default function PredictionChart({ ticker, mode = "default" }: Props) {
           <div
             style={{
               padding: 10,
-              background: "#f59e0b",
+              background: "var(--terminal-bg)",
+              border: "1px solid #f59e0b",
               borderRadius: 2,
             }}
           >
-            <div style={{ fontSize: 9, color: "rgba(0,0,0,0.7)", marginBottom: 2, fontFamily: "monospace", fontWeight: 600 }}>
+            <div style={{ fontSize: 9, color: "var(--muted)", marginBottom: 2, fontFamily: "monospace", fontWeight: 600 }}>
               UNCERTAINTY
             </div>
-            <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "monospace", color: "#000000" }}>
+            <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "monospace", color: "#f59e0b" }}>
               ±{range90.toFixed(1)}%
             </div>
-            <div style={{ fontSize: 8, color: "rgba(0,0,0,0.6)", marginTop: 2, fontFamily: "monospace", fontWeight: 600 }}>
+            <div style={{ fontSize: 8, color: "var(--muted)", marginTop: 2, fontFamily: "monospace", fontWeight: 600 }}>
               90% RANGE
             </div>
           </div>
@@ -378,17 +380,18 @@ export default function PredictionChart({ ticker, mode = "default" }: Props) {
           <div
             style={{
               padding: 10,
-              background: "#06b6d4",
+              background: "var(--terminal-bg)",
+              border: "1px solid #06b6d4",
               borderRadius: 2,
             }}
           >
-            <div style={{ fontSize: 9, color: "rgba(0,0,0,0.7)", marginBottom: 2, fontFamily: "monospace", fontWeight: 600 }}>
+            <div style={{ fontSize: 9, color: "var(--muted)", marginBottom: 2, fontFamily: "monospace", fontWeight: 600 }}>
               CONFIDENCE
             </div>
-            <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "monospace", color: "#000000" }}>
+            <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "monospace", color: "#06b6d4" }}>
               {(prediction.confidence_score * 100).toFixed(1)}%
             </div>
-            <div style={{ fontSize: 8, color: "rgba(0,0,0,0.6)", marginTop: 2, fontFamily: "monospace", fontWeight: 600 }}>
+            <div style={{ fontSize: 8, color: "var(--muted)", marginTop: 2, fontFamily: "monospace", fontWeight: 600 }}>
               SCORE
             </div>
           </div>

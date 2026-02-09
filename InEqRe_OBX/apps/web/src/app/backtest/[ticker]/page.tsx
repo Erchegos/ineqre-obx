@@ -145,6 +145,10 @@ const GLOSSARY = [
   { term: "Confidence", def: "Model confidence score based on ensemble tree agreement. Higher means models agree more on the prediction." },
   { term: "Ensemble", def: "Combined prediction from Gradient Boosting (60%) and Random Forest (40%) models." },
   { term: "Direction", def: "Whether the model correctly predicted up or down movement. Check = correct, cross = incorrect." },
+  { term: "Sharpe Ratio", def: "Risk-adjusted return: (Return - Risk-free) / Volatility. Higher is better. >1.0 is excellent." },
+  { term: "Sortino Ratio", def: "Like Sharpe but only penalizes downside volatility. Better for asymmetric strategies." },
+  { term: "Calmar Ratio", def: "Annualized return / Max drawdown. Measures return per unit of drawdown risk." },
+  { term: "Max Drawdown", def: "Largest peak-to-trough decline. Shows worst-case loss if you invested at the peak." },
 ];
 
 export default function TickerBacktestPage() {
@@ -171,6 +175,7 @@ export default function TickerBacktestPage() {
       })
       .catch(() => {});
   }, [ticker]);
+
 
   useEffect(() => {
     if (!ticker) return;
@@ -248,7 +253,7 @@ export default function TickerBacktestPage() {
     };
   });
 
-  // Cumulative return if following model signal (trading strategy)
+  // Calculate cumulative returns for both buy-and-hold and strategy
   const cumData = withActual.map((p, i) => {
     const cumReturn = withActual
       .slice(0, i + 1)
@@ -265,6 +270,11 @@ export default function TickerBacktestPage() {
         }
         return sum + strategyReturn;
       }, 0);
+
+    const buyHoldReturn = withActual
+      .slice(0, i + 1)
+      .reduce((sum, r) => sum + (r.actual_return as number), 0);
+
     const month =
       typeof p.prediction_date === "string"
         ? p.prediction_date.slice(0, 7)
@@ -272,8 +282,13 @@ export default function TickerBacktestPage() {
     return {
       month,
       cumReturn: cumReturn * 100,
+      buyHold: buyHoldReturn * 100,
     };
   });
+
+  // Final returns for display
+  const finalStrategyReturn = cumData.length > 0 ? cumData[cumData.length - 1].cumReturn : 0;
+  const finalBuyHoldReturn = cumData.length > 0 ? cumData[cumData.length - 1].buyHold : 0;
 
   const formatMonth = (val: string) => {
     if (!val || val.length < 7) return val;
@@ -591,6 +606,7 @@ export default function TickerBacktestPage() {
         </div>
       )}
 
+
       {/* Charts */}
       <div
         style={{
@@ -691,14 +707,14 @@ export default function TickerBacktestPage() {
                   fontWeight: 600,
                   fontFamily: "monospace",
                   padding: "3px 8px",
+                  border: "1px solid var(--terminal-border)",
+                  borderRadius: "3px 0 0 3px",
+                  background: strategy === "long-only" ? "var(--accent)" : "var(--card-bg)",
+                  color: strategy === "long-only" ? "#fff" : "var(--muted)",
                   cursor: "pointer",
-                  border: "1px solid var(--border)",
-                  borderRadius: "2px 0 0 2px",
-                  background: strategy === "long-only" ? "var(--success)" : "var(--input-bg)",
-                  color: strategy === "long-only" ? "#000" : "var(--muted)",
                 }}
               >
-                LONG
+                LONG ONLY
               </button>
               <button
                 onClick={() => setStrategy("long-short")}
@@ -707,15 +723,15 @@ export default function TickerBacktestPage() {
                   fontWeight: 600,
                   fontFamily: "monospace",
                   padding: "3px 8px",
-                  cursor: "pointer",
-                  border: "1px solid var(--border)",
+                  border: "1px solid var(--terminal-border)",
                   borderLeft: "none",
-                  borderRadius: "0 2px 2px 0",
-                  background: strategy === "long-short" ? "var(--accent)" : "var(--input-bg)",
+                  borderRadius: "0 3px 3px 0",
+                  background: strategy === "long-short" ? "var(--accent)" : "var(--card-bg)",
                   color: strategy === "long-short" ? "#fff" : "var(--muted)",
+                  cursor: "pointer",
                 }}
               >
-                L/S
+                LONG/SHORT
               </button>
             </div>
           </div>
@@ -750,34 +766,50 @@ export default function TickerBacktestPage() {
               />
               <Tooltip
                 contentStyle={tooltipStyle}
-                formatter={(value: any) => [
+                formatter={(value, name) => [
                   <span key="val" style={{ color: Number(value) >= 0 ? "#10b981" : "#ef4444" }}>{Number(value).toFixed(1)}%</span>,
-                  <span key="label" style={{ color: "var(--foreground)" }}>Strategy Return</span>,
+                  <span key="label" style={{ color: "var(--foreground)" }}>{name === "cumReturn" ? "Strategy" : "Buy & Hold"}</span>,
                 ]}
-                labelFormatter={(label: string) => <span style={{ color: "var(--foreground)", fontWeight: 600 }}>{label}</span>}
+                labelFormatter={(label) => <span style={{ color: "var(--foreground)", fontWeight: 600 }}>{label}</span>}
               />
               <Line
                 type="monotone"
                 dataKey="cumReturn"
-                stroke="#3b82f6"
+                stroke="#10b981"
                 strokeWidth={2}
                 dot={false}
                 isAnimationActive={false}
+                name="Strategy"
+              />
+              <Line
+                type="monotone"
+                dataKey="buyHold"
+                stroke="#3b82f6"
+                strokeWidth={1.5}
+                strokeDasharray="5 5"
+                dot={false}
+                isAnimationActive={false}
+                name="Buy & Hold"
               />
             </LineChart>
           </ResponsiveContainer>
           <div
             style={{
+              display: "flex",
+              justifyContent: "center",
+              gap: 16,
               fontSize: 8,
               fontFamily: "monospace",
               color: "var(--muted)",
               marginTop: 6,
-              textAlign: "center",
             }}
           >
-            {strategy === "long-only"
-              ? "STRATEGY: LONG IF PREDICTED > 0, FLAT IF PREDICTED < 0"
-              : "STRATEGY: LONG IF PREDICTED > 0, SHORT IF PREDICTED < 0"}
+            <span>
+              <span style={{ color: "#10b981" }}>━━</span> Strategy: {finalStrategyReturn.toFixed(1)}%
+            </span>
+            <span>
+              <span style={{ color: "#3b82f6" }}>- - -</span> Buy & Hold: {finalBuyHoldReturn.toFixed(1)}%
+            </span>
           </div>
         </div>
       </div>
