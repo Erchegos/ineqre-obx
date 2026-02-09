@@ -11,6 +11,10 @@ export async function GET(
     const { ticker: rawTicker } = await params;
     const ticker = rawTicker.toUpperCase().trim();
 
+    // Get model_type from query params (default or optimized)
+    const { searchParams } = new URL(req.url);
+    const modelType = searchParams.get("model_type") || "default";
+
     // Get latest backtest run
     const runResult = await pool.query(
       `SELECT id FROM backtest_runs ORDER BY created_at DESC LIMIT 1`
@@ -23,7 +27,7 @@ export async function GET(
     }
     const runId = runResult.rows[0].id;
 
-    // Get all predictions for this ticker
+    // Get all predictions for this ticker with specified model_type
     const predResult = await pool.query(
       `SELECT
         prediction_date, target_date,
@@ -32,9 +36,9 @@ export async function GET(
         confidence_score, size_regime, turnover_regime,
         quintile, direction_correct
       FROM backtest_predictions
-      WHERE ticker = $1 AND backtest_run_id = $2
+      WHERE ticker = $1 AND backtest_run_id = $2 AND model_type = $3
       ORDER BY prediction_date ASC`,
-      [ticker, runId]
+      [ticker, runId, modelType]
     );
 
     if (predResult.rows.length === 0) {
