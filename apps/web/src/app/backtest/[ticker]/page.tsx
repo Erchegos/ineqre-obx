@@ -161,6 +161,7 @@ export default function TickerBacktestPage() {
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<"default" | "optimized">("default");
   const [optimizerData, setOptimizerData] = useState<OptimizerData | null>(null);
+  const [strategy, setStrategy] = useState<"long-short" | "long-only">("long-only");
 
   // Fetch optimizer config on mount
   useEffect(() => {
@@ -252,22 +253,41 @@ export default function TickerBacktestPage() {
     };
   });
 
-  // Calculate buy-and-hold cumulative returns
-  const buyHoldReturns = withActual.map((p) => p.actual_return as number);
-
+  // Calculate cumulative returns for both buy-and-hold and strategy
   const cumData = withActual.map((p, i) => {
-    const cumBuyHoldReturn = buyHoldReturns.slice(0, i + 1).reduce((sum, r) => sum + r, 0);
+    const cumReturn = withActual
+      .slice(0, i + 1)
+      .reduce((sum, r) => {
+        const actualRet = r.actual_return as number;
+        const predicted = r.ensemble_prediction;
+        let strategyReturn: number;
+        if (strategy === "long-only") {
+          // Long only: go long when prediction > 0, stay flat otherwise
+          strategyReturn = predicted >= 0 ? actualRet : 0;
+        } else {
+          // Long/short: go long when prediction > 0, short when < 0
+          strategyReturn = predicted >= 0 ? actualRet : -actualRet;
+        }
+        return sum + strategyReturn;
+      }, 0);
+
+    const buyHoldReturn = withActual
+      .slice(0, i + 1)
+      .reduce((sum, r) => sum + (r.actual_return as number), 0);
+
     const month =
       typeof p.prediction_date === "string"
         ? p.prediction_date.slice(0, 7)
         : p.prediction_date;
     return {
       month,
-      buyHold: cumBuyHoldReturn * 100,
+      cumReturn: cumReturn * 100,
+      buyHold: buyHoldReturn * 100,
     };
   });
 
-  // Final return for display
+  // Final returns for display
+  const finalStrategyReturn = cumData.length > 0 ? cumData[cumData.length - 1].cumReturn : 0;
   const finalBuyHoldReturn = cumData.length > 0 ? cumData[cumData.length - 1].buyHold : 0;
 
   const formatMonth = (val: string) => {
@@ -673,9 +693,48 @@ export default function TickerBacktestPage() {
           </div>
         </div>
 
-        {/* Cumulative Stock Return */}
+        {/* Cumulative Strategy Return */}
         <div style={chartCardStyle}>
-          <div style={sectionTitle}>{ticker} CUMULATIVE RETURN</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div style={sectionTitle}>
+              CUMULATIVE STRATEGY RETURN ({strategy === "long-only" ? "LONG ONLY" : "LONG/SHORT"})
+            </div>
+            <div style={{ display: "flex", gap: 0 }}>
+              <button
+                onClick={() => setStrategy("long-only")}
+                style={{
+                  fontSize: 8,
+                  fontWeight: 600,
+                  fontFamily: "monospace",
+                  padding: "3px 8px",
+                  border: "1px solid var(--terminal-border)",
+                  borderRadius: "3px 0 0 3px",
+                  background: strategy === "long-only" ? "var(--accent)" : "var(--card-bg)",
+                  color: strategy === "long-only" ? "#fff" : "var(--muted)",
+                  cursor: "pointer",
+                }}
+              >
+                LONG ONLY
+              </button>
+              <button
+                onClick={() => setStrategy("long-short")}
+                style={{
+                  fontSize: 8,
+                  fontWeight: 600,
+                  fontFamily: "monospace",
+                  padding: "3px 8px",
+                  border: "1px solid var(--terminal-border)",
+                  borderLeft: "none",
+                  borderRadius: "0 3px 3px 0",
+                  background: strategy === "long-short" ? "var(--accent)" : "var(--card-bg)",
+                  color: strategy === "long-short" ? "#fff" : "var(--muted)",
+                  cursor: "pointer",
+                }}
+              >
+                LONG/SHORT
+              </button>
+            </div>
+          </div>
           <ResponsiveContainer width="100%" height={280}>
             <LineChart
               data={cumData}
@@ -707,32 +766,50 @@ export default function TickerBacktestPage() {
               />
               <Tooltip
                 contentStyle={tooltipStyle}
-                formatter={(value: any) => [
+                formatter={(value, name) => [
                   <span key="val" style={{ color: Number(value) >= 0 ? "#10b981" : "#ef4444" }}>{Number(value).toFixed(1)}%</span>,
-                  <span key="label" style={{ color: "var(--foreground)" }}>Cumulative Return</span>,
+                  <span key="label" style={{ color: "var(--foreground)" }}>{name === "cumReturn" ? "Strategy" : "Buy & Hold"}</span>,
                 ]}
-                labelFormatter={(label: string) => <span style={{ color: "var(--foreground)", fontWeight: 600 }}>{label}</span>}
+                labelFormatter={(label) => <span style={{ color: "var(--foreground)", fontWeight: 600 }}>{label}</span>}
+              />
+              <Line
+                type="monotone"
+                dataKey="cumReturn"
+                stroke="#10b981"
+                strokeWidth={2}
+                dot={false}
+                isAnimationActive={false}
+                name="Strategy"
               />
               <Line
                 type="monotone"
                 dataKey="buyHold"
                 stroke="#3b82f6"
-                strokeWidth={2}
+                strokeWidth={1.5}
+                strokeDasharray="5 5"
                 dot={false}
                 isAnimationActive={false}
+                name="Buy & Hold"
               />
             </LineChart>
           </ResponsiveContainer>
           <div
             style={{
+              display: "flex",
+              justifyContent: "center",
+              gap: 16,
               fontSize: 8,
               fontFamily: "monospace",
               color: "var(--muted)",
               marginTop: 6,
-              textAlign: "center",
             }}
           >
-            Stock performance over backtest period (buy & hold)
+            <span>
+              <span style={{ color: "#10b981" }}>━━</span> Strategy: {finalStrategyReturn.toFixed(1)}%
+            </span>
+            <span>
+              <span style={{ color: "#3b82f6" }}>- - -</span> Buy & Hold: {finalBuyHoldReturn.toFixed(1)}%
+            </span>
           </div>
         </div>
       </div>
