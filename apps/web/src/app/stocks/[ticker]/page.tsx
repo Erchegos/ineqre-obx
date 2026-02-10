@@ -250,13 +250,25 @@ export default function StockTickerPage() {
   const [showOptimizerParams, setShowOptimizerParams] = useState<boolean>(false);
   const [showTrades, setShowTrades] = useState<boolean>(false);
 
-  // Optimizer parameter state
-  const [optEntrySigmas, setOptEntrySigmas] = useState<string>("1.5,2,2.5,3");
-  const [optStopSigmas, setOptStopSigmas] = useState<string>("2.5,3,3.5,4");
-  const [optMaxDays, setOptMaxDays] = useState<string>("7,10,14,21,30");
-  const [optMinR2s, setOptMinR2s] = useState<string>("0.3,0.5,0.7");
-  const [optWindows, setOptWindows] = useState<string>("126,189,252");
+  // Optimizer parameter state - use Sets for checkbox selections
+  // Better risk/reward: stop offset from entry (not absolute sigma)
+  const [optEntrySigmas, setOptEntrySigmas] = useState<Set<number>>(new Set([2, 2.5, 3]));
+  const [optStopOffsets, setOptStopOffsets] = useState<Set<number>>(new Set([0.5, 1.0])); // Stop = Entry + offset (tighter risk)
+  const [optMaxDays, setOptMaxDays] = useState<Set<number>>(new Set([7, 14, 21]));
+  const [optMinR2s, setOptMinR2s] = useState<Set<number>>(new Set([0.5, 0.7]));
+  const [optWindows, setOptWindows] = useState<Set<number>>(new Set([126, 252]));
   const [optMinTrades, setOptMinTrades] = useState<number>(3);
+
+  // Toggle helper for checkbox selections
+  const toggleSetValue = (set: Set<number>, value: number, setter: React.Dispatch<React.SetStateAction<Set<number>>>) => {
+    const newSet = new Set(set);
+    if (newSet.has(value)) {
+      if (newSet.size > 1) newSet.delete(value); // Keep at least one selected
+    } else {
+      newSet.add(value);
+    }
+    setter(newSet);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -525,13 +537,26 @@ export default function StockTickerPage() {
     setShowTrades(false);
 
     try {
+      // Calculate stop sigmas from entry + offsets (better risk/reward)
+      const entrySigmasArray = Array.from(optEntrySigmas).sort((a, b) => a - b);
+      const stopOffsetsArray = Array.from(optStopOffsets);
+
+      // Generate stop sigmas: for each entry, add each offset
+      const stopSigmasSet = new Set<number>();
+      entrySigmasArray.forEach(entry => {
+        stopOffsetsArray.forEach(offset => {
+          stopSigmasSet.add(Math.round((entry + offset) * 10) / 10); // Round to 1 decimal
+        });
+      });
+      const stopSigmasArray = Array.from(stopSigmasSet).sort((a, b) => a - b);
+
       // Build URL with custom parameters
       const params = new URLSearchParams();
-      if (optEntrySigmas) params.set("entrySigmas", optEntrySigmas);
-      if (optStopSigmas) params.set("stopSigmas", optStopSigmas);
-      if (optMaxDays) params.set("maxDays", optMaxDays);
-      if (optMinR2s) params.set("minR2s", optMinR2s);
-      if (optWindows) params.set("windows", optWindows);
+      params.set("entrySigmas", entrySigmasArray.join(","));
+      params.set("stopSigmas", stopSigmasArray.join(","));
+      params.set("maxDays", Array.from(optMaxDays).sort((a, b) => a - b).join(","));
+      params.set("minR2s", Array.from(optMinR2s).sort((a, b) => a - b).join(","));
+      params.set("windows", Array.from(optWindows).sort((a, b) => a - b).join(","));
       params.set("minTrades", String(optMinTrades));
 
       const res = await fetch(`/api/std-channel-optimize/${encodeURIComponent(ticker)}?${params.toString()}`, {
@@ -1516,141 +1541,170 @@ export default function StockTickerPage() {
                     border: "1px solid var(--accent)",
                     borderLeftWidth: 3,
                   }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
-                      {/* Left column - Entry/Exit parameters */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                      {/* Entry Sigma - when to enter */}
                       <div>
-                        <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 10, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                          Entry & Exit
+                        <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                          Entry σ <span style={{ textTransform: "none", opacity: 0.7 }}>(distance from mean to enter)</span>
                         </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <label style={{ fontSize: 11, color: "var(--muted)", width: 70, flexShrink: 0 }}>Entry σ</label>
-                            <input
-                              type="text"
-                              value={optEntrySigmas}
-                              onChange={(e) => setOptEntrySigmas(e.target.value)}
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {[1.5, 2, 2.5, 3, 3.5].map(v => (
+                            <button
+                              key={v}
+                              onClick={() => toggleSetValue(optEntrySigmas, v, setOptEntrySigmas)}
                               style={{
-                                flex: 1,
-                                padding: "5px 8px",
+                                padding: "4px 10px",
                                 borderRadius: 4,
-                                border: "1px solid var(--input-border)",
-                                background: "var(--input-bg)",
-                                color: "var(--foreground)",
+                                border: optEntrySigmas.has(v) ? "1px solid var(--accent)" : "1px solid var(--border)",
+                                background: optEntrySigmas.has(v) ? "var(--accent)" : "transparent",
+                                color: optEntrySigmas.has(v) ? "#fff" : "var(--foreground)",
                                 fontSize: 12,
                                 fontFamily: "monospace",
+                                cursor: "pointer",
                               }}
-                              placeholder="1.5,2,2.5,3"
-                            />
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <label style={{ fontSize: 11, color: "var(--muted)", width: 70, flexShrink: 0 }}>Stop σ</label>
-                            <input
-                              type="text"
-                              value={optStopSigmas}
-                              onChange={(e) => setOptStopSigmas(e.target.value)}
-                              style={{
-                                flex: 1,
-                                padding: "5px 8px",
-                                borderRadius: 4,
-                                border: "1px solid var(--input-border)",
-                                background: "var(--input-bg)",
-                                color: "var(--foreground)",
-                                fontSize: 12,
-                                fontFamily: "monospace",
-                              }}
-                              placeholder="2.5,3,3.5,4"
-                            />
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <label style={{ fontSize: 11, color: "var(--muted)", width: 70, flexShrink: 0 }}>Max Days</label>
-                            <input
-                              type="text"
-                              value={optMaxDays}
-                              onChange={(e) => setOptMaxDays(e.target.value)}
-                              style={{
-                                flex: 1,
-                                padding: "5px 8px",
-                                borderRadius: 4,
-                                border: "1px solid var(--input-border)",
-                                background: "var(--input-bg)",
-                                color: "var(--foreground)",
-                                fontSize: 12,
-                                fontFamily: "monospace",
-                              }}
-                              placeholder="7,10,14,21,30"
-                            />
-                          </div>
+                            >
+                              {v}σ
+                            </button>
+                          ))}
                         </div>
                       </div>
 
-                      {/* Right column - Filter parameters */}
+                      {/* Stop Offset - risk per trade */}
                       <div>
-                        <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 10, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                          Filters
+                        <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                          Stop Offset <span style={{ textTransform: "none", opacity: 0.7 }}>(stop = entry + offset, controls risk)</span>
                         </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <label style={{ fontSize: 11, color: "var(--muted)", width: 70, flexShrink: 0 }}>Min R²</label>
-                            <input
-                              type="text"
-                              value={optMinR2s}
-                              onChange={(e) => setOptMinR2s(e.target.value)}
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {[0.5, 0.75, 1.0, 1.5].map(v => (
+                            <button
+                              key={v}
+                              onClick={() => toggleSetValue(optStopOffsets, v, setOptStopOffsets)}
                               style={{
-                                flex: 1,
-                                padding: "5px 8px",
+                                padding: "4px 10px",
                                 borderRadius: 4,
-                                border: "1px solid var(--input-border)",
-                                background: "var(--input-bg)",
-                                color: "var(--foreground)",
+                                border: optStopOffsets.has(v) ? "1px solid #ef4444" : "1px solid var(--border)",
+                                background: optStopOffsets.has(v) ? "rgba(239, 68, 68, 0.2)" : "transparent",
+                                color: optStopOffsets.has(v) ? "#ef4444" : "var(--foreground)",
                                 fontSize: 12,
                                 fontFamily: "monospace",
+                                cursor: "pointer",
                               }}
-                              placeholder="0.3,0.5,0.7"
-                            />
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <label style={{ fontSize: 11, color: "var(--muted)", width: 70, flexShrink: 0 }}>Windows</label>
-                            <input
-                              type="text"
-                              value={optWindows}
-                              onChange={(e) => setOptWindows(e.target.value)}
-                              style={{
-                                flex: 1,
-                                padding: "5px 8px",
-                                borderRadius: 4,
-                                border: "1px solid var(--input-border)",
-                                background: "var(--input-bg)",
-                                color: "var(--foreground)",
-                                fontSize: 12,
-                                fontFamily: "monospace",
-                              }}
-                              placeholder="126,189,252"
-                            />
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <label style={{ fontSize: 11, color: "var(--muted)", width: 70, flexShrink: 0 }}>Min Trades</label>
-                            <input
-                              type="number"
-                              value={optMinTrades}
-                              onChange={(e) => setOptMinTrades(parseInt(e.target.value) || 3)}
-                              min={1}
-                              max={20}
-                              style={{
-                                width: 60,
-                                padding: "5px 8px",
-                                borderRadius: 4,
-                                border: "1px solid var(--input-border)",
-                                background: "var(--input-bg)",
-                                color: "var(--foreground)",
-                                fontSize: 12,
-                              }}
-                            />
-                          </div>
+                            >
+                              +{v}σ
+                            </button>
+                          ))}
+                        </div>
+                        <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4, fontStyle: "italic" }}>
+                          e.g. Entry 2σ + Offset 0.5σ = Stop at 2.5σ (risk 0.5σ per trade)
                         </div>
                       </div>
-                    </div>
-                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)", fontSize: 10, color: "var(--muted)", lineHeight: 1.5 }}>
-                      Enter when price is X sigma from regression. Exit at mean (target), beyond stop sigma (stop), or after max days (time).
+
+                      {/* Max Holding Days */}
+                      <div>
+                        <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                          Max Days <span style={{ textTransform: "none", opacity: 0.7 }}>(time limit per trade)</span>
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {[5, 7, 10, 14, 21, 30].map(v => (
+                            <button
+                              key={v}
+                              onClick={() => toggleSetValue(optMaxDays, v, setOptMaxDays)}
+                              style={{
+                                padding: "4px 10px",
+                                borderRadius: 4,
+                                border: optMaxDays.has(v) ? "1px solid #3b82f6" : "1px solid var(--border)",
+                                background: optMaxDays.has(v) ? "rgba(59, 130, 246, 0.2)" : "transparent",
+                                color: optMaxDays.has(v) ? "#3b82f6" : "var(--foreground)",
+                                fontSize: 12,
+                                fontFamily: "monospace",
+                                cursor: "pointer",
+                              }}
+                            >
+                              {v}d
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Second row - Filters */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 120px", gap: 12 }}>
+                        {/* Min R² */}
+                        <div>
+                          <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                            Min R² <span style={{ textTransform: "none", opacity: 0.7 }}>(channel quality)</span>
+                          </div>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            {[0.3, 0.5, 0.7].map(v => (
+                              <button
+                                key={v}
+                                onClick={() => toggleSetValue(optMinR2s, v, setOptMinR2s)}
+                                style={{
+                                  padding: "4px 10px",
+                                  borderRadius: 4,
+                                  border: optMinR2s.has(v) ? "1px solid #10b981" : "1px solid var(--border)",
+                                  background: optMinR2s.has(v) ? "rgba(16, 185, 129, 0.2)" : "transparent",
+                                  color: optMinR2s.has(v) ? "#10b981" : "var(--foreground)",
+                                  fontSize: 12,
+                                  fontFamily: "monospace",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                {v}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Window Sizes */}
+                        <div>
+                          <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                            Window <span style={{ textTransform: "none", opacity: 0.7 }}>(lookback)</span>
+                          </div>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            {[126, 189, 252].map(v => (
+                              <button
+                                key={v}
+                                onClick={() => toggleSetValue(optWindows, v, setOptWindows)}
+                                style={{
+                                  padding: "4px 8px",
+                                  borderRadius: 4,
+                                  border: optWindows.has(v) ? "1px solid var(--foreground)" : "1px solid var(--border)",
+                                  background: optWindows.has(v) ? "var(--hover-bg)" : "transparent",
+                                  color: optWindows.has(v) ? "var(--foreground)" : "var(--muted)",
+                                  fontSize: 11,
+                                  fontFamily: "monospace",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                {v}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Min Trades */}
+                        <div>
+                          <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                            Min Trades
+                          </div>
+                          <input
+                            type="number"
+                            value={optMinTrades}
+                            onChange={(e) => setOptMinTrades(parseInt(e.target.value) || 3)}
+                            min={1}
+                            max={20}
+                            style={{
+                              width: "100%",
+                              padding: "4px 8px",
+                              borderRadius: 4,
+                              border: "1px solid var(--input-border)",
+                              background: "var(--input-bg)",
+                              color: "var(--foreground)",
+                              fontSize: 12,
+                            }}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
