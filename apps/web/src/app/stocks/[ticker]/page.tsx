@@ -1466,32 +1466,36 @@ export default function StockTickerPage() {
                       Optimized parameters for {ticker} using slope-aligned mean reversion
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 8 }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                     <button
                       onClick={() => setShowOptimizerParams(!showOptimizerParams)}
+                      title="Configure parameters"
                       style={{
-                        padding: "8px 14px",
+                        padding: "8px 10px",
                         borderRadius: 4,
                         border: "1px solid var(--border)",
-                        background: showOptimizerParams ? "var(--hover-bg)" : "transparent",
-                        color: "var(--foreground)",
-                        fontSize: 11,
-                        fontWeight: 500,
+                        background: showOptimizerParams ? "var(--accent)" : "transparent",
+                        color: showOptimizerParams ? "#fff" : "var(--muted)",
+                        fontSize: 14,
                         cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "all 0.2s",
                       }}
                     >
-                      {showOptimizerParams ? "Hide Config" : "Configure"}
+                      ⚙
                     </button>
                     <button
                       onClick={runStdChannelOptimizer}
                       disabled={stdBacktestLoading}
                       style={{
-                        padding: "8px 14px",
+                        padding: "8px 16px",
                         borderRadius: 4,
                         border: "none",
                         background: stdBacktestLoading ? "var(--muted)" : "#f59e0b",
                         color: "#fff",
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: 600,
                         cursor: stdBacktestLoading ? "not-allowed" : "pointer",
                         opacity: stdBacktestLoading ? 0.7 : 1,
@@ -1506,145 +1510,147 @@ export default function StockTickerPage() {
                 {showOptimizerParams && (
                   <div style={{
                     padding: 16,
-                    background: "var(--hover-bg)",
+                    background: "linear-gradient(135deg, var(--card-bg) 0%, var(--hover-bg) 100%)",
                     borderRadius: 6,
                     marginBottom: 16,
-                    border: "1px solid var(--border)",
+                    border: "1px solid var(--accent)",
+                    borderLeftWidth: 3,
                   }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 12, color: "var(--foreground)" }}>
-                      Parameter Grid (comma-separated values)
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
+                      {/* Left column - Entry/Exit parameters */}
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 10, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                          Entry & Exit
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <label style={{ fontSize: 11, color: "var(--muted)", width: 70, flexShrink: 0 }}>Entry σ</label>
+                            <input
+                              type="text"
+                              value={optEntrySigmas}
+                              onChange={(e) => setOptEntrySigmas(e.target.value)}
+                              style={{
+                                flex: 1,
+                                padding: "5px 8px",
+                                borderRadius: 4,
+                                border: "1px solid var(--input-border)",
+                                background: "var(--input-bg)",
+                                color: "var(--foreground)",
+                                fontSize: 12,
+                                fontFamily: "monospace",
+                              }}
+                              placeholder="1.5,2,2.5,3"
+                            />
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <label style={{ fontSize: 11, color: "var(--muted)", width: 70, flexShrink: 0 }}>Stop σ</label>
+                            <input
+                              type="text"
+                              value={optStopSigmas}
+                              onChange={(e) => setOptStopSigmas(e.target.value)}
+                              style={{
+                                flex: 1,
+                                padding: "5px 8px",
+                                borderRadius: 4,
+                                border: "1px solid var(--input-border)",
+                                background: "var(--input-bg)",
+                                color: "var(--foreground)",
+                                fontSize: 12,
+                                fontFamily: "monospace",
+                              }}
+                              placeholder="2.5,3,3.5,4"
+                            />
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <label style={{ fontSize: 11, color: "var(--muted)", width: 70, flexShrink: 0 }}>Max Days</label>
+                            <input
+                              type="text"
+                              value={optMaxDays}
+                              onChange={(e) => setOptMaxDays(e.target.value)}
+                              style={{
+                                flex: 1,
+                                padding: "5px 8px",
+                                borderRadius: 4,
+                                border: "1px solid var(--input-border)",
+                                background: "var(--input-bg)",
+                                color: "var(--foreground)",
+                                fontSize: 12,
+                                fontFamily: "monospace",
+                              }}
+                              placeholder="7,10,14,21,30"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right column - Filter parameters */}
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 10, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                          Filters
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <label style={{ fontSize: 11, color: "var(--muted)", width: 70, flexShrink: 0 }}>Min R²</label>
+                            <input
+                              type="text"
+                              value={optMinR2s}
+                              onChange={(e) => setOptMinR2s(e.target.value)}
+                              style={{
+                                flex: 1,
+                                padding: "5px 8px",
+                                borderRadius: 4,
+                                border: "1px solid var(--input-border)",
+                                background: "var(--input-bg)",
+                                color: "var(--foreground)",
+                                fontSize: 12,
+                                fontFamily: "monospace",
+                              }}
+                              placeholder="0.3,0.5,0.7"
+                            />
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <label style={{ fontSize: 11, color: "var(--muted)", width: 70, flexShrink: 0 }}>Windows</label>
+                            <input
+                              type="text"
+                              value={optWindows}
+                              onChange={(e) => setOptWindows(e.target.value)}
+                              style={{
+                                flex: 1,
+                                padding: "5px 8px",
+                                borderRadius: 4,
+                                border: "1px solid var(--input-border)",
+                                background: "var(--input-bg)",
+                                color: "var(--foreground)",
+                                fontSize: 12,
+                                fontFamily: "monospace",
+                              }}
+                              placeholder="126,189,252"
+                            />
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <label style={{ fontSize: 11, color: "var(--muted)", width: 70, flexShrink: 0 }}>Min Trades</label>
+                            <input
+                              type="number"
+                              value={optMinTrades}
+                              onChange={(e) => setOptMinTrades(parseInt(e.target.value) || 3)}
+                              min={1}
+                              max={20}
+                              style={{
+                                width: 60,
+                                padding: "5px 8px",
+                                borderRadius: 4,
+                                border: "1px solid var(--input-border)",
+                                background: "var(--input-bg)",
+                                color: "var(--foreground)",
+                                fontSize: 12,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-                      <div>
-                        <label style={{ display: "block", fontSize: 10, color: "var(--muted)", marginBottom: 4, textTransform: "uppercase" }}>
-                          Entry σ (how far from mean to enter)
-                        </label>
-                        <input
-                          type="text"
-                          value={optEntrySigmas}
-                          onChange={(e) => setOptEntrySigmas(e.target.value)}
-                          style={{
-                            width: "100%",
-                            padding: "6px 8px",
-                            borderRadius: 4,
-                            border: "1px solid var(--input-border)",
-                            background: "var(--input-bg)",
-                            color: "var(--foreground)",
-                            fontSize: 12,
-                            fontFamily: "monospace",
-                          }}
-                          placeholder="1.5,2,2.5,3"
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: "block", fontSize: 10, color: "var(--muted)", marginBottom: 4, textTransform: "uppercase" }}>
-                          Stop σ (where to cut loss)
-                        </label>
-                        <input
-                          type="text"
-                          value={optStopSigmas}
-                          onChange={(e) => setOptStopSigmas(e.target.value)}
-                          style={{
-                            width: "100%",
-                            padding: "6px 8px",
-                            borderRadius: 4,
-                            border: "1px solid var(--input-border)",
-                            background: "var(--input-bg)",
-                            color: "var(--foreground)",
-                            fontSize: 12,
-                            fontFamily: "monospace",
-                          }}
-                          placeholder="2.5,3,3.5,4"
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: "block", fontSize: 10, color: "var(--muted)", marginBottom: 4, textTransform: "uppercase" }}>
-                          Max Days (time limit per trade)
-                        </label>
-                        <input
-                          type="text"
-                          value={optMaxDays}
-                          onChange={(e) => setOptMaxDays(e.target.value)}
-                          style={{
-                            width: "100%",
-                            padding: "6px 8px",
-                            borderRadius: 4,
-                            border: "1px solid var(--input-border)",
-                            background: "var(--input-bg)",
-                            color: "var(--foreground)",
-                            fontSize: 12,
-                            fontFamily: "monospace",
-                          }}
-                          placeholder="7,10,14,21,30"
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: "block", fontSize: 10, color: "var(--muted)", marginBottom: 4, textTransform: "uppercase" }}>
-                          Min R² (channel quality filter)
-                        </label>
-                        <input
-                          type="text"
-                          value={optMinR2s}
-                          onChange={(e) => setOptMinR2s(e.target.value)}
-                          style={{
-                            width: "100%",
-                            padding: "6px 8px",
-                            borderRadius: 4,
-                            border: "1px solid var(--input-border)",
-                            background: "var(--input-bg)",
-                            color: "var(--foreground)",
-                            fontSize: 12,
-                            fontFamily: "monospace",
-                          }}
-                          placeholder="0.3,0.5,0.7"
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: "block", fontSize: 10, color: "var(--muted)", marginBottom: 4, textTransform: "uppercase" }}>
-                          Window Sizes (lookback days)
-                        </label>
-                        <input
-                          type="text"
-                          value={optWindows}
-                          onChange={(e) => setOptWindows(e.target.value)}
-                          style={{
-                            width: "100%",
-                            padding: "6px 8px",
-                            borderRadius: 4,
-                            border: "1px solid var(--input-border)",
-                            background: "var(--input-bg)",
-                            color: "var(--foreground)",
-                            fontSize: 12,
-                            fontFamily: "monospace",
-                          }}
-                          placeholder="126,189,252"
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: "block", fontSize: 10, color: "var(--muted)", marginBottom: 4, textTransform: "uppercase" }}>
-                          Min Trades (filter low-signal)
-                        </label>
-                        <input
-                          type="number"
-                          value={optMinTrades}
-                          onChange={(e) => setOptMinTrades(parseInt(e.target.value) || 3)}
-                          min={1}
-                          max={20}
-                          style={{
-                            width: "100%",
-                            padding: "6px 8px",
-                            borderRadius: 4,
-                            border: "1px solid var(--input-border)",
-                            background: "var(--input-bg)",
-                            color: "var(--foreground)",
-                            fontSize: 12,
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div style={{ marginTop: 12, fontSize: 11, color: "var(--muted)", lineHeight: 1.5 }}>
-                      <strong>Strategy:</strong> Enter when price deviates X sigma from regression line (mean reversion).
-                      Exit at mean (target), stop if price moves further away (stop sigma), or time limit (max days).
+                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)", fontSize: 10, color: "var(--muted)", lineHeight: 1.5 }}>
+                      Enter when price is X sigma from regression. Exit at mean (target), beyond stop sigma (stop), or after max days (time).
                     </div>
                   </div>
                 )}
