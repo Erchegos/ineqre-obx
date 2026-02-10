@@ -77,6 +77,15 @@ type StdChannelResponse = {
   data: StdChannelData[];
 };
 
+type OptimizeTrade = {
+  entryDate: string;
+  exitDate: string;
+  signal: "LONG" | "SHORT";
+  returnPct: number;
+  holdingDays: number;
+  exitReason: "TARGET" | "TIME" | "STOP";
+};
+
 type StdChannelOptimizeResult = {
   params: {
     entrySigma: number;
@@ -95,6 +104,7 @@ type StdChannelOptimizeResult = {
   avgHoldingDays: number;
   exitBreakdown: { target: number; time: number; stop: number };
   score: number;
+  trades?: OptimizeTrade[];
 };
 
 type StdChannelOptimizeResponse = {
@@ -105,6 +115,14 @@ type StdChannelOptimizeResponse = {
   dateRange: { start: string; end: string };
   results: StdChannelOptimizeResult[];
   best: StdChannelOptimizeResult | null;
+  parametersUsed?: {
+    entrySigmas: number[];
+    stopSigmas: number[];
+    maxDaysList: number[];
+    minR2s: number[];
+    windowSizes: number[];
+    minTrades: number;
+  };
 };
 
 function calculateReturnStats(returns: Array<{ date: string; return: number }>) {
@@ -229,6 +247,16 @@ export default function StockTickerPage() {
   const [stdBacktestError, setStdBacktestError] = useState<string | null>(null);
   const [showOptimizer, setShowOptimizer] = useState<boolean>(false);
   const [optimizerProgress, setOptimizerProgress] = useState<number>(0);
+  const [showOptimizerParams, setShowOptimizerParams] = useState<boolean>(false);
+  const [showTrades, setShowTrades] = useState<boolean>(false);
+
+  // Optimizer parameter state
+  const [optEntrySigmas, setOptEntrySigmas] = useState<string>("1.5,2,2.5,3");
+  const [optStopSigmas, setOptStopSigmas] = useState<string>("2.5,3,3.5,4");
+  const [optMaxDays, setOptMaxDays] = useState<string>("7,10,14,21,30");
+  const [optMinR2s, setOptMinR2s] = useState<string>("0.3,0.5,0.7");
+  const [optWindows, setOptWindows] = useState<string>("126,189,252");
+  const [optMinTrades, setOptMinTrades] = useState<number>(3);
 
   useEffect(() => {
     let cancelled = false;
@@ -494,9 +522,19 @@ export default function StockTickerPage() {
     setStdBacktestLoading(true);
     setStdBacktestError(null);
     setShowOptimizer(true);
+    setShowTrades(false);
 
     try {
-      const res = await fetch(`/api/std-channel-optimize/${encodeURIComponent(ticker)}`, {
+      // Build URL with custom parameters
+      const params = new URLSearchParams();
+      if (optEntrySigmas) params.set("entrySigmas", optEntrySigmas);
+      if (optStopSigmas) params.set("stopSigmas", optStopSigmas);
+      if (optMaxDays) params.set("maxDays", optMaxDays);
+      if (optMinR2s) params.set("minR2s", optMinR2s);
+      if (optWindows) params.set("windows", optWindows);
+      params.set("minTrades", String(optMinTrades));
+
+      const res = await fetch(`/api/std-channel-optimize/${encodeURIComponent(ticker)}?${params.toString()}`, {
         method: "GET",
         headers: { accept: "application/json" },
         cache: "no-store",
@@ -1428,24 +1466,188 @@ export default function StockTickerPage() {
                       Optimized parameters for {ticker} using slope-aligned mean reversion
                     </div>
                   </div>
-                  <button
-                    onClick={runStdChannelOptimizer}
-                    disabled={stdBacktestLoading}
-                    style={{
-                      padding: "8px 14px",
-                      borderRadius: 4,
-                      border: "none",
-                      background: stdBacktestLoading ? "var(--muted)" : "#f59e0b",
-                      color: "#fff",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      cursor: stdBacktestLoading ? "not-allowed" : "pointer",
-                      opacity: stdBacktestLoading ? 0.7 : 1,
-                    }}
-                  >
-                    {stdBacktestLoading ? "Optimizing..." : showOptimizer && stdBacktestData ? "Re-Optimize" : "Find Optimal Parameters"}
-                  </button>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      onClick={() => setShowOptimizerParams(!showOptimizerParams)}
+                      style={{
+                        padding: "8px 14px",
+                        borderRadius: 4,
+                        border: "1px solid var(--border)",
+                        background: showOptimizerParams ? "var(--hover-bg)" : "transparent",
+                        color: "var(--foreground)",
+                        fontSize: 11,
+                        fontWeight: 500,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {showOptimizerParams ? "Hide Config" : "Configure"}
+                    </button>
+                    <button
+                      onClick={runStdChannelOptimizer}
+                      disabled={stdBacktestLoading}
+                      style={{
+                        padding: "8px 14px",
+                        borderRadius: 4,
+                        border: "none",
+                        background: stdBacktestLoading ? "var(--muted)" : "#f59e0b",
+                        color: "#fff",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: stdBacktestLoading ? "not-allowed" : "pointer",
+                        opacity: stdBacktestLoading ? 0.7 : 1,
+                      }}
+                    >
+                      {stdBacktestLoading ? "Optimizing..." : showOptimizer && stdBacktestData ? "Re-Optimize" : "Run Backtest"}
+                    </button>
+                  </div>
                 </div>
+
+                {/* Parameter Configuration Panel */}
+                {showOptimizerParams && (
+                  <div style={{
+                    padding: 16,
+                    background: "var(--hover-bg)",
+                    borderRadius: 6,
+                    marginBottom: 16,
+                    border: "1px solid var(--border)",
+                  }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 12, color: "var(--foreground)" }}>
+                      Parameter Grid (comma-separated values)
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+                      <div>
+                        <label style={{ display: "block", fontSize: 10, color: "var(--muted)", marginBottom: 4, textTransform: "uppercase" }}>
+                          Entry σ (how far from mean to enter)
+                        </label>
+                        <input
+                          type="text"
+                          value={optEntrySigmas}
+                          onChange={(e) => setOptEntrySigmas(e.target.value)}
+                          style={{
+                            width: "100%",
+                            padding: "6px 8px",
+                            borderRadius: 4,
+                            border: "1px solid var(--input-border)",
+                            background: "var(--input-bg)",
+                            color: "var(--foreground)",
+                            fontSize: 12,
+                            fontFamily: "monospace",
+                          }}
+                          placeholder="1.5,2,2.5,3"
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: "block", fontSize: 10, color: "var(--muted)", marginBottom: 4, textTransform: "uppercase" }}>
+                          Stop σ (where to cut loss)
+                        </label>
+                        <input
+                          type="text"
+                          value={optStopSigmas}
+                          onChange={(e) => setOptStopSigmas(e.target.value)}
+                          style={{
+                            width: "100%",
+                            padding: "6px 8px",
+                            borderRadius: 4,
+                            border: "1px solid var(--input-border)",
+                            background: "var(--input-bg)",
+                            color: "var(--foreground)",
+                            fontSize: 12,
+                            fontFamily: "monospace",
+                          }}
+                          placeholder="2.5,3,3.5,4"
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: "block", fontSize: 10, color: "var(--muted)", marginBottom: 4, textTransform: "uppercase" }}>
+                          Max Days (time limit per trade)
+                        </label>
+                        <input
+                          type="text"
+                          value={optMaxDays}
+                          onChange={(e) => setOptMaxDays(e.target.value)}
+                          style={{
+                            width: "100%",
+                            padding: "6px 8px",
+                            borderRadius: 4,
+                            border: "1px solid var(--input-border)",
+                            background: "var(--input-bg)",
+                            color: "var(--foreground)",
+                            fontSize: 12,
+                            fontFamily: "monospace",
+                          }}
+                          placeholder="7,10,14,21,30"
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: "block", fontSize: 10, color: "var(--muted)", marginBottom: 4, textTransform: "uppercase" }}>
+                          Min R² (channel quality filter)
+                        </label>
+                        <input
+                          type="text"
+                          value={optMinR2s}
+                          onChange={(e) => setOptMinR2s(e.target.value)}
+                          style={{
+                            width: "100%",
+                            padding: "6px 8px",
+                            borderRadius: 4,
+                            border: "1px solid var(--input-border)",
+                            background: "var(--input-bg)",
+                            color: "var(--foreground)",
+                            fontSize: 12,
+                            fontFamily: "monospace",
+                          }}
+                          placeholder="0.3,0.5,0.7"
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: "block", fontSize: 10, color: "var(--muted)", marginBottom: 4, textTransform: "uppercase" }}>
+                          Window Sizes (lookback days)
+                        </label>
+                        <input
+                          type="text"
+                          value={optWindows}
+                          onChange={(e) => setOptWindows(e.target.value)}
+                          style={{
+                            width: "100%",
+                            padding: "6px 8px",
+                            borderRadius: 4,
+                            border: "1px solid var(--input-border)",
+                            background: "var(--input-bg)",
+                            color: "var(--foreground)",
+                            fontSize: 12,
+                            fontFamily: "monospace",
+                          }}
+                          placeholder="126,189,252"
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: "block", fontSize: 10, color: "var(--muted)", marginBottom: 4, textTransform: "uppercase" }}>
+                          Min Trades (filter low-signal)
+                        </label>
+                        <input
+                          type="number"
+                          value={optMinTrades}
+                          onChange={(e) => setOptMinTrades(parseInt(e.target.value) || 3)}
+                          min={1}
+                          max={20}
+                          style={{
+                            width: "100%",
+                            padding: "6px 8px",
+                            borderRadius: 4,
+                            border: "1px solid var(--input-border)",
+                            background: "var(--input-bg)",
+                            color: "var(--foreground)",
+                            fontSize: 12,
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ marginTop: 12, fontSize: 11, color: "var(--muted)", lineHeight: 1.5 }}>
+                      <strong>Strategy:</strong> Enter when price deviates X sigma from regression line (mean reversion).
+                      Exit at mean (target), stop if price moves further away (stop sigma), or time limit (max days).
+                    </div>
+                  </div>
+                )}
 
                 {/* Optimizer Results */}
                 {showOptimizer && (
@@ -1574,7 +1776,7 @@ export default function StockTickerPage() {
                         </div>
 
                         {/* Exit Breakdown */}
-                        <div style={{ display: "flex", gap: 16, fontSize: 11 }}>
+                        <div style={{ display: "flex", gap: 16, fontSize: 11, marginBottom: 16 }}>
                           <span style={{ color: "#10b981" }}>
                             ● Target: {((stdBacktestData.best.exitBreakdown.target / stdBacktestData.best.totalTrades) * 100).toFixed(0)}%
                           </span>
@@ -1585,6 +1787,84 @@ export default function StockTickerPage() {
                             ● Stop: {((stdBacktestData.best.exitBreakdown.stop / stdBacktestData.best.totalTrades) * 100).toFixed(0)}%
                           </span>
                         </div>
+
+                        {/* Trade History */}
+                        {stdBacktestData.best.trades && stdBacktestData.best.trades.length > 0 && (
+                          <div style={{ marginBottom: 16 }}>
+                            <button
+                              onClick={() => setShowTrades(!showTrades)}
+                              style={{
+                                padding: "6px 12px",
+                                borderRadius: 4,
+                                border: "1px solid var(--border)",
+                                background: showTrades ? "var(--hover-bg)" : "transparent",
+                                color: "var(--accent)",
+                                fontSize: 12,
+                                fontWeight: 500,
+                                cursor: "pointer",
+                                marginBottom: 12,
+                              }}
+                            >
+                              {showTrades ? "Hide" : "Show"} {stdBacktestData.best.trades.length} Trades
+                            </button>
+
+                            {showTrades && (
+                              <div style={{ overflowX: "auto" }}>
+                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                                  <thead>
+                                    <tr style={{ color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--border)" }}>
+                                      <th style={{ padding: "8px 6px", fontWeight: 500 }}>#</th>
+                                      <th style={{ padding: "8px 6px", fontWeight: 500 }}>Entry Date</th>
+                                      <th style={{ padding: "8px 6px", fontWeight: 500 }}>Exit Date</th>
+                                      <th style={{ padding: "8px 6px", fontWeight: 500 }}>Signal</th>
+                                      <th style={{ padding: "8px 6px", fontWeight: 500 }}>Days</th>
+                                      <th style={{ padding: "8px 6px", fontWeight: 500 }}>Return</th>
+                                      <th style={{ padding: "8px 6px", fontWeight: 500 }}>Exit</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {stdBacktestData.best.trades.map((trade, idx) => (
+                                      <tr
+                                        key={idx}
+                                        style={{
+                                          borderBottom: "1px solid var(--border)",
+                                          background: idx % 2 === 0 ? "transparent" : "var(--hover-bg)",
+                                        }}
+                                      >
+                                        <td style={{ padding: "8px 6px", color: "var(--muted)" }}>{idx + 1}</td>
+                                        <td style={{ padding: "8px 6px", fontFamily: "monospace" }}>{trade.entryDate}</td>
+                                        <td style={{ padding: "8px 6px", fontFamily: "monospace" }}>{trade.exitDate}</td>
+                                        <td style={{
+                                          padding: "8px 6px",
+                                          color: trade.signal === "LONG" ? "#10b981" : "#ef4444",
+                                          fontWeight: 500,
+                                        }}>
+                                          {trade.signal}
+                                        </td>
+                                        <td style={{ padding: "8px 6px", fontFamily: "monospace" }}>{trade.holdingDays}d</td>
+                                        <td style={{
+                                          padding: "8px 6px",
+                                          fontFamily: "monospace",
+                                          fontWeight: 600,
+                                          color: trade.returnPct >= 0 ? "#10b981" : "#ef4444",
+                                        }}>
+                                          {trade.returnPct >= 0 ? "+" : ""}{(trade.returnPct * 100).toFixed(1)}%
+                                        </td>
+                                        <td style={{
+                                          padding: "8px 6px",
+                                          color: trade.exitReason === "TARGET" ? "#10b981" :
+                                                 trade.exitReason === "TIME" ? "#3b82f6" : "#ef4444",
+                                        }}>
+                                          {trade.exitReason}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         {/* All Results Table (collapsed by default, expandable) */}
                         {stdBacktestData.results.length > 1 && (
@@ -1642,7 +1922,7 @@ export default function StockTickerPage() {
                 {/* Initial state - show hint */}
                 {!showOptimizer && (
                   <div style={{ fontSize: 12, color: "var(--muted-foreground)", fontStyle: "italic" }}>
-                    Click &quot;Find Optimal Parameters&quot; to test ~270 parameter combinations and find the best STD Channel mean reversion strategy for {ticker}.
+                    Click &quot;Configure&quot; to adjust parameters, then &quot;Run Backtest&quot; to find the best STD Channel mean reversion strategy for {ticker}.
                   </div>
                 )}
               </div>

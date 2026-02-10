@@ -247,10 +247,19 @@ export async function GET(
   { params }: { params: Promise<{ ticker: string }> }
 ) {
   const { ticker } = await params;
+  const { searchParams } = new URL(request.url);
 
   if (!ticker) {
     return NextResponse.json({ success: false, error: "Missing ticker" }, { status: 400 });
   }
+
+  // Parse custom parameters from query string
+  const customEntrySigmas = searchParams.get("entrySigmas");
+  const customStopSigmas = searchParams.get("stopSigmas");
+  const customMaxDays = searchParams.get("maxDays");
+  const customMinR2s = searchParams.get("minR2s");
+  const customWindows = searchParams.get("windows");
+  const minTrades = parseInt(searchParams.get("minTrades") || "3");
 
   try {
     // Fetch 5+ years of price data for this ticker
@@ -276,12 +285,22 @@ export async function GET(
       close: parseFloat(r.close),
     }));
 
-    // Parameter grid for optimization
-    const entrySigmas = [2.0, 2.5, 3.0, 3.5, 4.0];
-    const stopSigmas = [3.0, 3.5, 4.0, 4.5]; // Max 4.5σ - tighter risk control
-    const maxDaysList = [5, 7, 10, 14, 21, 30];
-    const minR2s = [0.3, 0.5, 0.7];
-    const windowSizes = [126, 189, 252];
+    // Parameter grid for optimization - use custom or defaults
+    const entrySigmas = customEntrySigmas
+      ? customEntrySigmas.split(",").map(Number).filter(n => !isNaN(n) && n > 0)
+      : [1.5, 2.0, 2.5, 3.0, 3.5];
+    const stopSigmas = customStopSigmas
+      ? customStopSigmas.split(",").map(Number).filter(n => !isNaN(n) && n > 0)
+      : [2.5, 3.0, 3.5, 4.0]; // Max 4σ - tighter risk control
+    const maxDaysList = customMaxDays
+      ? customMaxDays.split(",").map(Number).filter(n => !isNaN(n) && n > 0)
+      : [5, 7, 10, 14, 21, 30];
+    const minR2s = customMinR2s
+      ? customMinR2s.split(",").map(Number).filter(n => !isNaN(n) && n >= 0 && n <= 1)
+      : [0.3, 0.5, 0.7];
+    const windowSizes = customWindows
+      ? customWindows.split(",").map(Number).filter(n => !isNaN(n) && n > 50)
+      : [126, 189, 252];
 
     const results: BacktestResult[] = [];
     let tested = 0;
@@ -303,7 +322,7 @@ export async function GET(
                 windowSize,
               });
 
-              if (result && result.totalTrades >= 5) {
+              if (result && result.totalTrades >= minTrades) {
                 results.push(result);
               }
             }
@@ -315,7 +334,7 @@ export async function GET(
     // Sort by score (higher is better)
     results.sort((a, b) => b.score - a.score);
 
-    // Return top 10 results
+    // Return top 10 results (without trades to keep response small)
     const topResults = results.slice(0, 10).map(r => ({
       params: r.params,
       totalTrades: r.totalTrades,
@@ -330,6 +349,20 @@ export async function GET(
       score: r.score,
     }));
 
+    // Include trades for the best result
+    const bestResult = results[0];
+    const bestWithTrades = bestResult ? {
+      ...topResults[0],
+      trades: bestResult.trades.map(t => ({
+        entryDate: t.entryDate,
+        exitDate: t.exitDate,
+        signal: t.signal,
+        returnPct: t.returnPct,
+        holdingDays: t.holdingDays,
+        exitReason: t.exitReason,
+      })),
+    } : null;
+
     return NextResponse.json({
       success: true,
       ticker,
@@ -340,7 +373,15 @@ export async function GET(
         end: prices[prices.length - 1].date,
       },
       results: topResults,
-      best: topResults[0] || null,
+      best: bestWithTrades,
+      parametersUsed: {
+        entrySigmas,
+        stopSigmas,
+        maxDaysList,
+        minR2s,
+        windowSizes,
+        minTrades,
+      },
     });
   } catch (error) {
     console.error(`STD Channel Optimize error for ${ticker}:`, error);
