@@ -255,7 +255,7 @@ export async function GET(
 
   // Parse custom parameters from query string
   const customEntrySigmas = searchParams.get("entrySigmas");
-  const customStopSigmas = searchParams.get("stopSigmas");
+  const customStopOffsets = searchParams.get("stopOffsets"); // NEW: offset from entry, not absolute stop
   const customMaxDays = searchParams.get("maxDays");
   const customMinR2s = searchParams.get("minR2s");
   const customWindows = searchParams.get("windows");
@@ -288,27 +288,28 @@ export async function GET(
     // Parameter grid for optimization - use custom or defaults
     const entrySigmas = customEntrySigmas
       ? customEntrySigmas.split(",").map(Number).filter(n => !isNaN(n) && n > 0)
-      : [1.5, 2.0, 2.5, 3.0, 3.5];
-    const stopSigmas = customStopSigmas
-      ? customStopSigmas.split(",").map(Number).filter(n => !isNaN(n) && n > 0)
-      : [2.5, 3.0, 3.5, 4.0]; // Max 4σ - tighter risk control
+      : [2.0, 2.5, 3.0];
+    // Use stop OFFSETS (risk per trade), not absolute stop sigmas
+    const stopOffsets = customStopOffsets
+      ? customStopOffsets.split(",").map(Number).filter(n => !isNaN(n) && n > 0)
+      : [0.5, 1.0]; // Default: tight risk control (0.5-1σ risk per trade)
     const maxDaysList = customMaxDays
       ? customMaxDays.split(",").map(Number).filter(n => !isNaN(n) && n > 0)
-      : [5, 7, 10, 14, 21, 30];
+      : [7, 14, 21];
     const minR2s = customMinR2s
       ? customMinR2s.split(",").map(Number).filter(n => !isNaN(n) && n >= 0 && n <= 1)
-      : [0.3, 0.5, 0.7];
+      : [0.5, 0.7];
     const windowSizes = customWindows
       ? customWindows.split(",").map(Number).filter(n => !isNaN(n) && n > 50)
-      : [126, 189, 252];
+      : [126, 252];
 
     const results: BacktestResult[] = [];
     let tested = 0;
 
     for (const entrySigma of entrySigmas) {
-      for (const stopSigma of stopSigmas) {
-        // Stop must be wider than entry
-        if (stopSigma <= entrySigma) continue;
+      for (const stopOffset of stopOffsets) {
+        // Stop = entry + offset (enforces proper risk/reward)
+        const stopSigma = Math.round((entrySigma + stopOffset) * 10) / 10;
 
         for (const maxDays of maxDaysList) {
           for (const minR2 of minR2s) {
@@ -376,7 +377,7 @@ export async function GET(
       best: bestWithTrades,
       parametersUsed: {
         entrySigmas,
-        stopSigmas,
+        stopOffsets, // Offset from entry, not absolute stop
         maxDaysList,
         minR2s,
         windowSizes,

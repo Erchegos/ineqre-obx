@@ -537,23 +537,10 @@ export default function StockTickerPage() {
     setShowTrades(false);
 
     try {
-      // Calculate stop sigmas from entry + offsets (better risk/reward)
-      const entrySigmasArray = Array.from(optEntrySigmas).sort((a, b) => a - b);
-      const stopOffsetsArray = Array.from(optStopOffsets);
-
-      // Generate stop sigmas: for each entry, add each offset
-      const stopSigmasSet = new Set<number>();
-      entrySigmasArray.forEach(entry => {
-        stopOffsetsArray.forEach(offset => {
-          stopSigmasSet.add(Math.round((entry + offset) * 10) / 10); // Round to 1 decimal
-        });
-      });
-      const stopSigmasArray = Array.from(stopSigmasSet).sort((a, b) => a - b);
-
-      // Build URL with custom parameters
+      // Build URL with custom parameters - send offsets directly
       const params = new URLSearchParams();
-      params.set("entrySigmas", entrySigmasArray.join(","));
-      params.set("stopSigmas", stopSigmasArray.join(","));
+      params.set("entrySigmas", Array.from(optEntrySigmas).sort((a, b) => a - b).join(","));
+      params.set("stopOffsets", Array.from(optStopOffsets).sort((a, b) => a - b).join(",")); // Send offsets, not absolute stops
       params.set("maxDays", Array.from(optMaxDays).sort((a, b) => a - b).join(","));
       params.set("minR2s", Array.from(optMinR2s).sort((a, b) => a - b).join(","));
       params.set("windows", Array.from(optWindows).sort((a, b) => a - b).join(","));
