@@ -1588,12 +1588,12 @@ export default function STDChannelStrategyPage() {
                         </span>
                       </td>
                       <td style={{ padding: "12px 8px" }}>
-                        <div style={{ fontSize: 9, lineHeight: 1.5 }}>
-                          <div style={{ color: "var(--foreground)", fontWeight: 500, marginBottom: 2 }}>
+                        <div style={{ fontSize: 11, lineHeight: 1.5 }}>
+                          <div style={{ color: "var(--foreground)", fontWeight: 500, marginBottom: 3 }}>
                             <span style={{ color: eventScore >= 0.7 ? "#10b981" : eventScore >= 0.5 ? "#fbbf24" : "#ef4444" }}>●</span>{" "}
                             {eventDescription}
                           </div>
-                          <div style={{ color: "var(--muted)", fontSize: 8 }}>
+                          <div style={{ color: "var(--muted)", fontSize: 10 }}>
                             {(eventScore * 100).toFixed(0)}% • σ={trade.sigmaAtEntry.toFixed(1)} • R²={trade.r2.toFixed(2)} {outcomeText}
                           </div>
                         </div>
