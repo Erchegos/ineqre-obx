@@ -438,11 +438,16 @@ export default function STDChannelStrategyPage() {
   }
 
   const { summary, currentSignals, recentTrades, stats } = data || {
-    summary: { totalTrades: 0, winRate: 0, avgReturn: 0, totalReturn: 0, maxDrawdown: 0, sharpeRatio: 0, profitFactor: 0, avgHoldingDays: 0, exitBreakdown: { target: 0, time: 0, stop: 0 } },
+    summary: { totalTrades: 0, winRate: 0, avgReturn: 0, totalReturn: 0, maxDrawdown: 0, worstTradeLoss: 0, sharpeRatio: 0, profitFactor: 0, avgHoldingDays: 0, exitBreakdown: { target: 0, time: 0, stop: 0 } },
     currentSignals: [],
     recentTrades: [],
     stats: { tickersAnalyzed: 0, tickersWithSignals: 0, avgR2: 0 },
   };
+
+  // Calculate actual worst trade from trades list (more reliable than API value)
+  const actualWorstTrade = recentTrades.length > 0
+    ? Math.min(...recentTrades.map(t => t.returnPct))
+    : 0;
 
   // Build cumulative return chart data from trades (portfolio-weighted, compounded)
   // Each trade is weighted as 1/maxPositions of the portfolio (same as API calculation)
@@ -738,7 +743,7 @@ export default function STDChannelStrategyPage() {
             />
             <MetricCard
               label="Worst Trade"
-              value={`${((summary.worstTradeLoss ?? summary.maxDrawdown) * 100).toFixed(1)}%`}
+              value={`${(actualWorstTrade * 100).toFixed(1)}%`}
               subtext="Single trade loss"
               positive={false}
               neutral
