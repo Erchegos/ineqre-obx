@@ -177,6 +177,7 @@ export default function STDChannelStrategyPage() {
 
   // Optimizer state
   const [optimizing, setOptimizing] = useState(false);
+  const [runBacktestTrigger, setRunBacktestTrigger] = useState(0); // Trigger to auto-run backtest
   const [optimResults, setOptimResults] = useState<OptimizationResult[] | null>(null);
   const [showOptimizer, setShowOptimizer] = useState(false);
 
@@ -250,7 +251,7 @@ export default function STDChannelStrategyPage() {
     setOptimizing(false);
   };
 
-  const applyOptimalParams = async (result: OptimizationResult) => {
+  const applyOptimalParams = (result: OptimizationResult) => {
     // Apply all params from optimization result
     setEntrySigma(result.params.entrySigma);
     setStopSigma(result.params.stopSigma);
@@ -259,21 +260,16 @@ export default function STDChannelStrategyPage() {
     setWindowSize(result.params.windowSize);
     // Position controls
     setMaxPositions(5);
-    // Calculate theoretical max loss per trade from sigma distance
-    // For mean reversion: loss = (stopSigma - entrySigma) * sigma_as_pct_of_price
-    // Typical sigma ≈ 2-3% of price for 189-day window
-    const sigmaOffset = result.params.stopSigma - result.params.entrySigma;
-    const avgSigmaPct = 0.025; // 2.5% average sigma as % of price
-    const maxLossPerTrade = sigmaOffset * avgSigmaPct * 100; // in percentage points
-    // With 5 max positions, worst case scenario (add buffer for correlated losses)
-    const theoreticalMaxDD = Math.ceil(maxLossPerTrade * 2.5); // ~2.5x for correlated drawdowns
-    setMaxDD(Math.max(theoreticalMaxDD, 5)); // Minimum 5%
+    // Use actual historical max DD from backtest result + buffer for safety
+    // maxDrawdown is negative (e.g., -0.02 = -2%), convert to positive percentage
+    const historicalDD = Math.abs(result.maxDrawdown) * 100;
+    const ddWithBuffer = Math.ceil(historicalDD * 1.5); // 50% buffer for variance
+    setMaxDD(Math.max(ddWithBuffer, 3)); // Minimum 3%
     setMinBM(0.3);
     setMinEP(0);
     setShowOptimizer(false);
-    // Auto-run backtest with new params (wait for state updates)
-    await new Promise(resolve => setTimeout(resolve, 50));
-    fetchData();
+    // Trigger backtest run via useEffect (ensures state is updated first)
+    setRunBacktestTrigger(prev => prev + 1);
   };
 
   // Initial load
@@ -281,6 +277,14 @@ export default function STDChannelStrategyPage() {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-run backtest when triggered (after applying optimal params)
+  useEffect(() => {
+    if (runBacktestTrigger > 0) {
+      fetchData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runBacktestTrigger]);
 
   if (initialLoad && loading) {
     return (
