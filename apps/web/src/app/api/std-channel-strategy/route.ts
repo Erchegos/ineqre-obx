@@ -546,21 +546,24 @@ export async function GET(request: NextRequest) {
     // Sort trades by date
     allTrades.sort((a, b) => a.exitDate.localeCompare(b.exitDate));
 
-    // Calculate summary stats
-    const wins = allTrades.filter((t) => t.returnPct > 0);
-    const losses = allTrades.filter((t) => t.returnPct <= 0);
-    const compoundedEquity = allTrades.reduce((eq, t) => eq * (1 + t.returnPct / params.maxPositions), 1.0);
+    // Filter trades by max loss limit (maxDrawdownPct is per-trade loss limit)
+    const filteredTrades = allTrades.filter(t => t.returnPct >= -params.maxDrawdownPct);
+
+    // Calculate summary stats from FILTERED trades only
+    const wins = filteredTrades.filter((t) => t.returnPct > 0);
+    const losses = filteredTrades.filter((t) => t.returnPct <= 0);
+    const compoundedEquity = filteredTrades.reduce((eq, t) => eq * (1 + t.returnPct / params.maxPositions), 1.0);
     const totalReturn = compoundedEquity - 1;
-    const avgReturn = allTrades.length > 0 ? allTrades.reduce((sum, t) => sum + t.returnPct, 0) / allTrades.length : 0;
-    const winRate = allTrades.length > 0 ? wins.length / allTrades.length : 0;
+    const avgReturn = filteredTrades.length > 0 ? filteredTrades.reduce((sum, t) => sum + t.returnPct, 0) / filteredTrades.length : 0;
+    const winRate = filteredTrades.length > 0 ? wins.length / filteredTrades.length : 0;
 
     // Sharpe
-    const returns = allTrades.map((t) => t.returnPct / params.maxPositions);
+    const returns = filteredTrades.map((t) => t.returnPct / params.maxPositions);
     const meanReturn = returns.length > 0 ? returns.reduce((a, b) => a + b, 0) / returns.length : 0;
     const stdReturn = returns.length > 1
       ? Math.sqrt(returns.reduce((sum, r) => sum + Math.pow(r - meanReturn, 2), 0) / (returns.length - 1))
       : 0;
-    const tradesPerYear = allTrades.length > 0 ? (allTrades.length / 3) : 0;
+    const tradesPerYear = filteredTrades.length > 0 ? (filteredTrades.length / 3) : 0;
     const sharpeRatio = stdReturn > 0 ? (meanReturn * Math.sqrt(tradesPerYear)) / stdReturn : 0;
 
     // Profit factor
@@ -568,16 +571,16 @@ export async function GET(request: NextRequest) {
     const grossLoss = Math.abs(losses.reduce((sum, t) => sum + t.returnPct, 0));
     const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? 99 : 0;
 
-    // Worst single trade loss (more realistic risk metric)
-    const worstTradeLoss = allTrades.length > 0
-      ? Math.min(...allTrades.map(t => t.returnPct))
+    // Worst single trade loss (from filtered trades)
+    const worstTradeLoss = filteredTrades.length > 0
+      ? Math.min(...filteredTrades.map(t => t.returnPct))
       : 0;
 
     // Exit breakdown
     const exitBreakdown = {
-      target: allTrades.filter((t) => t.exitReason === "TARGET").length,
-      time: allTrades.filter((t) => t.exitReason === "TIME").length,
-      stop: allTrades.filter((t) => t.exitReason === "STOP").length,
+      target: filteredTrades.filter((t) => t.exitReason === "TARGET").length,
+      time: filteredTrades.filter((t) => t.exitReason === "TIME").length,
+      stop: filteredTrades.filter((t) => t.exitReason === "STOP").length,
     };
     const totalExits = exitBreakdown.target + exitBreakdown.time + exitBreakdown.stop;
     const exitPcts = {
@@ -586,8 +589,8 @@ export async function GET(request: NextRequest) {
       stop: totalExits > 0 ? Math.round((exitBreakdown.stop / totalExits) * 100) : 0,
     };
 
-    const avgHoldingDays = allTrades.length > 0
-      ? allTrades.reduce((sum, t) => sum + t.holdingDays, 0) / allTrades.length
+    const avgHoldingDays = filteredTrades.length > 0
+      ? filteredTrades.reduce((sum, t) => sum + t.holdingDays, 0) / filteredTrades.length
       : 0;
 
     currentSignals.sort((a, b) => Math.abs(b.sigmaDistance) - Math.abs(a.sigmaDistance));
@@ -600,12 +603,13 @@ export async function GET(request: NextRequest) {
       success: true,
       params,
       summary: {
-        totalTrades: allTrades.length,
+        totalTrades: filteredTrades.length,
+        tradesExcluded: allTrades.length - filteredTrades.length,  // Trades filtered out by max loss
         winRate,
         avgReturn,
         totalReturn,
         maxDrawdown: -maxDrawdown,
-        worstTradeLoss,  // Single trade worst loss (more realistic risk)
+        worstTradeLoss,  // Worst trade from filtered set (should be <= maxDrawdownPct)
         sharpeRatio,
         profitFactor,
         avgHoldingDays,
@@ -613,7 +617,7 @@ export async function GET(request: NextRequest) {
         circuitBreakerTriggered,
       },
       currentSignals,
-      recentTrades: allTrades, // Return all trades for accurate chart
+      recentTrades: filteredTrades, // Only return trades within max loss limit
       stats: {
         tickersAnalyzed: tickerStats.length,
         tickersWithSignals: currentSignals.length,

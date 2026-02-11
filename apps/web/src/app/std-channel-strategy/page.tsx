@@ -261,11 +261,10 @@ export default function STDChannelStrategyPage() {
     setWindowSize(result.params.windowSize);
     // Position controls
     setMaxPositions(5);
-    // Use actual historical max DD from backtest result + buffer for safety
-    // maxDrawdown is negative (e.g., -0.02 = -2%), convert to positive percentage
-    const historicalDD = Math.abs(result.maxDrawdown) * 100;
-    const ddWithBuffer = Math.ceil(historicalDD * 1.5); // 50% buffer for variance
-    setMaxDD(Math.max(ddWithBuffer, 3)); // Minimum 3%
+    // Set max DD to the worst trade value from optimizer (no buffer - exact filter)
+    // maxDrawdown is negative (e.g., -0.17 = -17%), convert to positive percentage
+    const worstTradePct = Math.ceil(Math.abs(result.maxDrawdown) * 100);
+    setMaxDD(worstTradePct); // Exact worst trade as filter limit
     setMinBM(0.3);
     setMinEP(0);
     setShowOptimizer(false);
