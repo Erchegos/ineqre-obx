@@ -619,7 +619,7 @@ export default function TickerBacktestPage() {
         {/* Predicted vs Actual */}
         <div style={chartCardStyle}>
           <div style={sectionTitle}>PREDICTED vs ACTUAL RETURNS</div>
-          <ResponsiveContainer width="100%" height={280}>
+          <ResponsiveContainer width="100%" height={340}>
             <BarChart
               data={barData}
               margin={{ top: 5, right: 5, left: -20, bottom: 5 }}
@@ -735,7 +735,7 @@ export default function TickerBacktestPage() {
               </button>
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={280}>
+          <ResponsiveContainer width="100%" height={340}>
             <LineChart
               data={cumData}
               margin={{ top: 5, right: 5, left: -20, bottom: 5 }}
