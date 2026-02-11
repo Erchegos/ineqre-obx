@@ -250,20 +250,30 @@ export default function STDChannelStrategyPage() {
     setOptimizing(false);
   };
 
-  const applyOptimalParams = (result: OptimizationResult) => {
+  const applyOptimalParams = async (result: OptimizationResult) => {
+    // Apply all params from optimization result
     setEntrySigma(result.params.entrySigma);
     setStopSigma(result.params.stopSigma);
     setMaxDays(result.params.maxDays);
     setMinR2(result.params.minR2);
     setWindowSize(result.params.windowSize);
-    // Keep optimized defaults for position controls
+    // Position controls
     setMaxPositions(5);
-    setMaxDD(20); // 20% max drawdown circuit breaker
+    // Calculate theoretical max loss per trade from sigma distance
+    // For mean reversion: loss = (stopSigma - entrySigma) * sigma_as_pct_of_price
+    // Typical sigma ≈ 2-3% of price for 189-day window
+    const sigmaOffset = result.params.stopSigma - result.params.entrySigma;
+    const avgSigmaPct = 0.025; // 2.5% average sigma as % of price
+    const maxLossPerTrade = sigmaOffset * avgSigmaPct * 100; // in percentage points
+    // With 5 max positions, worst case scenario (add buffer for correlated losses)
+    const theoreticalMaxDD = Math.ceil(maxLossPerTrade * 2.5); // ~2.5x for correlated drawdowns
+    setMaxDD(Math.max(theoreticalMaxDD, 5)); // Minimum 5%
     setMinBM(0.3);
     setMinEP(0);
     setShowOptimizer(false);
-    // Auto-run backtest with new params
-    setTimeout(() => fetchData(), 100);
+    // Auto-run backtest with new params (wait for state updates)
+    await new Promise(resolve => setTimeout(resolve, 50));
+    fetchData();
   };
 
   // Initial load
