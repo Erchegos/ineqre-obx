@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
+import {
+  runEventFilters,
+  type EventFilterInput,
+  type CompositeFilterResult,
+} from "@/lib/eventFilters";
 
 export const dynamic = "force-dynamic";
 
@@ -7,6 +12,10 @@ interface PriceRow {
   date: string;
   close: number;
   adj_close: number;
+  open?: number;
+  high?: number;
+  low?: number;
+  volume?: number;
 }
 
 interface Trade {
@@ -22,6 +31,7 @@ interface Trade {
   sigmaAtEntry: number;
   r2: number;
   slope: number;
+  eventScore?: number;  // Event filter score at entry (0-1)
 }
 
 interface StrategyParams {
@@ -35,6 +45,9 @@ interface StrategyParams {
   windowSize: number;
   maxPositions: number;
   maxDrawdownPct: number;
+  // Event filter settings
+  useEventFilters: boolean;
+  minEventScore: number;  // Minimum composite filter score (0-1)
 }
 
 const DEFAULT_PARAMS: StrategyParams = {
@@ -48,11 +61,30 @@ const DEFAULT_PARAMS: StrategyParams = {
   windowSize: 252,
   maxPositions: 5,
   maxDrawdownPct: 0.15,
+  useEventFilters: true,
+  minEventScore: 0.5,
 };
 
 interface Fundamentals {
   ep: number | null;
   bm: number | null;
+  mom1m: number | null;
+  mom6m: number | null;
+  vol1m: number | null;
+  vol12m: number | null;
+  beta: number | null;
+  mktcap: number | null;
+}
+
+interface MarketData {
+  date: string;
+  return: number;
+}
+
+interface ResearchActivity {
+  ticker: string;
+  recentCount: number;
+  lastDate: string | null;
 }
 
 function calculateLinearRegression(prices: number[]): {
@@ -82,12 +114,21 @@ function calculateLinearRegression(prices: number[]): {
   return { slope, intercept, r2 };
 }
 
-// Portfolio-aware backtest with risk controls
+// Helper to calculate trailing average
+function calculateTrailingAvg(values: number[], lookback: number): number {
+  if (values.length < lookback) return values.reduce((a, b) => a + b, 0) / values.length;
+  const slice = values.slice(-lookback);
+  return slice.reduce((a, b) => a + b, 0) / slice.length;
+}
+
+// Portfolio-aware backtest with risk controls and event filters
 function runPortfolioBacktest(
   tickerPrices: Map<string, PriceRow[]>,
   tickerFundamentals: Map<string, Fundamentals>,
+  marketData: Map<string, number>,  // date -> OBX return
+  researchActivity: Map<string, ResearchActivity>,
   params: StrategyParams
-): { trades: Trade[]; maxDrawdown: number; circuitBreakerTriggered: boolean } {
+): { trades: Trade[]; maxDrawdown: number; circuitBreakerTriggered: boolean; filterStats: { avgScore: number; filtered: number; total: number } } {
   const allTrades: Trade[] = [];
 
   // Track open positions
@@ -100,9 +141,15 @@ function runPortfolioBacktest(
     sigmaAtEntry: number;
     r2: number;
     slope: number;
+    eventScore: number;
   }
 
   const openPositions = new Map<string, OpenPosition>();
+
+  // Filter tracking (for stats)
+  let totalCandidates = 0;
+  let filteredCandidates = 0;
+  let filterScoreSum = 0;
 
   // Portfolio equity tracking
   let portfolioEquity = 1.0;
@@ -160,6 +207,7 @@ function runPortfolioBacktest(
             sigmaAtEntry: pos.sigmaAtEntry,
             r2: pos.r2,
             slope: pos.slope,
+            eventScore: pos.eventScore,
           });
 
           portfolioEquity *= (1 + returnPct / params.maxPositions);
@@ -245,6 +293,7 @@ function runPortfolioBacktest(
           sigmaAtEntry: pos.sigmaAtEntry,
           r2: pos.r2,
           slope: pos.slope,
+          eventScore: pos.eventScore,
         });
 
         // Update portfolio equity (equal weight per position)
@@ -269,6 +318,8 @@ function runPortfolioBacktest(
       slope: number;
       price: number;
       convictionScore: number;
+      eventFilterScore: number;
+      eventFilterResult?: CompositeFilterResult;
     }
 
     const candidates: EntryCandidate[] = [];
@@ -324,8 +375,78 @@ function runPortfolioBacktest(
       }
 
       if (signal) {
-        // Conviction score: higher R², more extreme sigma = higher conviction
-        const convictionScore = r2 * Math.abs(sigmaDistance) * (fund.bm || 0.5);
+        totalCandidates++;
+
+        // Get price history for event filters
+        const priceHistory = windowPrices.slice(-20).map((p, i) => {
+          const histDate = sortedDates[dateIdx - 20 + i] || currentDate;
+          return {
+            date: histDate,
+            close: p,
+            volume: 0,  // Will be populated if available
+            high: p * 1.01,  // Estimate if not available
+            low: p * 0.99,
+          };
+        });
+
+        // Get current and previous day data
+        const prevClose = windowPrices[windowPrices.length - 2] || price;
+        const avgVolume20d = 1_000_000;  // Default estimate
+        const avgRange20d = 0.02;  // 2% average daily range
+
+        // Build event filter input
+        const eventInput: EventFilterInput = {
+          ticker,
+          currentDate,
+          signal,
+          sigmaDistance,
+          currentPrice: price,
+          previousClose: prevClose,
+          open: price,  // Estimate
+          high: price * 1.01,
+          low: price * 0.99,
+          volume: avgVolume20d,  // Will be actual if available
+          avgVolume20d,
+          avgRange20d,
+          priceHistory,
+          marketReturn: marketData.get(currentDate),
+          currentFactors: {
+            ep: fund.ep,
+            bm: fund.bm,
+            mom1m: fund.mom1m,
+            mom6m: fund.mom6m,
+            vol1m: fund.vol1m,
+            vol12m: fund.vol12m,
+            beta: fund.beta,
+            mktcap: fund.mktcap,
+          },
+          recentResearchCount: researchActivity.get(ticker)?.recentCount || 0,
+          lastResearchDate: researchActivity.get(ticker)?.lastDate || undefined,
+          dayOfWeek: new Date(currentDate).getDay(),
+          dayOfMonth: new Date(currentDate).getDate(),
+          isMonthEnd: new Date(currentDate).getDate() > 25,
+          isQuarterEnd: [2, 5, 8, 11].includes(new Date(currentDate).getMonth()) &&
+                        new Date(currentDate).getDate() > 25,
+        };
+
+        // Run event filters
+        let eventFilterScore = 1.0;
+        let eventFilterResult: CompositeFilterResult | undefined;
+
+        if (params.useEventFilters) {
+          eventFilterResult = runEventFilters(eventInput);
+          eventFilterScore = eventFilterResult.overallScore;
+          filterScoreSum += eventFilterScore;
+
+          // Skip if below minimum score
+          if (eventFilterScore < params.minEventScore) {
+            filteredCandidates++;
+            continue;
+          }
+        }
+
+        // Conviction score: higher R², more extreme sigma, better filter score = higher conviction
+        const convictionScore = r2 * Math.abs(sigmaDistance) * (fund.bm || 0.5) * eventFilterScore;
 
         candidates.push({
           ticker,
@@ -335,6 +456,8 @@ function runPortfolioBacktest(
           slope,
           price,
           convictionScore,
+          eventFilterScore,
+          eventFilterResult,
         });
       }
     }
@@ -354,11 +477,24 @@ function runPortfolioBacktest(
         sigmaAtEntry: c.sigmaDistance,
         r2: c.r2,
         slope: c.slope,
+        eventScore: c.eventFilterScore,
       });
     }
   }
 
-  return { trades: allTrades, maxDrawdown, circuitBreakerTriggered };
+  // Calculate filter stats
+  const avgFilterScore = totalCandidates > 0 ? filterScoreSum / totalCandidates : 1;
+
+  return {
+    trades: allTrades,
+    maxDrawdown,
+    circuitBreakerTriggered,
+    filterStats: {
+      avgScore: avgFilterScore,
+      filtered: filteredCandidates,
+      total: totalCandidates,
+    },
+  };
 }
 
 async function analyzeTickerChannel(
@@ -449,11 +585,13 @@ export async function GET(request: NextRequest) {
       windowSize: parseInt(searchParams.get("window") || String(DEFAULT_PARAMS.windowSize)),
       maxPositions: parseInt(searchParams.get("maxPos") || String(DEFAULT_PARAMS.maxPositions)),
       maxDrawdownPct: parseFloat(searchParams.get("maxDD") || String(DEFAULT_PARAMS.maxDrawdownPct)),
+      useEventFilters: searchParams.get("useFilters") !== "false",  // Default true
+      minEventScore: parseFloat(searchParams.get("minEventScore") || String(DEFAULT_PARAMS.minEventScore)),
     };
 
-    // Fetch all price data in ONE query (5 years for proper backtest)
+    // Fetch all price data with OHLCV (5 years for proper backtest)
     const priceResult = await pool.query(`
-      SELECT ticker, date::text, close, adj_close
+      SELECT ticker, date::text, open, high, low, close, adj_close, volume
       FROM prices_daily
       WHERE date > '2020-01-01'
         AND ticker IN (
@@ -472,16 +610,67 @@ export async function GET(request: NextRequest) {
       }
       tickerPrices.get(row.ticker)!.push({
         date: row.date,
+        open: row.open ? parseFloat(row.open) : undefined,
+        high: row.high ? parseFloat(row.high) : undefined,
+        low: row.low ? parseFloat(row.low) : undefined,
         close: row.close,
         adj_close: row.adj_close,
+        volume: row.volume ? parseFloat(row.volume) : undefined,
       });
     }
 
-    // Fetch all fundamentals in ONE query
+    // Fetch OBX index returns for market context
+    const marketResult = await pool.query(`
+      SELECT date::text,
+             (adj_close - LAG(adj_close) OVER (ORDER BY date)) / LAG(adj_close) OVER (ORDER BY date) as return
+      FROM prices_daily
+      WHERE ticker = 'OBX' AND date > '2020-01-01'
+      ORDER BY date ASC
+    `);
+
+    const marketData = new Map<string, number>();
+    for (const row of marketResult.rows) {
+      if (row.return !== null) {
+        marketData.set(row.date, parseFloat(row.return));
+      }
+    }
+
+    // Fetch research activity per ticker (last 7 days)
+    // Use substring instead of regexp_matches to avoid set-returning function issues
+    const researchResult = await pool.query(`
+      SELECT
+        UPPER(COALESCE(
+          substring(subject FROM '([A-Z]{2,6})'),
+          substring(subject FROM '\\m([A-Z][a-z]+)\\M')
+        )) as ticker,
+        COUNT(*) as recent_count,
+        MAX(received_date)::text as last_date
+      FROM research_documents
+      WHERE received_date > CURRENT_DATE - INTERVAL '7 days'
+      GROUP BY 1
+    `);
+
+    const researchActivity = new Map<string, ResearchActivity>();
+    for (const row of researchResult.rows) {
+      if (row.ticker) {
+        researchActivity.set(row.ticker, {
+          ticker: row.ticker,
+          recentCount: parseInt(row.recent_count) || 0,
+          lastDate: row.last_date,
+        });
+      }
+    }
+
+    // Fetch all fundamentals with technical factors
     const fundResult = await pool.query(`
-      SELECT DISTINCT ON (ticker) ticker, ep, bm
-      FROM factor_fundamentals
-      ORDER BY ticker, date DESC
+      SELECT
+        f.ticker, f.ep, f.bm, f.mktcap,
+        t.mom1m, t.mom6m, t.vol1m, t.vol12m, t.beta
+      FROM factor_fundamentals f
+      LEFT JOIN factor_technical t ON f.ticker = t.ticker AND f.date = t.date
+      WHERE (f.ticker, f.date) IN (
+        SELECT ticker, MAX(date) FROM factor_fundamentals GROUP BY ticker
+      )
     `);
 
     const tickerFundamentals = new Map<string, Fundamentals>();
@@ -489,17 +678,25 @@ export async function GET(request: NextRequest) {
       tickerFundamentals.set(row.ticker, {
         ep: row.ep ? parseFloat(row.ep) : null,
         bm: row.bm ? parseFloat(row.bm) : null,
+        mom1m: row.mom1m ? parseFloat(row.mom1m) : null,
+        mom6m: row.mom6m ? parseFloat(row.mom6m) : null,
+        vol1m: row.vol1m ? parseFloat(row.vol1m) : null,
+        vol12m: row.vol12m ? parseFloat(row.vol12m) : null,
+        beta: row.beta ? parseFloat(row.beta) : null,
+        mktcap: row.mktcap ? parseFloat(row.mktcap) : null,
       });
     }
 
-    // Run portfolio-aware backtest
-    const { trades: allTrades, maxDrawdown, circuitBreakerTriggered } = runPortfolioBacktest(
+    // Run portfolio-aware backtest with event filters
+    const { trades: allTrades, maxDrawdown, circuitBreakerTriggered, filterStats } = runPortfolioBacktest(
       tickerPrices,
       tickerFundamentals,
+      marketData,
+      researchActivity,
       params
     );
 
-    // Current signals
+    // Current signals with event filter analysis
     const currentSignals: Array<{
       ticker: string;
       signal: "LONG" | "SHORT";
@@ -509,6 +706,9 @@ export async function GET(request: NextRequest) {
       ep: number | null;
       bm: number | null;
       mom6m: number | null;
+      eventScore: number;
+      eventRecommendation: string;
+      eventFilters: Array<{ name: string; score: number; reason: string }>;
     }> = [];
 
     const tickerStats: Array<{
@@ -518,7 +718,10 @@ export async function GET(request: NextRequest) {
 
     for (const [ticker, prices] of tickerPrices) {
       if (prices.length < params.windowSize + 50) continue;
-      const fund = tickerFundamentals.get(ticker) || { ep: null, bm: null };
+      const fund: Fundamentals = tickerFundamentals.get(ticker) || {
+        ep: null, bm: null, mom1m: null, mom6m: null,
+        vol1m: null, vol12m: null, beta: null, mktcap: null
+      };
 
       try {
         const analysis = await analyzeTickerChannel(ticker, prices, fund, params);
@@ -526,16 +729,79 @@ export async function GET(request: NextRequest) {
           tickerStats.push({ ticker, r2: analysis.r2 });
 
           if (analysis.hasSignal) {
-            currentSignals.push({
+            // Get latest price data for event filters
+            const latestPrices = prices.slice(-21);
+            const currentPrice = parseFloat(String(latestPrices[latestPrices.length - 1]?.adj_close || latestPrices[latestPrices.length - 1]?.close));
+            const prevClose = parseFloat(String(latestPrices[latestPrices.length - 2]?.adj_close || latestPrices[latestPrices.length - 2]?.close));
+
+            // Calculate volume averages
+            const volumes = latestPrices.slice(0, -1).map(p => p.volume || 0).filter(v => v > 0);
+            const avgVol = volumes.length > 0 ? volumes.reduce((a, b) => a + b, 0) / volumes.length : 1_000_000;
+            const currentVol = latestPrices[latestPrices.length - 1]?.volume || avgVol;
+
+            // Build event filter input for current signal
+            const eventInput: EventFilterInput = {
               ticker,
+              currentDate: latestPrices[latestPrices.length - 1]?.date || new Date().toISOString().split('T')[0],
               signal: analysis.signalType as "LONG" | "SHORT",
               sigmaDistance: analysis.currentSigma,
-              r2: analysis.r2,
-              slope: analysis.slope,
-              ep: analysis.fundamentals.ep,
-              bm: analysis.fundamentals.bm,
-              mom6m: analysis.fundamentals.mom6m,
-            });
+              currentPrice,
+              previousClose: prevClose,
+              open: latestPrices[latestPrices.length - 1]?.open || currentPrice,
+              high: latestPrices[latestPrices.length - 1]?.high || currentPrice,
+              low: latestPrices[latestPrices.length - 1]?.low || currentPrice,
+              volume: currentVol,
+              avgVolume20d: avgVol,
+              avgRange20d: 0.02,
+              priceHistory: latestPrices.slice(0, -1).map(p => ({
+                date: p.date,
+                close: parseFloat(String(p.adj_close || p.close)),
+                volume: p.volume || 0,
+                high: p.high || parseFloat(String(p.close)),
+                low: p.low || parseFloat(String(p.close)),
+              })),
+              marketReturn: marketData.get(latestPrices[latestPrices.length - 1]?.date || ''),
+              currentFactors: {
+                ep: fund.ep,
+                bm: fund.bm,
+                mom1m: fund.mom1m,
+                mom6m: fund.mom6m,
+                vol1m: fund.vol1m,
+                vol12m: fund.vol12m,
+                beta: fund.beta,
+                mktcap: fund.mktcap,
+              },
+              recentResearchCount: researchActivity.get(ticker)?.recentCount || 0,
+              lastResearchDate: researchActivity.get(ticker)?.lastDate || undefined,
+              dayOfWeek: new Date().getDay(),
+              dayOfMonth: new Date().getDate(),
+              isMonthEnd: new Date().getDate() > 25,
+              isQuarterEnd: [2, 5, 8, 11].includes(new Date().getMonth()) && new Date().getDate() > 25,
+            };
+
+            // Run event filters
+            const eventResult = runEventFilters(eventInput);
+
+            // Only include signals that pass minimum event score (or if filters disabled)
+            if (!params.useEventFilters || eventResult.overallScore >= params.minEventScore) {
+              currentSignals.push({
+                ticker,
+                signal: analysis.signalType as "LONG" | "SHORT",
+                sigmaDistance: analysis.currentSigma,
+                r2: analysis.r2,
+                slope: analysis.slope,
+                ep: analysis.fundamentals.ep,
+                bm: analysis.fundamentals.bm,
+                mom6m: analysis.fundamentals.mom6m,
+                eventScore: eventResult.overallScore,
+                eventRecommendation: eventResult.recommendation,
+                eventFilters: eventResult.filters.map(f => ({
+                  name: f.name,
+                  score: f.score,
+                  reason: f.reason,
+                })),
+              });
+            }
           }
         }
       } catch {
@@ -623,6 +889,12 @@ export async function GET(request: NextRequest) {
         tickersWithSignals: currentSignals.length,
         avgR2,
       },
+      filterStats: params.useEventFilters ? {
+        avgScore: filterStats.avgScore,
+        candidatesFiltered: filterStats.filtered,
+        totalCandidates: filterStats.total,
+        filterRate: filterStats.total > 0 ? (filterStats.filtered / filterStats.total * 100).toFixed(1) + '%' : '0%',
+      } : null,
     });
   } catch (error: unknown) {
     console.error("STD Channel Strategy error:", error);
