@@ -204,6 +204,13 @@ export default function STDChannelStrategyPage() {
   const [optimResults, setOptimResults] = useState<OptimizationResult[] | null>(null);
   const [showOptimizer, setShowOptimizer] = useState(false);
 
+  // Trade log sorting and filtering
+  type SortColumn = "ticker" | "direction" | "eventScore" | "pnl" | "entryDate" | "exitDate" | "days" | "exit";
+  const [sortColumn, setSortColumn] = useState<SortColumn>("entryDate");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [filterDirection, setFilterDirection] = useState<"ALL" | "LONG" | "SHORT">("ALL");
+  const [filterExit, setFilterExit] = useState<"ALL" | "TARGET" | "TIME" | "STOP">("ALL");
+
   // Loading progress animation
   const [loadingProgress, setLoadingProgress] = useState(0);
 
@@ -678,6 +685,54 @@ export default function STDChannelStrategyPage() {
   const actualWorstTrade = recentTrades.length > 0
     ? Math.min(...recentTrades.map(t => t.returnPct))
     : 0;
+
+  // Filter and sort trades for the table
+  const filteredAndSortedTrades = [...recentTrades]
+    .filter(trade => {
+      if (filterDirection !== "ALL" && trade.signal !== filterDirection) return false;
+      if (filterExit !== "ALL" && trade.exitReason !== filterExit) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      let comparison = 0;
+      switch (sortColumn) {
+        case "ticker":
+          comparison = a.ticker.localeCompare(b.ticker);
+          break;
+        case "direction":
+          comparison = a.signal.localeCompare(b.signal);
+          break;
+        case "eventScore":
+          comparison = (a.eventScore ?? 1) - (b.eventScore ?? 1);
+          break;
+        case "pnl":
+          comparison = a.returnPct - b.returnPct;
+          break;
+        case "entryDate":
+          comparison = a.entryDate.localeCompare(b.entryDate);
+          break;
+        case "exitDate":
+          comparison = a.exitDate.localeCompare(b.exitDate);
+          break;
+        case "days":
+          comparison = a.holdingDays - b.holdingDays;
+          break;
+        case "exit":
+          comparison = a.exitReason.localeCompare(b.exitReason);
+          break;
+      }
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+
+  // Handler for clicking column headers
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("desc");
+    }
+  };
 
   // Build cumulative return chart data from trades (portfolio-weighted, compounded)
   // Each trade is weighted as 1/maxPositions of the portfolio (same as API calculation)
@@ -1431,34 +1486,130 @@ export default function STDChannelStrategyPage() {
 
         {/* Trade Execution Log */}
         <section style={{ ...cardStyle, marginBottom: 24, background: "#08080c" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <div style={sectionTitle}>Trade Log ({recentTrades.length})</div>
-              <div style={{ display: "flex", gap: 8, fontSize: 9 }}>
+              <div style={sectionTitle}>
+                Trade Log ({filteredAndSortedTrades.length}{filteredAndSortedTrades.length !== recentTrades.length ? ` of ${recentTrades.length}` : ""})
+              </div>
+              <div style={{ display: "flex", gap: 8, fontSize: 10 }}>
                 <span style={{ color: "#10b981" }}>■ TARGET</span>
                 <span style={{ color: "#3b82f6" }}>■ TIME</span>
                 <span style={{ color: "#ef4444" }}>■ STOP</span>
               </div>
             </div>
+            {/* Filters */}
+            <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+              {/* Direction Filter */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase" }}>Direction:</span>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {(["ALL", "LONG", "SHORT"] as const).map(dir => (
+                    <button
+                      key={dir}
+                      onClick={() => setFilterDirection(dir)}
+                      style={{
+                        padding: "4px 10px",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        border: "none",
+                        borderRadius: 4,
+                        cursor: "pointer",
+                        background: filterDirection === dir
+                          ? dir === "LONG" ? "rgba(16, 185, 129, 0.3)" : dir === "SHORT" ? "rgba(239, 68, 68, 0.3)" : "var(--accent)"
+                          : "rgba(255,255,255,0.05)",
+                        color: filterDirection === dir
+                          ? dir === "LONG" ? "#10b981" : dir === "SHORT" ? "#ef4444" : "#fff"
+                          : "var(--muted)",
+                      }}
+                    >
+                      {dir}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Exit Filter */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase" }}>Exit:</span>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {(["ALL", "TARGET", "TIME", "STOP"] as const).map(exit => (
+                    <button
+                      key={exit}
+                      onClick={() => setFilterExit(exit)}
+                      style={{
+                        padding: "4px 10px",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        border: "none",
+                        borderRadius: 4,
+                        cursor: "pointer",
+                        background: filterExit === exit
+                          ? exit === "TARGET" ? "rgba(16, 185, 129, 0.3)" : exit === "TIME" ? "rgba(59, 130, 246, 0.3)" : exit === "STOP" ? "rgba(239, 68, 68, 0.3)" : "var(--accent)"
+                          : "rgba(255,255,255,0.05)",
+                        color: filterExit === exit
+                          ? exit === "TARGET" ? "#10b981" : exit === "TIME" ? "#3b82f6" : exit === "STOP" ? "#ef4444" : "#fff"
+                          : "var(--muted)",
+                      }}
+                    >
+                      {exit}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
           <div style={{ overflowX: "auto", maxHeight: 600 }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <thead style={{ position: "sticky", top: 0, background: "var(--card-bg)", zIndex: 1 }}>
+              <thead style={{ position: "sticky", top: 0, background: "#08080c", zIndex: 1 }}>
                 <tr style={{ borderBottom: "2px solid var(--border)" }}>
-                  <th style={{ padding: "12px 10px 12px 0", fontWeight: 600, color: "var(--muted)", textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em" }}>Ticker</th>
-                  <th style={{ padding: "12px 10px", fontWeight: 600, color: "var(--muted)", textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em" }}>Direction</th>
-                  <th style={{ padding: "12px 10px", fontWeight: 600, color: "var(--muted)", textAlign: "center", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em" }}>Event Score</th>
-                  <th style={{ padding: "12px 10px", fontWeight: 600, color: "var(--muted)", textAlign: "right", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em" }}>P&L</th>
-                  <th style={{ padding: "12px 10px", fontWeight: 600, color: "var(--muted)", textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em" }}>Entry → Exit</th>
+                  <th
+                    onClick={() => handleSort("ticker")}
+                    style={{ padding: "12px 10px 12px 0", fontWeight: 600, color: sortColumn === "ticker" ? "var(--accent)" : "var(--muted)", textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
+                  >
+                    Ticker {sortColumn === "ticker" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </th>
+                  <th
+                    onClick={() => handleSort("direction")}
+                    style={{ padding: "12px 10px", fontWeight: 600, color: sortColumn === "direction" ? "var(--accent)" : "var(--muted)", textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
+                  >
+                    Direction {sortColumn === "direction" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </th>
+                  <th
+                    onClick={() => handleSort("eventScore")}
+                    style={{ padding: "12px 10px", fontWeight: 600, color: sortColumn === "eventScore" ? "var(--accent)" : "var(--muted)", textAlign: "center", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
+                  >
+                    Event Score {sortColumn === "eventScore" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </th>
+                  <th
+                    onClick={() => handleSort("pnl")}
+                    style={{ padding: "12px 10px", fontWeight: 600, color: sortColumn === "pnl" ? "var(--accent)" : "var(--muted)", textAlign: "right", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
+                  >
+                    P&L {sortColumn === "pnl" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </th>
+                  <th
+                    onClick={() => handleSort("entryDate")}
+                    style={{ padding: "12px 10px", fontWeight: 600, color: sortColumn === "entryDate" ? "var(--accent)" : "var(--muted)", textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
+                  >
+                    Entry → Exit {sortColumn === "entryDate" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </th>
                   <th style={{ padding: "12px 10px", fontWeight: 600, color: "var(--muted)", textAlign: "right", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em" }}>Entry $</th>
                   <th style={{ padding: "12px 10px", fontWeight: 600, color: "var(--muted)", textAlign: "right", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em" }}>Exit $</th>
-                  <th style={{ padding: "12px 10px", fontWeight: 600, color: "var(--muted)", textAlign: "right", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em" }}>Days</th>
-                  <th style={{ padding: "12px 10px", fontWeight: 600, color: "var(--muted)", textAlign: "center", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em" }}>Exit</th>
+                  <th
+                    onClick={() => handleSort("days")}
+                    style={{ padding: "12px 10px", fontWeight: 600, color: sortColumn === "days" ? "var(--accent)" : "var(--muted)", textAlign: "right", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
+                  >
+                    Days {sortColumn === "days" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </th>
+                  <th
+                    onClick={() => handleSort("exit")}
+                    style={{ padding: "12px 10px", fontWeight: 600, color: sortColumn === "exit" ? "var(--accent)" : "var(--muted)", textAlign: "center", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
+                  >
+                    Exit {sortColumn === "exit" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </th>
                   <th style={{ padding: "12px 10px", fontWeight: 600, color: "var(--muted)", textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", minWidth: 240 }}>Signal Analysis</th>
                 </tr>
               </thead>
               <tbody>
-                {recentTrades.map((trade, idx) => {
+                {filteredAndSortedTrades.map((trade, idx) => {
                   // Use actual event score from backtest (filters trades at entry)
                   const eventScore = trade.eventScore ?? 1.0;
 
