@@ -1462,19 +1462,39 @@ export default function STDChannelStrategyPage() {
                   // Use actual event score from backtest (filters trades at entry)
                   const eventScore = trade.eventScore ?? 1.0;
 
-                  // Generate reasoning based on trade characteristics
-                  const reasoningParts: string[] = [];
-                  reasoningParts.push(`Event: ${(eventScore * 100).toFixed(0)}%`);
-                  reasoningParts.push(`σ=${trade.sigmaAtEntry.toFixed(1)}`);
-                  reasoningParts.push(`R²=${trade.r2.toFixed(2)}`);
+                  // Generate event description based on signal characteristics
+                  const sigmaMagnitude = Math.abs(trade.sigmaAtEntry);
+                  const isExtreme = sigmaMagnitude >= 3.5;
+                  const isStrong = sigmaMagnitude >= 2.5;
+                  const channelQuality = trade.r2 >= 0.8 ? "strong" : trade.r2 >= 0.6 ? "solid" : "weak";
 
-                  if (trade.exitReason === "TARGET") {
-                    reasoningParts.push("→ Reverted");
-                  } else if (trade.exitReason === "TIME") {
-                    reasoningParts.push("→ Partial");
+                  let eventType = "";
+                  if (trade.signal === "LONG") {
+                    if (isExtreme) {
+                      eventType = "Deep oversold";
+                    } else if (isStrong) {
+                      eventType = "Oversold bounce";
+                    } else {
+                      eventType = "Channel support";
+                    }
                   } else {
-                    reasoningParts.push("→ Stopped");
+                    if (isExtreme) {
+                      eventType = "Extended rally";
+                    } else if (isStrong) {
+                      eventType = "Overbought fade";
+                    } else {
+                      eventType = "Channel resistance";
+                    }
                   }
+
+                  // Generate reasoning with event context
+                  const eventDescription = `${eventType} (${channelQuality} channel)`;
+
+                  const outcomeText = trade.exitReason === "TARGET"
+                    ? "→ Mean reverted"
+                    : trade.exitReason === "TIME"
+                    ? "→ Time exit"
+                    : "→ Stopped out";
 
                   return (
                     <tr
@@ -1568,9 +1588,14 @@ export default function STDChannelStrategyPage() {
                         </span>
                       </td>
                       <td style={{ padding: "12px 8px" }}>
-                        <div style={{ fontSize: 9, color: "var(--muted)", lineHeight: 1.4 }}>
-                          <span style={{ color: eventScore >= 0.7 ? "#10b981" : eventScore >= 0.5 ? "#fbbf24" : "#ef4444" }}>●</span>{" "}
-                          {reasoningParts.join(" • ")}
+                        <div style={{ fontSize: 9, lineHeight: 1.5 }}>
+                          <div style={{ color: "var(--foreground)", fontWeight: 500, marginBottom: 2 }}>
+                            <span style={{ color: eventScore >= 0.7 ? "#10b981" : eventScore >= 0.5 ? "#fbbf24" : "#ef4444" }}>●</span>{" "}
+                            {eventDescription}
+                          </div>
+                          <div style={{ color: "var(--muted)", fontSize: 8 }}>
+                            {(eventScore * 100).toFixed(0)}% • σ={trade.sigmaAtEntry.toFixed(1)} • R²={trade.r2.toFixed(2)} {outcomeText}
+                          </div>
                         </div>
                       </td>
                     </tr>
