@@ -568,6 +568,11 @@ export async function GET(request: NextRequest) {
     const grossLoss = Math.abs(losses.reduce((sum, t) => sum + t.returnPct, 0));
     const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? 99 : 0;
 
+    // Worst single trade loss (more realistic risk metric)
+    const worstTradeLoss = allTrades.length > 0
+      ? Math.min(...allTrades.map(t => t.returnPct))
+      : 0;
+
     // Exit breakdown
     const exitBreakdown = {
       target: allTrades.filter((t) => t.exitReason === "TARGET").length,
@@ -600,6 +605,7 @@ export async function GET(request: NextRequest) {
         avgReturn,
         totalReturn,
         maxDrawdown: -maxDrawdown,
+        worstTradeLoss,  // Single trade worst loss (more realistic risk)
         sharpeRatio,
         profitFactor,
         avgHoldingDays,

@@ -48,6 +48,7 @@ interface BacktestSummary {
   avgReturn: number;
   totalReturn: number;
   maxDrawdown: number;
+  worstTradeLoss?: number;  // Single worst trade loss (more realistic)
   sharpeRatio: number;
   profitFactor: number;
   avgHoldingDays: number;
@@ -656,7 +657,7 @@ export default function STDChannelStrategyPage() {
                       <th style={{ padding: "8px", fontWeight: 500, textAlign: "right" }}>Return</th>
                       <th style={{ padding: "8px", fontWeight: 500, textAlign: "right" }}>Sharpe</th>
                       <th style={{ padding: "8px", fontWeight: 500, textAlign: "right" }}>PF</th>
-                      <th style={{ padding: "8px", fontWeight: 500, textAlign: "right" }}>Max DD</th>
+                      <th style={{ padding: "8px", fontWeight: 500, textAlign: "right" }}>Worst Trade</th>
                       <th style={{ padding: "8px", fontWeight: 500 }}></th>
                     </tr>
                   </thead>
@@ -736,9 +737,9 @@ export default function STDChannelStrategyPage() {
               positive={summary.avgReturn > 0}
             />
             <MetricCard
-              label="Max Drawdown"
-              value={`${(summary.maxDrawdown * 100).toFixed(1)}%`}
-              subtext="Peak to trough"
+              label="Worst Trade"
+              value={`${((summary.worstTradeLoss ?? summary.maxDrawdown) * 100).toFixed(1)}%`}
+              subtext="Single trade loss"
               positive={false}
               neutral
             />
