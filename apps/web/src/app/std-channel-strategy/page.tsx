@@ -192,6 +192,10 @@ export default function STDChannelStrategyPage() {
   const [maxPositions, setMaxPositions] = useState(3); // Concentrated for higher returns
   const [maxDD, setMaxDD] = useState(12); // 12% circuit breaker (optimized)
 
+  // Strategy direction (LONG only, SHORT only, or BOTH)
+  type StrategyDirection = "LONG" | "SHORT" | "BOTH";
+  const [strategyDirection, setStrategyDirection] = useState<StrategyDirection>("LONG");
+
   // Event filter settings
   const [useEventFilters, setUseEventFilters] = useState(true);
   const [minEventScoreStr, setMinEventScoreStr] = useState("0.5"); // String for editable input
@@ -570,6 +574,49 @@ export default function STDChannelStrategyPage() {
               </div>
             </div>
 
+            {/* Strategy Direction Section */}
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12 }}>
+                <div style={{ ...sectionTitle, margin: 0 }}>Strategy Direction</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {(["LONG", "SHORT", "BOTH"] as const).map(dir => (
+                    <button
+                      key={dir}
+                      onClick={() => {
+                        setStrategyDirection(dir);
+                        // Reset trade log filter to match strategy direction
+                        if (dir === "LONG") setFilterDirection("ALL");
+                        if (dir === "SHORT") setFilterDirection("ALL");
+                      }}
+                      disabled={loading}
+                      style={{
+                        padding: "6px 14px",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        border: "none",
+                        borderRadius: 4,
+                        cursor: loading ? "not-allowed" : "pointer",
+                        background: strategyDirection === dir
+                          ? dir === "LONG" ? "rgba(16, 185, 129, 0.25)" : dir === "SHORT" ? "rgba(239, 68, 68, 0.25)" : "var(--accent)"
+                          : "rgba(255,255,255,0.08)",
+                        color: strategyDirection === dir
+                          ? dir === "LONG" ? "#10b981" : dir === "SHORT" ? "#ef4444" : "#fff"
+                          : "var(--muted)",
+                        opacity: loading ? 0.5 : 1,
+                      }}
+                    >
+                      {dir === "BOTH" ? "Long & Short" : dir}
+                    </button>
+                  ))}
+                </div>
+                <span style={{ fontSize: 11, color: "var(--muted)" }}>
+                  {strategyDirection === "LONG" ? "Only take long positions (buy oversold)" :
+                   strategyDirection === "SHORT" ? "Only take short positions (sell overbought)" :
+                   "Take both long and short positions"}
+                </span>
+              </div>
+            </div>
+
             {/* Event Filter Section */}
             <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12 }}>
@@ -686,8 +733,14 @@ export default function STDChannelStrategyPage() {
     ? Math.min(...recentTrades.map(t => t.returnPct))
     : 0;
 
-  // Filter and sort trades for the table
-  const filteredAndSortedTrades = [...recentTrades]
+  // First filter by strategy direction (at the strategy level)
+  const strategyFilteredTrades = recentTrades.filter(trade => {
+    if (strategyDirection === "BOTH") return true;
+    return trade.signal === strategyDirection;
+  });
+
+  // Filter and sort trades for the table (additional filtering on top of strategy)
+  const filteredAndSortedTrades = [...strategyFilteredTrades]
     .filter(trade => {
       if (filterDirection !== "ALL" && trade.signal !== filterDirection) return false;
       if (filterExit !== "ALL" && trade.exitReason !== filterExit) return false;
@@ -1499,34 +1552,50 @@ export default function STDChannelStrategyPage() {
             </div>
             {/* Filters */}
             <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-              {/* Direction Filter */}
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase" }}>Direction:</span>
-                <div style={{ display: "flex", gap: 4 }}>
-                  {(["ALL", "LONG", "SHORT"] as const).map(dir => (
-                    <button
-                      key={dir}
-                      onClick={() => setFilterDirection(dir)}
-                      style={{
-                        padding: "4px 10px",
-                        fontSize: 11,
-                        fontWeight: 600,
-                        border: "none",
-                        borderRadius: 4,
-                        cursor: "pointer",
-                        background: filterDirection === dir
-                          ? dir === "LONG" ? "rgba(16, 185, 129, 0.3)" : dir === "SHORT" ? "rgba(239, 68, 68, 0.3)" : "var(--accent)"
-                          : "rgba(255,255,255,0.05)",
-                        color: filterDirection === dir
-                          ? dir === "LONG" ? "#10b981" : dir === "SHORT" ? "#ef4444" : "#fff"
-                          : "var(--muted)",
-                      }}
-                    >
-                      {dir}
-                    </button>
-                  ))}
+              {/* Direction Filter - Only show when strategy is BOTH (otherwise all trades are same direction) */}
+              {strategyDirection === "BOTH" ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase" }}>Direction:</span>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {(["ALL", "LONG", "SHORT"] as const).map(dir => (
+                      <button
+                        key={dir}
+                        onClick={() => setFilterDirection(dir)}
+                        style={{
+                          padding: "4px 10px",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          border: "none",
+                          borderRadius: 4,
+                          cursor: "pointer",
+                          background: filterDirection === dir
+                            ? dir === "LONG" ? "rgba(16, 185, 129, 0.3)" : dir === "SHORT" ? "rgba(239, 68, 68, 0.3)" : "var(--accent)"
+                            : "rgba(255,255,255,0.05)",
+                          color: filterDirection === dir
+                            ? dir === "LONG" ? "#10b981" : dir === "SHORT" ? "#ef4444" : "#fff"
+                            : "var(--muted)",
+                        }}
+                      >
+                        {dir}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase" }}>Direction:</span>
+                  <span style={{
+                    padding: "4px 10px",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    borderRadius: 4,
+                    background: strategyDirection === "LONG" ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                    color: strategyDirection === "LONG" ? "#10b981" : "#ef4444",
+                  }}>
+                    {strategyDirection} only
+                  </span>
+                </div>
+              )}
               {/* Exit Filter */}
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase" }}>Exit:</span>
@@ -1756,7 +1825,7 @@ export default function STDChannelStrategyPage() {
             </table>
           </div>
 
-          {/* Summary Statistics Bar */}
+          {/* Summary Statistics Bar - updates with filters */}
           <div style={{
             marginTop: 16,
             padding: "12px 16px",
@@ -1769,40 +1838,40 @@ export default function STDChannelStrategyPage() {
             <div>
               <span style={{ color: "var(--muted)" }}>Avg Event Score: </span>
               <span style={{ fontFamily: "monospace", fontWeight: 600 }}>
-                {recentTrades.length > 0 ? (
-                  recentTrades.reduce((sum, t) => sum + (t.eventScore ?? 1), 0) / recentTrades.length * 100
+                {filteredAndSortedTrades.length > 0 ? (
+                  filteredAndSortedTrades.reduce((sum, t) => sum + (t.eventScore ?? 1), 0) / filteredAndSortedTrades.length * 100
                 ).toFixed(0) : 0}%
               </span>
             </div>
             <div>
               <span style={{ color: "var(--muted)" }}>Avg σ: </span>
               <span style={{ fontFamily: "monospace", fontWeight: 600 }}>
-                {recentTrades.length > 0 ? (
-                  recentTrades.reduce((sum, t) => sum + Math.abs(t.sigmaAtEntry), 0) / recentTrades.length
+                {filteredAndSortedTrades.length > 0 ? (
+                  filteredAndSortedTrades.reduce((sum, t) => sum + Math.abs(t.sigmaAtEntry), 0) / filteredAndSortedTrades.length
                 ).toFixed(2) : 0}
               </span>
             </div>
             <div>
               <span style={{ color: "var(--muted)" }}>R²: </span>
               <span style={{ fontFamily: "monospace", fontWeight: 600 }}>
-                {recentTrades.length > 0 ? (
-                  recentTrades.reduce((sum, t) => sum + t.r2, 0) / recentTrades.length
+                {filteredAndSortedTrades.length > 0 ? (
+                  filteredAndSortedTrades.reduce((sum, t) => sum + t.r2, 0) / filteredAndSortedTrades.length
                 ).toFixed(2) : 0}
               </span>
             </div>
             <div>
               <span style={{ color: "#10b981" }}>Target: </span>
               <span style={{ fontFamily: "monospace", fontWeight: 600, color: "#10b981" }}>
-                {recentTrades.length > 0 ? (
-                  (recentTrades.filter(t => t.exitReason === "TARGET").length / recentTrades.length * 100)
+                {filteredAndSortedTrades.length > 0 ? (
+                  (filteredAndSortedTrades.filter(t => t.exitReason === "TARGET").length / filteredAndSortedTrades.length * 100)
                 ).toFixed(0) : 0}%
               </span>
             </div>
             <div>
               <span style={{ color: "#ef4444" }}>Stop: </span>
               <span style={{ fontFamily: "monospace", fontWeight: 600, color: "#ef4444" }}>
-                {recentTrades.length > 0 ? (
-                  (recentTrades.filter(t => t.exitReason === "STOP").length / recentTrades.length * 100)
+                {filteredAndSortedTrades.length > 0 ? (
+                  (filteredAndSortedTrades.filter(t => t.exitReason === "STOP").length / filteredAndSortedTrades.length * 100)
                 ).toFixed(0) : 0}%
               </span>
             </div>
