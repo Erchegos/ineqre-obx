@@ -642,6 +642,7 @@ export default function STDChannelStrategyPage() {
                       type="text"
                       value={minEventScoreStr}
                       onChange={(e) => setMinEventScoreStr(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && !loading) fetchData(); }}
                       style={inputStyle}
                       disabled={loading}
                       placeholder="0.5"
@@ -1089,6 +1090,7 @@ export default function STDChannelStrategyPage() {
                     type="text"
                     value={minEventScoreStr}
                     onChange={(e) => setMinEventScoreStr(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && !loading) fetchData(); }}
                     style={inputStyle}
                     placeholder="0.5"
                   />
