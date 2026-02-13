@@ -721,23 +721,72 @@ export default function STDChannelStrategyPage() {
     );
   }
 
-  const { summary, currentSignals, recentTrades, stats } = data || {
+  const { summary: _summary, currentSignals, recentTrades, stats } = data || {
     summary: { totalTrades: 0, winRate: 0, avgReturn: 0, totalReturn: 0, maxDrawdown: 0, worstTradeLoss: 0, sharpeRatio: 0, profitFactor: 0, avgHoldingDays: 0, exitBreakdown: { target: 0, time: 0, stop: 0 } },
     currentSignals: [],
     recentTrades: [],
     stats: { tickersAnalyzed: 0, tickersWithSignals: 0, avgR2: 0 },
   };
 
-  // Calculate actual worst trade from trades list (more reliable than API value)
-  const actualWorstTrade = recentTrades.length > 0
-    ? Math.min(...recentTrades.map(t => t.returnPct))
-    : 0;
-
   // First filter by strategy direction (at the strategy level)
   const strategyFilteredTrades = recentTrades.filter(trade => {
     if (strategyDirection === "BOTH") return true;
     return trade.signal === strategyDirection;
   });
+
+  // Calculate client-side stats based on filtered trades (recalculates when direction changes)
+  const filteredStats = (() => {
+    const trades = strategyFilteredTrades;
+    if (trades.length === 0) {
+      return {
+        totalTrades: 0,
+        winRate: 0,
+        avgReturn: 0,
+        totalReturn: 0,
+        sharpeRatio: 0,
+        profitFactor: 0,
+        avgHoldingDays: 0,
+        worstTrade: 0,
+        exitBreakdown: { target: 0, time: 0, stop: 0 },
+      };
+    }
+
+    const wins = trades.filter(t => t.returnPct > 0);
+    const losses = trades.filter(t => t.returnPct <= 0);
+    const winRate = trades.length > 0 ? wins.length / trades.length : 0;
+    const avgReturn = trades.reduce((sum, t) => sum + t.returnPct, 0) / trades.length;
+    const avgHoldingDays = trades.reduce((sum, t) => sum + t.holdingDays, 0) / trades.length;
+    const worstTrade = Math.min(...trades.map(t => t.returnPct));
+
+    // Calculate total return (portfolio-weighted, compounded)
+    let equity = 1.0;
+    const sortedByExit = [...trades].sort((a, b) => a.exitDate.localeCompare(b.exitDate));
+    for (const trade of sortedByExit) {
+      equity *= (1 + trade.returnPct / maxPositions);
+    }
+    const totalReturn = equity - 1;
+
+    // Sharpe ratio (annualized) - using daily returns assumption
+    const returns = trades.map(t => t.returnPct);
+    const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+    const variance = returns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / returns.length;
+    const stdDev = Math.sqrt(variance);
+    const sharpeRatio = stdDev > 0 ? (mean / stdDev) * Math.sqrt(252 / (avgHoldingDays || 1)) : 0;
+
+    // Profit factor
+    const grossProfit = wins.reduce((sum, t) => sum + t.returnPct, 0);
+    const grossLoss = Math.abs(losses.reduce((sum, t) => sum + t.returnPct, 0));
+    const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : (grossProfit > 0 ? 99 : 0);
+
+    // Exit breakdown
+    const exitBreakdown = {
+      target: trades.filter(t => t.exitReason === "TARGET").length,
+      time: trades.filter(t => t.exitReason === "TIME").length,
+      stop: trades.filter(t => t.exitReason === "STOP").length,
+    };
+
+    return { totalTrades: trades.length, winRate, avgReturn, totalReturn, sharpeRatio, profitFactor, avgHoldingDays, worstTrade, exitBreakdown };
+  })();
 
   // Filter and sort trades for the table (additional filtering on top of strategy)
   const filteredAndSortedTrades = [...strategyFilteredTrades]
@@ -789,7 +838,8 @@ export default function STDChannelStrategyPage() {
 
   // Build cumulative return chart data from trades (portfolio-weighted, compounded)
   // Each trade is weighted as 1/maxPositions of the portfolio (same as API calculation)
-  const sortedTrades = [...recentTrades].sort((a, b) => a.exitDate.localeCompare(b.exitDate));
+  // Uses strategyFilteredTrades so chart updates when direction changes
+  const sortedTrades = [...strategyFilteredTrades].sort((a, b) => a.exitDate.localeCompare(b.exitDate));
   let equity = 1.0;
   const cumulativeData = sortedTrades.map((trade) => {
     // Portfolio-weighted return: each trade impacts 1/maxPositions of the portfolio
@@ -802,11 +852,11 @@ export default function STDChannelStrategyPage() {
     };
   });
 
-  // Trade distribution by exit reason
+  // Trade distribution by exit reason - use filtered stats
   const exitReasonData = [
-    { name: "Target", value: summary.exitBreakdown.target, color: "#10b981" },
-    { name: "Time", value: summary.exitBreakdown.time, color: "#3b82f6" },
-    { name: "Stop", value: summary.exitBreakdown.stop, color: "#ef4444" },
+    { name: "Target", value: filteredStats.exitBreakdown.target, color: "#10b981" },
+    { name: "Time", value: filteredStats.exitBreakdown.time, color: "#3b82f6" },
+    { name: "Stop", value: filteredStats.exitBreakdown.stop, color: "#ef4444" },
   ];
 
   return (
@@ -1087,50 +1137,54 @@ export default function STDChannelStrategyPage() {
           </section>
         )}
 
-        {/* Performance Summary Cards */}
+        {/* Performance Summary Cards - Uses filteredStats which updates with strategy direction */}
         <section style={{ marginBottom: 24 }}>
-          <div style={sectionTitle}>Backtest Performance Summary {loading && <span style={{ color: "var(--warning)" }}>(updating...)</span>}</div>
+          <div style={sectionTitle}>
+            Backtest Performance Summary
+            {strategyDirection !== "BOTH" && <span style={{ marginLeft: 8, fontSize: 12, color: strategyDirection === "LONG" ? "#10b981" : "#ef4444" }}>({strategyDirection} only)</span>}
+            {loading && <span style={{ color: "var(--warning)", marginLeft: 8 }}>(updating...)</span>}
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
             <MetricCard
               label="Win Rate"
-              value={`${(summary.winRate * 100).toFixed(0)}%`}
-              subtext={`${summary.totalTrades} trades`}
-              positive={summary.winRate >= 0.5}
+              value={`${(filteredStats.winRate * 100).toFixed(0)}%`}
+              subtext={`${filteredStats.totalTrades} trades`}
+              positive={filteredStats.winRate >= 0.5}
             />
             <MetricCard
               label="Sharpe Ratio"
-              value={summary.sharpeRatio.toFixed(2)}
+              value={filteredStats.sharpeRatio.toFixed(2)}
               subtext="Risk-adjusted"
-              positive={summary.sharpeRatio >= 1}
+              positive={filteredStats.sharpeRatio >= 1}
             />
             <MetricCard
               label="Total Return"
-              value={`${(summary.totalReturn * 100).toFixed(0)}%`}
+              value={`${(filteredStats.totalReturn * 100).toFixed(0)}%`}
               subtext="Cumulative"
-              positive={summary.totalReturn > 0}
+              positive={filteredStats.totalReturn > 0}
             />
             <MetricCard
               label="Profit Factor"
-              value={summary.profitFactor > 99 ? ">99" : summary.profitFactor.toFixed(2)}
+              value={filteredStats.profitFactor > 99 ? ">99" : filteredStats.profitFactor.toFixed(2)}
               subtext="Win/Loss ratio"
-              positive={summary.profitFactor >= 2}
+              positive={filteredStats.profitFactor >= 2}
             />
             <MetricCard
               label="Avg Return"
-              value={`${(summary.avgReturn * 100).toFixed(1)}%`}
+              value={`${(filteredStats.avgReturn * 100).toFixed(1)}%`}
               subtext="Per trade"
-              positive={summary.avgReturn > 0}
+              positive={filteredStats.avgReturn > 0}
             />
             <MetricCard
               label="Worst Trade"
-              value={`${(actualWorstTrade * 100).toFixed(1)}%`}
+              value={`${(filteredStats.worstTrade * 100).toFixed(1)}%`}
               subtext="Single trade loss"
               positive={false}
               neutral
             />
             <MetricCard
               label="Avg Holding"
-              value={`${summary.avgHoldingDays.toFixed(0)}d`}
+              value={`${filteredStats.avgHoldingDays.toFixed(0)}d`}
               subtext="Days per trade"
               positive={true}
               neutral
