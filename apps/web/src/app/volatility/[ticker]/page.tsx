@@ -274,7 +274,7 @@ export default function VolatilityPage() {
       {/* Header */}
       <div style={{ marginBottom: 32 }}>
         <Link
-          href={`/stocks/${ticker}`}
+          href="/stocks"
           style={{
             display: "inline-block",
             padding: "8px 16px",
