@@ -123,11 +123,86 @@ export default function ResearchPortalPage() {
         continue;
       }
 
-      // Section headers: **Thesis:**, **Key Points:**, **Estimates:**, **Price Target Changes:**, **Market:**, **Key Takeaway:**
-      if (/^\*\*(Thesis|Key Takeaway|Key Points|Estimates|Catalysts|Risks|Valuation|Price Target Changes|Market):?\*\*/.test(line)) {
+      // Section headers: **Thesis:**, **Key Points:**, **Estimates:**, **Price Target Changes:**, **Market:**, **Key Takeaway:**, **Market Overview:**, **Earnings/Results Summary:**, **Key Observations:**
+      if (/^\*\*(Thesis|Key Takeaway|Key Points|Estimates|Catalysts|Risks|Valuation|Price Target Changes|Market|Market Overview|Earnings\/Results Summary|Key Observations):?\*\*/.test(line)) {
         const match = line.match(/^\*\*(.+?):?\*\*\s*(.*)/);
         if (match) {
           const [, header, rest] = match;
+
+          // Market Overview - highlight box at top
+          if (header === 'Market Overview') {
+            elements.push(
+              <div key={i} style={{
+                padding: compact ? 10 : 14,
+                marginBottom: compact ? 10 : 14,
+                background: 'rgba(59, 130, 246, 0.08)',
+                border: '1px solid rgba(59, 130, 246, 0.2)',
+                borderRadius: 6,
+                borderLeft: '3px solid #3b82f6',
+              }}>
+                <div style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: '#3b82f6',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  marginBottom: 6
+                }}>
+                  Market Overview
+                </div>
+                <div style={{ fontSize: compact ? 12 : 13, lineHeight: 1.5, color: 'var(--foreground)' }}>
+                  {rest}
+                </div>
+              </div>
+            );
+            continue;
+          }
+
+          // Key Observations - highlight box
+          if (header === 'Key Observations') {
+            elements.push(
+              <div key={i} style={{
+                padding: compact ? 10 : 14,
+                marginTop: compact ? 10 : 14,
+                background: 'rgba(251, 191, 36, 0.08)',
+                border: '1px solid rgba(251, 191, 36, 0.2)',
+                borderRadius: 6,
+                borderLeft: '3px solid #fbbf24',
+              }}>
+                <div style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: '#fbbf24',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  marginBottom: 6
+                }}>
+                  Key Observations
+                </div>
+                {rest && <div style={{ fontSize: compact ? 12 : 13, lineHeight: 1.5, color: 'var(--foreground)' }}>{rest}</div>}
+              </div>
+            );
+            continue;
+          }
+
+          // Earnings/Results Summary - compact list
+          if (header === 'Earnings/Results Summary') {
+            elements.push(
+              <div key={i} style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: '#10b981',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                marginTop: 10,
+                marginBottom: 4,
+              }}>
+                Q4 Results Summary
+              </div>
+            );
+            continue;
+          }
+
           if (header === 'Key Points' || header === 'Estimates' || header === 'Price Target Changes') {
             // Always show Price Target Changes header; hide Key Points/Estimates in compact
             if (!compact || header === 'Price Target Changes') {
@@ -145,6 +220,22 @@ export default function ResearchPortalPage() {
                 </div>
               );
             }
+          } else if (header === 'Market') {
+            // Legacy Market section - render as text
+            elements.push(
+              <p key={i} style={{
+                fontSize: compact ? 12 : 13,
+                lineHeight: 1.5,
+                color: 'var(--muted)',
+                margin: compact ? '8px 0' : '10px 0',
+                padding: compact ? '8px 10px' : '10px 14px',
+                background: 'rgba(255,255,255,0.03)',
+                borderRadius: 4,
+                borderLeft: '2px solid #666',
+              }}>
+                <span style={{ fontWeight: 600, color: '#888' }}>Market: </span>{rest}
+              </p>
+            );
           } else {
             // Thesis - render inline
             elements.push(
@@ -161,6 +252,35 @@ export default function ResearchPortalPage() {
           }
           continue;
         }
+      }
+
+      // Earnings result bullet: - Company: better/weaker than expected
+      const earningsMatch = line.match(/^-\s*(.+?):\s*(better|weaker|in[- ]?line)\s*(than expected)?/i);
+      if (earningsMatch) {
+        const [, company, verdict] = earningsMatch;
+        const verdictColor = /better/i.test(verdict) ? '#22c55e' : /weaker/i.test(verdict) ? '#ef4444' : '#f59e0b';
+        const verdictText = /better/i.test(verdict) ? 'Better' : /weaker/i.test(verdict) ? 'Weaker' : 'In-line';
+        elements.push(
+          <div key={i} style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            marginRight: 12,
+            marginBottom: 4,
+            fontSize: compact ? 11 : 12,
+          }}>
+            <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{company.trim()}</span>
+            <span style={{
+              fontSize: compact ? 9 : 10,
+              fontWeight: 600,
+              padding: '2px 6px',
+              borderRadius: 3,
+              background: `${verdictColor}15`,
+              color: verdictColor,
+            }}>{verdictText}</span>
+          </div>
+        );
+        continue;
       }
 
       // BørsXtra-style price target bullet: - **Company**: Broker action target to NOK X (Y), Rating

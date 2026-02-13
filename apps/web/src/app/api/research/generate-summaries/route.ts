@@ -65,16 +65,22 @@ async function generateSummary(
 
   let prompt: string;
   if (isBorsXtra) {
-    prompt = `Extract ALL broker rating and price target changes from this Norwegian market newsletter. Output ONLY the structured list below — no commentary, disclaimers, or boilerplate.
+    prompt = `Extract key information from this Norwegian market newsletter. Output ONLY the structured sections below — no commentary, disclaimers, or boilerplate.
 
-Format — one line per company, then a brief market summary:
+**Market Overview:**
+[2-3 sentences: US/Asia overnight performance, oil price (Brent), expected Oslo Børs opening, key sector moves]
+
+**Earnings/Results Summary:**
+[If Q4/quarterly results mentioned, list companies with "better/weaker than expected" verdicts. If none, skip this section]
+- [Company]: [better/weaker] than expected
 
 **Price Target Changes:**
 - **[COMPANY]**: [Broker] [action] target to NOK [new] ([old]), [Buy/Hold/Sell]
-- **[COMPANY]**: [Broker] [action] target to NOK [new] ([old]), [Buy/Hold/Sell]
 [...continue for ALL companies mentioned with target/rating changes...]
 
-**Market:** [1-2 sentences on market open, oil price, key macro moves]
+**Key Observations:**
+[1-2 bullet points from "DAGENS OBS" or notable analyst commentary — focus on actionable insights]
+- [Key insight about a specific stock or situation]
 
 Rules:
 - List EVERY company with a price target or rating change — do not skip any
@@ -82,6 +88,7 @@ Rules:
 - Note upgrades/downgrades explicitly (e.g. "upgraded from Hold to Buy")
 - Use Norwegian broker short names: Pareto, DNB Carnegie, Arctic, SB1M, Clarksons, Fearnley, Nordea, SEB, Danske Bank, ABG
 - Company names in Norwegian style (e.g. Aker BP, Kongsberg Gruppen, Nordic Semiconductor)
+- Include overnight US-listed Norwegian stock moves if mentioned (BORR, EQNR, FRO, etc.)
 - No disclaimers or legal text
 
 Newsletter: ${subject}
