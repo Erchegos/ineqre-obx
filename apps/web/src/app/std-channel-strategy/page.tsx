@@ -198,7 +198,7 @@ export default function STDChannelStrategyPage() {
 
   // Event filter settings
   const [useEventFilters, setUseEventFilters] = useState(true);
-  const [minEventScoreStr, setMinEventScoreStr] = useState("0.5"); // String for editable input
+  const [minEventScoreStr, setMinEventScoreStr] = useState("0.65"); // String for editable input
   const minEventScore = parseFloat(minEventScoreStr) || 0;
   const [expandedSignal, setExpandedSignal] = useState<string | null>(null);
 
