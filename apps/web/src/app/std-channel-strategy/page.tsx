@@ -1023,6 +1023,48 @@ export default function STDChannelStrategyPage() {
             </div>
           </div>
 
+          {/* Strategy Direction Section */}
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12 }}>
+              <div style={{ ...sectionTitle, margin: 0 }}>Strategy Direction</div>
+              <div style={{ display: "flex", gap: 6 }}>
+                {(["LONG", "SHORT", "BOTH"] as const).map(dir => (
+                  <button
+                    key={dir}
+                    onClick={() => {
+                      setStrategyDirection(dir);
+                      // Reset trade log filter when changing strategy direction
+                      setFilterDirection("ALL");
+                    }}
+                    disabled={loading}
+                    style={{
+                      padding: "6px 14px",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      border: "none",
+                      borderRadius: 4,
+                      cursor: loading ? "not-allowed" : "pointer",
+                      background: strategyDirection === dir
+                        ? dir === "LONG" ? "rgba(16, 185, 129, 0.25)" : dir === "SHORT" ? "rgba(239, 68, 68, 0.25)" : "var(--accent)"
+                        : "rgba(255,255,255,0.08)",
+                      color: strategyDirection === dir
+                        ? dir === "LONG" ? "#10b981" : dir === "SHORT" ? "#ef4444" : "#fff"
+                        : "var(--muted)",
+                      opacity: loading ? 0.5 : 1,
+                    }}
+                  >
+                    {dir === "BOTH" ? "Long & Short" : dir}
+                  </button>
+                ))}
+              </div>
+              <span style={{ fontSize: 11, color: "var(--muted)" }}>
+                {strategyDirection === "LONG" ? "Only take long positions (buy oversold)" :
+                 strategyDirection === "SHORT" ? "Only take short positions (sell overbought)" :
+                 "Take both long and short positions"}
+              </span>
+            </div>
+          </div>
+
           {/* Event Filter Section */}
           <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12 }}>
