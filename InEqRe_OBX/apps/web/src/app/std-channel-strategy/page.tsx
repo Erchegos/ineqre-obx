@@ -29,6 +29,13 @@ interface Trade {
   sigmaAtEntry: number;
   r2: number;
   slope: number;
+  eventScore?: number;
+}
+
+interface EventFilter {
+  name: string;
+  score: number;
+  reason: string;
 }
 
 interface CurrentSignal {
@@ -40,6 +47,9 @@ interface CurrentSignal {
   ep: number | null;
   bm: number | null;
   mom6m: number | null;
+  eventScore?: number;
+  eventRecommendation?: string;
+  eventFilters?: EventFilter[];
 }
 
 interface BacktestSummary {
@@ -48,6 +58,7 @@ interface BacktestSummary {
   avgReturn: number;
   totalReturn: number;
   maxDrawdown: number;
+  worstTradeLoss?: number;  // Single worst trade loss (more realistic)
   sharpeRatio: number;
   profitFactor: number;
   avgHoldingDays: number;
@@ -80,6 +91,12 @@ interface StrategyData {
     tickersWithSignals: number;
     avgR2: number;
   };
+  filterStats?: {
+    avgScore: number;
+    candidatesFiltered: number;
+    totalCandidates: number;
+    filterRate: string;
+  };
 }
 
 interface OptimizationResult {
@@ -104,16 +121,16 @@ const cardStyle: React.CSSProperties = {
   background: "var(--card-bg)",
   border: "1px solid var(--card-border)",
   borderRadius: 6,
-  padding: 16,
+  padding: 20,
 };
 
 const sectionTitle: React.CSSProperties = {
-  fontSize: 11,
+  fontSize: 13,
   fontWeight: 600,
   color: "var(--muted)",
   letterSpacing: "0.05em",
   textTransform: "uppercase",
-  marginBottom: 12,
+  marginBottom: 14,
 };
 
 const tooltipStyle: React.CSSProperties = {
@@ -129,19 +146,19 @@ const inputStyle: React.CSSProperties = {
   background: "var(--input-bg)",
   border: "1px solid var(--input-border)",
   borderRadius: 4,
-  padding: "6px 10px",
-  fontSize: 13,
+  padding: "8px 12px",
+  fontSize: 14,
   color: "var(--foreground)",
   width: "100%",
   fontFamily: "monospace",
 };
 
 const labelStyle: React.CSSProperties = {
-  fontSize: 10,
+  fontSize: 12,
   color: "var(--muted)",
   textTransform: "uppercase",
   letterSpacing: "0.05em",
-  marginBottom: 4,
+  marginBottom: 6,
   display: "block",
 };
 
@@ -150,8 +167,8 @@ const buttonStyle: React.CSSProperties = {
   color: "#fff",
   border: "none",
   borderRadius: 4,
-  padding: "8px 16px",
-  fontSize: 12,
+  padding: "10px 20px",
+  fontSize: 13,
   fontWeight: 600,
   cursor: "pointer",
 };
@@ -175,10 +192,28 @@ export default function STDChannelStrategyPage() {
   const [maxPositions, setMaxPositions] = useState(3); // Concentrated for higher returns
   const [maxDD, setMaxDD] = useState(12); // 12% circuit breaker (optimized)
 
+  // Strategy direction (LONG only, SHORT only, or BOTH)
+  type StrategyDirection = "LONG" | "SHORT" | "BOTH";
+  const [strategyDirection, setStrategyDirection] = useState<StrategyDirection>("LONG");
+
+  // Event filter settings
+  const [useEventFilters, setUseEventFilters] = useState(true);
+  const [minEventScoreStr, setMinEventScoreStr] = useState("0.65"); // String for editable input
+  const minEventScore = parseFloat(minEventScoreStr) || 0;
+  const [expandedSignal, setExpandedSignal] = useState<string | null>(null);
+
   // Optimizer state
   const [optimizing, setOptimizing] = useState(false);
+  const [runBacktestTrigger, setRunBacktestTrigger] = useState(0); // Trigger to auto-run backtest
   const [optimResults, setOptimResults] = useState<OptimizationResult[] | null>(null);
   const [showOptimizer, setShowOptimizer] = useState(false);
+
+  // Trade log sorting and filtering
+  type SortColumn = "ticker" | "direction" | "eventScore" | "pnl" | "entryDate" | "exitDate" | "days" | "exit";
+  const [sortColumn, setSortColumn] = useState<SortColumn>("entryDate");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [filterDirection, setFilterDirection] = useState<"ALL" | "LONG" | "SHORT">("ALL");
+  const [filterExit, setFilterExit] = useState<"ALL" | "TARGET" | "TIME" | "STOP">("ALL");
 
   // Loading progress animation
   const [loadingProgress, setLoadingProgress] = useState(0);
@@ -218,6 +253,8 @@ export default function STDChannelStrategyPage() {
       window: String(windowSize),
       maxPos: String(maxPositions),
       maxDD: String(maxDD / 100), // Convert percentage (15) to decimal (0.15) for API
+      useFilters: String(useEventFilters),
+      minEventScore: String(minEventScore),
     });
 
     try {
@@ -251,19 +288,23 @@ export default function STDChannelStrategyPage() {
   };
 
   const applyOptimalParams = (result: OptimizationResult) => {
+    // Apply all params from optimization result
     setEntrySigma(result.params.entrySigma);
     setStopSigma(result.params.stopSigma);
     setMaxDays(result.params.maxDays);
     setMinR2(result.params.minR2);
     setWindowSize(result.params.windowSize);
-    // Keep optimized defaults for position controls
+    // Position controls
     setMaxPositions(5);
-    setMaxDD(20); // 20% max drawdown circuit breaker
+    // Set max DD to worst trade + 1% buffer (so the worst trade is included)
+    // maxDrawdown is negative (e.g., -0.17 = -17%), convert to positive percentage
+    const worstTradePct = Math.ceil(Math.abs(result.maxDrawdown) * 100) + 1;
+    setMaxDD(worstTradePct); // Worst trade + 1% buffer
     setMinBM(0.3);
     setMinEP(0);
     setShowOptimizer(false);
-    // Auto-run backtest with new params
-    setTimeout(() => fetchData(), 100);
+    // Trigger backtest run via useEffect (ensures state is updated first)
+    setRunBacktestTrigger(prev => prev + 1);
   };
 
   // Initial load
@@ -272,120 +313,368 @@ export default function STDChannelStrategyPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (initialLoad && loading) {
+  // Auto-run backtest when triggered (after applying optimal params)
+  useEffect(() => {
+    if (runBacktestTrigger > 0) {
+      fetchData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runBacktestTrigger]);
+
+  // Show configuration screen when no data loaded yet, or loading screen when backtest is running
+  if (!data && !error) {
     return (
       <div style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)" }}>
         {/* Header */}
         <header style={{ borderBottom: "1px solid var(--border)", padding: "16px 24px" }}>
-          <div style={{ maxWidth: 1400, margin: "0 auto" }}>
-            <div style={{ color: "var(--muted)", fontSize: 12 }}>← Back to Stocks</div>
-            <h1 style={{ fontSize: 20, fontWeight: 600, marginTop: 4 }}>STD Channel Mean Reversion</h1>
+          <div style={{ maxWidth: 1600, margin: "0 auto" }}>
+            <Link href="/stocks" style={{ color: "var(--muted)", fontSize: 12, textDecoration: "none" }}>← Back to Stocks</Link>
+            <h1 style={{ fontSize: 24, fontWeight: 600, marginTop: 4 }}>STD Channel Mean Reversion</h1>
             <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 2 }}>
               Slope-aligned mean reversion with fundamental quality filter
             </p>
           </div>
         </header>
 
-        {/* Loading Content */}
-        <main style={{ maxWidth: 1400, margin: "0 auto", padding: 24 }}>
-          {/* Loading indicator card */}
-          <div style={{
-            ...cardStyle,
-            marginBottom: 24,
-            display: "flex",
-            alignItems: "center",
-            gap: 16,
-            background: "linear-gradient(135deg, var(--card-bg) 0%, #1a1a2e 100%)",
-            borderColor: "var(--accent)",
-          }}>
-            {/* Pulsing dot indicator */}
+        <main style={{ maxWidth: 1600, margin: "0 auto", padding: 24 }}>
+          {/* Status card - changes based on loading state */}
+          {loading ? (
             <div style={{
-              width: 48,
-              height: 48,
-              borderRadius: "50%",
-              background: "linear-gradient(135deg, var(--accent) 0%, #60a5fa 100%)",
+              ...cardStyle,
+              marginBottom: 24,
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
+              gap: 16,
+              background: "linear-gradient(135deg, var(--card-bg) 0%, #1a1a2e 100%)",
+              borderColor: "var(--accent)",
             }}>
               <div style={{
-                width: 20,
-                height: 20,
+                width: 48,
+                height: 48,
                 borderRadius: "50%",
-                border: "2px solid rgba(255,255,255,0.3)",
-                borderTopColor: "#fff",
-              }} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
-                Running Full Backtest
-              </div>
-              <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>
-                Analyzing {windowSize}-day channels across all OBX tickers with fundamental filters...
-              </div>
-              {/* Animated progress bar */}
-              <div style={{
-                height: 4,
-                background: "var(--border)",
-                borderRadius: 2,
-                overflow: "hidden",
+                background: "linear-gradient(135deg, var(--accent) 0%, #60a5fa 100%)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
               }}>
                 <div style={{
-                  height: "100%",
-                  width: `${loadingProgress}%`,
-                  background: "linear-gradient(90deg, var(--accent) 0%, #60a5fa 100%)",
-                  borderRadius: 2,
-                  transition: "width 0.5s ease-out",
+                  width: 20,
+                  height: 20,
+                  borderRadius: "50%",
+                  border: "2px solid rgba(255,255,255,0.3)",
+                  borderTopColor: "#fff",
                 }} />
               </div>
-              <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4, fontFamily: "monospace" }}>
-                {loadingProgress.toFixed(0)}% complete
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
+                  Running Full Backtest
+                </div>
+                <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>
+                  Analyzing {windowSize}-day channels across all OBX tickers with fundamental filters...
+                </div>
+                <div style={{
+                  height: 4,
+                  background: "var(--border)",
+                  borderRadius: 2,
+                  overflow: "hidden",
+                }}>
+                  <div style={{
+                    height: "100%",
+                    width: `${loadingProgress}%`,
+                    background: "linear-gradient(90deg, var(--accent) 0%, #60a5fa 100%)",
+                    borderRadius: 2,
+                    transition: "width 0.5s ease-out",
+                  }} />
+                </div>
+                <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4, fontFamily: "monospace" }}>
+                  {loadingProgress.toFixed(0)}% complete
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div style={{
+              ...cardStyle,
+              marginBottom: 24,
+              display: "flex",
+              alignItems: "center",
+              gap: 16,
+              background: "linear-gradient(135deg, var(--card-bg) 0%, #1a2a1a 100%)",
+              borderColor: "#10b981",
+            }}>
+              <div style={{
+                width: 48,
+                height: 48,
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+                fontSize: 20,
+              }}>
+                ▶
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
+                  Ready to Run Backtest
+                </div>
+                <div style={{ fontSize: 12, color: "var(--muted)" }}>
+                  Configure parameters below and click &quot;Run Backtest&quot; to analyze {windowSize}-day channels across all OBX tickers
+                </div>
+              </div>
+            </div>
+          )}
 
-          {/* Parameters preview */}
-          <div style={{ ...cardStyle, marginBottom: 24, background: "var(--hover-bg)" }}>
-            <div style={sectionTitle}>Active Parameters</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12 }}>
-              <div style={{ padding: "8px 12px", background: "var(--card-bg)", borderRadius: 4, border: "1px solid var(--border)" }}>
-                <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 2 }}>ENTRY σ</div>
-                <div style={{ fontSize: 16, fontWeight: 600, fontFamily: "monospace" }}>{entrySigma}</div>
-              </div>
-              <div style={{ padding: "8px 12px", background: "var(--card-bg)", borderRadius: 4, border: "1px solid var(--border)" }}>
-                <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 2 }}>STOP σ</div>
-                <div style={{ fontSize: 16, fontWeight: 600, fontFamily: "monospace" }}>{stopSigma}</div>
-              </div>
-              <div style={{ padding: "8px 12px", background: "var(--card-bg)", borderRadius: 4, border: "1px solid var(--border)" }}>
-                <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 2 }}>MAX DAYS</div>
-                <div style={{ fontSize: 16, fontWeight: 600, fontFamily: "monospace" }}>{maxDays}</div>
-              </div>
-              <div style={{ padding: "8px 12px", background: "var(--card-bg)", borderRadius: 4, border: "1px solid var(--border)" }}>
-                <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 2 }}>MIN R²</div>
-                <div style={{ fontSize: 16, fontWeight: 600, fontFamily: "monospace" }}>{minR2}</div>
-              </div>
-              <div style={{ padding: "8px 12px", background: "var(--card-bg)", borderRadius: 4, border: "1px solid var(--border)" }}>
-                <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 2 }}>MAX DD</div>
-                <div style={{ fontSize: 16, fontWeight: 600, fontFamily: "monospace" }}>{maxDD}%</div>
+          {/* Editable Parameters */}
+          <section style={{ ...cardStyle, marginBottom: 24, background: "var(--hover-bg)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={sectionTitle}>Strategy Parameters</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={runOptimizer}
+                  disabled={optimizing || loading}
+                  style={{
+                    ...buttonStyle,
+                    background: optimizing || loading ? "var(--muted)" : "#f59e0b",
+                    opacity: optimizing || loading ? 0.6 : 1,
+                    cursor: optimizing || loading ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {optimizing ? "Optimizing..." : "Find Optimal"}
+                </button>
+                <button
+                  onClick={fetchData}
+                  disabled={loading}
+                  style={{
+                    ...buttonStyle,
+                    background: loading ? "var(--muted)" : "var(--accent)",
+                    opacity: loading ? 0.6 : 1,
+                    cursor: loading ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {loading ? "Running..." : "Run Backtest"}
+                </button>
               </div>
             </div>
-          </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16 }}>
+              <div>
+                <label style={labelStyle}>Entry Sigma (σ)</label>
+                <input
+                  type="number"
+                  step="0.25"
+                  value={entrySigma}
+                  onChange={(e) => setEntrySigma(parseFloat(e.target.value) || 2.0)}
+                  style={inputStyle}
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Stop Sigma (σ)</label>
+                <input
+                  type="number"
+                  step="0.25"
+                  value={stopSigma}
+                  onChange={(e) => setStopSigma(parseFloat(e.target.value) || 2.5)}
+                  style={inputStyle}
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Max Holding Days</label>
+                <input
+                  type="number"
+                  step="1"
+                  value={maxDays}
+                  onChange={(e) => setMaxDays(parseInt(e.target.value) || 14)}
+                  style={inputStyle}
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Max Positions</label>
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  max="20"
+                  value={maxPositions}
+                  onChange={(e) => setMaxPositions(parseInt(e.target.value) || 5)}
+                  style={inputStyle}
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Max Drawdown %</label>
+                <input
+                  type="number"
+                  step="1"
+                  min="5"
+                  max="50"
+                  value={maxDD}
+                  onChange={(e) => setMaxDD(parseFloat(e.target.value) || 15)}
+                  style={inputStyle}
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Min R²</label>
+                <input
+                  type="number"
+                  step="0.05"
+                  value={minR2}
+                  onChange={(e) => setMinR2(parseFloat(e.target.value) || 0.5)}
+                  style={inputStyle}
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Min Book/Market</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={minBM}
+                  onChange={(e) => setMinBM(parseFloat(e.target.value))}
+                  style={inputStyle}
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Min E/P (Earnings)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={minEP}
+                  onChange={(e) => setMinEP(parseFloat(e.target.value))}
+                  style={inputStyle}
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Window Size</label>
+                <input
+                  type="number"
+                  step="10"
+                  value={windowSize}
+                  onChange={(e) => setWindowSize(parseInt(e.target.value) || 252)}
+                  style={inputStyle}
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Min Slope</label>
+                <input
+                  type="number"
+                  step="0.0001"
+                  value={minSlope}
+                  onChange={(e) => setMinSlope(parseFloat(e.target.value) || 0.0001)}
+                  style={inputStyle}
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            {/* Strategy Direction Section */}
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12 }}>
+                <div style={{ ...sectionTitle, margin: 0 }}>Strategy Direction</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {(["LONG", "SHORT", "BOTH"] as const).map(dir => (
+                    <button
+                      key={dir}
+                      onClick={() => {
+                        setStrategyDirection(dir);
+                        // Reset trade log filter to match strategy direction
+                        if (dir === "LONG") setFilterDirection("ALL");
+                        if (dir === "SHORT") setFilterDirection("ALL");
+                      }}
+                      disabled={loading}
+                      style={{
+                        padding: "6px 14px",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        border: "none",
+                        borderRadius: 4,
+                        cursor: loading ? "not-allowed" : "pointer",
+                        background: strategyDirection === dir
+                          ? dir === "LONG" ? "rgba(16, 185, 129, 0.25)" : dir === "SHORT" ? "rgba(239, 68, 68, 0.25)" : "var(--accent)"
+                          : "rgba(255,255,255,0.08)",
+                        color: strategyDirection === dir
+                          ? dir === "LONG" ? "#10b981" : dir === "SHORT" ? "#ef4444" : "#fff"
+                          : "var(--muted)",
+                        opacity: loading ? 0.5 : 1,
+                      }}
+                    >
+                      {dir === "BOTH" ? "Long & Short" : dir}
+                    </button>
+                  ))}
+                </div>
+                <span style={{ fontSize: 11, color: "var(--muted)" }}>
+                  {strategyDirection === "LONG" ? "Only take long positions (buy oversold)" :
+                   strategyDirection === "SHORT" ? "Only take short positions (sell overbought)" :
+                   "Take both long and short positions"}
+                </span>
+              </div>
+            </div>
+
+            {/* Event Filter Section */}
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12 }}>
+                <div style={{ ...sectionTitle, margin: 0 }}>Event-Driven Filters</div>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: loading ? "not-allowed" : "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={useEventFilters}
+                    onChange={(e) => setUseEventFilters(e.target.checked)}
+                    style={{ width: 16, height: 16 }}
+                    disabled={loading}
+                  />
+                  <span style={{ fontSize: 12, color: useEventFilters ? "var(--foreground)" : "var(--muted)" }}>
+                    {useEventFilters ? "Enabled" : "Disabled"}
+                  </span>
+                </label>
+              </div>
+              {useEventFilters && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+                  <div>
+                    <label style={labelStyle}>Min Event Score</label>
+                    <input
+                      type="text"
+                      value={minEventScoreStr}
+                      onChange={(e) => setMinEventScoreStr(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && !loading) fetchData(); }}
+                      style={inputStyle}
+                      disabled={loading}
+                      placeholder="0.5"
+                    />
+                  </div>
+                  <div style={{ gridColumn: "span 3", display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "var(--muted)" }}>
+                    <span style={{ padding: "2px 6px", background: "rgba(16, 185, 129, 0.15)", color: "#10b981", borderRadius: 3 }}>Volume</span>
+                    <span style={{ padding: "2px 6px", background: "rgba(59, 130, 246, 0.15)", color: "#3b82f6", borderRadius: 3 }}>Gap</span>
+                    <span style={{ padding: "2px 6px", background: "rgba(168, 85, 247, 0.15)", color: "#a855f7", borderRadius: 3 }}>Market</span>
+                    <span style={{ padding: "2px 6px", background: "rgba(249, 115, 22, 0.15)", color: "#f97316", borderRadius: 3 }}>Volatility</span>
+                    <span style={{ padding: "2px 6px", background: "rgba(236, 72, 153, 0.15)", color: "#ec4899", borderRadius: 3 }}>Fundamentals</span>
+                    <span style={{ padding: "2px 6px", background: "rgba(20, 184, 166, 0.15)", color: "#14b8a6", borderRadius: 3 }}>Research</span>
+                    <span style={{ padding: "2px 6px", background: "rgba(251, 191, 36, 0.15)", color: "#fbbf24", borderRadius: 3 }}>Liquidity</span>
+                    <span style={{ padding: "2px 6px", background: "rgba(139, 92, 246, 0.15)", color: "#8b5cf6", borderRadius: 3 }}>Momentum</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
 
           {/* Placeholder metric cards */}
           <div style={sectionTitle}>Performance Metrics</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
             {["Win Rate", "Sharpe Ratio", "Total Return", "Profit Factor", "Avg Return", "Max Drawdown", "Avg Holding", "Avg R²"].map((label, i) => (
               <div key={i} style={cardStyle}>
                 <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
                   {label}
                 </div>
-                <div style={{
-                  height: 24,
-                  background: "linear-gradient(90deg, var(--border) 0%, var(--hover-bg) 50%, var(--border) 100%)",
-                  borderRadius: 4,
-                  width: "60%",
-                }} />
+                <div style={{ fontSize: 22, fontWeight: 700, color: "var(--muted)", fontFamily: "monospace" }}>
+                  --
+                </div>
+                <div style={{ fontSize: 10, color: "var(--muted-foreground)", marginTop: 2 }}>Run backtest</div>
               </div>
             ))}
           </div>
@@ -399,10 +688,21 @@ export default function STDChannelStrategyPage() {
             border: "1px dashed var(--border)",
             borderRadius: 6,
           }}>
-            <div style={{ marginBottom: 8 }}>⏱ Estimated time: 30-60 seconds</div>
-            <div style={{ fontSize: 11 }}>
-              Calculating 5-year historical returns, Sharpe ratios, and drawdown analysis for each ticker...
-            </div>
+            {loading ? (
+              <>
+                <div style={{ marginBottom: 8 }}>Estimated time: 30-60 seconds</div>
+                <div style={{ fontSize: 11 }}>
+                  Calculating 5-year historical returns, Sharpe ratios, and drawdown analysis for each ticker...
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ marginBottom: 8 }}>Configure your parameters above</div>
+                <div style={{ fontSize: 11 }}>
+                  Click &quot;Run Backtest&quot; to analyze all OBX tickers with your selected parameters
+                </div>
+              </>
+            )}
           </div>
         </main>
       </div>
@@ -412,7 +712,7 @@ export default function STDChannelStrategyPage() {
   if (error && !data) {
     return (
       <div style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)", padding: 24 }}>
-        <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+        <div style={{ maxWidth: 1600, margin: "0 auto" }}>
           <div style={{ background: "var(--danger-bg)", border: "1px solid var(--danger)", borderRadius: 6, padding: 16 }}>
             <div style={{ color: "var(--danger)", fontWeight: 600 }}>Error loading strategy</div>
             <div style={{ color: "var(--danger)", fontSize: 13, marginTop: 4 }}>{error}</div>
@@ -422,16 +722,125 @@ export default function STDChannelStrategyPage() {
     );
   }
 
-  const { summary, currentSignals, recentTrades, stats } = data || {
-    summary: { totalTrades: 0, winRate: 0, avgReturn: 0, totalReturn: 0, maxDrawdown: 0, sharpeRatio: 0, profitFactor: 0, avgHoldingDays: 0, exitBreakdown: { target: 0, time: 0, stop: 0 } },
+  const { summary: _summary, currentSignals, recentTrades, stats } = data || {
+    summary: { totalTrades: 0, winRate: 0, avgReturn: 0, totalReturn: 0, maxDrawdown: 0, worstTradeLoss: 0, sharpeRatio: 0, profitFactor: 0, avgHoldingDays: 0, exitBreakdown: { target: 0, time: 0, stop: 0 } },
     currentSignals: [],
     recentTrades: [],
     stats: { tickersAnalyzed: 0, tickersWithSignals: 0, avgR2: 0 },
   };
 
+  // First filter by strategy direction (at the strategy level)
+  const strategyFilteredTrades = recentTrades.filter(trade => {
+    if (strategyDirection === "BOTH") return true;
+    return trade.signal === strategyDirection;
+  });
+
+  // Calculate client-side stats based on filtered trades (recalculates when direction changes)
+  const filteredStats = (() => {
+    const trades = strategyFilteredTrades;
+    if (trades.length === 0) {
+      return {
+        totalTrades: 0,
+        winRate: 0,
+        avgReturn: 0,
+        totalReturn: 0,
+        sharpeRatio: 0,
+        profitFactor: 0,
+        avgHoldingDays: 0,
+        worstTrade: 0,
+        exitBreakdown: { target: 0, time: 0, stop: 0 },
+      };
+    }
+
+    const wins = trades.filter(t => t.returnPct > 0);
+    const losses = trades.filter(t => t.returnPct <= 0);
+    const winRate = trades.length > 0 ? wins.length / trades.length : 0;
+    const avgReturn = trades.reduce((sum, t) => sum + t.returnPct, 0) / trades.length;
+    const avgHoldingDays = trades.reduce((sum, t) => sum + t.holdingDays, 0) / trades.length;
+    const worstTrade = Math.min(...trades.map(t => t.returnPct));
+
+    // Calculate total return (portfolio-weighted, compounded)
+    let equity = 1.0;
+    const sortedByExit = [...trades].sort((a, b) => a.exitDate.localeCompare(b.exitDate));
+    for (const trade of sortedByExit) {
+      equity *= (1 + trade.returnPct / maxPositions);
+    }
+    const totalReturn = equity - 1;
+
+    // Sharpe ratio (annualized) - using daily returns assumption
+    const returns = trades.map(t => t.returnPct);
+    const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+    const variance = returns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / returns.length;
+    const stdDev = Math.sqrt(variance);
+    const sharpeRatio = stdDev > 0 ? (mean / stdDev) * Math.sqrt(252 / (avgHoldingDays || 1)) : 0;
+
+    // Profit factor
+    const grossProfit = wins.reduce((sum, t) => sum + t.returnPct, 0);
+    const grossLoss = Math.abs(losses.reduce((sum, t) => sum + t.returnPct, 0));
+    const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : (grossProfit > 0 ? 99 : 0);
+
+    // Exit breakdown
+    const exitBreakdown = {
+      target: trades.filter(t => t.exitReason === "TARGET").length,
+      time: trades.filter(t => t.exitReason === "TIME").length,
+      stop: trades.filter(t => t.exitReason === "STOP").length,
+    };
+
+    return { totalTrades: trades.length, winRate, avgReturn, totalReturn, sharpeRatio, profitFactor, avgHoldingDays, worstTrade, exitBreakdown };
+  })();
+
+  // Filter and sort trades for the table (additional filtering on top of strategy)
+  const filteredAndSortedTrades = [...strategyFilteredTrades]
+    .filter(trade => {
+      if (filterDirection !== "ALL" && trade.signal !== filterDirection) return false;
+      if (filterExit !== "ALL" && trade.exitReason !== filterExit) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      let comparison = 0;
+      switch (sortColumn) {
+        case "ticker":
+          comparison = a.ticker.localeCompare(b.ticker);
+          break;
+        case "direction":
+          comparison = a.signal.localeCompare(b.signal);
+          break;
+        case "eventScore":
+          comparison = (a.eventScore ?? 1) - (b.eventScore ?? 1);
+          break;
+        case "pnl":
+          comparison = a.returnPct - b.returnPct;
+          break;
+        case "entryDate":
+          comparison = a.entryDate.localeCompare(b.entryDate);
+          break;
+        case "exitDate":
+          comparison = a.exitDate.localeCompare(b.exitDate);
+          break;
+        case "days":
+          comparison = a.holdingDays - b.holdingDays;
+          break;
+        case "exit":
+          comparison = a.exitReason.localeCompare(b.exitReason);
+          break;
+      }
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+
+  // Handler for clicking column headers
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("desc");
+    }
+  };
+
   // Build cumulative return chart data from trades (portfolio-weighted, compounded)
   // Each trade is weighted as 1/maxPositions of the portfolio (same as API calculation)
-  const sortedTrades = [...recentTrades].sort((a, b) => a.exitDate.localeCompare(b.exitDate));
+  // Uses strategyFilteredTrades so chart updates when direction changes
+  const sortedTrades = [...strategyFilteredTrades].sort((a, b) => a.exitDate.localeCompare(b.exitDate));
   let equity = 1.0;
   const cumulativeData = sortedTrades.map((trade) => {
     // Portfolio-weighted return: each trade impacts 1/maxPositions of the portfolio
@@ -444,23 +853,23 @@ export default function STDChannelStrategyPage() {
     };
   });
 
-  // Trade distribution by exit reason
+  // Trade distribution by exit reason - use filtered stats
   const exitReasonData = [
-    { name: "Target", value: summary.exitBreakdown.target, color: "#10b981" },
-    { name: "Time", value: summary.exitBreakdown.time, color: "#3b82f6" },
-    { name: "Stop", value: summary.exitBreakdown.stop, color: "#ef4444" },
+    { name: "Target", value: filteredStats.exitBreakdown.target, color: "#10b981" },
+    { name: "Time", value: filteredStats.exitBreakdown.time, color: "#3b82f6" },
+    { name: "Stop", value: filteredStats.exitBreakdown.stop, color: "#ef4444" },
   ];
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)" }}>
       {/* Header */}
       <header style={{ borderBottom: "1px solid var(--border)", padding: "16px 24px" }}>
-        <div style={{ maxWidth: 1400, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ maxWidth: 1600, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <Link href="/stocks" style={{ color: "var(--muted)", fontSize: 12, textDecoration: "none" }}>
               ← Back to Stocks
             </Link>
-            <h1 style={{ fontSize: 20, fontWeight: 600, marginTop: 4 }}>STD Channel Mean Reversion</h1>
+            <h1 style={{ fontSize: 24, fontWeight: 600, marginTop: 4 }}>STD Channel Mean Reversion</h1>
             <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 2 }}>
               Slope-aligned mean reversion with fundamental quality filter
             </p>
@@ -476,7 +885,7 @@ export default function STDChannelStrategyPage() {
         </div>
       </header>
 
-      <main style={{ maxWidth: 1400, margin: "0 auto", padding: 24 }}>
+      <main style={{ maxWidth: 1600, margin: "0 auto", padding: 24 }}>
         {/* Strategy Parameters - Editable */}
         <section style={{ ...cardStyle, marginBottom: 24, background: "var(--hover-bg)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -508,7 +917,7 @@ export default function STDChannelStrategyPage() {
               </button>
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16 }}>
             <div>
               <label style={labelStyle}>Entry Sigma (σ)</label>
               <input
@@ -614,6 +1023,91 @@ export default function STDChannelStrategyPage() {
               />
             </div>
           </div>
+
+          {/* Strategy Direction Section */}
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12 }}>
+              <div style={{ ...sectionTitle, margin: 0 }}>Strategy Direction</div>
+              <div style={{ display: "flex", gap: 6 }}>
+                {(["LONG", "SHORT", "BOTH"] as const).map(dir => (
+                  <button
+                    key={dir}
+                    onClick={() => {
+                      setStrategyDirection(dir);
+                      // Reset trade log filter when changing strategy direction
+                      setFilterDirection("ALL");
+                    }}
+                    disabled={loading}
+                    style={{
+                      padding: "6px 14px",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      border: "none",
+                      borderRadius: 4,
+                      cursor: loading ? "not-allowed" : "pointer",
+                      background: strategyDirection === dir
+                        ? dir === "LONG" ? "rgba(16, 185, 129, 0.25)" : dir === "SHORT" ? "rgba(239, 68, 68, 0.25)" : "var(--accent)"
+                        : "rgba(255,255,255,0.08)",
+                      color: strategyDirection === dir
+                        ? dir === "LONG" ? "#10b981" : dir === "SHORT" ? "#ef4444" : "#fff"
+                        : "var(--muted)",
+                      opacity: loading ? 0.5 : 1,
+                    }}
+                  >
+                    {dir === "BOTH" ? "Long & Short" : dir}
+                  </button>
+                ))}
+              </div>
+              <span style={{ fontSize: 11, color: "var(--muted)" }}>
+                {strategyDirection === "LONG" ? "Only take long positions (buy oversold)" :
+                 strategyDirection === "SHORT" ? "Only take short positions (sell overbought)" :
+                 "Take both long and short positions"}
+              </span>
+            </div>
+          </div>
+
+          {/* Event Filter Section */}
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12 }}>
+              <div style={{ ...sectionTitle, margin: 0 }}>Event-Driven Filters</div>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={useEventFilters}
+                  onChange={(e) => setUseEventFilters(e.target.checked)}
+                  style={{ width: 16, height: 16 }}
+                />
+                <span style={{ fontSize: 12, color: useEventFilters ? "var(--foreground)" : "var(--muted)" }}>
+                  {useEventFilters ? "Enabled" : "Disabled"}
+                </span>
+              </label>
+            </div>
+            {useEventFilters && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+                <div>
+                  <label style={labelStyle}>Min Event Score</label>
+                  <input
+                    type="text"
+                    value={minEventScoreStr}
+                    onChange={(e) => setMinEventScoreStr(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && !loading) fetchData(); }}
+                    style={inputStyle}
+                    placeholder="0.5"
+                  />
+                </div>
+                <div style={{ gridColumn: "span 3", display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "var(--muted)" }}>
+                  <span style={{ padding: "2px 6px", background: "rgba(16, 185, 129, 0.15)", color: "#10b981", borderRadius: 3 }}>Volume</span>
+                  <span style={{ padding: "2px 6px", background: "rgba(59, 130, 246, 0.15)", color: "#3b82f6", borderRadius: 3 }}>Gap</span>
+                  <span style={{ padding: "2px 6px", background: "rgba(168, 85, 247, 0.15)", color: "#a855f7", borderRadius: 3 }}>Market</span>
+                  <span style={{ padding: "2px 6px", background: "rgba(249, 115, 22, 0.15)", color: "#f97316", borderRadius: 3 }}>Volatility</span>
+                  <span style={{ padding: "2px 6px", background: "rgba(236, 72, 153, 0.15)", color: "#ec4899", borderRadius: 3 }}>Fundamentals</span>
+                  <span style={{ padding: "2px 6px", background: "rgba(20, 184, 166, 0.15)", color: "#14b8a6", borderRadius: 3 }}>Research</span>
+                  <span style={{ padding: "2px 6px", background: "rgba(251, 191, 36, 0.15)", color: "#fbbf24", borderRadius: 3 }}>Liquidity</span>
+                  <span style={{ padding: "2px 6px", background: "rgba(139, 92, 246, 0.15)", color: "#8b5cf6", borderRadius: 3 }}>Momentum</span>
+                </div>
+              </div>
+            )}
+          </div>
         </section>
 
         {/* Optimizer Results */}
@@ -642,7 +1136,7 @@ export default function STDChannelStrategyPage() {
                       <th style={{ padding: "8px", fontWeight: 500, textAlign: "right" }}>Return</th>
                       <th style={{ padding: "8px", fontWeight: 500, textAlign: "right" }}>Sharpe</th>
                       <th style={{ padding: "8px", fontWeight: 500, textAlign: "right" }}>PF</th>
-                      <th style={{ padding: "8px", fontWeight: 500, textAlign: "right" }}>Max DD</th>
+                      <th style={{ padding: "8px", fontWeight: 500, textAlign: "right" }}>Worst Trade</th>
                       <th style={{ padding: "8px", fontWeight: 500 }}></th>
                     </tr>
                   </thead>
@@ -687,50 +1181,54 @@ export default function STDChannelStrategyPage() {
           </section>
         )}
 
-        {/* Performance Summary Cards */}
+        {/* Performance Summary Cards - Uses filteredStats which updates with strategy direction */}
         <section style={{ marginBottom: 24 }}>
-          <div style={sectionTitle}>Backtest Performance Summary {loading && <span style={{ color: "var(--warning)" }}>(updating...)</span>}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+          <div style={sectionTitle}>
+            Backtest Performance Summary
+            {strategyDirection !== "BOTH" && <span style={{ marginLeft: 8, fontSize: 12, color: strategyDirection === "LONG" ? "#10b981" : "#ef4444" }}>({strategyDirection} only)</span>}
+            {loading && <span style={{ color: "var(--warning)", marginLeft: 8 }}>(updating...)</span>}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
             <MetricCard
               label="Win Rate"
-              value={`${(summary.winRate * 100).toFixed(0)}%`}
-              subtext={`${summary.totalTrades} trades`}
-              positive={summary.winRate >= 0.5}
+              value={`${(filteredStats.winRate * 100).toFixed(0)}%`}
+              subtext={`${filteredStats.totalTrades} trades`}
+              positive={filteredStats.winRate >= 0.5}
             />
             <MetricCard
               label="Sharpe Ratio"
-              value={summary.sharpeRatio.toFixed(2)}
+              value={filteredStats.sharpeRatio.toFixed(2)}
               subtext="Risk-adjusted"
-              positive={summary.sharpeRatio >= 1}
+              positive={filteredStats.sharpeRatio >= 1}
             />
             <MetricCard
               label="Total Return"
-              value={`${(summary.totalReturn * 100).toFixed(0)}%`}
+              value={`${(filteredStats.totalReturn * 100).toFixed(0)}%`}
               subtext="Cumulative"
-              positive={summary.totalReturn > 0}
+              positive={filteredStats.totalReturn > 0}
             />
             <MetricCard
               label="Profit Factor"
-              value={summary.profitFactor > 99 ? ">99" : summary.profitFactor.toFixed(2)}
+              value={filteredStats.profitFactor > 99 ? ">99" : filteredStats.profitFactor.toFixed(2)}
               subtext="Win/Loss ratio"
-              positive={summary.profitFactor >= 2}
+              positive={filteredStats.profitFactor >= 2}
             />
             <MetricCard
               label="Avg Return"
-              value={`${(summary.avgReturn * 100).toFixed(1)}%`}
+              value={`${(filteredStats.avgReturn * 100).toFixed(1)}%`}
               subtext="Per trade"
-              positive={summary.avgReturn > 0}
+              positive={filteredStats.avgReturn > 0}
             />
             <MetricCard
-              label="Max Drawdown"
-              value={`${(summary.maxDrawdown * 100).toFixed(1)}%`}
-              subtext="Peak to trough"
+              label="Worst Trade"
+              value={`${(filteredStats.worstTrade * 100).toFixed(1)}%`}
+              subtext="Single trade loss"
               positive={false}
               neutral
             />
             <MetricCard
               label="Avg Holding"
-              value={`${summary.avgHoldingDays.toFixed(0)}d`}
+              value={`${filteredStats.avgHoldingDays.toFixed(0)}d`}
               subtext="Days per trade"
               positive={true}
               neutral
@@ -743,6 +1241,120 @@ export default function STDChannelStrategyPage() {
             />
           </div>
         </section>
+
+        {/* Event Filter Methodology & Statistics */}
+        {useEventFilters && (
+          <section style={{ ...cardStyle, marginBottom: 24, background: "#08080c", borderColor: "#1a1a2a" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+              <div>
+                <div style={{ ...sectionTitle, display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                  <span style={{ width: 8, height: 8, background: "#8b5cf6", borderRadius: 2 }} />
+                  Signal Quality Filter
+                </div>
+                <p style={{ fontSize: 11, color: "var(--muted)", margin: 0 }}>
+                  8-factor scoring: Mean reversion vs regime shift classification
+                </p>
+              </div>
+              {data?.filterStats && (
+                <div style={{ display: "flex", gap: 16, padding: "6px 12px", background: "rgba(139, 92, 246, 0.05)", borderRadius: 4, border: "1px solid rgba(139, 92, 246, 0.15)", fontSize: 10 }}>
+                  <div>
+                    <span style={{ color: "var(--muted)" }}>Score: </span>
+                    <span style={{ fontWeight: 700, fontFamily: "monospace", color: data.filterStats.avgScore >= 0.7 ? "#10b981" : "#fbbf24" }}>
+                      {(data.filterStats.avgScore * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <div>
+                    <span style={{ color: "var(--muted)" }}>Filtered: </span>
+                    <span style={{ fontWeight: 700, fontFamily: "monospace", color: "#ef4444" }}>
+                      {data.filterStats.candidatesFiltered}
+                    </span>
+                    <span style={{ color: "var(--muted)" }}> ({data.filterStats.filterRate})</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Filter Weight Visualization */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+              <FilterWeightCard
+                name="Volume Anomaly"
+                weight={20}
+                color="#10b981"
+                description="High volume + extreme σ = news-driven. Normal volume = technical overreaction."
+                logic="HIGH VOL → AVOID | NORMAL → TRADE"
+              />
+              <FilterWeightCard
+                name="Gap Detection"
+                weight={15}
+                color="#3b82f6"
+                description="Overnight gaps reveal news events. Large gaps = fundamental repricing."
+                logic="GAP > 2% → AVOID | GAP < 1% → TRADE"
+              />
+              <FilterWeightCard
+                name="Market Context"
+                weight={15}
+                color="#a855f7"
+                description="Beta-adjusted: systematic moves are noise, idiosyncratic = opportunity."
+                logic="β × MKT → SYSTEMATIC | RESIDUAL → IDIO"
+              />
+              <FilterWeightCard
+                name="Volatility Regime"
+                weight={10}
+                color="#f97316"
+                description="High-vol regime: extremes common. Low-vol: unusual, better reversion."
+                logic="HIGH VOL → COMMON | LOW VOL → UNUSUAL"
+              />
+              <FilterWeightCard
+                name="Fundamental Stability"
+                weight={10}
+                color="#ec4899"
+                description="E/P or B/M changes = repricing. Stable fundamentals = technical move."
+                logic="Δ FUND → REGIME | STABLE → TECHNICAL"
+              />
+              <FilterWeightCard
+                name="Research Activity"
+                weight={10}
+                color="#14b8a6"
+                description="Recent analyst reports = news-driven. No coverage = inefficiency."
+                logic="REPORT → NEWS | NO COVERAGE → TRADE"
+              />
+              <FilterWeightCard
+                name="Liquidity Quality"
+                weight={10}
+                color="#fbbf24"
+                description="Illiquid: moves persist. High liquidity: faster mean reversion."
+                logic="ILLIQUID → PERSIST | LIQUID → REVERT"
+              />
+              <FilterWeightCard
+                name="Momentum Divergence"
+                weight={10}
+                color="#8b5cf6"
+                description="Short vs long-term divergence = exhaustion. Aligned = continuation."
+                logic="DIVERGE → REVERSAL | ALIGNED → CONT"
+              />
+            </div>
+
+            {/* Scoring Legend */}
+            <div style={{ marginTop: 12, display: "flex", gap: 20, padding: "8px 12px", background: "rgba(0,0,0,0.2)", borderRadius: 4, alignItems: "center", fontSize: 10 }}>
+              <span style={{ color: "var(--muted)", fontWeight: 500 }}>ACTION:</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 8, height: 8, background: "#10b981", borderRadius: 1 }} />
+                <span style={{ color: "#10b981", fontWeight: 600 }}>≥70%</span>
+                <span style={{ color: "var(--muted)" }}>PROCEED</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 8, height: 8, background: "#fbbf24", borderRadius: 1 }} />
+                <span style={{ color: "#fbbf24", fontWeight: 600 }}>50-70%</span>
+                <span style={{ color: "var(--muted)" }}>CAUTION</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 8, height: 8, background: "#ef4444", borderRadius: 1 }} />
+                <span style={{ color: "#ef4444", fontWeight: 600 }}>&lt;50%</span>
+                <span style={{ color: "var(--muted)" }}>AVOID</span>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Charts Section */}
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, marginBottom: 24 }}>
@@ -833,68 +1445,189 @@ export default function STDChannelStrategyPage() {
           </div>
         </div>
 
-        {/* Current Signals */}
+        {/* Current Signals with Event Filters */}
         {currentSignals.length > 0 && (
           <section style={{ ...cardStyle, marginBottom: 24, background: "#0a1a14", borderColor: "#1a4a3a" }}>
             <div style={{ ...sectionTitle, display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ width: 8, height: 8, background: "#10b981", borderRadius: "50%" }} />
               Current Active Signals
+              {useEventFilters && <span style={{ fontSize: 10, color: "var(--muted)", fontWeight: 400 }}>(with event filter analysis)</span>}
             </div>
             <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
                 <thead>
                   <tr style={{ color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--border)" }}>
-                    <th style={{ padding: "8px 12px 8px 0", fontWeight: 500 }}>Ticker</th>
-                    <th style={{ padding: "8px 12px", fontWeight: 500 }}>Signal</th>
-                    <th style={{ padding: "8px 12px", fontWeight: 500, textAlign: "right" }}>Sigma Dist.</th>
-                    <th style={{ padding: "8px 12px", fontWeight: 500, textAlign: "right" }}>R²</th>
-                    <th style={{ padding: "8px 12px", fontWeight: 500, textAlign: "right" }}>Slope</th>
-                    <th style={{ padding: "8px 12px", fontWeight: 500, textAlign: "right" }}>B/M</th>
-                    <th style={{ padding: "8px 12px", fontWeight: 500, textAlign: "right" }}>E/P</th>
-                    <th style={{ padding: "8px 0 8px 12px", fontWeight: 500, textAlign: "right" }}>Mom 6M</th>
+                    <th style={{ padding: "10px 14px 10px 0", fontWeight: 600 }}>Ticker</th>
+                    <th style={{ padding: "10px 14px", fontWeight: 600 }}>Signal</th>
+                    <th style={{ padding: "10px 14px", fontWeight: 600, textAlign: "right" }}>Sigma</th>
+                    <th style={{ padding: "10px 14px", fontWeight: 600, textAlign: "right" }}>R²</th>
+                    {useEventFilters && (
+                      <>
+                        <th style={{ padding: "10px 14px", fontWeight: 600, textAlign: "center" }}>Event Score</th>
+                        <th style={{ padding: "10px 14px", fontWeight: 600 }}>Recommendation</th>
+                      </>
+                    )}
+                    <th style={{ padding: "10px 14px", fontWeight: 600, textAlign: "right" }}>B/M</th>
+                    <th style={{ padding: "10px 14px", fontWeight: 600, textAlign: "right" }}>E/P</th>
+                    <th style={{ padding: "10px 0 10px 14px", fontWeight: 600, textAlign: "right" }}>Mom 6M</th>
                   </tr>
                 </thead>
                 <tbody>
                   {currentSignals.map((signal, idx) => (
-                    <tr key={idx} style={{ borderBottom: "1px solid var(--table-border)" }}>
-                      <td style={{ padding: "10px 12px 10px 0" }}>
-                        <Link href={`/stocks/${signal.ticker}`} style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>
-                          {signal.ticker}
-                        </Link>
-                      </td>
-                      <td style={{ padding: "10px 12px" }}>
-                        <span style={{
-                          padding: "2px 8px",
-                          borderRadius: 4,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          background: signal.signal === "LONG" ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
-                          color: signal.signal === "LONG" ? "#10b981" : "#ef4444",
-                        }}>
-                          {signal.signal}
-                        </span>
-                      </td>
-                      <td style={{ padding: "10px 12px", textAlign: "right", fontFamily: "monospace" }}>
-                        {signal.sigmaDistance.toFixed(2)}σ
-                      </td>
-                      <td style={{ padding: "10px 12px", textAlign: "right", fontFamily: "monospace" }}>{signal.r2.toFixed(2)}</td>
-                      <td style={{ padding: "10px 12px", textAlign: "right", fontFamily: "monospace" }}>
-                        {signal.slope >= 0 ? "+" : ""}{signal.slope.toFixed(4)}
-                      </td>
-                      <td style={{ padding: "10px 12px", textAlign: "right", fontFamily: "monospace" }}>
-                        {signal.bm !== null ? signal.bm.toFixed(2) : "-"}
-                      </td>
-                      <td style={{ padding: "10px 12px", textAlign: "right", fontFamily: "monospace" }}>
-                        {signal.ep !== null ? signal.ep.toFixed(2) : "-"}
-                      </td>
-                      <td style={{ padding: "10px 0 10px 12px", textAlign: "right", fontFamily: "monospace" }}>
-                        {signal.mom6m !== null ? (
-                          <span style={{ color: signal.mom6m >= 0 ? "#10b981" : "#ef4444" }}>
-                            {signal.mom6m >= 0 ? "+" : ""}{(signal.mom6m * 100).toFixed(1)}%
+                    <>
+                      <tr
+                        key={idx}
+                        style={{
+                          borderBottom: expandedSignal === signal.ticker ? "none" : "1px solid var(--table-border)",
+                          cursor: signal.eventFilters ? "pointer" : "default",
+                        }}
+                        onClick={() => signal.eventFilters && setExpandedSignal(expandedSignal === signal.ticker ? null : signal.ticker)}
+                      >
+                        <td style={{ padding: "10px 12px 10px 0" }}>
+                          <Link href={`/stocks/${signal.ticker}`} style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }} onClick={(e) => e.stopPropagation()}>
+                            {signal.ticker}
+                          </Link>
+                          {signal.eventFilters && (
+                            <span style={{ marginLeft: 6, fontSize: 10, color: "var(--muted)" }}>
+                              {expandedSignal === signal.ticker ? "▼" : "▶"}
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: "10px 12px" }}>
+                          <span style={{
+                            padding: "2px 8px",
+                            borderRadius: 4,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            background: signal.signal === "LONG" ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
+                            color: signal.signal === "LONG" ? "#10b981" : "#ef4444",
+                          }}>
+                            {signal.signal}
                           </span>
-                        ) : "-"}
-                      </td>
-                    </tr>
+                        </td>
+                        <td style={{ padding: "10px 12px", textAlign: "right", fontFamily: "monospace" }}>
+                          {signal.sigmaDistance.toFixed(2)}σ
+                        </td>
+                        <td style={{ padding: "10px 12px", textAlign: "right", fontFamily: "monospace" }}>{signal.r2.toFixed(2)}</td>
+                        {useEventFilters && (
+                          <>
+                            <td style={{ padding: "10px 12px", textAlign: "center" }}>
+                              <div style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 6,
+                                padding: "2px 8px",
+                                borderRadius: 4,
+                                background: (signal.eventScore || 0) >= 0.7 ? "rgba(16, 185, 129, 0.15)" :
+                                           (signal.eventScore || 0) >= 0.5 ? "rgba(251, 191, 36, 0.15)" : "rgba(239, 68, 68, 0.15)",
+                              }}>
+                                <div style={{
+                                  width: 40,
+                                  height: 4,
+                                  background: "var(--border)",
+                                  borderRadius: 2,
+                                  overflow: "hidden",
+                                }}>
+                                  <div style={{
+                                    width: `${(signal.eventScore || 0) * 100}%`,
+                                    height: "100%",
+                                    background: (signal.eventScore || 0) >= 0.7 ? "#10b981" :
+                                               (signal.eventScore || 0) >= 0.5 ? "#fbbf24" : "#ef4444",
+                                  }} />
+                                </div>
+                                <span style={{
+                                  fontFamily: "monospace",
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  color: (signal.eventScore || 0) >= 0.7 ? "#10b981" :
+                                         (signal.eventScore || 0) >= 0.5 ? "#fbbf24" : "#ef4444",
+                                }}>
+                                  {((signal.eventScore || 0) * 100).toFixed(0)}%
+                                </span>
+                              </div>
+                            </td>
+                            <td style={{ padding: "10px 12px" }}>
+                              <span style={{
+                                padding: "2px 8px",
+                                borderRadius: 4,
+                                fontSize: 10,
+                                fontWeight: 600,
+                                background: signal.eventRecommendation === "PROCEED" ? "rgba(16, 185, 129, 0.15)" :
+                                           signal.eventRecommendation === "CAUTION" ? "rgba(251, 191, 36, 0.15)" : "rgba(239, 68, 68, 0.15)",
+                                color: signal.eventRecommendation === "PROCEED" ? "#10b981" :
+                                       signal.eventRecommendation === "CAUTION" ? "#fbbf24" : "#ef4444",
+                              }}>
+                                {signal.eventRecommendation || "N/A"}
+                              </span>
+                            </td>
+                          </>
+                        )}
+                        <td style={{ padding: "10px 12px", textAlign: "right", fontFamily: "monospace" }}>
+                          {signal.bm !== null ? signal.bm.toFixed(2) : "-"}
+                        </td>
+                        <td style={{ padding: "10px 12px", textAlign: "right", fontFamily: "monospace" }}>
+                          {signal.ep !== null ? signal.ep.toFixed(2) : "-"}
+                        </td>
+                        <td style={{ padding: "10px 0 10px 12px", textAlign: "right", fontFamily: "monospace" }}>
+                          {signal.mom6m !== null ? (
+                            <span style={{ color: signal.mom6m >= 0 ? "#10b981" : "#ef4444" }}>
+                              {signal.mom6m >= 0 ? "+" : ""}{(signal.mom6m * 100).toFixed(1)}%
+                            </span>
+                          ) : "-"}
+                        </td>
+                      </tr>
+                      {/* Expanded Event Filter Details */}
+                      {expandedSignal === signal.ticker && signal.eventFilters && (
+                        <tr key={`${idx}-filters`}>
+                          <td colSpan={useEventFilters ? 9 : 7} style={{ padding: "0 0 12px 12px", background: "#0d1f17" }}>
+                            <div style={{ padding: 12, borderRadius: 4, background: "#0a1510", border: "1px solid #1a3a2a" }}>
+                              <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                                Event Filter Breakdown
+                              </div>
+                              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+                                {signal.eventFilters.map((filter, fIdx) => (
+                                  <div key={fIdx} style={{
+                                    padding: 8,
+                                    borderRadius: 4,
+                                    background: "var(--card-bg)",
+                                    border: `1px solid ${filter.score >= 0.7 ? "#1a4a3a" : filter.score >= 0.5 ? "#4a4a2a" : "#4a2a2a"}`,
+                                  }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                                      <span style={{ fontSize: 10, fontWeight: 600, color: "var(--foreground)" }}>{filter.name}</span>
+                                      <span style={{
+                                        fontSize: 10,
+                                        fontWeight: 600,
+                                        fontFamily: "monospace",
+                                        color: filter.score >= 0.7 ? "#10b981" : filter.score >= 0.5 ? "#fbbf24" : "#ef4444",
+                                      }}>
+                                        {(filter.score * 100).toFixed(0)}%
+                                      </span>
+                                    </div>
+                                    <div style={{
+                                      width: "100%",
+                                      height: 3,
+                                      background: "var(--border)",
+                                      borderRadius: 2,
+                                      marginBottom: 6,
+                                    }}>
+                                      <div style={{
+                                        width: `${filter.score * 100}%`,
+                                        height: "100%",
+                                        background: filter.score >= 0.7 ? "#10b981" : filter.score >= 0.5 ? "#fbbf24" : "#ef4444",
+                                        borderRadius: 2,
+                                      }} />
+                                    </div>
+                                    <div style={{ fontSize: 9, color: "var(--muted)", lineHeight: 1.3 }}>
+                                      {filter.reason}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   ))}
                 </tbody>
               </table>
@@ -902,105 +1635,450 @@ export default function STDChannelStrategyPage() {
           </section>
         )}
 
-        {/* Recent Trades Table */}
-        <section style={{ ...cardStyle, marginBottom: 24 }}>
-          <div style={sectionTitle}>Recent Trades ({recentTrades.length} total)</div>
-          <div style={{ overflowX: "auto", maxHeight: 500 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-              <thead style={{ position: "sticky", top: 0, background: "var(--card-bg)" }}>
-                <tr style={{ color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--border)" }}>
-                  <th style={{ padding: "8px 8px 8px 0", fontWeight: 500 }}>Ticker</th>
-                  <th style={{ padding: "8px", fontWeight: 500 }}>Signal</th>
-                  <th style={{ padding: "8px", fontWeight: 500 }}>Entry</th>
-                  <th style={{ padding: "8px", fontWeight: 500 }}>Exit</th>
-                  <th style={{ padding: "8px", fontWeight: 500, textAlign: "right" }}>Entry Price</th>
-                  <th style={{ padding: "8px", fontWeight: 500, textAlign: "right" }}>Exit Price</th>
-                  <th style={{ padding: "8px", fontWeight: 500, textAlign: "right" }}>Return</th>
-                  <th style={{ padding: "8px", fontWeight: 500, textAlign: "right" }}>Days</th>
-                  <th style={{ padding: "8px", fontWeight: 500 }}>Exit Reason</th>
-                  <th style={{ padding: "8px", fontWeight: 500, textAlign: "right" }}>σ Entry</th>
-                  <th style={{ padding: "8px 0 8px 8px", fontWeight: 500, textAlign: "right" }}>R²</th>
+        {/* Trade Execution Log */}
+        <section style={{ ...cardStyle, marginBottom: 24, background: "#08080c" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <div style={sectionTitle}>
+                Trade Log ({filteredAndSortedTrades.length}{filteredAndSortedTrades.length !== recentTrades.length ? ` of ${recentTrades.length}` : ""})
+              </div>
+              <div style={{ display: "flex", gap: 8, fontSize: 10 }}>
+                <span style={{ color: "#10b981" }}>■ TARGET</span>
+                <span style={{ color: "#3b82f6" }}>■ TIME</span>
+                <span style={{ color: "#ef4444" }}>■ STOP</span>
+              </div>
+            </div>
+            {/* Filters */}
+            <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+              {/* Direction Filter - Only show when strategy is BOTH (otherwise all trades are same direction) */}
+              {strategyDirection === "BOTH" ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase" }}>Direction:</span>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {(["ALL", "LONG", "SHORT"] as const).map(dir => (
+                      <button
+                        key={dir}
+                        onClick={() => setFilterDirection(dir)}
+                        style={{
+                          padding: "4px 10px",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          border: "none",
+                          borderRadius: 4,
+                          cursor: "pointer",
+                          background: filterDirection === dir
+                            ? dir === "LONG" ? "rgba(16, 185, 129, 0.3)" : dir === "SHORT" ? "rgba(239, 68, 68, 0.3)" : "var(--accent)"
+                            : "rgba(255,255,255,0.05)",
+                          color: filterDirection === dir
+                            ? dir === "LONG" ? "#10b981" : dir === "SHORT" ? "#ef4444" : "#fff"
+                            : "var(--muted)",
+                        }}
+                      >
+                        {dir}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase" }}>Direction:</span>
+                  <span style={{
+                    padding: "4px 10px",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    borderRadius: 4,
+                    background: strategyDirection === "LONG" ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                    color: strategyDirection === "LONG" ? "#10b981" : "#ef4444",
+                  }}>
+                    {strategyDirection} only
+                  </span>
+                </div>
+              )}
+              {/* Exit Filter */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase" }}>Exit:</span>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {(["ALL", "TARGET", "TIME", "STOP"] as const).map(exit => (
+                    <button
+                      key={exit}
+                      onClick={() => setFilterExit(exit)}
+                      style={{
+                        padding: "4px 10px",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        border: "none",
+                        borderRadius: 4,
+                        cursor: "pointer",
+                        background: filterExit === exit
+                          ? exit === "TARGET" ? "rgba(16, 185, 129, 0.3)" : exit === "TIME" ? "rgba(59, 130, 246, 0.3)" : exit === "STOP" ? "rgba(239, 68, 68, 0.3)" : "var(--accent)"
+                          : "rgba(255,255,255,0.05)",
+                        color: filterExit === exit
+                          ? exit === "TARGET" ? "#10b981" : exit === "TIME" ? "#3b82f6" : exit === "STOP" ? "#ef4444" : "#fff"
+                          : "var(--muted)",
+                      }}
+                    >
+                      {exit}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style={{ overflowX: "auto", maxHeight: 600 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead style={{ position: "sticky", top: 0, background: "#08080c", zIndex: 1 }}>
+                <tr style={{ borderBottom: "2px solid var(--border)" }}>
+                  <th
+                    onClick={() => handleSort("ticker")}
+                    style={{ padding: "12px 10px 12px 0", fontWeight: 600, color: sortColumn === "ticker" ? "var(--accent)" : "var(--muted)", textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
+                  >
+                    Ticker {sortColumn === "ticker" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </th>
+                  <th
+                    onClick={() => handleSort("direction")}
+                    style={{ padding: "12px 10px", fontWeight: 600, color: sortColumn === "direction" ? "var(--accent)" : "var(--muted)", textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
+                  >
+                    Direction {sortColumn === "direction" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </th>
+                  <th
+                    onClick={() => handleSort("eventScore")}
+                    style={{ padding: "12px 10px", fontWeight: 600, color: sortColumn === "eventScore" ? "var(--accent)" : "var(--muted)", textAlign: "center", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
+                  >
+                    Event Score {sortColumn === "eventScore" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </th>
+                  <th
+                    onClick={() => handleSort("pnl")}
+                    style={{ padding: "12px 10px", fontWeight: 600, color: sortColumn === "pnl" ? "var(--accent)" : "var(--muted)", textAlign: "right", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
+                  >
+                    P&L {sortColumn === "pnl" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </th>
+                  <th
+                    onClick={() => handleSort("entryDate")}
+                    style={{ padding: "12px 10px", fontWeight: 600, color: sortColumn === "entryDate" ? "var(--accent)" : "var(--muted)", textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
+                  >
+                    Entry → Exit {sortColumn === "entryDate" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </th>
+                  <th style={{ padding: "12px 10px", fontWeight: 600, color: "var(--muted)", textAlign: "right", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em" }}>Entry $</th>
+                  <th style={{ padding: "12px 10px", fontWeight: 600, color: "var(--muted)", textAlign: "right", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em" }}>Exit $</th>
+                  <th
+                    onClick={() => handleSort("days")}
+                    style={{ padding: "12px 10px", fontWeight: 600, color: sortColumn === "days" ? "var(--accent)" : "var(--muted)", textAlign: "right", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
+                  >
+                    Days {sortColumn === "days" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </th>
+                  <th
+                    onClick={() => handleSort("exit")}
+                    style={{ padding: "12px 10px", fontWeight: 600, color: sortColumn === "exit" ? "var(--accent)" : "var(--muted)", textAlign: "center", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
+                  >
+                    Exit {sortColumn === "exit" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </th>
+                  <th style={{ padding: "12px 10px", fontWeight: 600, color: "var(--muted)", textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", minWidth: 240 }}>Signal Analysis</th>
                 </tr>
               </thead>
               <tbody>
-                {recentTrades.map((trade, idx) => (
-                  <tr key={idx} style={{ borderBottom: "1px solid var(--table-border)" }}>
-                    <td style={{ padding: "10px 8px 10px 0" }}>
-                      <Link href={`/stocks/${trade.ticker}`} style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>
-                        {trade.ticker}
-                      </Link>
-                    </td>
-                    <td style={{ padding: "10px 8px" }}>
-                      <span style={{
-                        padding: "2px 6px",
-                        borderRadius: 3,
-                        fontSize: 10,
-                        fontWeight: 600,
-                        background: trade.signal === "LONG" ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
-                        color: trade.signal === "LONG" ? "#10b981" : "#ef4444",
-                      }}>
-                        {trade.signal}
-                      </span>
-                    </td>
-                    <td style={{ padding: "10px 8px", color: "var(--muted)", fontSize: 11 }}>{trade.entryDate}</td>
-                    <td style={{ padding: "10px 8px", color: "var(--muted)", fontSize: 11 }}>{trade.exitDate}</td>
-                    <td style={{ padding: "10px 8px", textAlign: "right", fontFamily: "monospace" }}>{trade.entryPrice.toFixed(2)}</td>
-                    <td style={{ padding: "10px 8px", textAlign: "right", fontFamily: "monospace" }}>{trade.exitPrice.toFixed(2)}</td>
-                    <td style={{ padding: "10px 8px", textAlign: "right", fontFamily: "monospace" }}>
-                      <span style={{ fontWeight: 600, color: trade.returnPct >= 0 ? "#10b981" : "#ef4444" }}>
-                        {trade.returnPct >= 0 ? "+" : ""}{(trade.returnPct * 100).toFixed(1)}%
-                      </span>
-                    </td>
-                    <td style={{ padding: "10px 8px", textAlign: "right", color: "var(--muted)" }}>{trade.holdingDays}</td>
-                    <td style={{ padding: "10px 8px" }}>
-                      <span style={{
-                        padding: "2px 6px",
-                        borderRadius: 3,
-                        fontSize: 10,
-                        background: trade.exitReason === "TARGET" ? "rgba(16, 185, 129, 0.15)" :
-                                    trade.exitReason === "STOP" ? "rgba(239, 68, 68, 0.15)" : "rgba(59, 130, 246, 0.15)",
-                        color: trade.exitReason === "TARGET" ? "#10b981" :
-                               trade.exitReason === "STOP" ? "#ef4444" : "#3b82f6",
-                      }}>
-                        {trade.exitReason}
-                      </span>
-                    </td>
-                    <td style={{ padding: "10px 8px", textAlign: "right", fontFamily: "monospace", color: "var(--muted)" }}>
-                      {trade.sigmaAtEntry.toFixed(2)}σ
-                    </td>
-                    <td style={{ padding: "10px 0 10px 8px", textAlign: "right", fontFamily: "monospace", color: "var(--muted)" }}>
-                      {trade.r2.toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
+                {filteredAndSortedTrades.map((trade, idx) => {
+                  // Use actual event score from backtest (filters trades at entry)
+                  const eventScore = trade.eventScore ?? 1.0;
+
+                  // Generate event description based on signal characteristics
+                  const sigmaMagnitude = Math.abs(trade.sigmaAtEntry);
+                  const isExtreme = sigmaMagnitude >= 3.5;
+                  const isStrong = sigmaMagnitude >= 2.5;
+                  const channelQuality = trade.r2 >= 0.8 ? "strong" : trade.r2 >= 0.6 ? "solid" : "weak";
+
+                  let eventType = "";
+                  if (trade.signal === "LONG") {
+                    if (isExtreme) {
+                      eventType = "Deep oversold";
+                    } else if (isStrong) {
+                      eventType = "Oversold bounce";
+                    } else {
+                      eventType = "Channel support";
+                    }
+                  } else {
+                    if (isExtreme) {
+                      eventType = "Extended rally";
+                    } else if (isStrong) {
+                      eventType = "Overbought fade";
+                    } else {
+                      eventType = "Channel resistance";
+                    }
+                  }
+
+                  // Generate reasoning with event context
+                  const eventDescription = `${eventType} (${channelQuality} channel)`;
+
+                  const outcomeText = trade.exitReason === "TARGET"
+                    ? "→ Mean reverted"
+                    : trade.exitReason === "TIME"
+                    ? "→ Time exit"
+                    : "→ Stopped out";
+
+                  return (
+                    <tr
+                      key={idx}
+                      style={{
+                        borderBottom: "1px solid var(--table-border)",
+                        background: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)",
+                        borderLeft: `3px solid ${trade.exitReason === "TARGET" ? "#10b981" : trade.exitReason === "STOP" ? "#ef4444" : "#3b82f6"}`,
+                      }}
+                    >
+                      <td style={{ padding: "12px 10px 12px 8px" }}>
+                        <Link href={`/stocks/${trade.ticker}`} style={{ color: "var(--accent)", fontWeight: 700, textDecoration: "none", fontSize: 14 }}>
+                          {trade.ticker}
+                        </Link>
+                      </td>
+                      <td style={{ padding: "12px 10px" }}>
+                        <span style={{
+                          padding: "4px 10px",
+                          borderRadius: 4,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          letterSpacing: "0.05em",
+                          background: trade.signal === "LONG" ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
+                          color: trade.signal === "LONG" ? "#10b981" : "#ef4444",
+                          border: `1px solid ${trade.signal === "LONG" ? "#10b98130" : "#ef444430"}`,
+                        }}>
+                          {trade.signal}
+                        </span>
+                      </td>
+                      <td style={{ padding: "12px 10px", textAlign: "center" }}>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                          <div style={{
+                            width: 40,
+                            height: 7,
+                            background: "var(--border)",
+                            borderRadius: 3,
+                            overflow: "hidden",
+                          }}>
+                            <div style={{
+                              width: `${eventScore * 100}%`,
+                              height: "100%",
+                              background: eventScore >= 0.7 ? "#10b981" : eventScore >= 0.5 ? "#fbbf24" : "#ef4444",
+                              borderRadius: 3,
+                            }} />
+                          </div>
+                          <span style={{
+                            fontFamily: "monospace",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            color: eventScore >= 0.7 ? "#10b981" : eventScore >= 0.5 ? "#fbbf24" : "#ef4444",
+                          }}>
+                            {(eventScore * 100).toFixed(0)}%
+                          </span>
+                        </div>
+                      </td>
+                      <td style={{ padding: "12px 10px", textAlign: "right" }}>
+                        <span style={{
+                          fontFamily: "monospace",
+                          fontSize: 14,
+                          fontWeight: 700,
+                          color: trade.returnPct >= 0 ? "#10b981" : "#ef4444",
+                        }}>
+                          {trade.returnPct >= 0 ? "+" : ""}{(trade.returnPct * 100).toFixed(1)}%
+                        </span>
+                      </td>
+                      <td style={{ padding: "12px 10px", fontFamily: "monospace", fontSize: 11, color: "var(--muted)" }}>
+                        {trade.entryDate.slice(2)} → {trade.exitDate.slice(2)}
+                      </td>
+                      <td style={{ padding: "12px 10px", textAlign: "right", fontFamily: "monospace", fontSize: 13 }}>
+                        {trade.entryPrice.toFixed(2)}
+                      </td>
+                      <td style={{ padding: "12px 10px", textAlign: "right", fontFamily: "monospace", fontSize: 13 }}>
+                        {trade.exitPrice.toFixed(2)}
+                      </td>
+                      <td style={{ padding: "12px 10px", textAlign: "right", fontFamily: "monospace", fontSize: 13, color: trade.holdingDays <= 7 ? "#10b981" : trade.holdingDays <= 14 ? "var(--foreground)" : "#fbbf24" }}>
+                        {trade.holdingDays}
+                      </td>
+                      <td style={{ padding: "12px 10px", textAlign: "center" }}>
+                        <span style={{
+                          padding: "4px 10px",
+                          borderRadius: 4,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          letterSpacing: "0.05em",
+                          background: trade.exitReason === "TARGET" ? "rgba(16, 185, 129, 0.15)" :
+                                      trade.exitReason === "STOP" ? "rgba(239, 68, 68, 0.15)" : "rgba(59, 130, 246, 0.15)",
+                          color: trade.exitReason === "TARGET" ? "#10b981" :
+                                 trade.exitReason === "STOP" ? "#ef4444" : "#3b82f6",
+                        }}>
+                          {trade.exitReason}
+                        </span>
+                      </td>
+                      <td style={{ padding: "12px 10px" }}>
+                        <div style={{ fontSize: 13, lineHeight: 1.5 }}>
+                          <div style={{ color: "var(--foreground)", fontWeight: 600, marginBottom: 4 }}>
+                            <span style={{ color: eventScore >= 0.7 ? "#10b981" : eventScore >= 0.5 ? "#fbbf24" : "#ef4444" }}>●</span>{" "}
+                            {eventDescription}
+                          </div>
+                          <div style={{ color: "var(--muted)", fontSize: 12 }}>
+                            {(eventScore * 100).toFixed(0)}% • σ={trade.sigmaAtEntry.toFixed(1)} • R²={trade.r2.toFixed(2)} {outcomeText}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
+
+          {/* Summary Statistics Bar - updates with filters */}
+          <div style={{
+            marginTop: 16,
+            padding: "12px 16px",
+            background: "rgba(0,0,0,0.2)",
+            borderRadius: 4,
+            display: "flex",
+            gap: 28,
+            fontSize: 12,
+          }}>
+            <div>
+              <span style={{ color: "var(--muted)" }}>Avg Event Score: </span>
+              <span style={{ fontFamily: "monospace", fontWeight: 600 }}>
+                {filteredAndSortedTrades.length > 0 ? (
+                  filteredAndSortedTrades.reduce((sum, t) => sum + (t.eventScore ?? 1), 0) / filteredAndSortedTrades.length * 100
+                ).toFixed(0) : 0}%
+              </span>
+            </div>
+            <div>
+              <span style={{ color: "var(--muted)" }}>Avg σ: </span>
+              <span style={{ fontFamily: "monospace", fontWeight: 600 }}>
+                {filteredAndSortedTrades.length > 0 ? (
+                  filteredAndSortedTrades.reduce((sum, t) => sum + Math.abs(t.sigmaAtEntry), 0) / filteredAndSortedTrades.length
+                ).toFixed(2) : 0}
+              </span>
+            </div>
+            <div>
+              <span style={{ color: "var(--muted)" }}>R²: </span>
+              <span style={{ fontFamily: "monospace", fontWeight: 600 }}>
+                {filteredAndSortedTrades.length > 0 ? (
+                  filteredAndSortedTrades.reduce((sum, t) => sum + t.r2, 0) / filteredAndSortedTrades.length
+                ).toFixed(2) : 0}
+              </span>
+            </div>
+            <div>
+              <span style={{ color: "#10b981" }}>Target: </span>
+              <span style={{ fontFamily: "monospace", fontWeight: 600, color: "#10b981" }}>
+                {filteredAndSortedTrades.length > 0 ? (
+                  (filteredAndSortedTrades.filter(t => t.exitReason === "TARGET").length / filteredAndSortedTrades.length * 100)
+                ).toFixed(0) : 0}%
+              </span>
+            </div>
+            <div>
+              <span style={{ color: "#ef4444" }}>Stop: </span>
+              <span style={{ fontFamily: "monospace", fontWeight: 600, color: "#ef4444" }}>
+                {filteredAndSortedTrades.length > 0 ? (
+                  (filteredAndSortedTrades.filter(t => t.exitReason === "STOP").length / filteredAndSortedTrades.length * 100)
+                ).toFixed(0) : 0}%
+              </span>
+            </div>
+          </div>
         </section>
 
-        {/* Strategy Notes */}
-        <section style={{ ...cardStyle, background: "var(--hover-bg)" }}>
-          <div style={sectionTitle}>Strategy Logic - Pension Grade</div>
-          <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6 }}>
-            <p style={{ marginBottom: 8 }}>
-              <strong style={{ color: "var(--foreground)" }}>High Conviction Entry:</strong> Only trades extreme deviations ({entrySigma}σ+).
-              LONG when price drops below -{entrySigma}σ in uptrend, SHORT above +{entrySigma}σ in downtrend.
-            </p>
-            <p style={{ marginBottom: 8 }}>
-              <strong style={{ color: "var(--foreground)" }}>Fundamental Screen:</strong> Requires B/M ≥ {minBM} (value bias)
-              {minEP >= 0 && ` and E/P ≥ ${minEP} (positive earnings required)`}.
-            </p>
-            <p style={{ marginBottom: 8 }}>
-              <strong style={{ color: "var(--foreground)" }}>Quality Gate:</strong> R² ≥ {minR2} ensures statistically meaningful channels.
-            </p>
-            <p style={{ marginBottom: 8 }}>
-              <strong style={{ color: "var(--foreground)" }}>Position Limits:</strong> Max {maxPositions} concurrent positions,
-              equal-weighted. Conviction scoring prioritizes best opportunities.
-            </p>
-            <p>
-              <strong style={{ color: "var(--foreground)" }}>Risk Controls:</strong> Stop at ±{stopSigma}σ, max {maxDays} days hold,
-              <span style={{ color: "#ef4444" }}> circuit breaker at {maxDD.toFixed(0)}% portfolio drawdown</span>.
-            </p>
+        {/* Strategy Documentation */}
+        <section style={{ ...cardStyle, background: "linear-gradient(135deg, #0f0f14 0%, #0a0a0f 100%)", border: "1px solid #1a1a2a" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+            <div>
+              <div style={sectionTitle}>Strategy Specification</div>
+              <p style={{ fontSize: 11, color: "var(--muted)", margin: 0 }}>
+                Institutional-grade mean reversion system with multi-factor quality controls
+              </p>
+            </div>
+            <div style={{ padding: "4px 10px", background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.2)", borderRadius: 4, fontSize: 10, color: "#10b981", fontWeight: 600 }}>
+              v2.1 PRODUCTION
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+            {/* Entry Logic */}
+            <div style={{ padding: 16, background: "rgba(0,0,0,0.3)", borderRadius: 6, border: "1px solid #1a2a1a" }}>
+              <div style={{ fontSize: 10, color: "#10b981", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>
+                Entry Logic
+              </div>
+              <div style={{ fontSize: 12, color: "var(--foreground)", marginBottom: 8 }}>
+                <strong>Extreme Deviation Only</strong>
+              </div>
+              <ul style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.6, margin: 0, paddingLeft: 16 }}>
+                <li>LONG: Price &lt; -{entrySigma}σ in <span style={{ color: "#10b981" }}>uptrend</span> (slope &gt; 0)</li>
+                <li>SHORT: Price &gt; +{entrySigma}σ in <span style={{ color: "#ef4444" }}>downtrend</span> (slope &lt; 0)</li>
+                <li>Slope alignment prevents counter-trend trades</li>
+              </ul>
+              <div style={{ marginTop: 12, padding: 8, background: "rgba(16, 185, 129, 0.1)", borderRadius: 4, fontSize: 10, fontFamily: "monospace" }}>
+                σ_threshold = {entrySigma} | window = {windowSize}d
+              </div>
+            </div>
+
+            {/* Quality Filters */}
+            <div style={{ padding: 16, background: "rgba(0,0,0,0.3)", borderRadius: 6, border: "1px solid #1a1a3a" }}>
+              <div style={{ fontSize: 10, color: "#8b5cf6", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>
+                Quality Gates
+              </div>
+              <div style={{ fontSize: 12, color: "var(--foreground)", marginBottom: 8 }}>
+                <strong>Multi-Factor Screen</strong>
+              </div>
+              <ul style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.6, margin: 0, paddingLeft: 16 }}>
+                <li>R² ≥ {minR2} (statistical significance)</li>
+                <li>B/M ≥ {minBM} (value factor tilt)</li>
+                <li>E/P ≥ {minEP} (earnings quality)</li>
+                <li>Slope ≥ {minSlope.toFixed(4)} (trend strength)</li>
+              </ul>
+              <div style={{ marginTop: 12, padding: 8, background: "rgba(139, 92, 246, 0.1)", borderRadius: 4, fontSize: 10, fontFamily: "monospace" }}>
+                Event Score ≥ {(minEventScore * 100).toFixed(0)}% (8-filter)
+              </div>
+            </div>
+
+            {/* Risk Management */}
+            <div style={{ padding: 16, background: "rgba(0,0,0,0.3)", borderRadius: 6, border: "1px solid #2a1a1a" }}>
+              <div style={{ fontSize: 10, color: "#ef4444", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>
+                Risk Controls
+              </div>
+              <div style={{ fontSize: 12, color: "var(--foreground)", marginBottom: 8 }}>
+                <strong>Drawdown Protection</strong>
+              </div>
+              <ul style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.6, margin: 0, paddingLeft: 16 }}>
+                <li>Stop Loss: ±{stopSigma}σ from regression</li>
+                <li>Time Exit: {maxDays} days max holding</li>
+                <li>Max Positions: {maxPositions} concurrent</li>
+                <li style={{ color: "#ef4444" }}>Circuit Breaker: {maxDD.toFixed(0)}% portfolio DD</li>
+              </ul>
+              <div style={{ marginTop: 12, padding: 8, background: "rgba(239, 68, 68, 0.1)", borderRadius: 4, fontSize: 10, fontFamily: "monospace" }}>
+                Target: Mean reversion to regression line
+              </div>
+            </div>
+          </div>
+
+          {/* Mathematical Basis */}
+          <div style={{ marginTop: 16, padding: 16, background: "rgba(0,0,0,0.2)", borderRadius: 6, border: "1px solid var(--border)" }}>
+            <div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>
+              Mathematical Foundation
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, fontSize: 11 }}>
+              <div>
+                <div style={{ color: "var(--muted)", marginBottom: 4 }}>Channel Model</div>
+                <code style={{ fontSize: 10, color: "#a855f7", fontFamily: "monospace" }}>
+                  P(t) = α + βt + ε, ε ~ N(0, σ²)
+                </code>
+              </div>
+              <div>
+                <div style={{ color: "var(--muted)", marginBottom: 4 }}>Z-Score</div>
+                <code style={{ fontSize: 10, color: "#a855f7", fontFamily: "monospace" }}>
+                  z = (P - P̂) / σ_residual
+                </code>
+              </div>
+              <div>
+                <div style={{ color: "var(--muted)", marginBottom: 4 }}>Quality Metric</div>
+                <code style={{ fontSize: 10, color: "#a855f7", fontFamily: "monospace" }}>
+                  R² = 1 - SS_res / SS_tot
+                </code>
+              </div>
+              <div>
+                <div style={{ color: "var(--muted)", marginBottom: 4 }}>Event Score</div>
+                <code style={{ fontSize: 10, color: "#a855f7", fontFamily: "monospace" }}>
+                  S = Σ(wᵢ × fᵢ), Σwᵢ = 1
+                </code>
+              </div>
+            </div>
           </div>
         </section>
       </main>
@@ -1019,13 +2097,76 @@ function MetricCard({ label, value, subtext, positive, neutral }: {
 
   return (
     <div style={cardStyle}>
-      <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
+      <div style={{ fontSize: 12, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
         {label}
       </div>
-      <div style={{ fontSize: 22, fontWeight: 700, color: valueColor, fontFamily: "monospace" }}>
+      <div style={{ fontSize: 28, fontWeight: 700, color: valueColor, fontFamily: "monospace" }}>
         {value}
       </div>
-      <div style={{ fontSize: 10, color: "var(--muted-foreground)", marginTop: 2 }}>{subtext}</div>
+      <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 4 }}>{subtext}</div>
+    </div>
+  );
+}
+
+function FilterWeightCard({ name, weight, color, description, logic }: {
+  name: string;
+  weight: number;
+  color: string;
+  description: string;
+  logic: string;
+}) {
+  return (
+    <div style={{
+      padding: 14,
+      background: "rgba(0,0,0,0.3)",
+      borderRadius: 4,
+      border: `1px solid ${color}20`,
+      position: "relative",
+      overflow: "hidden",
+    }}>
+      {/* Weight indicator bar */}
+      <div style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: `${weight * 5}%`,
+        height: 3,
+        background: color,
+      }} />
+
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, marginTop: 2 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ width: 8, height: 8, background: color, borderRadius: 2 }} />
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--foreground)" }}>{name}</span>
+        </div>
+        <span style={{
+          fontSize: 11,
+          fontWeight: 700,
+          fontFamily: "monospace",
+          color: color,
+        }}>
+          {weight}%
+        </span>
+      </div>
+
+      {/* Description */}
+      <p style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.4, margin: "0 0 8px 0" }}>
+        {description}
+      </p>
+
+      {/* Logic indicator */}
+      <div style={{
+        fontSize: 9,
+        fontFamily: "monospace",
+        color: color,
+        background: `${color}10`,
+        padding: "4px 6px",
+        borderRadius: 2,
+        letterSpacing: "0.03em",
+      }}>
+        {logic}
+      </div>
     </div>
   );
 }

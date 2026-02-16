@@ -410,7 +410,7 @@ export default function PredictionChart({ ticker, mode = "default" }: Props) {
           <div style={{ fontSize: 10, fontWeight: 600, marginBottom: 10, color: "var(--foreground)", fontFamily: "monospace" }}>
             RETURN DISTRIBUTION
           </div>
-          <ResponsiveContainer width="100%" height={180}>
+          <ResponsiveContainer width="100%" height={220}>
             <BarChart data={distributionData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
               <XAxis

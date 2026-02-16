@@ -77,6 +77,15 @@ type StdChannelResponse = {
   data: StdChannelData[];
 };
 
+type OptimizeTrade = {
+  entryDate: string;
+  exitDate: string;
+  signal: "LONG" | "SHORT";
+  returnPct: number;
+  holdingDays: number;
+  exitReason: "TARGET" | "TIME" | "STOP";
+};
+
 type StdChannelOptimizeResult = {
   params: {
     entrySigma: number;
@@ -95,6 +104,7 @@ type StdChannelOptimizeResult = {
   avgHoldingDays: number;
   exitBreakdown: { target: number; time: number; stop: number };
   score: number;
+  trades?: OptimizeTrade[];
 };
 
 type StdChannelOptimizeResponse = {
@@ -105,6 +115,14 @@ type StdChannelOptimizeResponse = {
   dateRange: { start: string; end: string };
   results: StdChannelOptimizeResult[];
   best: StdChannelOptimizeResult | null;
+  parametersUsed?: {
+    entrySigmas: number[];
+    stopSigmas: number[];
+    maxDaysList: number[];
+    minR2s: number[];
+    windowSizes: number[];
+    minTrades: number;
+  };
 };
 
 function calculateReturnStats(returns: Array<{ date: string; return: number }>) {
@@ -229,6 +247,28 @@ export default function StockTickerPage() {
   const [stdBacktestError, setStdBacktestError] = useState<string | null>(null);
   const [showOptimizer, setShowOptimizer] = useState<boolean>(false);
   const [optimizerProgress, setOptimizerProgress] = useState<number>(0);
+  const [showOptimizerParams, setShowOptimizerParams] = useState<boolean>(false);
+  const [showTrades, setShowTrades] = useState<boolean>(false);
+
+  // Optimizer parameter state - use Sets for checkbox selections
+  // Better risk/reward: stop offset from entry (not absolute sigma)
+  const [optEntrySigmas, setOptEntrySigmas] = useState<Set<number>>(new Set([2, 2.5, 3]));
+  const [optStopOffsets, setOptStopOffsets] = useState<Set<number>>(new Set([0.5, 1.0])); // Stop = Entry + offset (tighter risk)
+  const [optMaxDays, setOptMaxDays] = useState<Set<number>>(new Set([7, 14, 21]));
+  const [optMinR2s, setOptMinR2s] = useState<Set<number>>(new Set([0.5, 0.7]));
+  const [optWindows, setOptWindows] = useState<Set<number>>(new Set([126, 252]));
+  const [optMinTrades, setOptMinTrades] = useState<number>(3);
+
+  // Toggle helper for checkbox selections
+  const toggleSetValue = (set: Set<number>, value: number, setter: React.Dispatch<React.SetStateAction<Set<number>>>) => {
+    const newSet = new Set(set);
+    if (newSet.has(value)) {
+      if (newSet.size > 1) newSet.delete(value); // Keep at least one selected
+    } else {
+      newSet.add(value);
+    }
+    setter(newSet);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -494,9 +534,19 @@ export default function StockTickerPage() {
     setStdBacktestLoading(true);
     setStdBacktestError(null);
     setShowOptimizer(true);
+    setShowTrades(false);
 
     try {
-      const res = await fetch(`/api/std-channel-optimize/${encodeURIComponent(ticker)}`, {
+      // Build URL with custom parameters - send offsets directly
+      const params = new URLSearchParams();
+      params.set("entrySigmas", Array.from(optEntrySigmas).sort((a, b) => a - b).join(","));
+      params.set("stopOffsets", Array.from(optStopOffsets).sort((a, b) => a - b).join(",")); // Send offsets, not absolute stops
+      params.set("maxDays", Array.from(optMaxDays).sort((a, b) => a - b).join(","));
+      params.set("minR2s", Array.from(optMinR2s).sort((a, b) => a - b).join(","));
+      params.set("windows", Array.from(optWindows).sort((a, b) => a - b).join(","));
+      params.set("minTrades", String(optMinTrades));
+
+      const res = await fetch(`/api/std-channel-optimize/${encodeURIComponent(ticker)}?${params.toString()}`, {
         method: "GET",
         headers: { accept: "application/json" },
         cache: "no-store",
@@ -911,6 +961,23 @@ export default function StockTickerPage() {
               ML PREDICTIONS
             </Link>
           )}
+          <Link
+            href={`/options/${ticker}`}
+            style={{
+              padding: "6px 10px",
+              borderRadius: 2,
+              background: "var(--card-bg)",
+              border: "1px solid var(--border)",
+              color: "var(--foreground)",
+              fontSize: 10,
+              fontWeight: 600,
+              textDecoration: "none",
+              fontFamily: "monospace",
+              transition: "all 0.15s",
+            }}
+          >
+            OPTIONS ANALYSIS
+          </Link>
           <Link
             href="/std-channel-strategy"
             style={{
@@ -1428,24 +1495,223 @@ export default function StockTickerPage() {
                       Optimized parameters for {ticker} using slope-aligned mean reversion
                     </div>
                   </div>
-                  <button
-                    onClick={runStdChannelOptimizer}
-                    disabled={stdBacktestLoading}
-                    style={{
-                      padding: "8px 14px",
-                      borderRadius: 4,
-                      border: "none",
-                      background: stdBacktestLoading ? "var(--muted)" : "#f59e0b",
-                      color: "#fff",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      cursor: stdBacktestLoading ? "not-allowed" : "pointer",
-                      opacity: stdBacktestLoading ? 0.7 : 1,
-                    }}
-                  >
-                    {stdBacktestLoading ? "Optimizing..." : showOptimizer && stdBacktestData ? "Re-Optimize" : "Find Optimal Parameters"}
-                  </button>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <button
+                      onClick={() => setShowOptimizerParams(!showOptimizerParams)}
+                      title="Configure parameters"
+                      style={{
+                        padding: "8px 10px",
+                        borderRadius: 4,
+                        border: "1px solid var(--border)",
+                        background: showOptimizerParams ? "var(--accent)" : "transparent",
+                        color: showOptimizerParams ? "#fff" : "var(--muted)",
+                        fontSize: 14,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "all 0.2s",
+                      }}
+                    >
+                      ⚙
+                    </button>
+                    <button
+                      onClick={runStdChannelOptimizer}
+                      disabled={stdBacktestLoading}
+                      style={{
+                        padding: "8px 16px",
+                        borderRadius: 4,
+                        border: "none",
+                        background: stdBacktestLoading ? "var(--muted)" : "#f59e0b",
+                        color: "#fff",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: stdBacktestLoading ? "not-allowed" : "pointer",
+                        opacity: stdBacktestLoading ? 0.7 : 1,
+                      }}
+                    >
+                      {stdBacktestLoading ? "Optimizing..." : showOptimizer && stdBacktestData ? "Re-Optimize" : "Run Backtest"}
+                    </button>
+                  </div>
                 </div>
+
+                {/* Parameter Configuration Panel */}
+                {showOptimizerParams && (
+                  <div style={{
+                    padding: 16,
+                    background: "linear-gradient(135deg, var(--card-bg) 0%, var(--hover-bg) 100%)",
+                    borderRadius: 6,
+                    marginBottom: 16,
+                    border: "1px solid var(--accent)",
+                    borderLeftWidth: 3,
+                  }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                      {/* Entry Sigma - when to enter */}
+                      <div>
+                        <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                          Entry σ <span style={{ textTransform: "none", opacity: 0.7 }}>(distance from mean to enter)</span>
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {[1.5, 2, 2.5, 3, 3.5].map(v => (
+                            <button
+                              key={v}
+                              onClick={() => toggleSetValue(optEntrySigmas, v, setOptEntrySigmas)}
+                              style={{
+                                padding: "4px 10px",
+                                borderRadius: 4,
+                                border: optEntrySigmas.has(v) ? "1px solid var(--accent)" : "1px solid var(--border)",
+                                background: optEntrySigmas.has(v) ? "var(--accent)" : "transparent",
+                                color: optEntrySigmas.has(v) ? "#fff" : "var(--foreground)",
+                                fontSize: 12,
+                                fontFamily: "monospace",
+                                cursor: "pointer",
+                              }}
+                            >
+                              {v}σ
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Stop Offset - risk per trade */}
+                      <div>
+                        <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                          Stop Offset <span style={{ textTransform: "none", opacity: 0.7 }}>(stop = entry + offset, controls risk)</span>
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {[0.5, 0.75, 1.0, 1.5].map(v => (
+                            <button
+                              key={v}
+                              onClick={() => toggleSetValue(optStopOffsets, v, setOptStopOffsets)}
+                              style={{
+                                padding: "4px 10px",
+                                borderRadius: 4,
+                                border: optStopOffsets.has(v) ? "1px solid #ef4444" : "1px solid var(--border)",
+                                background: optStopOffsets.has(v) ? "rgba(239, 68, 68, 0.2)" : "transparent",
+                                color: optStopOffsets.has(v) ? "#ef4444" : "var(--foreground)",
+                                fontSize: 12,
+                                fontFamily: "monospace",
+                                cursor: "pointer",
+                              }}
+                            >
+                              +{v}σ
+                            </button>
+                          ))}
+                        </div>
+                        <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4, fontStyle: "italic" }}>
+                          e.g. Entry 2σ + Offset 0.5σ = Stop at 2.5σ (risk 0.5σ per trade)
+                        </div>
+                      </div>
+
+                      {/* Max Holding Days */}
+                      <div>
+                        <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                          Max Days <span style={{ textTransform: "none", opacity: 0.7 }}>(time limit per trade)</span>
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {[5, 7, 10, 14, 21, 30].map(v => (
+                            <button
+                              key={v}
+                              onClick={() => toggleSetValue(optMaxDays, v, setOptMaxDays)}
+                              style={{
+                                padding: "4px 10px",
+                                borderRadius: 4,
+                                border: optMaxDays.has(v) ? "1px solid #3b82f6" : "1px solid var(--border)",
+                                background: optMaxDays.has(v) ? "rgba(59, 130, 246, 0.2)" : "transparent",
+                                color: optMaxDays.has(v) ? "#3b82f6" : "var(--foreground)",
+                                fontSize: 12,
+                                fontFamily: "monospace",
+                                cursor: "pointer",
+                              }}
+                            >
+                              {v}d
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Second row - Filters */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 120px", gap: 12 }}>
+                        {/* Min R² */}
+                        <div>
+                          <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                            Min R² <span style={{ textTransform: "none", opacity: 0.7 }}>(channel quality)</span>
+                          </div>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            {[0.3, 0.5, 0.7].map(v => (
+                              <button
+                                key={v}
+                                onClick={() => toggleSetValue(optMinR2s, v, setOptMinR2s)}
+                                style={{
+                                  padding: "4px 10px",
+                                  borderRadius: 4,
+                                  border: optMinR2s.has(v) ? "1px solid #10b981" : "1px solid var(--border)",
+                                  background: optMinR2s.has(v) ? "rgba(16, 185, 129, 0.2)" : "transparent",
+                                  color: optMinR2s.has(v) ? "#10b981" : "var(--foreground)",
+                                  fontSize: 12,
+                                  fontFamily: "monospace",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                {v}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Window Sizes */}
+                        <div>
+                          <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                            Window <span style={{ textTransform: "none", opacity: 0.7 }}>(lookback)</span>
+                          </div>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            {[126, 189, 252].map(v => (
+                              <button
+                                key={v}
+                                onClick={() => toggleSetValue(optWindows, v, setOptWindows)}
+                                style={{
+                                  padding: "4px 8px",
+                                  borderRadius: 4,
+                                  border: optWindows.has(v) ? "1px solid var(--foreground)" : "1px solid var(--border)",
+                                  background: optWindows.has(v) ? "var(--hover-bg)" : "transparent",
+                                  color: optWindows.has(v) ? "var(--foreground)" : "var(--muted)",
+                                  fontSize: 11,
+                                  fontFamily: "monospace",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                {v}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Min Trades */}
+                        <div>
+                          <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                            Min Trades
+                          </div>
+                          <input
+                            type="number"
+                            value={optMinTrades}
+                            onChange={(e) => setOptMinTrades(parseInt(e.target.value) || 3)}
+                            min={1}
+                            max={20}
+                            style={{
+                              width: "100%",
+                              padding: "4px 8px",
+                              borderRadius: 4,
+                              border: "1px solid var(--input-border)",
+                              background: "var(--input-bg)",
+                              color: "var(--foreground)",
+                              fontSize: 12,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Optimizer Results */}
                 {showOptimizer && (
@@ -1574,7 +1840,7 @@ export default function StockTickerPage() {
                         </div>
 
                         {/* Exit Breakdown */}
-                        <div style={{ display: "flex", gap: 16, fontSize: 11 }}>
+                        <div style={{ display: "flex", gap: 16, fontSize: 11, marginBottom: 16 }}>
                           <span style={{ color: "#10b981" }}>
                             ● Target: {((stdBacktestData.best.exitBreakdown.target / stdBacktestData.best.totalTrades) * 100).toFixed(0)}%
                           </span>
@@ -1585,6 +1851,84 @@ export default function StockTickerPage() {
                             ● Stop: {((stdBacktestData.best.exitBreakdown.stop / stdBacktestData.best.totalTrades) * 100).toFixed(0)}%
                           </span>
                         </div>
+
+                        {/* Trade History */}
+                        {stdBacktestData.best.trades && stdBacktestData.best.trades.length > 0 && (
+                          <div style={{ marginBottom: 16 }}>
+                            <button
+                              onClick={() => setShowTrades(!showTrades)}
+                              style={{
+                                padding: "6px 12px",
+                                borderRadius: 4,
+                                border: "1px solid var(--border)",
+                                background: showTrades ? "var(--hover-bg)" : "transparent",
+                                color: "var(--accent)",
+                                fontSize: 12,
+                                fontWeight: 500,
+                                cursor: "pointer",
+                                marginBottom: 12,
+                              }}
+                            >
+                              {showTrades ? "Hide" : "Show"} {stdBacktestData.best.trades.length} Trades
+                            </button>
+
+                            {showTrades && (
+                              <div style={{ overflowX: "auto" }}>
+                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                                  <thead>
+                                    <tr style={{ color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--border)" }}>
+                                      <th style={{ padding: "8px 6px", fontWeight: 500 }}>#</th>
+                                      <th style={{ padding: "8px 6px", fontWeight: 500 }}>Entry Date</th>
+                                      <th style={{ padding: "8px 6px", fontWeight: 500 }}>Exit Date</th>
+                                      <th style={{ padding: "8px 6px", fontWeight: 500 }}>Signal</th>
+                                      <th style={{ padding: "8px 6px", fontWeight: 500 }}>Days</th>
+                                      <th style={{ padding: "8px 6px", fontWeight: 500 }}>Return</th>
+                                      <th style={{ padding: "8px 6px", fontWeight: 500 }}>Exit</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {stdBacktestData.best.trades.map((trade, idx) => (
+                                      <tr
+                                        key={idx}
+                                        style={{
+                                          borderBottom: "1px solid var(--border)",
+                                          background: idx % 2 === 0 ? "transparent" : "var(--hover-bg)",
+                                        }}
+                                      >
+                                        <td style={{ padding: "8px 6px", color: "var(--muted)" }}>{idx + 1}</td>
+                                        <td style={{ padding: "8px 6px", fontFamily: "monospace" }}>{trade.entryDate}</td>
+                                        <td style={{ padding: "8px 6px", fontFamily: "monospace" }}>{trade.exitDate}</td>
+                                        <td style={{
+                                          padding: "8px 6px",
+                                          color: trade.signal === "LONG" ? "#10b981" : "#ef4444",
+                                          fontWeight: 500,
+                                        }}>
+                                          {trade.signal}
+                                        </td>
+                                        <td style={{ padding: "8px 6px", fontFamily: "monospace" }}>{trade.holdingDays}d</td>
+                                        <td style={{
+                                          padding: "8px 6px",
+                                          fontFamily: "monospace",
+                                          fontWeight: 600,
+                                          color: trade.returnPct >= 0 ? "#10b981" : "#ef4444",
+                                        }}>
+                                          {trade.returnPct >= 0 ? "+" : ""}{(trade.returnPct * 100).toFixed(1)}%
+                                        </td>
+                                        <td style={{
+                                          padding: "8px 6px",
+                                          color: trade.exitReason === "TARGET" ? "#10b981" :
+                                                 trade.exitReason === "TIME" ? "#3b82f6" : "#ef4444",
+                                        }}>
+                                          {trade.exitReason}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         {/* All Results Table (collapsed by default, expandable) */}
                         {stdBacktestData.results.length > 1 && (
@@ -1642,7 +1986,7 @@ export default function StockTickerPage() {
                 {/* Initial state - show hint */}
                 {!showOptimizer && (
                   <div style={{ fontSize: 12, color: "var(--muted-foreground)", fontStyle: "italic" }}>
-                    Click &quot;Find Optimal Parameters&quot; to test ~270 parameter combinations and find the best STD Channel mean reversion strategy for {ticker}.
+                    Click &quot;Configure&quot; to adjust parameters, then &quot;Run Backtest&quot; to find the best STD Channel mean reversion strategy for {ticker}.
                   </div>
                 )}
               </div>
