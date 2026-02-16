@@ -942,7 +942,7 @@ export default function StockTickerPage() {
           >
             MONTE CARLO SIMULATION
           </Link>
-          {(stockMetaLoading || (totalRows >= 756 && hasFactorData)) && (
+          {(!stockMetaLoading && totalRows >= 756 && hasFactorData) && (
             <Link
               href={`/predictions/${ticker}`}
               style={{
