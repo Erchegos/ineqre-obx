@@ -11,9 +11,43 @@ import { pool } from "@/lib/db";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * Compute max pain: the strike price where total payout to option holders is minimized.
+ * For each candidate settlement price P (each unique strike), sum across ALL strikes K:
+ *   call payout = max(0, P - K) * callOI[K]
+ *   put payout  = max(0, K - P) * putOI[K]
+ * Max pain = P with the lowest total payout.
+ */
+function computeMaxPain(
+  chain: { strike: number; call_oi: number; put_oi: number }[]
+): number | null {
+  if (chain.length === 0) return null;
+
+  const strikes = chain.map((c) => c.strike);
+  let minPain = Infinity;
+  let maxPainStrike: number | null = null;
+
+  for (const P of strikes) {
+    let totalPain = 0;
+    for (const row of chain) {
+      const K = row.strike;
+      // Call holders get paid when settlement P > strike K
+      if (P > K) totalPain += (P - K) * row.call_oi;
+      // Put holders get paid when settlement P < strike K
+      if (P < K) totalPain += (K - P) * row.put_oi;
+    }
+    if (totalPain < minPain) {
+      minPain = totalPain;
+      maxPainStrike = P;
+    }
+  }
+
+  return maxPainStrike;
+}
+
 export async function GET() {
   try {
-    // Get meta + aggregated chain stats in one query
+    // Get meta + aggregated chain stats in one query (without max pain)
     const result = await pool.query(`
       SELECT
         m.ticker,
@@ -30,8 +64,7 @@ export async function GET() {
         agg.nearest_expiry,
         agg.farthest_expiry,
         agg.atm_call_iv,
-        agg.atm_put_iv,
-        agg.max_pain_strike
+        agg.atm_put_iv
       FROM public.options_meta m
       LEFT JOIN LATERAL (
         SELECT
@@ -48,22 +81,42 @@ export async function GET() {
            ORDER BY ABS(strike - m.underlying_price) LIMIT 1) AS atm_call_iv,
           (SELECT iv FROM public.options_chain
            WHERE ticker = m.ticker AND option_right = 'put' AND expiry = MIN(c.expiry) AND iv > 0
-           ORDER BY ABS(strike - m.underlying_price) LIMIT 1) AS atm_put_iv,
-          -- Max pain: strike with minimum total obligation
-          (SELECT sub.strike FROM (
-            SELECT strike,
-              SUM(CASE WHEN option_right = 'call' AND strike < m.underlying_price THEN open_interest * (m.underlying_price - strike) ELSE 0 END) +
-              SUM(CASE WHEN option_right = 'put' AND strike > m.underlying_price THEN open_interest * (strike - m.underlying_price) ELSE 0 END) AS pain
-            FROM public.options_chain
-            WHERE ticker = m.ticker AND expiry = MIN(c.expiry)
-            GROUP BY strike
-            ORDER BY pain ASC LIMIT 1
-          ) sub) AS max_pain_strike
+           ORDER BY ABS(strike - m.underlying_price) LIMIT 1) AS atm_put_iv
         FROM public.options_chain c
         WHERE c.ticker = m.ticker
       ) agg ON true
       ORDER BY m.ticker
     `);
+
+    // Fetch nearest-expiry chain data for max pain calculation
+    // Get aggregated call/put OI per strike for each ticker's nearest expiry
+    const maxPainResult = await pool.query(`
+      SELECT
+        c.ticker,
+        c.strike,
+        COALESCE(SUM(CASE WHEN c.option_right = 'call' THEN c.open_interest ELSE 0 END), 0)::int AS call_oi,
+        COALESCE(SUM(CASE WHEN c.option_right = 'put' THEN c.open_interest ELSE 0 END), 0)::int AS put_oi
+      FROM public.options_chain c
+      INNER JOIN (
+        SELECT ticker, MIN(expiry) AS nearest_expiry
+        FROM public.options_chain
+        GROUP BY ticker
+      ) ne ON c.ticker = ne.ticker AND c.expiry = ne.nearest_expiry
+      GROUP BY c.ticker, c.strike
+      ORDER BY c.ticker, c.strike
+    `);
+
+    // Build max pain lookup: ticker -> chain data
+    const maxPainChains = new Map<string, { strike: number; call_oi: number; put_oi: number }[]>();
+    for (const row of maxPainResult.rows) {
+      const ticker = row.ticker as string;
+      if (!maxPainChains.has(ticker)) maxPainChains.set(ticker, []);
+      maxPainChains.get(ticker)!.push({
+        strike: parseFloat(row.strike),
+        call_oi: parseInt(row.call_oi) || 0,
+        put_oi: parseInt(row.put_oi) || 0,
+      });
+    }
 
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
 
@@ -75,6 +128,10 @@ export async function GET() {
       const atmCallIV = row.atm_call_iv ? parseFloat(row.atm_call_iv) : null;
       const atmPutIV = row.atm_put_iv ? parseFloat(row.atm_put_iv) : null;
       const atmIV = atmCallIV && atmPutIV ? (atmCallIV + atmPutIV) / 2 : (atmCallIV || atmPutIV);
+
+      // Compute max pain in JS
+      const chain = maxPainChains.get(row.ticker) || [];
+      const maxPain = computeMaxPain(chain);
 
       // Days to nearest expiry
       let daysToExpiry: number | null = null;
@@ -100,7 +157,7 @@ export async function GET() {
         total_contracts: parseInt(row.total_contracts) || 0,
         pc_ratio_oi: pcRatioOI,
         atm_iv: atmIV,
-        max_pain: row.max_pain_strike ? parseFloat(row.max_pain_strike) : null,
+        max_pain: maxPain,
         nearest_expiry: row.nearest_expiry,
         farthest_expiry: row.farthest_expiry,
         days_to_expiry: daysToExpiry,
