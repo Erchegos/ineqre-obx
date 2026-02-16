@@ -42,9 +42,10 @@ export default function StocksPage() {
     new Set(['equity']) // Default to equities only
   );
   const [selectedSectors, setSelectedSectors] = useState<Set<string>>(new Set());
-  const [tierFilter, setTierFilter] = useState<'all' | 'tierA' | 'tierAB' | 'ml'>('all');
+  const [tierFilter, setTierFilter] = useState<'all' | 'tierA' | 'tierAB' | 'ml' | 'options'>('all');
   const [tickersWithFactors, setTickersWithFactors] = useState<Set<string>>(new Set());
   const [tickersWithOptimizer, setTickersWithOptimizer] = useState<Set<string>>(new Set());
+  const [tickersWithOptions, setTickersWithOptions] = useState<Set<string>>(new Set());
 
   const fetchStocks = useCallback(async (assetTypes: Set<AssetType>) => {
     setLoading(true);
@@ -98,14 +99,19 @@ export default function StocksPage() {
       if (stocks.length === 0) return;
 
       try {
-        // Fetch both in parallel
-        const [factorRes, optimizerRes] = await Promise.all([
+        // Fetch all in parallel
+        const [factorRes, optimizerRes, optionsRes] = await Promise.all([
           fetch("/api/factors/tickers", {
             method: "GET",
             headers: { accept: "application/json" },
             cache: "no-store",
           }),
           fetch("/api/optimizer-config/tickers", {
+            method: "GET",
+            headers: { accept: "application/json" },
+            cache: "no-store",
+          }),
+          fetch("/api/options", {
             method: "GET",
             headers: { accept: "application/json" },
             cache: "no-store",
@@ -123,6 +129,13 @@ export default function StocksPage() {
           const data = await optimizerRes.json();
           if (data.success && data.tickers) {
             setTickersWithOptimizer(new Set(data.tickers));
+          }
+        }
+
+        if (optionsRes.ok) {
+          const data = await optionsRes.json();
+          if (data.stocks) {
+            setTickersWithOptions(new Set(data.stocks.map((s: { ticker: string }) => s.ticker)));
           }
         }
       } catch (e) {
@@ -148,6 +161,12 @@ export default function StocksPage() {
     });
   };
 
+  // Check if stock has options — only US-listed tickers (e.g. EQNR.US matches EQNR in options API)
+  const hasOptions = useCallback((ticker: string) => {
+    if (ticker.endsWith('.US')) return tickersWithOptions.has(ticker.replace('.US', ''));
+    return false;
+  }, [tickersWithOptions]);
+
   // Get unique sectors from stocks
   const availableSectors = useMemo(() => {
     const sectors = new Set<string>();
@@ -167,6 +186,8 @@ export default function StocksPage() {
       filtered = filtered.filter(stock => stock.dataTier === 'A' || stock.dataTier === 'B');
     } else if (tierFilter === 'ml') {
       filtered = filtered.filter(stock => tickersWithFactors.has(stock.ticker));
+    } else if (tierFilter === 'options') {
+      filtered = filtered.filter(stock => hasOptions(stock.ticker));
     }
 
     // Filter by sector
@@ -204,7 +225,7 @@ export default function StocksPage() {
     });
 
     return sorted;
-  }, [stocks, searchQuery, sortBy, sortOrder, selectedSectors, tierFilter, tickersWithFactors]);
+  }, [stocks, searchQuery, sortBy, sortOrder, selectedSectors, tierFilter, tickersWithFactors, hasOptions]);
 
   // Calculate tier counts and ML predictions count for summary panel
   const tierCounts = useMemo(() => {
@@ -222,6 +243,10 @@ export default function StocksPage() {
   const optCount = useMemo(() => {
     return tickersWithOptimizer.size;
   }, [tickersWithOptimizer]);
+
+  const optionsCount = useMemo(() => {
+    return stocks.filter(s => hasOptions(s.ticker)).length;
+  }, [stocks, hasOptions]);
 
   const toggleSort = (column: keyof StockData) => {
     if (sortBy === column) {
@@ -343,24 +368,50 @@ export default function StocksPage() {
               Home
             </Link>
           </div>
-          <Link
-            href="/correlation"
-            style={{
-              color: "var(--accent)",
-              textDecoration: "none",
-              fontSize: 14,
-              fontWeight: 500,
-              padding: "8px 16px",
-              borderRadius: 4,
-              border: "1px solid var(--accent)",
-              transition: "all 0.15s",
-            }}
-          >
-            → Correlation Matrix
-          </Link>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Link
+              href="/options"
+              style={{
+                color: "var(--foreground)",
+                textDecoration: "none",
+                fontSize: 13,
+                fontWeight: 500,
+                padding: "8px 16px",
+                border: "1px solid var(--border)",
+                borderRadius: 4,
+                background: "var(--card-bg)",
+                transition: "all 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "var(--foreground)";
+                e.currentTarget.style.background = "var(--hover-bg)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "var(--border)";
+                e.currentTarget.style.background = "var(--card-bg)";
+              }}
+            >
+              Options
+            </Link>
+            <Link
+              href="/correlation"
+              style={{
+                color: "var(--accent)",
+                textDecoration: "none",
+                fontSize: 14,
+                fontWeight: 500,
+                padding: "8px 16px",
+                borderRadius: 4,
+                border: "1px solid var(--accent)",
+                transition: "all 0.15s",
+              }}
+            >
+              Correlation
+            </Link>
+          </div>
         </div>
         <p style={{ color: "var(--muted)", marginBottom: 16, fontSize: 14 }}>
-          Universe: {stocks.length} assets | Tier A: {tierCounts.A} | Tier B: {tierCounts.B} | Tier C: {tierCounts.C} | Tier F: {tierCounts.F} | <span style={{ color: '#10b981', fontWeight: 600 }}>ML Ready: {mlCount}</span> | <span style={{ color: '#8b5cf6', fontWeight: 600 }}>Optimized: {optCount}</span>
+          Universe: {stocks.length} assets | Tier A: {tierCounts.A} | Tier B: {tierCounts.B} | Tier C: {tierCounts.C} | Tier F: {tierCounts.F} | <span style={{ color: '#10b981', fontWeight: 600 }}>ML Ready: {mlCount}</span> | <span style={{ color: '#8b5cf6', fontWeight: 600 }}>Optimized: {optCount}</span> | <span style={{ color: '#f59e0b', fontWeight: 600 }}>Options: {optionsCount}</span>
           <span style={{ marginLeft: 16, fontSize: 13 }}>Source: Interactive Brokers</span>
         </p>
 
@@ -376,6 +427,7 @@ export default function StocksPage() {
             { key: 'tierA', label: 'Tier A Only' },
             { key: 'tierAB', label: 'A+B Only' },
             { key: 'ml', label: 'ML Ready' },
+            { key: 'options', label: 'Options Available' },
           ].map((filter) => {
             const isSelected = tierFilter === filter.key;
             return (
@@ -632,6 +684,8 @@ export default function StocksPage() {
                     Ticker <SortIcon column="ticker" />
                   </button>
                 </th>
+                <th style={{ textAlign: "left", padding: "16px", fontSize: 13, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--foreground)" }}>
+                </th>
                 <th style={{ textAlign: "left", padding: "16px" }}>
                   <button
                     onClick={() => toggleSort("name")}
@@ -716,29 +770,6 @@ export default function StocksPage() {
                     }}
                   >
                     Last Close <SortIcon column="last_close" />
-                  </button>
-                </th>
-                <th style={{ textAlign: "right", padding: "16px" }}>
-                  <button
-                    onClick={() => toggleSort("last_adj_close")}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "var(--foreground)",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "flex-end",
-                      gap: 8,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      padding: 0,
-                      marginLeft: "auto",
-                    }}
-                  >
-                    Adj Close <SortIcon column="last_adj_close" />
                   </button>
                 </th>
                 <th style={{ textAlign: "right", padding: "16px" }}>
@@ -889,55 +920,28 @@ export default function StocksPage() {
                   style={{ cursor: "pointer" }}
                 >
                   <td style={{ padding: "16px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{
-                        color: "var(--accent)",
-                        fontWeight: 600,
-                        fontSize: 14,
-                      }}>
-                        {stock.ticker}
-                      </span>
+                    <span style={{
+                      color: "var(--accent)",
+                      fontWeight: 600,
+                      fontSize: 14,
+                    }}>
+                      {stock.ticker}
+                    </span>
+                  </td>
+                  <td style={{ padding: "8px 16px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
                       {tickersWithFactors.has(stock.ticker) && (
-                        <span style={{
-                          fontSize: 9,
-                          fontWeight: 700,
-                          padding: "2px 5px",
-                          borderRadius: 2,
-                          background: '#10b981',
-                          color: '#fff',
-                          fontFamily: 'monospace',
-                        }}>
-                          ML
-                        </span>
+                        <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 5px", borderRadius: 2, background: '#10b981', color: '#fff', fontFamily: 'monospace' }}>ML</span>
                       )}
                       {tickersWithOptimizer.has(stock.ticker) && (
-                        <span style={{
-                          fontSize: 9,
-                          fontWeight: 700,
-                          padding: "2px 5px",
-                          borderRadius: 2,
-                          background: '#8b5cf6',
-                          color: '#fff',
-                          fontFamily: 'monospace',
-                        }}>
-                          OPT
-                        </span>
+                        <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 5px", borderRadius: 2, background: '#8b5cf6', color: '#fff', fontFamily: 'monospace' }}>OPT</span>
+                      )}
+                      {hasOptions(stock.ticker) && (
+                        <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 5px", borderRadius: 2, background: '#f59e0b', color: '#fff', fontFamily: 'monospace' }}>OPTN</span>
                       )}
                       {selectedAssetTypes.size > 1 && stock.asset_type !== 'equity' && (
-                        <span style={{
-                          fontSize: 10,
-                          fontWeight: 600,
-                          padding: "2px 6px",
-                          borderRadius: 3,
-                          background: stock.asset_type === 'index' ? '#3b82f6' :
-                                     stock.asset_type === 'commodity_etf' ? '#f59e0b' :
-                                     stock.asset_type === 'index_etf' ? '#8b5cf6' : 'var(--muted)',
-                          color: '#fff',
-                          textTransform: 'uppercase',
-                        }}>
-                          {stock.asset_type === 'index' ? 'IDX' :
-                           stock.asset_type === 'commodity_etf' ? 'C-ETF' :
-                           stock.asset_type === 'index_etf' ? 'I-ETF' : stock.asset_type}
+                        <span style={{ fontSize: 9, fontWeight: 600, padding: "2px 5px", borderRadius: 2, background: stock.asset_type === 'index' ? '#3b82f6' : stock.asset_type === 'commodity_etf' ? '#f59e0b' : stock.asset_type === 'index_etf' ? '#8b5cf6' : 'var(--muted)', color: '#fff', fontFamily: 'monospace', textTransform: 'uppercase' }}>
+                          {stock.asset_type === 'index' ? 'IDX' : stock.asset_type === 'commodity_etf' ? 'C-ETF' : stock.asset_type === 'index_etf' ? 'I-ETF' : stock.asset_type}
                         </span>
                       )}
                     </div>
@@ -959,15 +963,6 @@ export default function StocksPage() {
                     fontSize: 14,
                   }}>
                     {stock.last_close.toFixed(2)}
-                  </td>
-                  <td style={{
-                    padding: "16px",
-                    textAlign: "right",
-                    fontFamily: "monospace",
-                    color: "var(--muted)",
-                    fontSize: 14,
-                  }}>
-                    {stock.last_adj_close.toFixed(2)}
                   </td>
                   <td style={{ padding: "16px", textAlign: "right", color: "var(--muted)", fontSize: 13 }}>
                     {stock.start_date}

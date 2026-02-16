@@ -962,6 +962,23 @@ export default function StockTickerPage() {
             </Link>
           )}
           <Link
+            href={`/options/${ticker}`}
+            style={{
+              padding: "6px 10px",
+              borderRadius: 2,
+              background: "var(--card-bg)",
+              border: "1px solid var(--border)",
+              color: "var(--foreground)",
+              fontSize: 10,
+              fontWeight: 600,
+              textDecoration: "none",
+              fontFamily: "monospace",
+              transition: "all 0.15s",
+            }}
+          >
+            OPTIONS ANALYSIS
+          </Link>
+          <Link
             href="/std-channel-strategy"
             style={{
               padding: "6px 10px",
