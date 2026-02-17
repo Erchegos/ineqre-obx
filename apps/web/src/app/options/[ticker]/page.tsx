@@ -159,12 +159,21 @@ export default function OptionsPage() {
   const ivSkewData = useMemo(() => {
     if (!data) return [];
     return data.chain
-      .filter(r => r.call?.iv || r.put?.iv)
-      .map(r => ({
-        strike: r.strike,
-        callIV: r.call?.iv ? r.call.iv * 100 : null,
-        putIV: r.put?.iv ? r.put.iv * 100 : null,
-      }));
+      .filter(r => {
+        // Only include strikes with valid IV data (non-zero IV AND some volume or OI)
+        const callValid = r.call?.iv && r.call.iv > 0 && ((r.call.volume ?? 0) > 0 || (r.call.openInterest ?? 0) > 0);
+        const putValid = r.put?.iv && r.put.iv > 0 && ((r.put.volume ?? 0) > 0 || (r.put.openInterest ?? 0) > 0);
+        return callValid || putValid;
+      })
+      .map(r => {
+        const callValid = r.call?.iv && r.call.iv > 0 && ((r.call.volume ?? 0) > 0 || (r.call.openInterest ?? 0) > 0);
+        const putValid = r.put?.iv && r.put.iv > 0 && ((r.put.volume ?? 0) > 0 || (r.put.openInterest ?? 0) > 0);
+        return {
+          strike: r.strike,
+          callIV: callValid ? r.call!.iv * 100 : null,
+          putIV: putValid ? r.put!.iv * 100 : null,
+        };
+      });
   }, [data]);
 
   const volumeData = useMemo(() => {
