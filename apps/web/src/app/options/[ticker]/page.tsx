@@ -170,8 +170,8 @@ export default function OptionsPage() {
         const putValid = r.put?.iv && r.put.iv > 0 && ((r.put.volume ?? 0) > 0 || (r.put.openInterest ?? 0) > 0);
         return {
           strike: r.strike,
-          callIV: callValid ? r.call!.iv * 100 : null,
-          putIV: putValid ? r.put!.iv * 100 : null,
+          callIV: callValid ? (r.call!.iv ?? 0) * 100 : null,
+          putIV: putValid ? (r.put!.iv ?? 0) * 100 : null,
         };
       });
   }, [data]);
