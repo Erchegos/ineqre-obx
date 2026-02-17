@@ -961,6 +961,7 @@ export default function StockTickerPage() {
               ML PREDICTIONS
             </Link>
           )}
+          {["EQNR.US", "BORR.US", "FLNG.US", "FRO.US"].includes(ticker) && (
           <Link
             href={`/options/${ticker}`}
             style={{
@@ -978,6 +979,7 @@ export default function StockTickerPage() {
           >
             OPTIONS ANALYSIS
           </Link>
+          )}
           <Link
             href="/std-channel-strategy"
             style={{
