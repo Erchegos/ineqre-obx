@@ -251,18 +251,18 @@ export default function OptionsPage() {
     for (const pos of positions) {
       const iv = pos.iv || 0.3;
       const bs = blackScholes(pos.type, data.underlyingPrice, pos.strike, T, 0.04, iv);
-      delta += bs.delta * pos.quantity;
-      gamma += bs.gamma * pos.quantity;
-      theta += bs.theta * pos.quantity * 100;
-      vega += bs.vega * pos.quantity;
+      const sign = pos.quantity < 0 ? -1 : 1;
+      delta += bs.delta * sign;
+      gamma += bs.gamma * sign;
+      theta += bs.theta * sign;
+      vega += bs.vega * sign;
     }
-    // Normalize to per-contract values
-    const n = greeksNorm;
+    // Per-contract values (not multiplied by quantity)
     return {
-      delta: Math.round((delta / n) * 1000) / 1000,
-      gamma: Math.round((gamma / n) * 10000) / 10000,
-      theta: Math.round((theta / n) * 100) / 100,
-      vega: Math.round((vega / n) * 1000) / 1000,
+      delta: Math.round(delta * 1000) / 1000,
+      gamma: Math.round(gamma * 10000) / 10000,
+      theta: Math.round(theta * 100) / 100,
+      vega: Math.round(vega * 1000) / 1000,
     };
   }, [positions, data, selectedExpiry, greeksNorm]);
 

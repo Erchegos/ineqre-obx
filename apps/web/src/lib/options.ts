@@ -373,7 +373,7 @@ export function generateMultiTimePayoff(
         const bs = blackScholes(pos.type, price, pos.strike, T, riskFreeRate, iv);
         delta += bs.delta * pos.quantity;
         gamma += bs.gamma * pos.quantity;
-        theta += bs.theta * pos.quantity * 100;
+        theta += bs.theta * pos.quantity;
         vega += bs.vega * pos.quantity;
       }
     }
