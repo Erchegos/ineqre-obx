@@ -214,6 +214,18 @@ export default function OptionsPage() {
     });
   }, [data, selectedExpiry]);
 
+  // Best realistic IV from near-ATM strikes (used as fallback throughout)
+  const chainFallbackIV = useMemo(() => {
+    if (!data) return 0.3;
+    const S = data.underlyingPrice;
+    const sorted = [...data.chain].sort((a, b) => Math.abs(a.strike - S) - Math.abs(b.strike - S));
+    for (const row of sorted) {
+      const iv = Math.max(row.call?.iv || 0, row.put?.iv || 0);
+      if (iv >= 0.05 && iv < 2.0) return iv;
+    }
+    return 0.3;
+  }, [data]);
+
   // ─── Calculator ─────────────────────────────────────────────
   const addPosition = () => {
     if (calcStrike <= 0 || calcPremium < 0) return;
@@ -240,13 +252,14 @@ export default function OptionsPage() {
     const premium = side === "long"
       ? (opt.ask || opt.last || opt.bid || 0)
       : (opt.bid || opt.last || 0);
+    const iv = (opt.iv && opt.iv >= 0.05 && opt.iv < 2.0) ? opt.iv : chainFallbackIV;
     const newPos: OptionPosition = {
       type,
       strike,
       premium,
       quantity: side === "long" ? 1 : -1,
       expiry: selectedExpiry || "",
-      iv: opt.iv || undefined,
+      iv,
     };
     setPositions(prev => [...prev, newPos]);
   };
@@ -270,7 +283,9 @@ export default function OptionsPage() {
     const T = Math.max(curDte, 1) / 365;
     let delta = 0, gamma = 0, theta = 0, vega = 0;
     for (const pos of positions) {
-      const iv = pos.iv || 0.3;
+      // Use per-position IV if realistic; fall back to chain ATM IV (not 0.3 hardcoded,
+      // which combined with very short DTE causes delta to blow up to 1.0)
+      const iv = (pos.iv && pos.iv >= 0.05 && pos.iv < 2.0) ? pos.iv : chainFallbackIV;
       const bs = blackScholes(pos.type, data.underlyingPrice, pos.strike, T, 0.04, iv);
       delta += bs.delta * pos.quantity;
       gamma += bs.gamma * pos.quantity;
@@ -285,7 +300,7 @@ export default function OptionsPage() {
       theta: Math.round((theta / n) * 100) / 100,
       vega: Math.round((vega / n) * 1000) / 1000,
     };
-  }, [positions, data, selectedExpiry, greeksNorm]);
+  }, [positions, data, selectedExpiry, greeksNorm, chainFallbackIV]);
 
   const buildStrategy = (name: string, qty?: number) => {
     if (!data || data.chain.length === 0) return;
@@ -305,7 +320,8 @@ export default function OptionsPage() {
       const opt = type === "call" ? row.call : row.put;
       if (!opt) return null;
       const prem = side === "long" ? (opt.ask || opt.last || opt.bid || 0) : (opt.bid || opt.last || 0);
-      return { type, strike: row.strike, premium: prem, quantity: side === "long" ? legQty : -legQty, expiry: selectedExpiry || "", iv: opt.iv || undefined };
+      const iv = (opt.iv && opt.iv >= 0.05 && opt.iv < 2.0) ? opt.iv : chainFallbackIV;
+      return { type, strike: row.strike, premium: prem, quantity: side === "long" ? legQty : -legQty, expiry: selectedExpiry || "", iv };
     };
 
     let legs: (OptionPosition | null)[] = [];

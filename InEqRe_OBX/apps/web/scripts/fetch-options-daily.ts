@@ -124,12 +124,120 @@ async function ibkrGetPrice(conid: number): Promise<number | null> {
   }
 }
 
+// ─── IBKR Options Bid/Ask ────────────────────────────────────────
+
+/** Convert "20260320" → "MAR26" */
+function formatIBKRMonth(expiry: string): string {
+  const year = expiry.substring(2, 4);
+  const month = parseInt(expiry.substring(4, 6)) - 1;
+  const months = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+  return months[month] + year;
+}
+
+/** Look up the IBKR conid for a specific option contract. */
+async function ibkrGetOptionConid(
+  underlyingConid: number,
+  monthStr: string,
+  right: "C" | "P",
+  strike: number,
+  exchange: string = "SMART",
+): Promise<number | null> {
+  try {
+    const info = await ibkrFetch(
+      `/v1/api/iserver/secdef/info?conid=${underlyingConid}&secType=OPT&month=${monthStr}&right=${right}&strike=${strike}&exchange=${exchange}`
+    );
+    if (Array.isArray(info) && info.length > 0 && info[0].conid) {
+      return info[0].conid;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+/** Batch bid/ask snapshot for a list of option conids.
+ *  Calls twice with a pause — first call primes the subscription. */
+async function ibkrGetBidAsk(conids: number[]): Promise<Map<number, { bid: number; ask: number }>> {
+  const result = new Map<number, { bid: number; ask: number }>();
+  if (conids.length === 0) return result;
+  const conidStr = conids.join(",");
+  // First call — primes streaming subscription
+  await ibkrFetch(`/v1/api/iserver/marketdata/snapshot?conids=${conidStr}&fields=84,86`).catch(() => {});
+  await sleep(1500);
+  // Second call — returns actual data
+  const snapshots = await ibkrFetch(`/v1/api/iserver/marketdata/snapshot?conids=${conidStr}&fields=84,86`);
+  if (Array.isArray(snapshots)) {
+    for (const snap of snapshots) {
+      const bid = parseFloat(snap["84"]) || 0;
+      const ask = parseFloat(snap["86"]) || 0;
+      if (bid > 0 || ask > 0) result.set(snap.conid, { bid, ask });
+    }
+  }
+  return result;
+}
+
+/** Update near-ATM strikes with real-time IBKR bid/ask after Yahoo data is stored. */
+async function ibkrUpdateOptionBidAsk(
+  dbTicker: string,
+  underlyingConid: number,
+  exchange: string,
+  expiry: string,
+  underlyingPrice: number,
+  db: Client,
+): Promise<void> {
+  const monthStr = formatIBKRMonth(expiry);
+
+  // Fetch near-ATM strikes from DB (within ±20%, max 20 strikes)
+  const res = await db.query(
+    `SELECT DISTINCT strike FROM public.options_chain
+     WHERE ticker = $1 AND expiry = $2 AND ABS(strike - $3) / NULLIF($3, 0) <= 0.20
+     ORDER BY ABS(strike - $3) LIMIT 20`,
+    [dbTicker, expiry, underlyingPrice]
+  );
+  const strikes: number[] = res.rows.map((r: any) => parseFloat(r.strike));
+  if (strikes.length === 0) return;
+
+  console.log(`    [IBKR] Looking up conids for ${strikes.length} strikes (${monthStr})`);
+
+  // Collect conids for calls + puts
+  const conidMap = new Map<number, { strike: number; right: "call" | "put" }>();
+  for (const strike of strikes) {
+    for (const right of ["C", "P"] as const) {
+      const conid = await ibkrGetOptionConid(underlyingConid, monthStr, right, strike, exchange);
+      if (conid) conidMap.set(conid, { strike, right: right === "C" ? "call" : "put" });
+      await sleep(80);
+    }
+  }
+
+  if (conidMap.size === 0) {
+    console.log(`    [IBKR] No option conids found for ${monthStr}`);
+    return;
+  }
+
+  // Batch bid/ask request
+  const bidAsk = await ibkrGetBidAsk(Array.from(conidMap.keys()));
+
+  // Update DB rows that have real data
+  let updated = 0;
+  for (const [conid, { strike, right }] of conidMap.entries()) {
+    const prices = bidAsk.get(conid);
+    if (prices) {
+      await db.query(
+        `UPDATE public.options_chain SET bid = $1, ask = $2
+         WHERE ticker = $3 AND expiry = $4 AND strike = $5 AND option_right = $6`,
+        [prices.bid, prices.ask, dbTicker, expiry, strike, right]
+      );
+      updated++;
+    }
+  }
+  console.log(`    [IBKR] Updated ${updated}/${conidMap.size} bid/ask prices for ${monthStr}`);
+}
+
 // ─── Yahoo Finance Fetcher ───────────────────────────────────────
 async function fetchYahooOptions(
   dbTicker: string,
   yahooSymbol: string,
   ibkrPrice: number | null,
-  db: Client
+  db: Client,
+  ibkr?: { conid: number; exchange: string; available: boolean },
 ): Promise<number> {
   const YahooFinance = (await import("yahoo-finance2")).default;
   const yf = new YahooFinance({ suppressNotices: ["yahooSurvey"] });
@@ -245,6 +353,19 @@ async function fetchYahooOptions(
       100, underlyingPrice, currency]
   );
 
+  // Override Yahoo bid/ask with real-time IBKR prices for near-ATM strikes
+  if (ibkr?.available && underlyingPrice > 0) {
+    console.log(`  [IBKR] Fetching real-time bid/ask for near-ATM options...`);
+    // Update first 3 expirations only (most liquid, most important)
+    for (const expiry of allExpirations.slice(0, 3)) {
+      try {
+        await ibkrUpdateOptionBidAsk(dbTicker, ibkr.conid, ibkr.exchange, expiry, underlyingPrice, db);
+      } catch (err: any) {
+        console.log(`    [IBKR] bid/ask update failed for ${expiry}: ${err.message}`);
+      }
+    }
+  }
+
   return totalRows;
 }
 
@@ -279,7 +400,10 @@ async function main() {
     }
 
     try {
-      const rows = await fetchYahooOptions(dbTicker, config.yahoo, ibkrPrice, db);
+      const ibkrParams = config.ibkr
+        ? { conid: config.ibkr.conid, exchange: config.ibkr.exchange, available: ibkrAvailable }
+        : undefined;
+      const rows = await fetchYahooOptions(dbTicker, config.yahoo, ibkrPrice, db, ibkrParams);
       totalRows += rows;
       console.log(`[${dbTicker}] Done: ${rows} rows saved`);
     } catch (err: any) {
