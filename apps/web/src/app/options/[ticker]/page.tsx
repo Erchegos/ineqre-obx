@@ -458,32 +458,33 @@ export default function OptionsPage() {
       </header>
 
       {/* ═══ EXPIRATION BAR ═══ */}
-      <div style={{ borderBottom: "1px solid #1e1e2e", padding: "8px 24px", background: "#0d0d14" }}>
-        <div style={{ maxWidth: 1800, margin: "0 auto", display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: "#555", fontFamily: "monospace", marginRight: 4 }}>EXP</span>
+      <div style={{ borderBottom: "1px solid #1e1e2e", padding: "12px 24px", background: "#0d0d14" }}>
+        <div style={{ maxWidth: 1800, margin: "0 auto", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "#888", fontFamily: "monospace", marginRight: 4, letterSpacing: 1 }}>EXPIRY</span>
           {data?.expirations.map(exp => {
             const d = daysToExpiry(exp);
             const active = exp === selectedExpiry;
+            const isNear = d <= 7;
             return (
               <button
                 key={exp}
                 onClick={() => handleExpiryChange(exp)}
                 disabled={loading}
                 style={{
-                  padding: "4px 10px",
-                  fontSize: 11,
+                  padding: "6px 14px",
+                  fontSize: 12,
                   fontWeight: active ? 700 : 500,
                   fontFamily: "monospace",
-                  border: active ? "1px solid #3b82f6" : "1px solid #1e1e2e",
-                  background: active ? "rgba(59,130,246,0.15)" : "transparent",
-                  color: active ? "#60a5fa" : "#888",
+                  border: active ? "1px solid #3b82f6" : "1px solid #333",
+                  background: active ? "rgba(59,130,246,0.15)" : "rgba(255,255,255,0.03)",
+                  color: active ? "#60a5fa" : "#aaa",
                   cursor: "pointer",
-                  borderRadius: 1,
+                  borderRadius: 3,
                   opacity: loading ? 0.5 : 1,
                   transition: "all 0.1s",
                 }}
               >
-                {formatExpiry(exp)} ({d}d)
+                {formatExpiry(exp)} <span style={{ color: isNear ? "#f59e0b" : active ? "#60a5fa" : "#666" }}>({d}d)</span>
               </button>
             );
           })}
