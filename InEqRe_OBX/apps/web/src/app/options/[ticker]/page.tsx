@@ -187,16 +187,32 @@ export default function OptionsPage() {
   }, [data]);
 
   const greeksData = useMemo(() => {
-    if (!data) return [];
-    return data.chain
-      .filter(r => r.call?.delta || r.put?.delta)
-      .map(r => ({
+    if (!data || !data.underlyingPrice) return [];
+    const S = data.underlyingPrice;
+    const T = Math.max(selectedExpiry ? daysToExpiry(selectedExpiry) : 30, 1) / 365;
+
+    // Find best fallback IV from nearest-ATM strikes with realistic data
+    const sorted = [...data.chain].sort((a, b) => Math.abs(a.strike - S) - Math.abs(b.strike - S));
+    let fallbackIV = 0.3;
+    for (const row of sorted) {
+      const iv = (row.call?.iv || 0) > (row.put?.iv || 0) ? (row.call?.iv || 0) : (row.put?.iv || 0);
+      if (iv >= 0.05 && iv < 2.0) { fallbackIV = iv; break; }
+    }
+
+    return data.chain.map(r => {
+      // Use per-strike IV where realistic; fall back to nearest ATM IV otherwise
+      const callIV = (r.call?.iv && r.call.iv >= 0.05 && r.call.iv < 2.0) ? r.call.iv : fallbackIV;
+      const putIV = (r.put?.iv && r.put.iv >= 0.05 && r.put.iv < 2.0) ? r.put.iv : fallbackIV;
+      const cg = blackScholes("call", S, r.strike, T, 0.04, callIV);
+      const pg = blackScholes("put", S, r.strike, T, 0.04, putIV);
+      return {
         strike: r.strike,
-        callDelta: r.call?.delta ? Math.abs(r.call.delta) : null,
-        putDelta: r.put?.delta ? Math.abs(r.put.delta) : null,
-        gamma: r.call?.gamma || r.put?.gamma || null,
-      }));
-  }, [data]);
+        callDelta: Math.abs(cg.delta),
+        putDelta: Math.abs(pg.delta),
+        gamma: (cg.gamma + pg.gamma) / 2,
+      };
+    });
+  }, [data, selectedExpiry]);
 
   // ─── Calculator ─────────────────────────────────────────────
   const addPosition = () => {
@@ -380,7 +396,7 @@ export default function OptionsPage() {
     for (const row of sorted) {
       const opt = type === "call" ? row.call : row.put;
       const iv = opt?.iv;
-      if (isValidIV(iv)) return iv;
+      if (iv && iv > 0) return iv;
     }
     return 0;
   };
