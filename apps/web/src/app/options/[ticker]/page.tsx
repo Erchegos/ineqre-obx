@@ -303,7 +303,11 @@ export default function OptionsPage() {
     const mk = (row: ChainRow, type: "call" | "put", side: "long" | "short", legQty = q): OptionPosition | null => {
       const opt = type === "call" ? row.call : row.put;
       if (!opt) return null;
-      const prem = side === "long" ? (opt.ask || opt.last || opt.bid || 0) : (opt.bid || opt.last || 0);
+      // Use mid-price when both bid/ask exist, otherwise fall back to last
+      const bid = opt.bid ?? 0;
+      const ask = opt.ask ?? 0;
+      const mid = bid > 0 && ask > 0 ? (bid + ask) / 2 : 0;
+      const prem = mid || opt.last || bid || ask || 0;
       if (prem <= 0) return null;
       return { type, strike: row.strike, premium: prem, quantity: side === "long" ? legQty : -legQty, expiry: selectedExpiry || "", iv: opt.iv || undefined };
     };
