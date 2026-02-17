@@ -134,10 +134,14 @@ export default function OptionsPage() {
     fetchData();
   }, []);// eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-load bull call spread when data first arrives
+  // Auto-load bull call spread on first load, rebuild active strategy on expiry change
   useEffect(() => {
-    if (data && data.chain.length > 0 && positions.length === 0) {
-      buildStrategy("bull_call");
+    if (data && data.chain.length > 0) {
+      if (positions.length === 0) {
+        buildStrategy("bull_call");
+      } else if (activeStrategy) {
+        buildStrategy(activeStrategy);
+      }
     }
   }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
