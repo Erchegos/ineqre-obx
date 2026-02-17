@@ -740,6 +740,12 @@ export default function OptionsPage() {
                       <button onClick={() => removePosition(i)} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 14, lineHeight: 1, fontFamily: "monospace" }}>x</button>
                     </div>
                   ))}
+                  {/* Warning: no profit possible */}
+                  {positions.length > 0 && maxProfitLoss.maxProfit !== "unlimited" && typeof maxProfitLoss.maxProfit === "number" && maxProfitLoss.maxProfit <= 0 && (
+                    <div style={{ marginTop: 10, padding: "8px 12px", background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.3)", fontSize: 11, fontFamily: "monospace", color: "#eab308" }}>
+                      ⚠ No profit possible — illiquid options with wide spreads may produce unrealistic mid-prices. Verify premiums manually.
+                    </div>
+                  )}
                   <div style={{ marginTop: 10, padding: "10px 12px", background: "#0d0d14", border: "1px solid #1e1e2e" }}>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 11, fontFamily: "monospace" }}>
                       <div>
