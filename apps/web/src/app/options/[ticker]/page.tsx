@@ -289,8 +289,8 @@ export default function OptionsPage() {
 
     let legs: (OptionPosition | null)[] = [];
     switch (name) {
-      case "bull_call": legs = [mk(atm, "call", "long"), mk(up1, "call", "short")]; break;
-      case "bear_put": legs = [mk(atm, "put", "long"), mk(down1, "put", "short")]; break;
+      case "bull_call": legs = [mk(atm, "call", "long"), mk(up2, "call", "short")]; break;
+      case "bear_put": legs = [mk(atm, "put", "long"), mk(down2, "put", "short")]; break;
       case "straddle": legs = [mk(atm, "call", "long"), mk(atm, "put", "long")]; break;
       case "strangle": legs = [mk(up1, "call", "long"), mk(down1, "put", "long")]; break;
       case "iron_condor": legs = [mk(down1, "put", "short"), mk(down2, "put", "long"), mk(up1, "call", "short"), mk(up2, "call", "long")]; break;
