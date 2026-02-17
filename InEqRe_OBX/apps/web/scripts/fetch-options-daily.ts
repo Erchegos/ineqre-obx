@@ -289,14 +289,21 @@ async function fetchYahooOptions(
         ? blackScholesGreeks("call", underlyingPrice, strike, T, r, iv)
         : { delta: 0, gamma: 0, theta: 0, vega: 0 };
 
+      // When Yahoo returns IV=0 (market closed / holiday), preserve existing
+      // good pricing data.  OI, volume, and underlying always update.
       await db.query(
         `INSERT INTO public.options_chain
           (ticker, expiry, strike, option_right, bid, ask, last_price, iv, delta, gamma, theta, vega, open_interest, volume, underlying_price, fetched_at)
         VALUES ($1, $2, $3, 'call', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, now())
         ON CONFLICT (ticker, expiry, strike, option_right) DO UPDATE SET
-          bid = EXCLUDED.bid, ask = EXCLUDED.ask, last_price = EXCLUDED.last_price,
-          iv = EXCLUDED.iv, delta = EXCLUDED.delta, gamma = EXCLUDED.gamma,
-          theta = EXCLUDED.theta, vega = EXCLUDED.vega,
+          bid       = CASE WHEN EXCLUDED.iv > 0 THEN EXCLUDED.bid       ELSE options_chain.bid END,
+          ask       = CASE WHEN EXCLUDED.iv > 0 THEN EXCLUDED.ask       ELSE options_chain.ask END,
+          last_price= CASE WHEN EXCLUDED.iv > 0 THEN EXCLUDED.last_price ELSE options_chain.last_price END,
+          iv        = CASE WHEN EXCLUDED.iv > 0 THEN EXCLUDED.iv        ELSE options_chain.iv END,
+          delta     = CASE WHEN EXCLUDED.iv > 0 THEN EXCLUDED.delta     ELSE options_chain.delta END,
+          gamma     = CASE WHEN EXCLUDED.iv > 0 THEN EXCLUDED.gamma     ELSE options_chain.gamma END,
+          theta     = CASE WHEN EXCLUDED.iv > 0 THEN EXCLUDED.theta     ELSE options_chain.theta END,
+          vega      = CASE WHEN EXCLUDED.iv > 0 THEN EXCLUDED.vega      ELSE options_chain.vega END,
           open_interest = EXCLUDED.open_interest, volume = EXCLUDED.volume,
           underlying_price = EXCLUDED.underlying_price, fetched_at = EXCLUDED.fetched_at`,
         [dbTicker, expStr, strike, opt.bid || 0, opt.ask || 0, opt.lastPrice || 0,
@@ -319,9 +326,14 @@ async function fetchYahooOptions(
           (ticker, expiry, strike, option_right, bid, ask, last_price, iv, delta, gamma, theta, vega, open_interest, volume, underlying_price, fetched_at)
         VALUES ($1, $2, $3, 'put', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, now())
         ON CONFLICT (ticker, expiry, strike, option_right) DO UPDATE SET
-          bid = EXCLUDED.bid, ask = EXCLUDED.ask, last_price = EXCLUDED.last_price,
-          iv = EXCLUDED.iv, delta = EXCLUDED.delta, gamma = EXCLUDED.gamma,
-          theta = EXCLUDED.theta, vega = EXCLUDED.vega,
+          bid       = CASE WHEN EXCLUDED.iv > 0 THEN EXCLUDED.bid       ELSE options_chain.bid END,
+          ask       = CASE WHEN EXCLUDED.iv > 0 THEN EXCLUDED.ask       ELSE options_chain.ask END,
+          last_price= CASE WHEN EXCLUDED.iv > 0 THEN EXCLUDED.last_price ELSE options_chain.last_price END,
+          iv        = CASE WHEN EXCLUDED.iv > 0 THEN EXCLUDED.iv        ELSE options_chain.iv END,
+          delta     = CASE WHEN EXCLUDED.iv > 0 THEN EXCLUDED.delta     ELSE options_chain.delta END,
+          gamma     = CASE WHEN EXCLUDED.iv > 0 THEN EXCLUDED.gamma     ELSE options_chain.gamma END,
+          theta     = CASE WHEN EXCLUDED.iv > 0 THEN EXCLUDED.theta     ELSE options_chain.theta END,
+          vega      = CASE WHEN EXCLUDED.iv > 0 THEN EXCLUDED.vega      ELSE options_chain.vega END,
           open_interest = EXCLUDED.open_interest, volume = EXCLUDED.volume,
           underlying_price = EXCLUDED.underlying_price, fetched_at = EXCLUDED.fetched_at`,
         [dbTicker, expStr, strike, opt.bid || 0, opt.ask || 0, opt.lastPrice || 0,

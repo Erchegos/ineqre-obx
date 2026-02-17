@@ -226,6 +226,27 @@ export default function OptionsPage() {
     return 0.3;
   }, [data]);
 
+  // Client-side BS Greeks for the chain table.
+  // When the DB stores garbage (IV=0 → delta=1.0, gamma=0), this gives
+  // realistic values using per-strike IV with ATM fallback.
+  const chainGreeks = useMemo(() => {
+    if (!data || !data.underlyingPrice) return new Map<number, { cd: number; cg: number; ct: number; cv: number; pd: number; pg: number; pt: number; pv: number }>();
+    const S = data.underlyingPrice;
+    const T = Math.max(selectedExpiry ? daysToExpiry(selectedExpiry) : 30, 1) / 365;
+    const result = new Map<number, { cd: number; cg: number; ct: number; cv: number; pd: number; pg: number; pt: number; pv: number }>();
+    for (const row of data.chain) {
+      const civ = (row.call?.iv && row.call.iv >= 0.05 && row.call.iv < 2.0) ? row.call.iv : chainFallbackIV;
+      const piv = (row.put?.iv && row.put.iv >= 0.05 && row.put.iv < 2.0) ? row.put.iv : chainFallbackIV;
+      const c = row.call ? blackScholes("call", S, row.strike, T, 0.04, civ) : null;
+      const p = row.put ? blackScholes("put", S, row.strike, T, 0.04, piv) : null;
+      result.set(row.strike, {
+        cd: c?.delta ?? 0, cg: c?.gamma ?? 0, ct: c?.theta ?? 0, cv: c?.vega ?? 0,
+        pd: p?.delta ?? 0, pg: p?.gamma ?? 0, pt: p?.theta ?? 0, pv: p?.vega ?? 0,
+      });
+    }
+    return result;
+  }, [data, selectedExpiry, chainFallbackIV]);
+
   // ─── Calculator ─────────────────────────────────────────────
   const addPosition = () => {
     if (calcStrike <= 0 || calcPremium < 0) return;
@@ -404,21 +425,22 @@ export default function OptionsPage() {
   const atmStrike = data?.strikes?.reduce((c, s) =>
     Math.abs(s - underlyingPrice) < Math.abs(c - underlyingPrice) ? s : c
   , data?.strikes[0] || 0) || 0;
-  // Find ATM IV using valid IV from nearest strikes (Yahoo often has garbage at exact ATM)
-  const findValidAtmIV = (type: "call" | "put"): number => {
+  // Find ATM IV using valid IV from nearest strikes.
+  // Uses ≥5% threshold (same as chainFallbackIV) to ignore garbage Yahoo values.
+  // Falls back to checking both call AND put IVs so a holiday fetch with
+  // all-zero call IVs still picks up realistic put IVs (and vice-versa).
+  const findValidAtmIV = (): number => {
     if (!data) return 0;
-    // Sort chain by distance from ATM and find first valid IV
     const sorted = [...data.chain].sort((a, b) => Math.abs(a.strike - underlyingPrice) - Math.abs(b.strike - underlyingPrice));
+    let callIV = 0, putIV = 0;
     for (const row of sorted) {
-      const opt = type === "call" ? row.call : row.put;
-      const iv = opt?.iv;
-      if (iv && iv > 0) return iv;
+      if (!callIV && row.call?.iv && row.call.iv >= 0.05 && row.call.iv < 2.0) callIV = row.call.iv;
+      if (!putIV && row.put?.iv && row.put.iv >= 0.05 && row.put.iv < 2.0) putIV = row.put.iv;
+      if (callIV && putIV) break;
     }
-    return 0;
+    return callIV && putIV ? (callIV + putIV) / 2 : (callIV || putIV || 0);
   };
-  const atmCallIV = findValidAtmIV("call");
-  const atmPutIV = findValidAtmIV("put");
-  const atmIV = atmCallIV && atmPutIV ? (atmCallIV + atmPutIV) / 2 : (atmCallIV || atmPutIV || 0);
+  const atmIV = findValidAtmIV();
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0f", color: "#e5e5e5", fontFamily: "'Inter', -apple-system, sans-serif" }}>
@@ -961,6 +983,7 @@ export default function OptionsPage() {
                   const isMaxPain = data?.maxPain && row.strike === data.maxPain.strike;
                   const midCall = row.call?.bid && row.call?.ask ? ((row.call.bid + row.call.ask) / 2).toFixed(2) : null;
                   const midPut = row.put?.bid && row.put?.ask ? ((row.put.bid + row.put.ask) / 2).toFixed(2) : null;
+                  const g = chainGreeks.get(row.strike);
 
                   return (
                     <tr
@@ -977,10 +1000,10 @@ export default function OptionsPage() {
                       <td style={{ ...tdStyle, fontWeight: 600, color: "#e5e5e5", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call?.last?.toFixed(2) || (midCall ? <span style={{ color: "#444" }}>{midCall}</span> : "--")}</td>
                       <td style={{ ...tdStyle, color: "#60a5fa", fontWeight: 600, cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call?.iv ? (row.call.iv * 100).toFixed(1) : "--"}</td>
                       {showGreeks && <>
-                        <td style={{ ...tdStyle, color: deltaColor(row.call?.delta), cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call?.delta?.toFixed(3) || "--"}</td>
-                        <td style={{ ...tdStyle, color: "#666", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call?.gamma?.toFixed(4) || "--"}</td>
-                        <td style={{ ...tdStyle, color: "#ef4444", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call?.theta?.toFixed(3) || "--"}</td>
-                        <td style={{ ...tdStyle, color: "#a78bfa", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call?.vega?.toFixed(3) || "--"}</td>
+                        <td style={{ ...tdStyle, color: deltaColor(g?.cd), cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call ? g?.cd.toFixed(3) : "--"}</td>
+                        <td style={{ ...tdStyle, color: "#666", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call ? g?.cg.toFixed(4) : "--"}</td>
+                        <td style={{ ...tdStyle, color: "#ef4444", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call ? g?.ct.toFixed(3) : "--"}</td>
+                        <td style={{ ...tdStyle, color: "#a78bfa", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call ? g?.cv.toFixed(3) : "--"}</td>
                       </>}
                       <td style={{ ...tdStyle, textAlign: "center" }}>
                         <button onClick={() => addFromChain(row.strike, "call", "long")} style={btnBuy} title="Buy Call">B</button>
@@ -1011,10 +1034,10 @@ export default function OptionsPage() {
                         <button onClick={() => addFromChain(row.strike, "put", "short")} style={btnSell} title="Sell Put">S</button>
                       </td>
                       {showGreeks && <>
-                        <td style={{ ...tdStyle, color: deltaColor(row.put?.delta), cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put?.delta?.toFixed(3) || "--"}</td>
-                        <td style={{ ...tdStyle, color: "#666", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put?.gamma?.toFixed(4) || "--"}</td>
-                        <td style={{ ...tdStyle, color: "#ef4444", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put?.theta?.toFixed(3) || "--"}</td>
-                        <td style={{ ...tdStyle, color: "#a78bfa", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put?.vega?.toFixed(3) || "--"}</td>
+                        <td style={{ ...tdStyle, color: deltaColor(g?.pd), cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put ? g?.pd.toFixed(3) : "--"}</td>
+                        <td style={{ ...tdStyle, color: "#666", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put ? g?.pg.toFixed(4) : "--"}</td>
+                        <td style={{ ...tdStyle, color: "#ef4444", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put ? g?.pt.toFixed(3) : "--"}</td>
+                        <td style={{ ...tdStyle, color: "#a78bfa", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put ? g?.pv.toFixed(3) : "--"}</td>
                       </>}
                       <td style={{ ...tdStyle, color: "#60a5fa", fontWeight: 600, cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put?.iv ? (row.put.iv * 100).toFixed(1) : "--"}</td>
                       <td style={{ ...tdStyle, color: "#22c55e", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "short")} title="Sell Put at bid">{row.put?.bid?.toFixed(2) || "--"}</td>
