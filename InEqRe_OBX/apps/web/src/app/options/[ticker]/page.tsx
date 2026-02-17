@@ -170,14 +170,21 @@ export default function OptionsPage() {
   }, [data, chainFilter]);
 
   // ─── Derived Data ─────────────────────────────────────────────
+  // Helper: is this IV value realistic? Yahoo often returns 0, 0.00001, or 1.0 for illiquid options
+  const isValidIV = (iv: number | undefined | null): iv is number => {
+    if (!iv || iv <= 0) return false;
+    if (iv < 0.01 || iv > 0.95) return false; // filter < 1% and > 95%
+    return true;
+  };
+
   const ivSkewData = useMemo(() => {
     if (!data) return [];
     return data.chain
-      .filter(r => r.call?.iv || r.put?.iv)
+      .filter(r => isValidIV(r.call?.iv) || isValidIV(r.put?.iv))
       .map(r => ({
         strike: r.strike,
-        callIV: r.call?.iv ? r.call.iv * 100 : null,
-        putIV: r.put?.iv ? r.put.iv * 100 : null,
+        callIV: isValidIV(r.call?.iv) ? r.call!.iv! * 100 : null,
+        putIV: isValidIV(r.put?.iv) ? r.put!.iv! * 100 : null,
       }));
   }, [data]);
 
@@ -189,13 +196,22 @@ export default function OptionsPage() {
   const greeksData = useMemo(() => {
     if (!data) return [];
     return data.chain
-      .filter(r => r.call?.delta || r.put?.delta)
-      .map(r => ({
-        strike: r.strike,
-        callDelta: r.call?.delta ? Math.abs(r.call.delta) : null,
-        putDelta: r.put?.delta ? Math.abs(r.put.delta) : null,
-        gamma: r.call?.gamma || r.put?.gamma || null,
-      }));
+      .filter(r => {
+        // Filter out garbage Greeks (delta exactly 1.0/-1.0/0 means Yahoo had no real data)
+        const validCallDelta = r.call?.delta != null && Math.abs(r.call.delta) > 0.001 && Math.abs(r.call.delta) < 0.999;
+        const validPutDelta = r.put?.delta != null && Math.abs(r.put.delta) > 0.001 && Math.abs(r.put.delta) < 0.999;
+        return validCallDelta || validPutDelta;
+      })
+      .map(r => {
+        const validCallDelta = r.call?.delta != null && Math.abs(r.call.delta) > 0.001 && Math.abs(r.call.delta) < 0.999;
+        const validPutDelta = r.put?.delta != null && Math.abs(r.put.delta) > 0.001 && Math.abs(r.put.delta) < 0.999;
+        return {
+          strike: r.strike,
+          callDelta: validCallDelta ? Math.abs(r.call!.delta!) : null,
+          putDelta: validPutDelta ? Math.abs(r.put!.delta!) : null,
+          gamma: r.call?.gamma || r.put?.gamma || null,
+        };
+      });
   }, [data]);
 
   // ─── Calculator ─────────────────────────────────────────────
@@ -372,9 +388,21 @@ export default function OptionsPage() {
   const atmStrike = data?.strikes?.reduce((c, s) =>
     Math.abs(s - underlyingPrice) < Math.abs(c - underlyingPrice) ? s : c
   , data?.strikes[0] || 0) || 0;
-  const atmCallIV = data?.chain.find(r => r.strike === atmStrike)?.call?.iv;
-  const atmPutIV = data?.chain.find(r => r.strike === atmStrike)?.put?.iv;
-  const atmIV = atmCallIV || atmPutIV || 0;
+  // Find ATM IV using valid IV from nearest strikes (Yahoo often has garbage at exact ATM)
+  const findValidAtmIV = (type: "call" | "put"): number => {
+    if (!data) return 0;
+    // Sort chain by distance from ATM and find first valid IV
+    const sorted = [...data.chain].sort((a, b) => Math.abs(a.strike - underlyingPrice) - Math.abs(b.strike - underlyingPrice));
+    for (const row of sorted) {
+      const opt = type === "call" ? row.call : row.put;
+      const iv = opt?.iv;
+      if (isValidIV(iv)) return iv;
+    }
+    return 0;
+  };
+  const atmCallIV = findValidAtmIV("call");
+  const atmPutIV = findValidAtmIV("put");
+  const atmIV = atmCallIV && atmPutIV ? (atmCallIV + atmPutIV) / 2 : (atmCallIV || atmPutIV || 0);
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0f", color: "#e5e5e5", fontFamily: "'Inter', -apple-system, sans-serif" }}>

@@ -177,6 +177,9 @@ export function blackScholes(
   r: number, // Risk-free interest rate
   sigma: number // Volatility
 ): { price: number; delta: number; gamma: number; theta: number; vega: number } {
+  // Clamp IV to a minimum of 5% — Yahoo often returns unrealistically low IV for
+  // illiquid options, which causes gamma to blow up (sigma is in the denominator).
+  sigma = Math.max(sigma, 0.05);
   const d1 = (Math.log(S / K) + (r + sigma * sigma / 2) * T) / (sigma * Math.sqrt(T));
   const d2 = d1 - sigma * Math.sqrt(T);
 
