@@ -275,29 +275,51 @@ export default function OptionsPage() {
       Math.abs(r.strike - price) < Math.abs(c.strike - price) ? r : c
     , chain[0]);
     const atmIdx = chain.findIndex(r => r.strike === atm.strike);
-    const up1 = chain[Math.min(atmIdx + 1, chain.length - 1)];
-    const up2 = chain[Math.min(atmIdx + 2, chain.length - 1)];
-    const down1 = chain[Math.max(atmIdx - 1, 0)];
-    const down2 = chain[Math.max(atmIdx - 2, 0)];
+
+    // Find nth valid strike above/below ATM that has data for the given type
+    const findUp = (n: number, type: "call" | "put"): ChainRow => {
+      let count = 0;
+      for (let i = atmIdx + 1; i < chain.length; i++) {
+        const opt = type === "call" ? chain[i].call : chain[i].put;
+        if (opt && ((opt.bid ?? 0) > 0 || (opt.ask ?? 0) > 0 || (opt.last ?? 0) > 0)) {
+          count++;
+          if (count >= n) return chain[i];
+        }
+      }
+      return chain[Math.min(atmIdx + n, chain.length - 1)];
+    };
+    const findDown = (n: number, type: "call" | "put"): ChainRow => {
+      let count = 0;
+      for (let i = atmIdx - 1; i >= 0; i--) {
+        const opt = type === "call" ? chain[i].call : chain[i].put;
+        if (opt && ((opt.bid ?? 0) > 0 || (opt.ask ?? 0) > 0 || (opt.last ?? 0) > 0)) {
+          count++;
+          if (count >= n) return chain[i];
+        }
+      }
+      return chain[Math.max(atmIdx - n, 0)];
+    };
 
     const mk = (row: ChainRow, type: "call" | "put", side: "long" | "short", legQty = q): OptionPosition | null => {
       const opt = type === "call" ? row.call : row.put;
       if (!opt) return null;
       const prem = side === "long" ? (opt.ask || opt.last || opt.bid || 0) : (opt.bid || opt.last || 0);
+      if (prem <= 0) return null;
       return { type, strike: row.strike, premium: prem, quantity: side === "long" ? legQty : -legQty, expiry: selectedExpiry || "", iv: opt.iv || undefined };
     };
 
     let legs: (OptionPosition | null)[] = [];
     switch (name) {
-      case "bull_call": legs = [mk(atm, "call", "long"), mk(up2, "call", "short")]; break;
-      case "bear_put": legs = [mk(atm, "put", "long"), mk(down2, "put", "short")]; break;
+      case "bull_call": legs = [mk(atm, "call", "long"), mk(findUp(2, "call"), "call", "short")]; break;
+      case "bear_put": legs = [mk(atm, "put", "long"), mk(findDown(2, "put"), "put", "short")]; break;
       case "straddle": legs = [mk(atm, "call", "long"), mk(atm, "put", "long")]; break;
-      case "strangle": legs = [mk(up1, "call", "long"), mk(down1, "put", "long")]; break;
-      case "iron_condor": legs = [mk(down1, "put", "short"), mk(down2, "put", "long"), mk(up1, "call", "short"), mk(up2, "call", "long")]; break;
+      case "strangle": legs = [mk(findUp(1, "call"), "call", "long"), mk(findDown(1, "put"), "put", "long")]; break;
+      case "iron_condor": legs = [mk(findDown(1, "put"), "put", "short"), mk(findDown(2, "put"), "put", "long"), mk(findUp(1, "call"), "call", "short"), mk(findUp(2, "call"), "call", "long")]; break;
       case "butterfly": {
-        const opt = atm.call;
-        const body: OptionPosition | null = opt ? { type: "call" as const, strike: atm.strike, premium: opt.bid || opt.last || 0, quantity: -2 * q, expiry: selectedExpiry || "", iv: opt.iv || undefined } : null;
-        legs = [mk(down1, "call", "long"), body, mk(up1, "call", "long")];
+        const up = findUp(1, "call");
+        const down = findDown(1, "call");
+        const body: OptionPosition | null = atm.call ? { type: "call" as const, strike: atm.strike, premium: atm.call.bid || atm.call.last || 0, quantity: -2 * q, expiry: selectedExpiry || "", iv: atm.call.iv || undefined } : null;
+        legs = [mk(down, "call", "long"), body, mk(up, "call", "long")];
         break;
       }
     }
