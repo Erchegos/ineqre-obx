@@ -82,7 +82,7 @@ export async function GET(
         iv: parseFloat(row.iv) || 0,
         delta: parseFloat(row.delta) || 0,
         gamma: parseFloat(row.gamma) || 0,
-        theta: parseFloat(row.theta) || 0,
+        theta: Math.abs(parseFloat(row.theta)) < 10 ? parseFloat(row.theta) || 0 : 0,
         vega: parseFloat(row.vega) || 0,
         openInterest: row.open_interest || 0,
         volume: row.volume || 0,

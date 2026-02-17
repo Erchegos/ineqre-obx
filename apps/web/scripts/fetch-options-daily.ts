@@ -74,7 +74,9 @@ function blackScholesGreeks(
   const Nd2 = normalCDF(d2);
   const delta = type === "call" ? Nd1 : Nd1 - 1;
   const gamma = nd1 / (S * sigma * Math.sqrt(T));
-  const theta = (-S * nd1 * sigma / (2 * Math.sqrt(T)) - r * K * Math.exp(-r * T) * (type === "call" ? Nd2 : normalCDF(-d2))) / 365;
+  let theta = (-S * nd1 * sigma / (2 * Math.sqrt(T)) - r * K * Math.exp(-r * T) * (type === "call" ? Nd2 : normalCDF(-d2))) / 365;
+  // Sanity: theta should be small negative; clamp nonsensical values
+  if (!isFinite(theta) || Math.abs(theta) > 10) theta = 0;
   const vega = (S * nd1 * Math.sqrt(T)) / 100;
   return { delta, gamma, theta, vega };
 }
