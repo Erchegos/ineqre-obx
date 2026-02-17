@@ -1,4 +1,4 @@
-# InEqRe (Intelligence Equity Research) v2.2
+# InEqRe (Intelligence Equity Research) v2.3
 
 Quantitative equity research platform for Oslo Stock Exchange (OSE). Combines automated research aggregation, ML price predictions, volatility modeling, and strategy backtesting.
 
@@ -94,7 +94,7 @@ All endpoints in `apps/web/src/app/api/`
 ### Options APIs
 | Endpoint | Purpose |
 |----------|---------|
-| `GET /api/options` | List all stocks with options data |
+| `GET /api/options` | List all stocks with options data + aggregated stats (OI, IV, max pain, P/C ratio) |
 | `GET /api/options/[ticker]` | Options chain, OI, Max Pain, IV skew (from DB) |
 | `GET /api/options/[ticker]/iv-curve` | ATM IV term structure (from DB) |
 
@@ -411,7 +411,7 @@ The options module (`/options/[ticker]`) provides:
 - Options chain table (calls & puts side-by-side) with bid/ask/last/IV/Greeks/OI
 - Open Interest distribution chart by strike
 - Volume by strike chart
-- IV skew chart (volatility smile)
+- IV skew chart (volatility smile) — filters out 0% IV strikes with no volume/OI
 - Greeks by strike (delta, gamma on dual axes)
 - Max Pain calculation
 - Put/Call ratio (OI & Volume based)
@@ -422,14 +422,18 @@ The options module (`/options/[ticker]`) provides:
 - Quick add from chain via B/S buttons per strike
 - 6 preset strategies with adjustable qty (default 10):
   - Bull Call Spread, Bear Put Spread, Long Straddle, Long Strangle, Iron Condor, Call Butterfly
+- Smart strategy builder: skips strikes with no data, uses mid-price for realistic premiums
+- Strategies auto-rebuild when switching expiry dates (premiums, costs, breakevens update)
 - Each strategy shows description, legs, outlook, risk, cost
 - Multi-time payoff diagram (today, 1/3 elapsed, 2/3 elapsed, at expiry)
-- Portfolio Greeks normalized per-contract (delta, gamma, theta, vega)
+- Portfolio Greeks per-contract (delta, gamma, theta, vega) — raw Black-Scholes values, not scaled by quantity
 - Breakeven points, max profit, max loss (detects unlimited profit/loss via net call exposure)
 
 ### Data
 - Ticker mapping: `.US` suffix stripped for API calls (e.g., `EQNR.US` → `EQNR` in DB)
 - Data from `options_chain` and `options_meta` tables (populated by `fetch-options-daily.ts`)
+- Supported tickers: EQNR, BORR, FLNG, FRO (US-listed with valid OI/volume)
+- Max pain computed in JS (iterates each strike as hypothetical settlement price)
 - OPTN badge on stocks list only shows for `.US`-suffixed tickers
 
 ---
