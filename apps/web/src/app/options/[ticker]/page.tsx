@@ -97,7 +97,7 @@ export default function OptionsPage() {
   const [calcQty, setCalcQty] = useState<number>(1);
   const [calcSide, setCalcSide] = useState<"long" | "short">("long");
   const [showGreeks, setShowGreeks] = useState(true);
-  const [chainFilter, setChainFilter] = useState<"all" | "near">("near");
+  const [chainFilter, setChainFilter] = useState<"all" | "itm" | "otm" | "near">("near");
   const [strategyQty, setStrategyQty] = useState<number>(10);
   const [activeStrategy, setActiveStrategy] = useState<string | null>(null);
 
@@ -134,14 +134,10 @@ export default function OptionsPage() {
     fetchData();
   }, []);// eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-load bull call spread on first load, rebuild active strategy on expiry change
+  // Auto-load bull call spread when data first arrives
   useEffect(() => {
-    if (data && data.chain.length > 0) {
-      if (positions.length === 0) {
-        buildStrategy("bull_call");
-      } else if (activeStrategy) {
-        buildStrategy(activeStrategy);
-      }
+    if (data && data.chain.length > 0 && positions.length === 0) {
+      buildStrategy("bull_call");
     }
   }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -156,6 +152,20 @@ export default function OptionsPage() {
     const chain = data.chain;
     const price = data.underlyingPrice;
     if (chainFilter === "all") return chain;
+    if (chainFilter === "itm") {
+      return chain.filter(r => {
+        const callItm = price > r.strike;
+        const putItm = price < r.strike;
+        return callItm || putItm;
+      });
+    }
+    if (chainFilter === "otm") {
+      return chain.filter(r => {
+        const callOtm = price < r.strike;
+        const putOtm = price > r.strike;
+        return callOtm || putOtm;
+      });
+    }
     return chain.filter(r => Math.abs(r.strike - price) / price < 0.3);
   }, [data, chainFilter]);
 
@@ -163,21 +173,12 @@ export default function OptionsPage() {
   const ivSkewData = useMemo(() => {
     if (!data) return [];
     return data.chain
-      .filter(r => {
-        // Only include strikes with valid IV data (non-zero IV AND some volume or OI)
-        const callValid = r.call?.iv && r.call.iv > 0 && ((r.call.volume ?? 0) > 0 || (r.call.openInterest ?? 0) > 0);
-        const putValid = r.put?.iv && r.put.iv > 0 && ((r.put.volume ?? 0) > 0 || (r.put.openInterest ?? 0) > 0);
-        return callValid || putValid;
-      })
-      .map(r => {
-        const callValid = r.call?.iv && r.call.iv > 0 && ((r.call.volume ?? 0) > 0 || (r.call.openInterest ?? 0) > 0);
-        const putValid = r.put?.iv && r.put.iv > 0 && ((r.put.volume ?? 0) > 0 || (r.put.openInterest ?? 0) > 0);
-        return {
-          strike: r.strike,
-          callIV: callValid ? (r.call!.iv ?? 0) * 100 : null,
-          putIV: putValid ? (r.put!.iv ?? 0) * 100 : null,
-        };
-      });
+      .filter(r => r.call?.iv || r.put?.iv)
+      .map(r => ({
+        strike: r.strike,
+        callIV: r.call?.iv ? r.call.iv * 100 : null,
+        putIV: r.put?.iv ? r.put.iv * 100 : null,
+      }));
   }, [data]);
 
   const volumeData = useMemo(() => {
@@ -186,16 +187,65 @@ export default function OptionsPage() {
   }, [data]);
 
   const greeksData = useMemo(() => {
-    if (!data) return [];
-    return data.chain
-      .filter(r => r.call?.delta || r.put?.delta)
-      .map(r => ({
+    if (!data || !data.underlyingPrice) return [];
+    const S = data.underlyingPrice;
+    const T = Math.max(selectedExpiry ? daysToExpiry(selectedExpiry) : 30, 1) / 365;
+
+    // Find best fallback IV from nearest-ATM strikes with realistic data
+    const sorted = [...data.chain].sort((a, b) => Math.abs(a.strike - S) - Math.abs(b.strike - S));
+    let fallbackIV = 0.3;
+    for (const row of sorted) {
+      const iv = (row.call?.iv || 0) > (row.put?.iv || 0) ? (row.call?.iv || 0) : (row.put?.iv || 0);
+      if (iv >= 0.05 && iv < 2.0) { fallbackIV = iv; break; }
+    }
+
+    return data.chain.map(r => {
+      // Use per-strike IV where realistic; fall back to nearest ATM IV otherwise
+      const callIV = (r.call?.iv && r.call.iv >= 0.05 && r.call.iv < 2.0) ? r.call.iv : fallbackIV;
+      const putIV = (r.put?.iv && r.put.iv >= 0.05 && r.put.iv < 2.0) ? r.put.iv : fallbackIV;
+      const cg = blackScholes("call", S, r.strike, T, 0.04, callIV);
+      const pg = blackScholes("put", S, r.strike, T, 0.04, putIV);
+      return {
         strike: r.strike,
-        callDelta: r.call?.delta ? Math.abs(r.call.delta) : null,
-        putDelta: r.put?.delta ? Math.abs(r.put.delta) : null,
-        gamma: r.call?.gamma || r.put?.gamma || null,
-      }));
+        callDelta: Math.abs(cg.delta),
+        putDelta: Math.abs(pg.delta),
+        gamma: (cg.gamma + pg.gamma) / 2,
+      };
+    });
+  }, [data, selectedExpiry]);
+
+  // Best realistic IV from near-ATM strikes (used as fallback throughout)
+  const chainFallbackIV = useMemo(() => {
+    if (!data) return 0.3;
+    const S = data.underlyingPrice;
+    const sorted = [...data.chain].sort((a, b) => Math.abs(a.strike - S) - Math.abs(b.strike - S));
+    for (const row of sorted) {
+      const iv = Math.max(row.call?.iv || 0, row.put?.iv || 0);
+      if (iv >= 0.05 && iv < 2.0) return iv;
+    }
+    return 0.3;
   }, [data]);
+
+  // Client-side BS Greeks for the chain table.
+  // When the DB stores garbage (IV=0 → delta=1.0, gamma=0), this gives
+  // realistic values using per-strike IV with ATM fallback.
+  const chainGreeks = useMemo(() => {
+    if (!data || !data.underlyingPrice) return new Map<number, { cd: number; cg: number; ct: number; cv: number; pd: number; pg: number; pt: number; pv: number }>();
+    const S = data.underlyingPrice;
+    const T = Math.max(selectedExpiry ? daysToExpiry(selectedExpiry) : 30, 1) / 365;
+    const result = new Map<number, { cd: number; cg: number; ct: number; cv: number; pd: number; pg: number; pt: number; pv: number }>();
+    for (const row of data.chain) {
+      const civ = (row.call?.iv && row.call.iv >= 0.05 && row.call.iv < 2.0) ? row.call.iv : chainFallbackIV;
+      const piv = (row.put?.iv && row.put.iv >= 0.05 && row.put.iv < 2.0) ? row.put.iv : chainFallbackIV;
+      const c = row.call ? blackScholes("call", S, row.strike, T, 0.04, civ) : null;
+      const p = row.put ? blackScholes("put", S, row.strike, T, 0.04, piv) : null;
+      result.set(row.strike, {
+        cd: c?.delta ?? 0, cg: c?.gamma ?? 0, ct: c?.theta ?? 0, cv: c?.vega ?? 0,
+        pd: p?.delta ?? 0, pg: p?.gamma ?? 0, pt: p?.theta ?? 0, pv: p?.vega ?? 0,
+      });
+    }
+    return result;
+  }, [data, selectedExpiry, chainFallbackIV]);
 
   // ─── Calculator ─────────────────────────────────────────────
   const addPosition = () => {
@@ -223,15 +273,48 @@ export default function OptionsPage() {
     const premium = side === "long"
       ? (opt.ask || opt.last || opt.bid || 0)
       : (opt.bid || opt.last || 0);
-    const newPos: OptionPosition = {
-      type,
-      strike,
-      premium,
-      quantity: side === "long" ? 1 : -1,
-      expiry: selectedExpiry || "",
-      iv: opt.iv || undefined,
-    };
-    setPositions(prev => [...prev, newPos]);
+    setCalcType(type);
+    setCalcStrike(strike);
+    setCalcPremium(premium);
+    setCalcSide(side);
+    setCalcQty(1);
+  };
+
+  const editPosition = (index: number) => {
+    const pos = positions[index];
+    setCalcType(pos.type);
+    setCalcStrike(pos.strike);
+    setCalcPremium(pos.premium);
+    setCalcSide(pos.quantity > 0 ? "long" : "short");
+    setCalcQty(Math.abs(pos.quantity));
+    setPositions(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const getPremiumForStrike = (strike: number): number => {
+    const row = data?.chain.find(r => r.strike === strike);
+    const opt = calcType === "call" ? row?.call : row?.put;
+    if (!opt) return 0;
+    return calcSide === "long"
+      ? (opt.ask || opt.last || opt.bid || 0)
+      : (opt.bid || opt.last || 0);
+  };
+
+  const handleStrikeStep = (direction: "up" | "down") => {
+    if (!data?.strikes || data.strikes.length === 0) return;
+    const sorted = [...data.strikes].sort((a, b) => a - b);
+    const currentIdx = sorted.findIndex(s => s === calcStrike);
+    let newStrike: number;
+    if (currentIdx === -1) {
+      // Current strike not in list — find nearest
+      const nearest = sorted.reduce((c, s) => Math.abs(s - calcStrike) < Math.abs(c - calcStrike) ? s : c, sorted[0]);
+      newStrike = nearest;
+    } else if (direction === "up") {
+      newStrike = currentIdx < sorted.length - 1 ? sorted[currentIdx + 1] : sorted[currentIdx];
+    } else {
+      newStrike = currentIdx > 0 ? sorted[currentIdx - 1] : sorted[currentIdx];
+    }
+    setCalcStrike(newStrike);
+    setCalcPremium(getPremiumForStrike(newStrike));
   };
 
   const multiTimeData = useMemo((): MultiTimePayoffPoint[] => {
@@ -253,22 +336,24 @@ export default function OptionsPage() {
     const T = Math.max(curDte, 1) / 365;
     let delta = 0, gamma = 0, theta = 0, vega = 0;
     for (const pos of positions) {
-      const iv = pos.iv || 0.3;
+      // Use per-position IV if realistic; fall back to chain ATM IV (not 0.3 hardcoded,
+      // which combined with very short DTE causes delta to blow up to 1.0)
+      const iv = (pos.iv && pos.iv >= 0.05 && pos.iv < 2.0) ? pos.iv : chainFallbackIV;
       const bs = blackScholes(pos.type, data.underlyingPrice, pos.strike, T, 0.04, iv);
-      const sign = pos.quantity < 0 ? -1 : 1;
-      delta += bs.delta * sign;
-      gamma += bs.gamma * sign;
-      theta += bs.theta * sign;
-      vega += bs.vega * sign;
+      delta += bs.delta * pos.quantity;
+      gamma += bs.gamma * pos.quantity;
+      theta += bs.theta * pos.quantity * 100;
+      vega += bs.vega * pos.quantity;
     }
-    // Per-contract values (not multiplied by quantity)
+    // Normalize to per-contract values
+    const n = greeksNorm;
     return {
-      delta: Math.round(delta * 1000) / 1000,
-      gamma: Math.round(gamma * 10000) / 10000,
-      theta: Math.round(theta * 100) / 100,
-      vega: Math.round(vega * 1000) / 1000,
+      delta: Math.round((delta / n) * 1000) / 1000,
+      gamma: Math.round((gamma / n) * 10000) / 10000,
+      theta: Math.round((theta / n) * 100) / 100,
+      vega: Math.round((vega / n) * 1000) / 1000,
     };
-  }, [positions, data, selectedExpiry, greeksNorm]);
+  }, [positions, data, selectedExpiry, greeksNorm, chainFallbackIV]);
 
   const buildStrategy = (name: string, qty?: number) => {
     if (!data || data.chain.length === 0) return;
@@ -279,55 +364,30 @@ export default function OptionsPage() {
       Math.abs(r.strike - price) < Math.abs(c.strike - price) ? r : c
     , chain[0]);
     const atmIdx = chain.findIndex(r => r.strike === atm.strike);
-
-    // Find nth valid strike above/below ATM that has data for the given type
-    const findUp = (n: number, type: "call" | "put"): ChainRow => {
-      let count = 0;
-      for (let i = atmIdx + 1; i < chain.length; i++) {
-        const opt = type === "call" ? chain[i].call : chain[i].put;
-        if (opt && ((opt.bid ?? 0) > 0 || (opt.ask ?? 0) > 0 || (opt.last ?? 0) > 0)) {
-          count++;
-          if (count >= n) return chain[i];
-        }
-      }
-      return chain[Math.min(atmIdx + n, chain.length - 1)];
-    };
-    const findDown = (n: number, type: "call" | "put"): ChainRow => {
-      let count = 0;
-      for (let i = atmIdx - 1; i >= 0; i--) {
-        const opt = type === "call" ? chain[i].call : chain[i].put;
-        if (opt && ((opt.bid ?? 0) > 0 || (opt.ask ?? 0) > 0 || (opt.last ?? 0) > 0)) {
-          count++;
-          if (count >= n) return chain[i];
-        }
-      }
-      return chain[Math.max(atmIdx - n, 0)];
-    };
+    const up1 = chain[Math.min(atmIdx + 1, chain.length - 1)];
+    const up2 = chain[Math.min(atmIdx + 2, chain.length - 1)];
+    const down1 = chain[Math.max(atmIdx - 1, 0)];
+    const down2 = chain[Math.max(atmIdx - 2, 0)];
 
     const mk = (row: ChainRow, type: "call" | "put", side: "long" | "short", legQty = q): OptionPosition | null => {
       const opt = type === "call" ? row.call : row.put;
       if (!opt) return null;
-      // Use mid-price when both bid/ask exist, otherwise fall back to last
-      const bid = opt.bid ?? 0;
-      const ask = opt.ask ?? 0;
-      const mid = bid > 0 && ask > 0 ? (bid + ask) / 2 : 0;
-      const prem = mid || opt.last || bid || ask || 0;
-      if (prem <= 0) return null;
-      return { type, strike: row.strike, premium: prem, quantity: side === "long" ? legQty : -legQty, expiry: selectedExpiry || "", iv: opt.iv || undefined };
+      const prem = side === "long" ? (opt.ask || opt.last || opt.bid || 0) : (opt.bid || opt.last || 0);
+      const iv = (opt.iv && opt.iv >= 0.05 && opt.iv < 2.0) ? opt.iv : chainFallbackIV;
+      return { type, strike: row.strike, premium: prem, quantity: side === "long" ? legQty : -legQty, expiry: selectedExpiry || "", iv };
     };
 
     let legs: (OptionPosition | null)[] = [];
     switch (name) {
-      case "bull_call": legs = [mk(atm, "call", "long"), mk(findUp(2, "call"), "call", "short")]; break;
-      case "bear_put": legs = [mk(atm, "put", "long"), mk(findDown(2, "put"), "put", "short")]; break;
+      case "bull_call": legs = [mk(atm, "call", "long"), mk(up1, "call", "short")]; break;
+      case "bear_put": legs = [mk(atm, "put", "long"), mk(down1, "put", "short")]; break;
       case "straddle": legs = [mk(atm, "call", "long"), mk(atm, "put", "long")]; break;
-      case "strangle": legs = [mk(findUp(1, "call"), "call", "long"), mk(findDown(1, "put"), "put", "long")]; break;
-      case "iron_condor": legs = [mk(findDown(1, "put"), "put", "short"), mk(findDown(2, "put"), "put", "long"), mk(findUp(1, "call"), "call", "short"), mk(findUp(2, "call"), "call", "long")]; break;
+      case "strangle": legs = [mk(up1, "call", "long"), mk(down1, "put", "long")]; break;
+      case "iron_condor": legs = [mk(down1, "put", "short"), mk(down2, "put", "long"), mk(up1, "call", "short"), mk(up2, "call", "long")]; break;
       case "butterfly": {
-        const up = findUp(1, "call");
-        const down = findDown(1, "call");
-        const body: OptionPosition | null = atm.call ? { type: "call" as const, strike: atm.strike, premium: atm.call.bid || atm.call.last || 0, quantity: -2 * q, expiry: selectedExpiry || "", iv: atm.call.iv || undefined } : null;
-        legs = [mk(down, "call", "long"), body, mk(up, "call", "long")];
+        const opt = atm.call;
+        const body: OptionPosition | null = opt ? { type: "call" as const, strike: atm.strike, premium: opt.bid || opt.last || 0, quantity: -2 * q, expiry: selectedExpiry || "", iv: opt.iv || undefined } : null;
+        legs = [mk(down1, "call", "long"), body, mk(up1, "call", "long")];
         break;
       }
     }
@@ -397,9 +457,22 @@ export default function OptionsPage() {
   const atmStrike = data?.strikes?.reduce((c, s) =>
     Math.abs(s - underlyingPrice) < Math.abs(c - underlyingPrice) ? s : c
   , data?.strikes[0] || 0) || 0;
-  const atmCallIV = data?.chain.find(r => r.strike === atmStrike)?.call?.iv;
-  const atmPutIV = data?.chain.find(r => r.strike === atmStrike)?.put?.iv;
-  const atmIV = atmCallIV || atmPutIV || 0;
+  // Find ATM IV using valid IV from nearest strikes.
+  // Uses ≥5% threshold (same as chainFallbackIV) to ignore garbage Yahoo values.
+  // Falls back to checking both call AND put IVs so a holiday fetch with
+  // all-zero call IVs still picks up realistic put IVs (and vice-versa).
+  const findValidAtmIV = (): number => {
+    if (!data) return 0;
+    const sorted = [...data.chain].sort((a, b) => Math.abs(a.strike - underlyingPrice) - Math.abs(b.strike - underlyingPrice));
+    let callIV = 0, putIV = 0;
+    for (const row of sorted) {
+      if (!callIV && row.call?.iv && row.call.iv >= 0.05 && row.call.iv < 2.0) callIV = row.call.iv;
+      if (!putIV && row.put?.iv && row.put.iv >= 0.05 && row.put.iv < 2.0) putIV = row.put.iv;
+      if (callIV && putIV) break;
+    }
+    return callIV && putIV ? (callIV + putIV) / 2 : (callIV || putIV || 0);
+  };
+  const atmIV = findValidAtmIV();
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0f", color: "#e5e5e5", fontFamily: "'Inter', -apple-system, sans-serif" }}>
@@ -458,33 +531,32 @@ export default function OptionsPage() {
       </header>
 
       {/* ═══ EXPIRATION BAR ═══ */}
-      <div style={{ borderBottom: "1px solid #1e1e2e", padding: "12px 24px", background: "#0d0d14" }}>
-        <div style={{ maxWidth: 1800, margin: "0 auto", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "#888", fontFamily: "monospace", marginRight: 4, letterSpacing: 1 }}>EXPIRY</span>
+      <div style={{ borderBottom: "1px solid #1e1e2e", padding: "8px 24px", background: "#0d0d14" }}>
+        <div style={{ maxWidth: 1800, margin: "0 auto", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: "#555", fontFamily: "monospace", marginRight: 4 }}>EXP</span>
           {data?.expirations.map(exp => {
             const d = daysToExpiry(exp);
             const active = exp === selectedExpiry;
-            const isNear = d <= 7;
             return (
               <button
                 key={exp}
                 onClick={() => handleExpiryChange(exp)}
                 disabled={loading}
                 style={{
-                  padding: "6px 14px",
-                  fontSize: 12,
+                  padding: "4px 10px",
+                  fontSize: 11,
                   fontWeight: active ? 700 : 500,
                   fontFamily: "monospace",
-                  border: active ? "1px solid #3b82f6" : "1px solid #333",
-                  background: active ? "rgba(59,130,246,0.15)" : "rgba(255,255,255,0.03)",
-                  color: active ? "#60a5fa" : "#aaa",
+                  border: active ? "1px solid #3b82f6" : "1px solid #1e1e2e",
+                  background: active ? "rgba(59,130,246,0.15)" : "transparent",
+                  color: active ? "#60a5fa" : "#888",
                   cursor: "pointer",
-                  borderRadius: 3,
+                  borderRadius: 1,
                   opacity: loading ? 0.5 : 1,
                   transition: "all 0.1s",
                 }}
               >
-                {formatExpiry(exp)} <span style={{ color: isNear ? "#f59e0b" : active ? "#60a5fa" : "#666" }}>({d}d)</span>
+                {formatExpiry(exp)} ({d}d)
               </button>
             );
           })}
@@ -685,7 +757,20 @@ export default function OptionsPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 8 }}>
                 <div>
                   <label style={lbl}>STRIKE</label>
-                  <input type="number" step="0.5" value={calcStrike} onChange={e => setCalcStrike(parseFloat(e.target.value) || 0)} style={inp} />
+                  <input
+                    type="number"
+                    value={calcStrike}
+                    onChange={e => {
+                      const v = parseFloat(e.target.value) || 0;
+                      setCalcStrike(v);
+                      setCalcPremium(getPremiumForStrike(v));
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === "ArrowUp") { e.preventDefault(); handleStrikeStep("up"); }
+                      if (e.key === "ArrowDown") { e.preventDefault(); handleStrikeStep("down"); }
+                    }}
+                    style={inp}
+                  />
                 </div>
                 <div>
                   <label style={lbl}>PREMIUM</label>
@@ -729,7 +814,7 @@ export default function OptionsPage() {
                       fontFamily: "monospace",
                       borderLeft: `2px solid ${pos.quantity > 0 ? "#22c55e" : "#ef4444"}`,
                     }}>
-                      <div>
+                      <div style={{ cursor: "pointer" }} onClick={() => editPosition(i)} title="Click to edit">
                         <span style={{ color: pos.quantity > 0 ? "#22c55e" : "#ef4444", fontWeight: 700, fontSize: 9, letterSpacing: "0.05em" }}>
                           {pos.quantity > 0 ? "LONG" : "SHORT"}
                         </span>
@@ -737,15 +822,12 @@ export default function OptionsPage() {
                         <span style={{ fontWeight: 600 }}>{Math.abs(pos.quantity)}x {pos.type.toUpperCase()}</span>
                         {" "}@{pos.strike} -- ${pos.premium.toFixed(2)}
                       </div>
-                      <button onClick={() => removePosition(i)} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 14, lineHeight: 1, fontFamily: "monospace" }}>x</button>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <button onClick={() => editPosition(i)} style={{ background: "none", border: "1px solid #1e1e2e", color: "#60a5fa", cursor: "pointer", fontSize: 8, fontWeight: 700, padding: "1px 5px", fontFamily: "monospace", letterSpacing: "0.05em" }} title="Edit position">EDIT</button>
+                        <button onClick={() => removePosition(i)} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 14, lineHeight: 1, fontFamily: "monospace" }}>x</button>
+                      </div>
                     </div>
                   ))}
-                  {/* Warning: no profit possible */}
-                  {positions.length > 0 && maxProfitLoss.maxProfit !== "unlimited" && typeof maxProfitLoss.maxProfit === "number" && maxProfitLoss.maxProfit <= 0 && (
-                    <div style={{ marginTop: 10, padding: "8px 12px", background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.3)", fontSize: 11, fontFamily: "monospace", color: "#eab308" }}>
-                      ⚠ No profit possible — illiquid options with wide spreads may produce unrealistic mid-prices. Verify premiums manually.
-                    </div>
-                  )}
                   <div style={{ marginTop: 10, padding: "10px 12px", background: "#0d0d14", border: "1px solid #1e1e2e" }}>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 11, fontFamily: "monospace" }}>
                       <div>
@@ -868,7 +950,7 @@ export default function OptionsPage() {
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ ...secHead, margin: 0 }}>OPTIONS CHAIN</div>
               <div style={{ display: "flex", gap: 2 }}>
-                {(["near", "all"] as const).map(f => (
+                {(["near", "all", "itm", "otm"] as const).map(f => (
                   <button key={f} onClick={() => setChainFilter(f)} style={{
                     padding: "3px 10px",
                     fontSize: 10,
@@ -949,6 +1031,7 @@ export default function OptionsPage() {
                   const isMaxPain = data?.maxPain && row.strike === data.maxPain.strike;
                   const midCall = row.call?.bid && row.call?.ask ? ((row.call.bid + row.call.ask) / 2).toFixed(2) : null;
                   const midPut = row.put?.bid && row.put?.ask ? ((row.put.bid + row.put.ask) / 2).toFixed(2) : null;
+                  const g = chainGreeks.get(row.strike);
 
                   return (
                     <tr
@@ -965,10 +1048,10 @@ export default function OptionsPage() {
                       <td style={{ ...tdStyle, fontWeight: 600, color: "#e5e5e5", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call?.last?.toFixed(2) || (midCall ? <span style={{ color: "#444" }}>{midCall}</span> : "--")}</td>
                       <td style={{ ...tdStyle, color: "#60a5fa", fontWeight: 600, cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call?.iv ? (row.call.iv * 100).toFixed(1) : "--"}</td>
                       {showGreeks && <>
-                        <td style={{ ...tdStyle, color: deltaColor(row.call?.delta), cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call?.delta?.toFixed(3) || "--"}</td>
-                        <td style={{ ...tdStyle, color: "#666", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call?.gamma?.toFixed(4) || "--"}</td>
-                        <td style={{ ...tdStyle, color: "#ef4444", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call?.theta?.toFixed(3) || "--"}</td>
-                        <td style={{ ...tdStyle, color: "#a78bfa", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call?.vega?.toFixed(3) || "--"}</td>
+                        <td style={{ ...tdStyle, color: deltaColor(g?.cd), cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call ? g?.cd.toFixed(3) : "--"}</td>
+                        <td style={{ ...tdStyle, color: "#666", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call ? g?.cg.toFixed(4) : "--"}</td>
+                        <td style={{ ...tdStyle, color: "#ef4444", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call ? g?.ct.toFixed(3) : "--"}</td>
+                        <td style={{ ...tdStyle, color: "#a78bfa", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call ? g?.cv.toFixed(3) : "--"}</td>
                       </>}
                       <td style={{ ...tdStyle, textAlign: "center" }}>
                         <button onClick={() => addFromChain(row.strike, "call", "long")} style={btnBuy} title="Buy Call">B</button>
@@ -999,10 +1082,10 @@ export default function OptionsPage() {
                         <button onClick={() => addFromChain(row.strike, "put", "short")} style={btnSell} title="Sell Put">S</button>
                       </td>
                       {showGreeks && <>
-                        <td style={{ ...tdStyle, color: deltaColor(row.put?.delta), cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put?.delta?.toFixed(3) || "--"}</td>
-                        <td style={{ ...tdStyle, color: "#666", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put?.gamma?.toFixed(4) || "--"}</td>
-                        <td style={{ ...tdStyle, color: "#ef4444", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put?.theta?.toFixed(3) || "--"}</td>
-                        <td style={{ ...tdStyle, color: "#a78bfa", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put?.vega?.toFixed(3) || "--"}</td>
+                        <td style={{ ...tdStyle, color: deltaColor(g?.pd), cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put ? g?.pd.toFixed(3) : "--"}</td>
+                        <td style={{ ...tdStyle, color: "#666", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put ? g?.pg.toFixed(4) : "--"}</td>
+                        <td style={{ ...tdStyle, color: "#ef4444", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put ? g?.pt.toFixed(3) : "--"}</td>
+                        <td style={{ ...tdStyle, color: "#a78bfa", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put ? g?.pv.toFixed(3) : "--"}</td>
                       </>}
                       <td style={{ ...tdStyle, color: "#60a5fa", fontWeight: 600, cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put?.iv ? (row.put.iv * 100).toFixed(1) : "--"}</td>
                       <td style={{ ...tdStyle, color: "#22c55e", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "short")} title="Sell Put at bid">{row.put?.bid?.toFixed(2) || "--"}</td>
