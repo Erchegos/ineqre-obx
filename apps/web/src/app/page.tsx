@@ -59,7 +59,7 @@ export default function HomePage() {
             letterSpacing: "0.1em",
             textTransform: "uppercase"
           }}>
-            Ola Slettebak / InEqRe v2.1 / Oslo Børs
+            Ola Slettebak / InEqRe v2.3 / Oslo Børs
           </div>
           <h1 style={{
             fontSize: 42,
@@ -165,6 +165,9 @@ export default function HomePage() {
             <Capability title="Factor Backtesting">
               Historical strategy backtesting with configurable signal thresholds and holding periods. Performance attribution by factor category (momentum, mean reversion, volatility). Cumulative return charts, hit rate analysis, and Sharpe ratio calculation. Per-ticker drill-down with trade-level detail.
             </Capability>
+            <Capability title="Options Analytics">
+              Black-Scholes pricing with Greeks (Delta, Gamma, Theta, Vega). Options chain visualization with bid/ask, IV skew, and open interest distribution. P&L calculator with multi-leg strategy builder (spreads, straddles, condors, butterflies). Multi-time payoff diagrams showing time decay. Max pain calculation, put/call ratios, and IV term structure. Editable positions with valid strike stepping.
+            </Capability>
           </div>
         </section>
 
@@ -198,9 +201,6 @@ export default function HomePage() {
             </Capability>
             <Capability title="Portfolio Risk Optimizer">
               Mean-variance optimization with efficient frontier calculation. Multi-asset portfolio construction with constraints (sector limits, position sizing, turnover). Risk parity and minimum variance allocation strategies. Backtesting framework with transaction costs and rebalancing logic.
-            </Capability>
-            <Capability title="Option Pricing Models">
-              Black-Scholes-Merton model for European options with Greeks calculation (Delta, Gamma, Vega, Theta, Rho). Implied volatility surface construction using Newton-Raphson iteration. Put-Call parity validation and arbitrage detection. American options pricing using binomial tree models. Volatility smile analysis and risk-neutral probability distributions.
             </Capability>
           </div>
         </section>

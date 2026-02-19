@@ -153,7 +153,7 @@ All in `apps/web/src/lib/`
 | `rate-limit.ts` | IP-based rate limiting (100 req/min) |
 | `validation.ts` | Zod schemas for API validation |
 | `dataQuality.ts` | Data completeness, tier classification |
-| `options.ts` | Black-Scholes pricing, IV solver, payoff diagrams, multi-time P&L |
+| `options.ts` | Black-Scholes pricing, IV solver, payoff diagrams, multi-time P&L; sigma clamped ≥5% to prevent gamma blow-up from bad Yahoo IV |
 | `parameterValidation.ts` | Strategy parameter validation |
 | `market.ts` | Market-level calculations |
 | `price-data-adapter.ts` | Price data normalization |
@@ -419,15 +419,17 @@ The options module (`/options/[ticker]`) provides:
 
 ### P&L Calculator
 - Manual position entry (type, strike, expiry, premium, qty)
-- Quick add from chain via B/S buttons per strike
+- B/S buttons on chain populate the manual entry form (no auto-add) — user reviews and clicks "ADD TO STRATEGY"
+- Editable positions: EDIT button loads position back into form for adjustment, click to re-add
+- Strike input: arrow up/down keys snap to next/prev valid strike from chain, premium auto-updates
 - 6 preset strategies with adjustable qty (default 10):
   - Bull Call Spread, Bear Put Spread, Long Straddle, Long Strangle, Iron Condor, Call Butterfly
 - Smart strategy builder: skips strikes with no data, uses mid-price for realistic premiums
-- Strategies auto-rebuild when switching expiry dates (premiums, costs, breakevens update)
 - Each strategy shows description, legs, outlook, risk, cost
 - Multi-time payoff diagram (today, 1/3 elapsed, 2/3 elapsed, at expiry)
 - Portfolio Greeks per-contract (delta, gamma, theta, vega) — raw Black-Scholes values, not scaled by quantity
 - Breakeven points, max profit, max loss (detects unlimited profit/loss via net call exposure)
+- Chain filters: Near ATM, All, ITM, OTM
 
 ### Data
 - Ticker mapping: `.US` suffix stripped for API calls (e.g., `EQNR.US` → `EQNR` in DB)
