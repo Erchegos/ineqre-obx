@@ -7,7 +7,7 @@ Quantitative equity research platform for Oslo Stock Exchange (OSE). Combines au
 ## Tech Stack
 - **Frontend**: Next.js 15, React 19, TypeScript, Recharts, Tailwind CSS 4
 - **Backend**: Node.js, PostgreSQL 17, Drizzle ORM, Supabase
-- **ML**: Python, scikit-learn (Ridge regression, Gradient Boosting, Random Forest)
+- **ML**: Python, scikit-learn (Ridge, GB, RF), arch (GARCH), hmmlearn (MSGARCH), FastAPI ML service
 - **Data**: Interactive Brokers TWS API (primary), Yahoo Finance (fallback)
 - **Build**: Turborepo, PNPM workspaces
 
@@ -46,6 +46,7 @@ InEqRe_OBX/
 | **ML Predictions** | `/predictions/[ticker]` | `apps/web/src/app/predictions/[ticker]/page.tsx` |
 | **Monte Carlo** | `/montecarlo/[ticker]` | `apps/web/src/app/montecarlo/[ticker]/page.tsx` |
 | **Volatility** | `/volatility/[ticker]` | `apps/web/src/app/volatility/[ticker]/page.tsx` |
+| **OBX Volatility Dashboard** | `/volatility/obx` | `apps/web/src/app/volatility/obx/page.tsx` |
 | **Std Channel Strategy** | `/std-channel-strategy` | `apps/web/src/app/std-channel-strategy/page.tsx` |
 | **Backtest Results** | `/backtest` | `apps/web/src/app/backtest/page.tsx` |
 | **FX Hedging** | `/fx-hedging` | `apps/web/src/app/fx-hedging/page.tsx` |
@@ -65,7 +66,9 @@ All endpoints in `apps/web/src/app/api/`
 | `GET /api/equities/[ticker]` | Equity details |
 | `GET /api/prices/[ticker]` | OHLCV price history |
 | `GET /api/analytics/[ticker]` | Price analytics, returns, drawdown |
-| `GET /api/volatility/[ticker]` | Volatility metrics (Yang-Zhang, EWMA, etc.) |
+| `GET /api/volatility/[ticker]` | Volatility metrics (Yang-Zhang, EWMA, vol cone, decomposition) |
+| `GET /api/volatility/obx` | OBX index-level vol dashboard (constituents, vol cone, correlation) |
+| `GET /api/volatility/ml/[ticker]` | Proxy to Python ML service (GARCH, MSGARCH, VaR, jumps) |
 | `GET /api/fundamentals/[ticker]` | E/P, B/M, dividend yield, market cap |
 | `GET /api/liquidity/[ticker]` | Liquidity regime classification |
 
@@ -178,6 +181,16 @@ All in `apps/web/src/components/`
 - `SeasonalityChart.tsx` - Monthly seasonality patterns
 - `ResidualSquaresChart.tsx` - Residual analysis
 - `price-drawdown-chart.tsx` - Drawdown visualization
+- `VolConeChart.tsx` - Percentile band cone chart (5th-95th at 1W-1Y windows)
+- `ConstituentHeatmap.tsx` - Sortable OBX constituent vol heatmap
+
+### Volatility Advanced
+- `VolatilityHero.tsx` - Regime-colored hero panel with key metrics
+- `VolatilityAdvancedTabs.tsx` - Tabbed interface (Estimators | GARCH | Regime | VaR)
+- `ExpectedMovesStrip.tsx` - Compact expected moves display
+- `GarchParametersTab.tsx` - GARCH(1,1) parameters, conditional vol chart, AIC/BIC
+- `RegimeModelTab.tsx` - MSGARCH transition matrix, state probabilities, regime duration
+- `VarBacktestTab.tsx` - VaR levels, backtest chart, Kupiec/Christoffersen tests, jump events
 
 ### Data Display
 - `TickerSelector.tsx` - Ticker autocomplete input
@@ -325,6 +338,8 @@ Located in `apps/web/scripts/ml-daily-pipeline.ts`:
 | **ML predictions** | `apps/web/scripts/regenerate-predictions.ts` |
 | **Research portal** | `apps/web/src/app/research/` + `api/research/` |
 | **FX hedging** | `apps/web/src/lib/fxHedging.ts` + `api/fx-hedging/` |
+| **Volatility models** | `ml-service/app/models/` + `api/volatility/ml/[ticker]` |
+| **OBX dashboard** | `apps/web/src/app/volatility/obx/` + `api/volatility/obx/` |
 
 ---
 
@@ -366,6 +381,53 @@ Required in `.env`:
 - **Target**: 1-month forward returns
 - **Output**: Point estimate + percentiles (p05, p25, p50, p75, p95)
 - **Versions**: v2.0_19factor_enhanced, v2.1_optimized (ticker-specific)
+
+### Python ML Service (Volatility Models)
+Located in `ml-service/`. FastAPI service for advanced volatility models.
+
+**Endpoints** (all POST, receive returns array):
+| Endpoint | Purpose |
+|----------|---------|
+| `/volatility/garch` | GARCH(1,1) fitting, conditional vol series, forecasts |
+| `/volatility/regime` | 2-state MSGARCH (HMM + per-state GARCH), transition matrix |
+| `/volatility/var` | Historical, Parametric, GARCH VaR/ES at 95%/99% |
+| `/volatility/var-backtest` | Kupiec POF + Christoffersen independence tests |
+| `/volatility/jumps` | Statistical jump detection (3σ threshold) |
+| `/volatility/full` | Combined: all models in one call |
+
+**Dependencies**: `arch>=7.0`, `hmmlearn>=0.3`, `statsmodels>=0.14`, `fastapi`, `uvicorn`
+
+**Start**: `cd ml-service && source venv/bin/activate && uvicorn app.main:app --port 8000`
+
+---
+
+## Volatility Module Details
+
+### Per-Stock Page (`/volatility/[ticker]`)
+- **Regime Hero**: Color-coded panel with 6-regime classification (Crisis → Low & Stable)
+- **Regime Timeline**: Price overlay with regime-colored background bands
+- **Vol Cone**: Percentile bands (5th-95th) at 1W/2W/1M/3M/6M/1Y windows
+- **Vol Decomposition**: Systematic (β×σ_m) vs idiosyncratic risk breakdown
+- **Advanced Tabs**: Estimators | GARCH Parameters | Regime Model | VaR Backtest
+- **Trading Implications**: Regime-specific trading signals
+
+### OBX Dashboard (`/volatility/obx`)
+- **Regime Status Bar**: OBX index regime + duration + trend
+- **3-Column Dashboard**: Index vol metrics | Regime distribution | Systemic risk
+- **Regime Timeline**: OBX price with regime overlay
+- **Vol Cone + Rolling Correlation**: 2-column layout
+- **Constituent Heatmap**: Sortable table of all OSE equities by vol/regime/percentile
+- **Market Assessment**: AI-generated interpretation
+
+### Regime Classification (6 regimes)
+```
+Crisis (>95th pctile):     #FF1744 — Cash preservation, emergency hedging
+Extreme High (>85th):      #F44336 — Defensive, reduce exposure
+Elevated (>65th):          #FF9800 — Cautious, tighten stops
+Normal (30th-65th):        #9E9E9E — Standard positioning
+Low & Contracting (<30th): #2196F3 — Accumulate, expand positions
+Low & Stable (<30th):      #4CAF50 — Full allocation, sell vol
+```
 
 ---
 
@@ -419,15 +481,17 @@ The options module (`/options/[ticker]`) provides:
 
 ### P&L Calculator
 - Manual position entry (type, strike, expiry, premium, qty)
-- Quick add from chain via B/S buttons per strike
+- B/S buttons on chain populate the manual entry form (no auto-add) — user reviews and clicks "ADD TO STRATEGY"
+- Editable positions: EDIT button loads position back into form for adjustment, click to re-add
+- Strike input: arrow up/down keys snap to next/prev valid strike from chain, premium auto-updates
 - 6 preset strategies with adjustable qty (default 10):
   - Bull Call Spread, Bear Put Spread, Long Straddle, Long Strangle, Iron Condor, Call Butterfly
 - Smart strategy builder: skips strikes with no data, uses mid-price for realistic premiums
-- Strategies auto-rebuild when switching expiry dates (premiums, costs, breakevens update)
 - Each strategy shows description, legs, outlook, risk, cost
 - Multi-time payoff diagram (today, 1/3 elapsed, 2/3 elapsed, at expiry)
 - Portfolio Greeks per-contract (delta, gamma, theta, vega) — raw Black-Scholes values, not scaled by quantity
 - Breakeven points, max profit, max loss (detects unlimited profit/loss via net call exposure)
+- Chain filters: Near ATM, All, ITM, OTM
 
 ### Data
 - Ticker mapping: `.US` suffix stripped for API calls (e.g., `EQNR.US` → `EQNR` in DB)

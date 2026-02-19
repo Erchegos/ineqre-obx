@@ -273,16 +273,48 @@ export default function OptionsPage() {
     const premium = side === "long"
       ? (opt.ask || opt.last || opt.bid || 0)
       : (opt.bid || opt.last || 0);
-    const iv = (opt.iv && opt.iv >= 0.05 && opt.iv < 2.0) ? opt.iv : chainFallbackIV;
-    const newPos: OptionPosition = {
-      type,
-      strike,
-      premium,
-      quantity: side === "long" ? 1 : -1,
-      expiry: selectedExpiry || "",
-      iv,
-    };
-    setPositions(prev => [...prev, newPos]);
+    setCalcType(type);
+    setCalcStrike(strike);
+    setCalcPremium(premium);
+    setCalcSide(side);
+    setCalcQty(1);
+  };
+
+  const editPosition = (index: number) => {
+    const pos = positions[index];
+    setCalcType(pos.type);
+    setCalcStrike(pos.strike);
+    setCalcPremium(pos.premium);
+    setCalcSide(pos.quantity > 0 ? "long" : "short");
+    setCalcQty(Math.abs(pos.quantity));
+    setPositions(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const getPremiumForStrike = (strike: number): number => {
+    const row = data?.chain.find(r => r.strike === strike);
+    const opt = calcType === "call" ? row?.call : row?.put;
+    if (!opt) return 0;
+    return calcSide === "long"
+      ? (opt.ask || opt.last || opt.bid || 0)
+      : (opt.bid || opt.last || 0);
+  };
+
+  const handleStrikeStep = (direction: "up" | "down") => {
+    if (!data?.strikes || data.strikes.length === 0) return;
+    const sorted = [...data.strikes].sort((a, b) => a - b);
+    const currentIdx = sorted.findIndex(s => s === calcStrike);
+    let newStrike: number;
+    if (currentIdx === -1) {
+      // Current strike not in list — find nearest
+      const nearest = sorted.reduce((c, s) => Math.abs(s - calcStrike) < Math.abs(c - calcStrike) ? s : c, sorted[0]);
+      newStrike = nearest;
+    } else if (direction === "up") {
+      newStrike = currentIdx < sorted.length - 1 ? sorted[currentIdx + 1] : sorted[currentIdx];
+    } else {
+      newStrike = currentIdx > 0 ? sorted[currentIdx - 1] : sorted[currentIdx];
+    }
+    setCalcStrike(newStrike);
+    setCalcPremium(getPremiumForStrike(newStrike));
   };
 
   const multiTimeData = useMemo((): MultiTimePayoffPoint[] => {
@@ -725,7 +757,20 @@ export default function OptionsPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 8 }}>
                 <div>
                   <label style={lbl}>STRIKE</label>
-                  <input type="number" step="0.5" value={calcStrike} onChange={e => setCalcStrike(parseFloat(e.target.value) || 0)} style={inp} />
+                  <input
+                    type="number"
+                    value={calcStrike}
+                    onChange={e => {
+                      const v = parseFloat(e.target.value) || 0;
+                      setCalcStrike(v);
+                      setCalcPremium(getPremiumForStrike(v));
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === "ArrowUp") { e.preventDefault(); handleStrikeStep("up"); }
+                      if (e.key === "ArrowDown") { e.preventDefault(); handleStrikeStep("down"); }
+                    }}
+                    style={inp}
+                  />
                 </div>
                 <div>
                   <label style={lbl}>PREMIUM</label>
@@ -769,7 +814,7 @@ export default function OptionsPage() {
                       fontFamily: "monospace",
                       borderLeft: `2px solid ${pos.quantity > 0 ? "#22c55e" : "#ef4444"}`,
                     }}>
-                      <div>
+                      <div style={{ cursor: "pointer" }} onClick={() => editPosition(i)} title="Click to edit">
                         <span style={{ color: pos.quantity > 0 ? "#22c55e" : "#ef4444", fontWeight: 700, fontSize: 9, letterSpacing: "0.05em" }}>
                           {pos.quantity > 0 ? "LONG" : "SHORT"}
                         </span>
@@ -777,7 +822,10 @@ export default function OptionsPage() {
                         <span style={{ fontWeight: 600 }}>{Math.abs(pos.quantity)}x {pos.type.toUpperCase()}</span>
                         {" "}@{pos.strike} -- ${pos.premium.toFixed(2)}
                       </div>
-                      <button onClick={() => removePosition(i)} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 14, lineHeight: 1, fontFamily: "monospace" }}>x</button>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <button onClick={() => editPosition(i)} style={{ background: "none", border: "1px solid #1e1e2e", color: "#60a5fa", cursor: "pointer", fontSize: 8, fontWeight: 700, padding: "1px 5px", fontFamily: "monospace", letterSpacing: "0.05em" }} title="Edit position">EDIT</button>
+                        <button onClick={() => removePosition(i)} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 14, lineHeight: 1, fontFamily: "monospace" }}>x</button>
+                      </div>
                     </div>
                   ))}
                   <div style={{ marginTop: 10, padding: "10px 12px", background: "#0d0d14", border: "1px solid #1e1e2e" }}>

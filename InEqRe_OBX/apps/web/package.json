@@ -20,7 +20,8 @@
     "import:new-tickers": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/import-new-tickers.ts",
     "daily-update": "bash scripts/daily-update.sh",
     "daily-update:yahoo": "bash scripts/daily-update.sh --yahoo",
-    "daily-update:ibkr": "bash scripts/daily-update.sh --ibkr"
+    "daily-update:ibkr": "bash scripts/daily-update.sh --ibkr",
+    "ml:volatility": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/compute-volatility-models.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
