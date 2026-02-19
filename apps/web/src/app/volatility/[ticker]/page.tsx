@@ -4,24 +4,23 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 
-// --- New Components ---
-import RegimeHeader from "@/components/RegimeHeader";
+// Components
+import VolatilityHero from "@/components/VolatilityHero";
 import TradingImplications from "@/components/TradingImplications";
-import ExpectedMoves from "@/components/ExpectedMoves";
 import RegimeTimeline from "@/components/RegimeTimeline";
-import MarketCorrelation from "@/components/MarketCorrelation";
-import MethodologySection from "@/components/MethodologySection";
-
-// --- Existing Components ---
+import VolatilityCorrelationChart from "@/components/VolatilityCorrelationChart";
 import VolatilityChart from "@/components/VolatilityChart";
 import SeasonalityChart from "@/components/SeasonalityChart";
+import GarchParametersTab from "@/components/GarchParametersTab";
+import RegimeModelTab from "@/components/RegimeModelTab";
+import VarBacktestTab from "@/components/VarBacktestTab";
+import VolConeChart from "@/components/VolConeChart";
 
-// --- Utilities ---
-import { getTradingImplications, getPortfolioImplications } from "@/lib/tradingImplications";
-import { computeReturns, computeCorrelation } from "@/lib/metrics";
-import type { VolatilityRegime } from "@/lib/regimeClassification";
+// Utilities
+import { getTradingImplications } from "@/lib/tradingImplications";
+import { type VolatilityRegime } from "@/lib/regimeClassification";
 
-// --- Types ---
+// Types
 type VolatilityData = {
   ticker: string;
   count: number;
@@ -82,13 +81,27 @@ type VolatilityData = {
     yangZhang?: number;
     close?: number;
   }>;
-  dateRange: {
-    start: string;
-    end: string;
-  };
+  dateRange: { start: string; end: string };
+  volCone?: Array<{
+    window: number;
+    p5: number;
+    p25: number;
+    p50: number;
+    p75: number;
+    p95: number;
+    current: number;
+  }> | null;
+  volDecomposition?: {
+    totalVol: number | null;
+    systematicVol: number | null;
+    idiosyncraticVol: number | null;
+    systematicPct: number | null;
+    idiosyncraticPct: number | null;
+    marketVol: number | null;
+    beta: number | null;
+  } | null;
 };
 
-// --- Configuration ---
 const MEASURE_CONFIG = [
   { key: "yangZhang", label: "Yang-Zhang", color: "#f59e0b" },
   { key: "rogersSatchell", label: "Rogers-Satchell", color: "#22c55e" },
@@ -119,89 +132,80 @@ export default function VolatilityPage() {
   }, [params]);
 
   const initialLimit = useMemo(() => {
-    return clampInt(searchParams.get("limit"), 252, 100, 2000); // Default to 1Y (252 days)
+    return clampInt(searchParams.get("limit"), 504, 100, 2000);
   }, [searchParams]);
 
   const [limit, setLimit] = useState<number>(initialLimit);
   const [isAdjusted, setIsAdjusted] = useState<boolean>(true);
-
   const [loading, setLoading] = useState<boolean>(true);
   const [data, setData] = useState<VolatilityData | null>(null);
   const [marketData, setMarketData] = useState<VolatilityData | null>(null);
   const [error, setError] = useState<string | null>(null);
-
   const [selectedMeasures, setSelectedMeasures] = useState<string[]>([
-    "rolling20",
-    "rolling60",
-    "ewma94",
+    "rolling20", "rolling60", "ewma94",
   ]);
-
-  const [isMethodologyExpanded, setIsMethodologyExpanded] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [mlData, setMlData] = useState<any>(null);
+  const [mlLoading, setMlLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-
     async function run() {
       if (!ticker) return;
       setLoading(true);
       setError(null);
       try {
-        // Fetch stock volatility data
-        const url = `/api/volatility/${encodeURIComponent(
-          ticker
-        )}?limit=${limit}&adjusted=${isAdjusted}`;
-        const res = await fetch(url, {
-          method: "GET",
-          headers: { accept: "application/json" },
-          cache: "no-store",
-        });
-
+        const url = `/api/volatility/${encodeURIComponent(ticker)}?limit=${limit}&adjusted=${isAdjusted}`;
+        const res = await fetch(url, { method: "GET", headers: { accept: "application/json" }, cache: "no-store" });
         if (!res.ok) {
           const text = await res.text();
-          if (!cancelled) {
-            setError(`Volatility API failed: ${text}`);
-            setData(null);
-          }
+          if (!cancelled) { setError(`Volatility API failed: ${text}`); setData(null); }
           return;
         }
-
         const json = (await res.json()) as VolatilityData;
 
-        // Fetch OBX (market) volatility data for correlation
         let marketJson: VolatilityData | null = null;
         try {
-          const marketUrl = `/api/volatility/OBX?limit=${limit}&adjusted=${isAdjusted}`;
-          const marketRes = await fetch(marketUrl, {
-            method: "GET",
-            headers: { accept: "application/json" },
-            cache: "no-store",
+          const marketRes = await fetch(`/api/volatility/OBX?limit=${limit}&adjusted=${isAdjusted}`, {
+            method: "GET", headers: { accept: "application/json" }, cache: "no-store",
           });
-          if (marketRes.ok) {
-            marketJson = (await marketRes.json()) as VolatilityData;
-          }
+          if (marketRes.ok) marketJson = (await marketRes.json()) as VolatilityData;
         } catch (e) {
           console.warn("Failed to fetch market volatility data:", e);
         }
 
-        if (!cancelled) {
-          setData(json);
-          setMarketData(marketJson);
-          setLoading(false);
-        }
+        if (!cancelled) { setData(json); setMarketData(marketJson); setLoading(false); }
       } catch (e: any) {
-        if (!cancelled) {
-          setError(e?.message ?? String(e));
-          setData(null);
-          setLoading(false);
-        }
+        if (!cancelled) { setError(e?.message ?? String(e)); setData(null); setLoading(false); }
       }
     }
-
     run();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [ticker, limit, isAdjusted]);
+
+  // Fetch ML model data (GARCH, MSGARCH, VaR, Jumps) — non-blocking
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchML() {
+      if (!ticker) return;
+      setMlLoading(true);
+      try {
+        const res = await fetch(`/api/volatility/ml/${encodeURIComponent(ticker)}?limit=${limit}`, {
+          method: "GET", headers: { accept: "application/json" }, cache: "no-store",
+        });
+        if (res.ok && !cancelled) {
+          const json = await res.json();
+          setMlData(json);
+        }
+      } catch {
+        // ML service unavailable — tabs will show placeholder
+      } finally {
+        if (!cancelled) setMlLoading(false);
+      }
+    }
+    fetchML();
+    return () => { cancelled = true; };
+  }, [ticker, limit]);
 
   const toggleMeasure = (measure: string) => {
     setSelectedMeasures((prev) =>
@@ -209,222 +213,96 @@ export default function VolatilityPage() {
     );
   };
 
-  // --- Derived Metrics (MUST be before early returns to satisfy Rules of Hooks) ---
-  const avgCorrelation = useMemo(() => {
-    if (!data || !marketData) return 0;
-
-    // Calculate correlation between stock returns and market returns
-    // This is consistent with how beta is calculated
-    const stockPrices = data.series
-      .map((s) => s.close)
-      .filter((c): c is number => c !== null && c !== undefined && c > 0);
-    const marketPrices = marketData.series
-      .map((s) => s.close)
-      .filter((c): c is number => c !== null && c !== undefined && c > 0);
-
-    if (stockPrices.length < 30 || marketPrices.length < 30) return 0;
-
-    const minLength = Math.min(stockPrices.length, marketPrices.length);
-    const stockReturns = computeReturns(stockPrices.slice(0, minLength));
-    const marketReturns = computeReturns(marketPrices.slice(0, minLength));
-
-    return computeCorrelation(stockReturns, marketReturns);
-  }, [data, marketData]);
-
-  // Compute regime-related values (with safe fallbacks for when data is null)
   const hasRegimeData = data?.regime !== undefined;
   const regime = data?.regime || {
     current: "Normal" as VolatilityRegime,
-    level: 0,
-    percentile: 50,
-    trend: "Stable" as const,
-    duration: 0,
-    lastShift: null,
-    averageDuration: 0,
+    level: 0, percentile: 50, trend: "Stable" as const,
+    duration: 0, lastShift: null, averageDuration: 0,
     interpretation: "Unable to determine regime classification.",
   };
 
-  // Trading implications (MUST be before early returns)
   const tradingImplications = useMemo(
     () => getTradingImplications(regime.current, data?.beta ?? null),
     [regime.current, data?.beta]
   );
-
-  const portfolioImplications = useMemo(
-    () => getPortfolioImplications(regime.current, data?.beta ?? null),
-    [regime.current, data?.beta]
-  );
-
-  // Early returns AFTER all hooks
+  // Early returns
   if (loading && !data) return <main style={{ padding: 24 }}>Loading...</main>;
   if (error || !data) return <main style={{ padding: 24 }}>Error: {error}</main>;
 
-  // Now safe to use data
-  const expectedMoves = data.expectedMoves || {
-    currentPrice: 0,
-    daily1Sigma: 0,
-    weekly1Sigma: 0,
-    daily2Sigma: 0,
-  };
-
+  const expectedMoves = data.expectedMoves || { currentPrice: 0, daily1Sigma: 0, weekly1Sigma: 0, daily2Sigma: 0 };
   const regimeHistory = data.regimeHistory || [];
 
   return (
-    <main style={{ padding: 24, maxWidth: 1400, margin: "0 auto" }}>
-      {/* Header */}
-      <div style={{ marginBottom: 32 }}>
-        <Link
-          href="/stocks"
-          style={{
-            display: "inline-block",
-            padding: "8px 16px",
-            marginBottom: 20,
-            fontSize: 13,
-            fontWeight: 500,
-            color: "var(--foreground)",
-            textDecoration: "none",
-            border: "1px solid var(--border)",
-            borderRadius: 4,
-            background: "var(--card-bg)",
-            transition: "all 0.15s ease",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = "var(--foreground)";
-            e.currentTarget.style.background = "var(--hover-bg)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = "var(--border)";
-            e.currentTarget.style.background = "var(--card-bg)";
-          }}
-        >
-          Asset List
-        </Link>
-        <h1
-          style={{
-            fontSize: 32,
-            fontWeight: 700,
-            margin: 0,
-            color: "var(--foreground)",
-          }}
-        >
-          Volatility Analysis
-        </h1>
-      </div>
+    <main style={{ padding: "20px 24px", maxWidth: 1400, margin: "0 auto" }}>
 
+      {/* ═══ HEADER: ticker + controls ═══ */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          marginBottom: 32,
+          marginBottom: 20,
           flexWrap: "wrap",
-          gap: 16,
+          gap: 12,
         }}
       >
-        <div style={{ fontSize: 40, fontWeight: 700 }}>{ticker}</div>
-
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          {/* Price Mode Toggle */}
-          <div
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <Link
+            href="/stocks"
             style={{
-              display: "flex",
-              background: "var(--card-bg)",
-              borderRadius: 6,
-              border: "1px solid var(--border)",
-              padding: 2,
+              fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)",
+              textDecoration: "none", fontFamily: "monospace",
             }}
           >
-            <button
-              onClick={() => setIsAdjusted(false)}
-              style={{
-                padding: "6px 12px",
-                fontSize: 12,
-                fontWeight: 500,
-                borderRadius: 4,
-                border: "none",
-                background: !isAdjusted ? "var(--foreground)" : "transparent",
-                color: !isAdjusted ? "var(--background)" : "var(--muted)",
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-                transform: "scale(1)",
-                boxShadow: !isAdjusted ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
-              }}
-              onMouseEnter={(e) => {
-                if (!isAdjusted) {
-                  e.currentTarget.style.filter = "brightness(0.9)";
-                } else {
-                  e.currentTarget.style.background = "var(--hover-bg)";
-                  e.currentTarget.style.borderColor = "var(--accent)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isAdjusted) {
-                  e.currentTarget.style.filter = "brightness(1)";
-                } else {
-                  e.currentTarget.style.background = "transparent";
-                  e.currentTarget.style.borderColor = "transparent";
-                }
-              }}
-              onMouseDown={(e) => {
-                e.currentTarget.style.transform = "scale(0.95)";
-              }}
-              onMouseUp={(e) => {
-                e.currentTarget.style.transform = "scale(1)";
-              }}
-            >
-              Raw
-            </button>
-            <button
-              onClick={() => setIsAdjusted(true)}
-              style={{
-                padding: "6px 12px",
-                fontSize: 12,
-                fontWeight: 500,
-                borderRadius: 4,
-                border: "none",
-                background: isAdjusted ? "var(--accent)" : "transparent",
-                color: isAdjusted ? "#fff" : "var(--muted)",
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-                transform: "scale(1)",
-                boxShadow: isAdjusted ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
-              }}
-              onMouseEnter={(e) => {
-                if (isAdjusted) {
-                  e.currentTarget.style.filter = "brightness(0.9)";
-                } else {
-                  e.currentTarget.style.background = "var(--hover-bg)";
-                  e.currentTarget.style.borderColor = "var(--accent)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (isAdjusted) {
-                  e.currentTarget.style.filter = "brightness(1)";
-                } else {
-                  e.currentTarget.style.background = "transparent";
-                  e.currentTarget.style.borderColor = "transparent";
-                }
-              }}
-              onMouseDown={(e) => {
-                e.currentTarget.style.transform = "scale(0.95)";
-              }}
-              onMouseUp={(e) => {
-                e.currentTarget.style.transform = "scale(1)";
-              }}
-            >
-              Total Return
-            </button>
+            ← Asset List
+          </Link>
+          <span style={{ color: "var(--border)" }}>|</span>
+          <Link
+            href="/volatility/obx"
+            style={{
+              fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)",
+              textDecoration: "none", fontFamily: "monospace",
+            }}
+          >
+            OBX Dashboard
+          </Link>
+          <span style={{ color: "var(--border)" }}>|</span>
+          <span style={{ fontSize: 24, fontWeight: 700, fontFamily: "monospace", color: "var(--foreground)" }}>
+            {ticker}
+          </span>
+          <span style={{ fontSize: 14, color: "var(--muted-foreground)", fontFamily: "monospace" }}>
+            Volatility Analysis
+          </span>
+          <span style={{ fontSize: 11, color: "var(--muted-foreground)", fontFamily: "monospace" }}>
+            ({data.count}d)
+          </span>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div style={{ display: "flex", background: "var(--card-bg)", borderRadius: 4, border: "1px solid var(--border)", padding: 2 }}>
+            {[{ label: "Raw", val: false }, { label: "Total Return", val: true }].map((opt) => {
+              const isActive = isAdjusted === opt.val;
+              return (
+                <button
+                  key={opt.label}
+                  onClick={() => setIsAdjusted(opt.val)}
+                  style={{
+                    padding: "4px 10px", fontSize: 11, fontWeight: 600, borderRadius: 3, border: "none",
+                    background: isActive ? "var(--accent)" : "transparent",
+                    color: isActive ? "#fff" : "var(--muted-foreground)",
+                    cursor: "pointer", fontFamily: "monospace", transition: "all 0.15s",
+                  }}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Timeframe Buttons */}
-          <div style={{ display: "flex", gap: 4 }}>
+          <div style={{ display: "flex", gap: 2 }}>
             {[
-              { l: "3M", v: 63 },
-              { l: "6M", v: 126 },
-              { l: "1Y", v: 252 },
-              { l: "2Y", v: 504 },
-              { l: "5Y", v: 1260 },
-              { l: "All", v: 2000 },
+              { l: "3M", v: 63 }, { l: "6M", v: 126 }, { l: "1Y", v: 252 },
+              { l: "2Y", v: 504 }, { l: "5Y", v: 1260 }, { l: "All", v: 2000 },
             ].map((tf) => {
               const isActive = limit === tf.v;
               return (
@@ -432,39 +310,11 @@ export default function VolatilityPage() {
                   key={tf.v}
                   onClick={() => setLimit(tf.v)}
                   style={{
-                    padding: "6px 12px",
-                    borderRadius: 4,
+                    padding: "4px 10px", borderRadius: 3, fontSize: 11, fontWeight: 600,
                     border: `1px solid ${isActive ? "var(--accent)" : "var(--border)"}`,
                     background: isActive ? "var(--accent)" : "transparent",
-                    color: isActive ? "#fff" : "var(--muted)",
-                    fontSize: 11,
-                    fontWeight: 500,
-                    cursor: "pointer",
-                    transition: "all 0.15s ease",
-                    transform: "scale(1)",
-                    boxShadow: isActive ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (isActive) {
-                      e.currentTarget.style.filter = "brightness(0.9)";
-                    } else {
-                      e.currentTarget.style.background = "var(--hover-bg)";
-                      e.currentTarget.style.borderColor = "var(--accent)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (isActive) {
-                      e.currentTarget.style.filter = "brightness(1)";
-                    } else {
-                      e.currentTarget.style.background = "transparent";
-                      e.currentTarget.style.borderColor = "var(--border)";
-                    }
-                  }}
-                  onMouseDown={(e) => {
-                    e.currentTarget.style.transform = "scale(0.95)";
-                  }}
-                  onMouseUp={(e) => {
-                    e.currentTarget.style.transform = "scale(1)";
+                    color: isActive ? "#fff" : "var(--muted-foreground)",
+                    cursor: "pointer", fontFamily: "monospace", transition: "all 0.15s",
                   }}
                 >
                   {tf.l}
@@ -475,45 +325,33 @@ export default function VolatilityPage() {
         </div>
       </div>
 
-      {/* NEW SECTION 1: Regime Header */}
+      {/* ═══ 1. VOLATILITY DASHBOARD (replaces flashy hero) ═══ */}
       {hasRegimeData && (
-        <>
-          <div
-            style={{
-              fontSize: 12,
-              color: "var(--muted)",
-              marginBottom: 8,
-              textAlign: "right",
-            }}
-          >
-            Analysis period: {data.count} trading days
-          </div>
-          <RegimeHeader
-            regime={regime.current}
-            currentLevel={regime.level}
-            percentile={regime.percentile}
-            trend={regime.trend}
-            beta={data.beta}
-            interpretation={regime.interpretation}
-            ticker={ticker}
-          />
-        </>
-      )}
-
-      {/* NEW SECTION 2: Trading Implications */}
-      {hasRegimeData && <TradingImplications implications={tradingImplications} />}
-
-      {/* NEW SECTION 3: Expected Moves */}
-      {hasRegimeData && expectedMoves.currentPrice > 0 && (
-        <ExpectedMoves
-          currentPrice={expectedMoves.currentPrice}
-          daily1Sigma={expectedMoves.daily1Sigma}
-          weekly1Sigma={expectedMoves.weekly1Sigma}
-          daily2Sigma={expectedMoves.daily2Sigma}
+        <VolatilityHero
+          regime={regime.current}
+          annualizedVol={regime.level}
+          percentile={regime.percentile}
+          trend={regime.trend}
+          beta={data.beta}
+          rolling20={data.current.rolling20}
+          rolling60={data.current.rolling60}
+          rolling120={data.current.rolling120}
+          ewma94={data.current.ewma94}
+          yangZhang={data.current.yangZhang}
+          interpretation={regime.interpretation}
+          ticker={ticker}
+          regimeDuration={regime.duration}
+          percentiles={{
+            rolling20: data.percentiles.rolling20,
+            rolling60: data.percentiles.rolling60,
+            ewma94: data.percentiles.ewma94,
+            yangZhang: data.percentiles.yangZhang,
+          }}
+          expectedMoves={expectedMoves}
         />
       )}
 
-      {/* NEW SECTION 4: Regime Timeline */}
+      {/* ═══ 2. PRICE HISTORY WITH REGIME OVERLAY ═══ */}
       {hasRegimeData && regimeHistory.length > 0 && (
         <RegimeTimeline
           data={regimeHistory}
@@ -525,105 +363,232 @@ export default function VolatilityPage() {
         />
       )}
 
-      {/* NEW SECTION 5: Simplified Volatility Metrics */}
-      <div style={{ marginBottom: 40 }}>
-        <h2
-          style={{
-            fontSize: 20,
-            fontWeight: 600,
-            marginBottom: 16,
-            color: "var(--foreground)",
-          }}
-        >
-          Volatility Metrics
-        </h2>
-
-        {/* Current Readings */}
-        <div
-          style={{
-            display: "flex",
-            gap: 16,
-            marginBottom: 16,
-            fontSize: 13,
-            color: "var(--muted-foreground)",
-            flexWrap: "wrap",
-          }}
-        >
-          <div>
-            <span style={{ fontWeight: 600 }}>20-Day:</span> {fmtPct(data.current.rolling20)}
-          </div>
-          <div>
-            <span style={{ fontWeight: 600 }}>60-Day:</span> {fmtPct(data.current.rolling60)}
-          </div>
-          <div>
-            <span style={{ fontWeight: 600 }}>EWMA (λ=0.94):</span> {fmtPct(data.current.ewma94)}
-          </div>
-          <div style={{ marginLeft: "auto" }}>
-            <span style={{ fontWeight: 600 }}>Trend:</span>{" "}
-            <span
-              style={{
-                color:
-                  regime.trend === "Expanding"
-                    ? "#ef4444"
-                    : regime.trend === "Contracting"
-                    ? "#22c55e"
-                    : "var(--foreground)",
-                fontWeight: 600,
-              }}
-            >
-              {regime.trend}
-            </span>
-          </div>
+      {/* ═══ 2b. VOL CONE + VOL DECOMPOSITION ═══ */}
+      {(data.volCone || data.volDecomposition) && (
+        <div style={{ display: "grid", gridTemplateColumns: data.volCone && data.volDecomposition ? "2fr 1fr" : "1fr", gap: 20, marginBottom: 24 }}>
+          {data.volCone && <VolConeChart data={data.volCone} />}
+          {data.volDecomposition && (
+            <VolDecompositionPanel decomp={data.volDecomposition} ticker={ticker} />
+          )}
         </div>
-
-        {/* Chart */}
-        <div
-          style={{
-            padding: 20,
-            borderRadius: 6,
-            border: "1px solid var(--border)",
-            background: "var(--card-bg)",
-          }}
-        >
-          <VolatilityChart
-            data={data.series}
-            selectedMeasures={selectedMeasures}
-            height={380}
-          />
-        </div>
-      </div>
-
-      {/* NEW SECTION 6: Market Co-Movement */}
-      {marketData && (
-        <MarketCorrelation
-          beta={data.beta}
-          avgCorrelation={avgCorrelation}
-          portfolioImplications={portfolioImplications}
-          stockData={data.series}
-          marketData={marketData.series}
-        />
       )}
 
-      {/* NEW SECTION 7: Advanced Methodology (Collapsible) */}
-      <MethodologySection
-        isExpanded={isMethodologyExpanded}
-        onToggle={() => setIsMethodologyExpanded(!isMethodologyExpanded)}
-      >
-        {/* All Estimators Chart */}
-        <div style={{ marginBottom: 32 }}>
-          <h3
-            style={{
-              fontSize: 18,
-              fontWeight: 600,
-              marginBottom: 16,
-              color: "var(--foreground)",
-            }}
-          >
-            All Estimators Comparison
-          </h3>
+      {/* ═══ 3. REGIME MODEL ═══ */}
+      <MlSection title="Regime Model (MSGARCH)" loading={mlLoading} hasData={!!mlData?.regime && !mlData.regime.error}>
+        {mlData?.regime && !mlData.regime.error && (
+          <RegimeModelTab data={mlData.regime} ticker={ticker} />
+        )}
+      </MlSection>
 
-          {/* Measure Toggles */}
-          <div style={{ marginBottom: 16, display: "flex", flexWrap: "wrap", gap: 8 }}>
+      {/* ═══ 5. VAR BACKTEST ═══ */}
+      <MlSection title="VaR Backtest" loading={mlLoading} hasData={!!(mlData?.var || mlData?.var_backtest || mlData?.jumps)}>
+        <VarBacktestTab
+          varLevels={mlData?.var && !mlData.var.error ? mlData.var : null}
+          backtestResults={mlData?.var_backtest?.results && !mlData.var_backtest.error ? mlData.var_backtest.results : null}
+          backtestChart={mlData?.var_backtest?.chart && !mlData.var_backtest.error ? mlData.var_backtest.chart : null}
+          jumps={mlData?.jumps && !mlData.jumps.error ? mlData.jumps : null}
+          ticker={ticker}
+        />
+      </MlSection>
+
+      {/* ═══ 6. VOLATILITY TIME SERIES ═══ */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <h2 style={{ fontSize: 14, fontWeight: 700, color: "var(--foreground)", fontFamily: "monospace", margin: 0 }}>
+            Volatility Time Series
+          </h2>
+          <div style={{ display: "flex", gap: 12, fontSize: 11, fontFamily: "monospace", color: "var(--muted-foreground)" }}>
+            <span style={{ color: "#3b82f6" }}>● 20d: {fmtPct(data.current.rolling20)}</span>
+            <span style={{ color: "#10b981" }}>● 60d: {fmtPct(data.current.rolling60)}</span>
+            <span style={{ color: "#6366f1" }}>● EWMA: {fmtPct(data.current.ewma94)}</span>
+          </div>
+        </div>
+        <div style={{ padding: 16, borderRadius: 6, border: "1px solid var(--border)", borderBottom: marketData ? "none" : undefined, borderBottomLeftRadius: marketData ? 0 : 6, borderBottomRightRadius: marketData ? 0 : 6, background: "var(--card-bg)" }}>
+          <VolatilityChart data={data.series} selectedMeasures={selectedMeasures} height={300} />
+        </div>
+        {marketData && (
+          <div style={{ padding: 16, borderRadius: "0 0 6px 6px", border: "1px solid var(--border)", borderTop: "1px dashed var(--border)", background: "var(--card-bg)" }}>
+            <VolatilityCorrelationChart
+              stockData={data.series}
+              marketData={marketData.series}
+              height={200}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* ═══ 7. ESTIMATORS (collapsible) ═══ */}
+      <EstimatorsCollapsible
+        series={data.series}
+        selectedMeasures={selectedMeasures}
+        toggleMeasure={toggleMeasure}
+        garchData={mlData?.garch && !mlData.garch.error ? mlData.garch : null}
+        ticker={ticker}
+      />
+
+      {/* ═══ 8. TRADING IMPLICATIONS ═══ */}
+      {hasRegimeData && (
+        <TradingImplications
+          implications={tradingImplications}
+          regime={regime.current}
+        />
+      )}
+    </main>
+  );
+}
+
+function VolDecompositionPanel({ decomp, ticker }: {
+  decomp: NonNullable<VolatilityData["volDecomposition"]>;
+  ticker: string;
+}) {
+  const sysPct = decomp.systematicPct ?? 0;
+  const idioPct = decomp.idiosyncraticPct ?? 0;
+  const total = (sysPct + idioPct) || 1;
+  const sysWidth = (sysPct / total) * 100;
+  const idioWidth = (idioPct / total) * 100;
+
+  return (
+    <div>
+      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted-foreground)", fontFamily: "monospace", marginBottom: 8 }}>
+        Volatility Decomposition
+      </div>
+      <div style={{ padding: 16, borderRadius: 6, border: "1px solid var(--border)", background: "var(--background)", height: "100%", boxSizing: "border-box" }}>
+        {/* Stacked bar */}
+        <div style={{ display: "flex", height: 20, borderRadius: 4, overflow: "hidden", marginBottom: 16 }}>
+          <div
+            style={{ width: `${sysWidth}%`, background: "#6366f1", display: "flex", alignItems: "center", justifyContent: "center" }}
+            title={`Systematic: ${sysPct.toFixed(0)}%`}
+          >
+            {sysWidth > 15 && <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", fontFamily: "monospace" }}>{sysPct.toFixed(0)}%</span>}
+          </div>
+          <div
+            style={{ width: `${idioWidth}%`, background: "#f59e0b", display: "flex", alignItems: "center", justifyContent: "center" }}
+            title={`Idiosyncratic: ${idioPct.toFixed(0)}%`}
+          >
+            {idioWidth > 15 && <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", fontFamily: "monospace" }}>{idioPct.toFixed(0)}%</span>}
+          </div>
+        </div>
+
+        {/* Metrics */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <DecompRow label="Total Vol" value={fmtPct(decomp.totalVol)} bold />
+          <DecompRow label="Systematic (β × σ_m)" value={fmtPct(decomp.systematicVol)} color="#6366f1" />
+          <DecompRow label="Idiosyncratic" value={fmtPct(decomp.idiosyncraticVol)} color="#f59e0b" />
+          <div style={{ borderTop: "1px solid var(--border)", marginTop: 4, paddingTop: 6 }}>
+            <DecompRow label={`Beta vs OBX`} value={decomp.beta?.toFixed(2) ?? "—"} />
+            <DecompRow label="OBX Vol" value={fmtPct(decomp.marketVol)} />
+          </div>
+        </div>
+
+        {/* Interpretation */}
+        <div style={{ marginTop: 12, fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.5, fontFamily: "monospace" }}>
+          {sysPct > 60
+            ? `${ticker} risk is dominated by market movements. Hedging with OBX index is effective.`
+            : sysPct > 35
+              ? `${ticker} has a balanced risk profile — both market and stock-specific factors contribute.`
+              : `${ticker} risk is primarily idiosyncratic. Stock-specific catalysts dominate price moves.`}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DecompRow({ label, value, color, bold }: { label: string; value: string; color?: string; bold?: boolean }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "monospace", fontSize: 12 }}>
+      <span style={{ color: color || "var(--muted-foreground)", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
+        {color && <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, display: "inline-block" }} />}
+        {label}
+      </span>
+      <span style={{ fontWeight: bold ? 700 : 600, fontSize: bold ? 14 : 12, color: color || "var(--foreground)" }}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function MlSection({ title, loading, hasData, children }: {
+  title: string;
+  loading: boolean;
+  hasData: boolean;
+  children: React.ReactNode;
+}) {
+  if (!loading && !hasData) return null; // ML service not available — hide section entirely
+
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <div style={{
+        fontSize: 11, fontWeight: 700, textTransform: "uppercase",
+        letterSpacing: "0.08em", color: "var(--muted-foreground)",
+        fontFamily: "monospace", marginBottom: 10,
+      }}>
+        {title}
+      </div>
+      {loading && !hasData ? (
+        <div style={{
+          padding: "32px 20px", borderRadius: 6,
+          border: "1px solid var(--border)", background: "var(--card-bg)",
+          textAlign: "center", fontFamily: "monospace", fontSize: 12,
+          color: "var(--muted-foreground)",
+        }}>
+          <span style={{ display: "inline-block", animation: "spin 1s linear infinite", marginRight: 8 }}>◐</span>
+          Fitting {title.toLowerCase()}...
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      ) : (
+        <div style={{
+          padding: 20, borderRadius: 6,
+          border: "1px solid var(--border)", background: "var(--card-bg)",
+        }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EstimatorsCollapsible({ series, selectedMeasures, toggleMeasure, garchData, ticker }: {
+  series: VolatilityData["series"];
+  selectedMeasures: string[];
+  toggleMeasure: (m: string) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  garchData: any | null;
+  ticker: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          width: "100%", padding: "10px 16px",
+          borderRadius: isOpen ? "6px 6px 0 0" : 6,
+          border: "1px solid var(--border)", background: "var(--card-bg)",
+          color: "var(--foreground)", fontSize: 12, fontWeight: 700,
+          cursor: "pointer", display: "flex", alignItems: "center",
+          justifyContent: "space-between", fontFamily: "monospace",
+        }}
+      >
+        Estimators, GARCH & Seasonality
+        <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
+          {isOpen ? "▲" : "▼"}
+        </span>
+      </button>
+      {isOpen && (
+        <div style={{
+          padding: 20, border: "1px solid var(--border)", borderTop: "none",
+          borderRadius: "0 0 6px 6px", background: "var(--card-bg)",
+        }}>
+          {/* GARCH Parameters */}
+          {garchData && (
+            <div style={{ marginBottom: 24 }}>
+              <GarchParametersTab data={garchData} ticker={ticker} />
+            </div>
+          )}
+
+          {/* Estimator selector */}
+          <div style={{ marginBottom: 16, display: "flex", flexWrap: "wrap", gap: 6 }}>
             {MEASURE_CONFIG.map((config) => {
               const isSelected = selectedMeasures.includes(config.key);
               return (
@@ -631,270 +596,63 @@ export default function VolatilityPage() {
                   key={config.key}
                   onClick={() => toggleMeasure(config.key)}
                   style={{
-                    padding: "6px 12px",
-                    borderRadius: 16,
-                    border: `1.5px solid ${isSelected ? config.color : "var(--border)"}`,
-                    background: isSelected ? `${config.color}10` : "transparent",
-                    color: isSelected ? config.color : "var(--muted)",
-                    fontSize: 11,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    transition: "all 0.15s",
+                    padding: "4px 10px", borderRadius: 12, fontSize: 11, fontWeight: 600,
+                    border: `1px solid ${isSelected ? config.color : "var(--border)"}`,
+                    background: isSelected ? `${config.color}15` : "transparent",
+                    color: isSelected ? config.color : "var(--muted-foreground)",
+                    cursor: "pointer", fontFamily: "monospace", transition: "all 0.15s",
+                    display: "flex", alignItems: "center", gap: 5,
                   }}
                 >
-                  <div
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: "50%",
-                      background: config.color,
-                      opacity: isSelected ? 1 : 0.3,
-                    }}
-                  />
+                  <div style={{ width: 5, height: 5, borderRadius: "50%", background: config.color, opacity: isSelected ? 1 : 0.3 }} />
                   {config.label}
                 </button>
               );
             })}
           </div>
 
-          <div
-            style={{
-              padding: 20,
-              borderRadius: 6,
-              border: "1px solid var(--border)",
-              background: "var(--card-bg)",
-            }}
-          >
-            <VolatilityChart
-              data={data.series}
-              selectedMeasures={selectedMeasures}
-              height={420}
-            />
+          <div style={{ padding: 16, borderRadius: 6, border: "1px solid var(--border)", background: "var(--background)", marginBottom: 24 }}>
+            <VolatilityChart data={series} selectedMeasures={selectedMeasures} height={380} />
           </div>
-        </div>
 
-        {/* Two-Column Layout: Seasonality + Estimator Guide */}
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24 }}>
-          {/* Seasonality Chart */}
-          <div>
-            <h3
-              style={{
-                fontSize: 18,
-                fontWeight: 600,
-                marginBottom: 12,
-                color: "var(--foreground)",
-              }}
-            >
-              Monthly Seasonality Pattern
-            </h3>
-            <p
-              style={{
-                fontSize: 12,
-                color: "var(--muted)",
-                marginBottom: 16,
-                lineHeight: 1.5,
-              }}
-            >
-              Average annualized volatility by calendar month. Helps identify historically volatile
-              periods, though sample size may be limited for statistical significance.
-            </p>
-            <div
-              style={{
-                padding: 20,
-                borderRadius: 6,
-                border: "1px solid var(--border)",
-                background: "var(--card-bg)",
-                height: 280,
-              }}
-            >
-              <SeasonalityChart data={data.series} />
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 20 }}>
+            <div>
+              <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, fontFamily: "monospace", color: "var(--foreground)" }}>
+                Monthly Seasonality
+              </h3>
+              <div style={{ padding: 16, borderRadius: 6, border: "1px solid var(--border)", background: "var(--background)", height: 260 }}>
+                <SeasonalityChart data={series} />
+              </div>
             </div>
-          </div>
-
-          {/* Volatility Estimators Explained */}
-          <div>
-            <h3
-              style={{
-                fontSize: 18,
-                fontWeight: 600,
-                marginBottom: 12,
-                color: "var(--foreground)",
-              }}
-            >
-              Estimator Guide
-            </h3>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 12,
-              }}
-            >
-              {/* Yang-Zhang */}
-              <EstimatorBox
-                color="#f59e0b"
-                name="Yang-Zhang"
-                formula="Combines overnight + open-to-close + close-to-close"
-                whenToUse="Best for position sizing and risk management"
-                pros="Most accurate, accounts for gaps"
-                cons="Requires OHLC data"
-              />
-
-              {/* Rogers-Satchell */}
-              <EstimatorBox
-                color="#22c55e"
-                name="Rogers-Satchell"
-                formula="log(H/C) × log(H/O) + log(L/C) × log(L/O)"
-                whenToUse="Trending markets with directional bias"
-                pros="Drift-independent, no close bias"
-                cons="Ignores overnight gaps"
-              />
-
-              {/* 20/60/120-Day Rolling */}
-              <EstimatorBox
-                color="#3b82f6"
-                name="20/60/120-Day Rolling"
-                formula="Standard deviation of log returns × √252"
-                whenToUse="Simple baseline, compare short vs long term"
-                pros="Easy to interpret, widely understood"
-                cons="Backward-looking, slow to react"
-              />
-
-              {/* EWMA */}
-              <EstimatorBox
-                color="#6366f1"
-                name="EWMA (λ=0.94)"
-                formula="Exponentially weighted moving average"
-                whenToUse="Regime change detection, recent data matters more"
-                pros="Reacts fast to volatility shifts"
-                cons="Can overreact to noise"
-              />
-
-              {/* Parkinson */}
-              <EstimatorBox
-                color="#ef4444"
-                name="Parkinson"
-                formula="(1/4ln2) × (H - L)²"
-                whenToUse="High-frequency data, intraday range focus"
-                pros="Efficient, uses high-low range"
-                cons="Ignores open/close, overnight gaps"
-              />
-
-              {/* Garman-Klass */}
-              <EstimatorBox
-                color="#06b6d4"
-                name="Garman-Klass"
-                formula="0.5(H-L)² - (2ln2-1)(C-O)²"
-                whenToUse="When you have OHLC but no overnight data"
-                pros="More efficient than close-only"
-                cons="Assumes zero drift"
-              />
+            <div>
+              <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, fontFamily: "monospace", color: "var(--foreground)" }}>
+                Estimator Reference
+              </h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <EstimatorBox color="#f59e0b" name="Yang-Zhang" desc="Gap-adjusted, most accurate. Best for risk management." />
+                <EstimatorBox color="#22c55e" name="Rogers-Satchell" desc="Drift-independent. Best for trending markets." />
+                <EstimatorBox color="#3b82f6" name="Rolling (20/60/120d)" desc="Std dev of log returns. Simple baseline." />
+                <EstimatorBox color="#6366f1" name="EWMA (λ=0.94)" desc="Recent data weighted more. Fast regime detection." />
+                <EstimatorBox color="#ef4444" name="Parkinson" desc="High-low range. Efficient but ignores gaps." />
+                <EstimatorBox color="#06b6d4" name="Garman-Klass" desc="OHLC-based. More efficient than close-only." />
+              </div>
             </div>
           </div>
         </div>
-      </MethodologySection>
-    </main>
+      )}
+    </div>
   );
 }
 
-// --- Helper Components ---
-function EstimatorBox({
-  color,
-  name,
-  formula,
-  whenToUse,
-  pros,
-  cons,
-}: {
-  color: string;
-  name: string;
-  formula: string;
-  whenToUse: string;
-  pros: string;
-  cons: string;
-}) {
+function EstimatorBox({ color, name, desc }: { color: string; name: string; desc: string }) {
   return (
-    <div
-      style={{
-        padding: 14,
-        borderRadius: 6,
-        border: `1px solid ${color}30`,
-        background: `${color}08`,
-        display: "flex",
-        flexDirection: "column",
-        gap: 6,
-      }}
-    >
-      {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          marginBottom: 4,
-        }}
-      >
-        <div
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: "50%",
-            background: color,
-          }}
-        />
-        <strong
-          style={{
-            fontSize: 12,
-            fontWeight: 700,
-            color: color,
-          }}
-        >
-          {name}
-        </strong>
-      </div>
-
-      {/* Formula */}
-      <div
-        style={{
-          fontSize: 10,
-          fontFamily: "monospace",
-          color: "var(--muted)",
-          padding: "4px 8px",
-          background: "var(--background)",
-          borderRadius: 3,
-          border: "1px solid var(--border)",
-        }}
-      >
-        {formula}
-      </div>
-
-      {/* When to use */}
-      <div style={{ fontSize: 11, lineHeight: 1.5 }}>
-        <span style={{ color: "var(--foreground)", fontWeight: 600 }}>Use when: </span>
-        <span style={{ color: "var(--muted)" }}>{whenToUse}</span>
-      </div>
-
-      {/* Pros/Cons */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 8,
-          fontSize: 10,
-        }}
-      >
-        <div>
-          <span style={{ color: "#22c55e", fontWeight: 600 }}>+ </span>
-          <span style={{ color: "var(--muted)" }}>{pros}</span>
-        </div>
-        <div>
-          <span style={{ color: "#ef4444", fontWeight: 600 }}>- </span>
-          <span style={{ color: "var(--muted)" }}>{cons}</span>
-        </div>
-      </div>
+    <div style={{
+      padding: "6px 10px", borderRadius: 4,
+      border: "1px solid var(--border)",
+      borderLeft: `3px solid ${color}`,
+    }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color, fontFamily: "monospace", marginBottom: 1 }}>{name}</div>
+      <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.4 }}>{desc}</div>
     </div>
   );
 }

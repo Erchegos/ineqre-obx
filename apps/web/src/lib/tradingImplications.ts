@@ -39,6 +39,27 @@ export function getTradingImplications(
  */
 function getBaseImplications(regime: VolatilityRegime): TradingImplication {
   const implicationsMap: Record<VolatilityRegime, TradingImplication> = {
+    "Crisis": {
+      favorable: [
+        "Cash preservation and capital protection",
+        "Deep OTM put protection (if not already hedged)",
+        "Pairs trades to isolate alpha from beta",
+        "Opportunistic buying of quality at extreme dislocations",
+      ],
+      unfavorable: [
+        "Any form of leverage",
+        "Short volatility strategies",
+        "Illiquid positions without exit plan",
+        "New directional bets without hedges",
+      ],
+      catalysts: [
+        "Central bank emergency interventions",
+        "Government policy responses",
+        "Credit market stabilization signals",
+        "VIX term structure normalization",
+      ],
+    },
+
     "Extreme High": {
       favorable: [
         "Short volatility strategies (sell straddles/strangles)",
@@ -165,7 +186,7 @@ function adjustForBeta(
   // High beta adjustments (>0.6)
   if (absBeta > 0.6) {
     // Market-driven volatility
-    if (regime === "Extreme High" || regime === "Elevated") {
+    if (regime === "Crisis" || regime === "Extreme High" || regime === "Elevated") {
       implications.favorable.push(
         "Index hedge overlay (correlated to market)"
       );
@@ -193,7 +214,7 @@ function adjustForBeta(
     }
 
     // Note: Index hedges less effective
-    if (regime === "Extreme High" || regime === "Elevated") {
+    if (regime === "Crisis" || regime === "Extreme High" || regime === "Elevated") {
       implications.unfavorable.push(
         "Using index derivatives as hedge (low correlation)"
       );
@@ -252,7 +273,11 @@ export function getPortfolioImplications(
   }
 
   // Regime-based implications
-  if (regime === "Extreme High") {
+  if (regime === "Crisis") {
+    implications.push(
+      "Position sizing: Minimum position size or fully hedged only. Prioritize portfolio survival over returns."
+    );
+  } else if (regime === "Extreme High") {
     implications.push(
       "Position sizing: Reduce position size or use wider stops due to elevated risk"
     );

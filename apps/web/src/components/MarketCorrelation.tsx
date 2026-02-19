@@ -3,7 +3,8 @@
 /**
  * MarketCorrelation Component
  *
- * Simplified correlation section with summary metrics and collapsible detailed chart
+ * Compact market sensitivity panel. Shows beta, systematic/idiosyncratic
+ * breakdown, portfolio implications. Collapsible detailed chart.
  */
 
 import { useState } from "react";
@@ -13,8 +14,8 @@ type MarketCorrelationProps = {
   beta: number | null;
   avgCorrelation: number;
   portfolioImplications: string[];
-  stockData: any[]; // API returns series with optional properties
-  marketData: any[]; // API returns series with optional properties
+  stockData: any[];
+  marketData: any[];
 };
 
 export default function MarketCorrelation({
@@ -26,17 +27,32 @@ export default function MarketCorrelation({
 }: MarketCorrelationProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const betaText = beta !== null ? beta.toFixed(3) : "N/A";
-  const correlationText = avgCorrelation.toFixed(3);
+  const absBeta = beta !== null ? Math.abs(beta) : 0;
+  const systematicPct = beta !== null ? Math.min(Math.round(beta * beta * 100), 100) : null;
+  const idiosyncraticPct = systematicPct !== null ? 100 - systematicPct : null;
+
+  const betaLabel = absBeta < 0.2
+    ? "Low → Idiosyncratic"
+    : absBeta < 0.6
+    ? "Moderate → Mixed"
+    : "High → Market-driven";
+
+  const diversificationNote = absBeta < 0.3
+    ? "Strong diversification benefit"
+    : absBeta < 0.7
+    ? "Moderate diversification"
+    : "Limited diversification (high β)";
 
   return (
-    <div style={{ marginBottom: 40 }}>
+    <div style={{ marginBottom: 32 }}>
       <h2
         style={{
-          fontSize: 20,
-          fontWeight: 600,
-          marginBottom: 16,
+          fontSize: 16,
+          fontWeight: 700,
+          marginBottom: 12,
           color: "var(--foreground)",
+          fontFamily: "monospace",
+          letterSpacing: "0.02em",
         }}
       >
         Market Sensitivity
@@ -50,133 +66,106 @@ export default function MarketCorrelation({
           border: "1px solid var(--border)",
         }}
       >
-        {/* Beta Display */}
+        {/* Compact metrics */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 24,
-            marginBottom: 20,
+            gridTemplateColumns: "auto 1fr",
+            gap: "6px 20px",
+            fontSize: 13,
+            fontFamily: "monospace",
+            marginBottom: 16,
           }}
         >
-          <div>
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-                color: "var(--muted)",
-                marginBottom: 8,
-              }}
-            >
-              Stock Beta
-            </div>
-            <div
-              style={{
-                fontSize: 48,
-                fontWeight: 700,
-                fontFamily: "monospace",
-                color: "var(--foreground)",
-              }}
-            >
-              {betaText}
-            </div>
-          </div>
-          <div>
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-                color: "var(--muted)",
-                marginBottom: 8,
-              }}
-            >
-              Index Beta (OBX)
-            </div>
-            <div
-              style={{
-                fontSize: 48,
-                fontWeight: 700,
-                fontFamily: "monospace",
-                color: "var(--foreground)",
-              }}
-            >
-              1.000
-            </div>
-          </div>
+          <span style={{ color: "var(--muted-foreground)", fontSize: 12 }}>Beta to OBX:</span>
+          <span style={{ fontWeight: 700, color: "var(--foreground)" }}>
+            {beta !== null ? beta.toFixed(3) : "N/A"}
+            <span style={{ fontWeight: 400, color: "var(--muted-foreground)", fontSize: 11, marginLeft: 8 }}>
+              {betaLabel}
+            </span>
+          </span>
+
+          {systematicPct !== null && (
+            <>
+              <span style={{ color: "var(--muted-foreground)", fontSize: 12 }}>Systematic risk:</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{
+                  flex: 1,
+                  maxWidth: 200,
+                  height: 6,
+                  background: "var(--border)",
+                  borderRadius: 3,
+                  overflow: "hidden",
+                }}>
+                  <div style={{
+                    width: `${systematicPct}%`,
+                    height: "100%",
+                    background: "#3b82f6",
+                    borderRadius: 3,
+                  }} />
+                </div>
+                <span style={{ fontSize: 12, color: "var(--foreground)" }}>
+                  {systematicPct}% systematic / {idiosyncraticPct}% idiosyncratic
+                </span>
+              </div>
+            </>
+          )}
+
+          <span style={{ color: "var(--muted-foreground)", fontSize: 12 }}>Avg Correlation:</span>
+          <span style={{ color: "var(--foreground)" }}>{avgCorrelation.toFixed(3)}</span>
+
+          <span style={{ color: "var(--muted-foreground)", fontSize: 12 }}>Diversification:</span>
+          <span style={{ color: "var(--muted-foreground)", fontSize: 12 }}>{diversificationNote}</span>
         </div>
 
-        {/* Portfolio Implications */}
-        <div style={{ marginBottom: 20 }}>
-          <h3
-            style={{
-              fontSize: 14,
-              fontWeight: 700,
-              color: "var(--foreground)",
-              marginBottom: 12,
-            }}
-          >
-            Portfolio Implications
-          </h3>
-          <ul
-            style={{
-              margin: 0,
-              padding: "0 0 0 20px",
-              listStyleType: "disc",
-            }}
-          >
-            {portfolioImplications.map((implication, index) => (
-              <li
-                key={index}
-                style={{
-                  fontSize: 13,
-                  lineHeight: 1.6,
-                  color: "var(--foreground)",
-                  marginBottom: 6,
-                }}
-              >
-                {implication}
-              </li>
-            ))}
-          </ul>
+        {/* Portfolio implications as compact list */}
+        <div style={{ marginBottom: 16 }}>
+          {portfolioImplications.map((imp, i) => (
+            <div
+              key={i}
+              style={{
+                fontSize: 12,
+                lineHeight: 1.5,
+                color: "var(--muted-foreground)",
+                paddingLeft: 12,
+                borderLeft: "2px solid var(--border)",
+                marginBottom: 4,
+              }}
+            >
+              {imp}
+            </div>
+          ))}
         </div>
 
-        {/* Toggle for Detailed Chart */}
+        {/* Toggle for detailed chart */}
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           style={{
             width: "100%",
-            padding: "12px 16px",
+            padding: "10px 14px",
             borderRadius: 4,
             border: "1px solid var(--border)",
             background: "var(--background)",
             color: "var(--foreground)",
-            fontSize: 13,
+            fontSize: 12,
             fontWeight: 600,
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             gap: 8,
+            fontFamily: "monospace",
             transition: "all 0.15s",
           }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.background = "var(--hover-bg)";
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.background = "var(--background)";
-          }}
+          onMouseOver={(e) => { e.currentTarget.style.background = "var(--hover-bg)"; }}
+          onMouseOut={(e) => { e.currentTarget.style.background = "var(--background)"; }}
         >
-          {isExpanded ? "Hide" : "Show"} Detailed Correlation Chart
-          <span style={{ fontSize: 16 }}>{isExpanded ? "▲" : "▼"}</span>
+          {isExpanded ? "Hide" : "Show"} Rolling Correlation Chart
+          <span style={{ fontSize: 14 }}>{isExpanded ? "▲" : "▼"}</span>
         </button>
 
-        {/* Collapsible Detailed Chart */}
         {isExpanded && (
-          <div style={{ marginTop: 20 }}>
+          <div style={{ marginTop: 16 }}>
             <VolatilityCorrelationChart
               stockData={stockData}
               marketData={marketData}

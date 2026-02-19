@@ -22,7 +22,7 @@ import os
 import json
 from datetime import datetime
 
-app = FastAPI(title="Oslo Børs ML Prediction Service", version="1.0.0")
+app = FastAPI(title="Oslo Børs ML Prediction Service", version="1.1.0")
 
 # Enable CORS for Next.js frontend
 app.add_middleware(
@@ -32,6 +32,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Volatility models router (GARCH, MSGARCH, VaR, Jump Detection)
+from .volatility_router import router as volatility_router
+app.include_router(volatility_router)
 
 # Feature columns (19 predictive factors)
 FEATURE_COLUMNS = [

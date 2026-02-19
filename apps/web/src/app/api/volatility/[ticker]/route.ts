@@ -144,6 +144,52 @@ async function fetchAlignedBarsForBeta(
   return { stockPrices, marketPrices };
 }
 
+// --- Volatility cone: percentile bands at multiple lookback windows ---
+function computeVolCone(bars: PriceBar[]) {
+  const closes = bars.map((b) => b.close);
+  const returns = computeReturns(closes);
+  if (returns.length < 252) return null;
+
+  const windows = [5, 10, 20, 60, 120, 252];
+  const cone: Array<{
+    window: number;
+    p5: number;
+    p25: number;
+    p50: number;
+    p75: number;
+    p95: number;
+    current: number;
+  }> = [];
+
+  for (const w of windows) {
+    if (returns.length < w + 20) continue;
+    const vols: number[] = [];
+    for (let i = w - 1; i < returns.length; i++) {
+      const windowReturns = returns.slice(i - w + 1, i + 1);
+      const mean = windowReturns.reduce((a, b) => a + b, 0) / windowReturns.length;
+      const variance =
+        windowReturns.reduce((s, r) => s + (r - mean) ** 2, 0) / (windowReturns.length - 1);
+      vols.push(Math.sqrt(variance * 252));
+    }
+    if (vols.length < 10) continue;
+
+    const sorted = [...vols].sort((a, b) => a - b);
+    const pctile = (p: number) => sorted[Math.floor(sorted.length * p)] ?? 0;
+
+    cone.push({
+      window: w,
+      p5: pctile(0.05),
+      p25: pctile(0.25),
+      p50: pctile(0.5),
+      p75: pctile(0.75),
+      p95: pctile(0.95),
+      current: vols[vols.length - 1] ?? 0,
+    });
+  }
+
+  return cone.length > 0 ? cone : null;
+}
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ ticker: string }> }
@@ -182,6 +228,7 @@ export async function GET(
 
     // Calculate Beta (vs OBX) with properly aligned data
     let beta = 0;
+    let marketReturnsForDecomp: number | null = null; // market annualized vol for decomposition
     try {
       const { stockPrices, marketPrices } = await fetchAlignedBarsForBeta(
         ticker,
@@ -192,6 +239,13 @@ export async function GET(
         const stockReturns = computeReturns(stockPrices);
         const marketReturns = computeReturns(marketPrices);
         beta = computeBeta(stockReturns, marketReturns);
+        // Compute market vol for decomposition (annualized std of last 60 market returns)
+        const recentMarket = marketReturns.slice(-60);
+        if (recentMarket.length >= 20) {
+          const mean = recentMarket.reduce((a, b) => a + b, 0) / recentMarket.length;
+          const variance = recentMarket.reduce((s, r) => s + (r - mean) ** 2, 0) / (recentMarket.length - 1);
+          marketReturnsForDecomp = Math.sqrt(variance * 252);
+        }
       }
     } catch (e) {
       console.warn('[Volatility API] Beta calculation failed:', e);
@@ -225,7 +279,10 @@ export async function GET(
 
     // Determine trend by comparing short-term vs medium-term
     const trend = determineVolatilityTrend(current.rolling20, current.rolling60);
-    const regime = classifyRegime(primaryPercentile, trend);
+    const volRatio = (current.rolling20 && current.rolling60 && current.rolling60 > 0)
+      ? current.rolling20 / current.rolling60
+      : undefined;
+    const regime = classifyRegime(primaryPercentile, trend, volRatio);
 
     // Build regime history
     const regimeHistory: RegimePoint[] = [];
@@ -236,7 +293,10 @@ export async function GET(
         ? currentVolatilityPercentile(point.yangZhang ?? null, volSeries.map(v => v.yangZhang ?? null))
         : currentVolatilityPercentile(point.rolling20, volSeries.map(v => v.rolling20));
       const pointTrend = determineVolatilityTrend(point.rolling20, point.rolling60);
-      const pointRegime = classifyRegime(pointPercentile, pointTrend);
+      const pointVolRatio = (point.rolling20 && point.rolling60 && point.rolling60 > 0)
+        ? point.rolling20 / point.rolling60
+        : undefined;
+      const pointRegime = classifyRegime(pointPercentile, pointTrend, pointVolRatio);
 
       regimeHistory.push({
         date: point.date,
@@ -277,6 +337,16 @@ export async function GET(
     const eventAnalysis = largeMoves.map(event => {
       return compareVolatilityAroundEvent(volSeries, event.date, 10);
     }).filter(e => e !== null);
+
+    // Volatility cone
+    const volCone = computeVolCone(bars);
+
+    // Vol decomposition: systematic vs idiosyncratic
+    const totalVol = primaryVol;
+    const systematicVol = Math.abs(beta) * (marketReturnsForDecomp ?? 0);
+    const idiosyncraticVol = totalVol > 0 && systematicVol < totalVol
+      ? Math.sqrt(Math.max(0, totalVol ** 2 - systematicVol ** 2))
+      : totalVol;
 
     const responseData = {
       ticker: ticker.toUpperCase(),
@@ -333,6 +403,18 @@ export async function GET(
 
       series: sanitizeData(volSeries),
       eventAnalysis: eventAnalysis.length > 0 ? sanitizeData(eventAnalysis) : undefined,
+
+      volCone,
+
+      volDecomposition: totalVol > 0 ? {
+        totalVol: sanitizeNumber(totalVol),
+        systematicVol: sanitizeNumber(systematicVol),
+        idiosyncraticVol: sanitizeNumber(idiosyncraticVol),
+        systematicPct: sanitizeNumber(systematicVol > 0 ? (systematicVol / totalVol) * 100 : 0),
+        idiosyncraticPct: sanitizeNumber(idiosyncraticVol > 0 ? (idiosyncraticVol / totalVol) * 100 : 0),
+        marketVol: sanitizeNumber(marketReturnsForDecomp ?? undefined),
+        beta: sanitizeNumber(beta),
+      } : null,
 
       dateRange: {
         start: volSeries[0].date,

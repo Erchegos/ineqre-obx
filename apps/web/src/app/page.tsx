@@ -249,6 +249,18 @@ export default function HomePage() {
                 delay={2}
               />
               <FeatureCard
+                href="/volatility/obx"
+                title="OBX Volatility Dashboard"
+                description="Index-level volatility intelligence. Constituent heatmap with regime classification, vol cone, systemic risk via rolling pairwise correlation, GARCH/MSGARCH models."
+                tags={[
+                  { label: "Regime", color: "var(--warning)" },
+                  { label: "GARCH", color: "var(--accent)" },
+                  { label: "Systemic", color: "var(--info)" },
+                ]}
+                visible={modulesReveal.visible}
+                delay={3}
+              />
+              <FeatureCard
                 href="/options"
                 title="Options Analytics"
                 description="Black-Scholes pricing with full Greeks chain. IV skew visualization, open interest distribution, and a multi-leg P&L strategy builder with time-decay payoff diagrams."
@@ -258,7 +270,7 @@ export default function HomePage() {
                   { label: "IV Skew", color: "var(--warning)" },
                 ]}
                 visible={modulesReveal.visible}
-                delay={3}
+                delay={4}
               />
             </div>
           </section>

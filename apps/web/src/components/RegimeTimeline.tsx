@@ -3,7 +3,8 @@
 /**
  * RegimeTimeline Component
  *
- * Shows price history with volatility regime background shading
+ * Shows price history with volatility regime background shading.
+ * Legend above chart, "NOW" marker at latest date.
  */
 
 import { useMemo } from "react";
@@ -16,9 +17,10 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceArea,
+  ReferenceLine,
 } from "recharts";
-import { groupRegimePeriods, type RegimePoint } from "@/lib/volatility";
-import { getRegimeColor, type VolatilityRegime } from "@/lib/regimeClassification";
+import { groupRegimePeriods } from "@/lib/volatility";
+import { getRegimeColor, ALL_REGIMES, type VolatilityRegime } from "@/lib/regimeClassification";
 
 type RegimeTimelineProps = {
   data: Array<{
@@ -38,9 +40,8 @@ type RegimeTimelineProps = {
 export default function RegimeTimeline({
   data,
   regimeStats,
-  height = 400,
+  height = 360,
 }: RegimeTimelineProps) {
-  // Group consecutive regime periods for background shading
   const regimePeriods = useMemo(() => {
     return groupRegimePeriods(
       data.map((d) => ({
@@ -51,25 +52,26 @@ export default function RegimeTimeline({
     );
   }, [data]);
 
-  // Format date for display
+  const lastDate = data.length > 0 ? data[data.length - 1].date : null;
+  const lastPrice = data.length > 0 ? data[data.length - 1].close : null;
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
   };
 
-  // Format price with 2 decimals
-  const formatPrice = (value: number) => {
-    return value.toFixed(2);
-  };
+  const formatPrice = (value: number) => value.toFixed(2);
 
   return (
-    <div style={{ marginBottom: 40 }}>
+    <div style={{ marginBottom: 32 }}>
       <h2
         style={{
-          fontSize: 20,
-          fontWeight: 600,
-          marginBottom: 16,
+          fontSize: 16,
+          fontWeight: 700,
+          marginBottom: 12,
           color: "var(--foreground)",
+          fontFamily: "monospace",
+          letterSpacing: "0.02em",
         }}
       >
         Price History with Volatility Regimes
@@ -79,29 +81,20 @@ export default function RegimeTimeline({
       <div
         style={{
           display: "flex",
-          gap: 24,
-          marginBottom: 16,
-          fontSize: 13,
+          gap: 20,
+          marginBottom: 12,
+          fontSize: 12,
           color: "var(--muted-foreground)",
+          fontFamily: "monospace",
         }}
       >
-        <div>
-          <span style={{ fontWeight: 600 }}>Current regime duration:</span>{" "}
-          {regimeStats.currentDuration} days
-        </div>
-        <div>
-          <span style={{ fontWeight: 600 }}>Average regime duration:</span>{" "}
-          {regimeStats.averageDuration} days
-        </div>
+        <span><strong>In regime:</strong> {regimeStats.currentDuration}d</span>
+        <span><strong>Avg duration:</strong> {regimeStats.averageDuration}d</span>
         {regimeStats.lastShift && (
-          <div>
-            <span style={{ fontWeight: 600 }}>Last regime shift:</span>{" "}
-            {formatDate(regimeStats.lastShift)}
-          </div>
+          <span><strong>Last shift:</strong> {formatDate(regimeStats.lastShift)}</span>
         )}
       </div>
 
-      {/* Chart */}
       <div
         style={{
           background: "var(--card-bg)",
@@ -110,6 +103,45 @@ export default function RegimeTimeline({
           padding: 16,
         }}
       >
+        {/* Legend ABOVE chart */}
+        <div
+          style={{
+            display: "flex",
+            gap: 14,
+            marginBottom: 12,
+            flexWrap: "wrap",
+            justifyContent: "center",
+          }}
+        >
+          {ALL_REGIMES.map((regimeName) => {
+            const color = getRegimeColor(regimeName);
+            return (
+              <div
+                key={regimeName}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  fontSize: 11,
+                }}
+              >
+                <div
+                  style={{
+                    width: 14,
+                    height: 14,
+                    background: color,
+                    opacity: 0.6,
+                    borderRadius: 2,
+                  }}
+                />
+                <span style={{ color: "var(--muted-foreground)", fontFamily: "monospace" }}>
+                  {regimeName}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
         <ResponsiveContainer width="100%" height={height}>
           <ComposedChart
             data={data}
@@ -130,17 +162,34 @@ export default function RegimeTimeline({
                   x1={period.start}
                   x2={period.end}
                   fill={color}
-                  fillOpacity={0.15}
+                  fillOpacity={0.18}
                   strokeOpacity={0}
                 />
               );
             })}
 
+            {/* NOW marker */}
+            {lastDate && (
+              <ReferenceLine
+                x={lastDate}
+                stroke="var(--foreground)"
+                strokeDasharray="4 4"
+                strokeWidth={1}
+                label={{
+                  value: lastPrice ? `NOW ${formatPrice(lastPrice)}` : "NOW",
+                  position: "top",
+                  fill: "var(--foreground)",
+                  fontSize: 10,
+                  fontFamily: "monospace",
+                }}
+              />
+            )}
+
             <XAxis
               dataKey="date"
               tickFormatter={formatDate}
               stroke="var(--muted)"
-              fontSize={12}
+              fontSize={11}
               tickLine={false}
             />
 
@@ -148,13 +197,13 @@ export default function RegimeTimeline({
               domain={["auto", "auto"]}
               tickFormatter={formatPrice}
               stroke="var(--muted)"
-              fontSize={12}
+              fontSize={11}
               tickLine={false}
               label={{
                 value: "Price (NOK)",
                 angle: -90,
                 position: "insideLeft",
-                style: { fill: "var(--muted)", fontSize: 12 },
+                style: { fill: "var(--muted)", fontSize: 11 },
               }}
             />
 
@@ -167,9 +216,7 @@ export default function RegimeTimeline({
                 fontSize: "12px",
               }}
               formatter={(value: any, name?: string) => {
-                if (name === "close") {
-                  return [`${formatPrice(value)} NOK`, "Price"];
-                }
+                if (name === "close") return [`${formatPrice(value)} NOK`, "Price"];
                 return [value, name];
               }}
               labelFormatter={(label) => `Date: ${formatDate(label)}`}
@@ -185,51 +232,6 @@ export default function RegimeTimeline({
             />
           </ComposedChart>
         </ResponsiveContainer>
-
-        {/* Regime Legend */}
-        <div
-          style={{
-            display: "flex",
-            gap: 16,
-            marginTop: 16,
-            flexWrap: "wrap",
-            justifyContent: "center",
-          }}
-        >
-          {[
-            "Extreme High",
-            "Elevated",
-            "Normal",
-            "Low & Contracting",
-            "Low & Stable",
-          ].map((regimeName) => {
-            const color = getRegimeColor(regimeName as VolatilityRegime);
-            return (
-              <div
-                key={regimeName}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  fontSize: 12,
-                }}
-              >
-                <div
-                  style={{
-                    width: 16,
-                    height: 16,
-                    background: color,
-                    opacity: 0.6,
-                    borderRadius: 2,
-                  }}
-                />
-                <span style={{ color: "var(--muted-foreground)" }}>
-                  {regimeName}
-                </span>
-              </div>
-            );
-          })}
-        </div>
       </div>
     </div>
   );
