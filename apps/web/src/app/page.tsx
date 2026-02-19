@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 
 type SystemStats = {
   securities: number;
@@ -9,233 +9,378 @@ type SystemStats = {
   data_points: number;
 };
 
+// Animated counter hook
+function useCountUp(target: number, duration = 1500, enabled = false) {
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    if (!enabled || target === 0) return;
+    let start: number | null = null;
+    const step = (ts: number) => {
+      if (!start) start = ts;
+      const progress = Math.min((ts - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+      setValue(Math.round(eased * target));
+      if (progress < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }, [target, duration, enabled]);
+  return value;
+}
+
+// IntersectionObserver hook for scroll animations
+function useScrollReveal() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect(); } },
+      { threshold: 0.1, rootMargin: "0px 0px -40px 0px" }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return { ref, visible };
+}
+
 export default function HomePage() {
   const [stats, setStats] = useState<SystemStats | null>(null);
+  const [heroVisible, setHeroVisible] = useState(false);
 
   useEffect(() => {
+    // Trigger hero animation on mount
+    requestAnimationFrame(() => setHeroVisible(true));
+
     async function fetchStats() {
       try {
-        const res = await fetch("/api/stats", {
-          method: "GET",
-          cache: "no-store",
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          setStats(data);
-        }
+        const res = await fetch("/api/stats", { method: "GET", cache: "no-store" });
+        if (res.ok) setStats(await res.json());
       } catch (e) {
         console.error("Failed to fetch stats:", e);
       }
     }
-
     fetchStats();
   }, []);
 
+  const securities = useCountUp(stats?.securities || 0, 1500, !!stats);
+  const dataPoints = useCountUp(Number(stats?.data_points) || 0, 2000, !!stats);
+
   const lastUpdate = stats?.last_updated
     ? new Date(stats.last_updated).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
+        year: 'numeric', month: 'long', day: 'numeric'
       })
     : '...';
 
+  const modulesReveal = useScrollReveal();
+  const capabilitiesReveal = useScrollReveal();
+  const upcomingReveal = useScrollReveal();
+
   return (
-    <main style={{
-      minHeight: "100vh",
-      background: "var(--background)",
-      color: "var(--foreground)",
-      padding: "48px 32px"
-    }}>
-      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-        
-        {/* Header */}
-        <header style={{ marginBottom: 48, borderBottom: "1px solid var(--border)", paddingBottom: 32 }}>
+    <>
+      <style>{`
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(24px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.6; transform: scale(1.3); }
+        }
+        @keyframes shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        .feature-card {
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          cursor: pointer;
+        }
+        .feature-card:hover {
+          transform: translateY(-3px);
+          border-color: var(--accent) !important;
+          box-shadow: 0 8px 24px rgba(59, 130, 246, 0.12);
+        }
+        .cap-card {
+          transition: all 0.2s ease;
+        }
+        .cap-card:hover {
+          transform: translateY(-2px);
+          border-color: var(--accent) !important;
+          box-shadow: 0 4px 16px rgba(59, 130, 246, 0.08);
+        }
+        .tag-pill {
+          display: inline-block;
+          padding: 2px 8px;
+          border-radius: 3px;
+          font-size: 10px;
+          font-family: monospace;
+          font-weight: 600;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+        }
+      `}</style>
+
+      <main style={{
+        minHeight: "100vh",
+        background: "var(--background)",
+        color: "var(--foreground)",
+        padding: "48px 32px"
+      }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+
+          {/* Hero */}
+          <header style={{
+            marginBottom: 48,
+            borderBottom: "1px solid var(--border)",
+            paddingBottom: 32,
+          }}>
+            <div style={{
+              fontSize: 11,
+              fontFamily: "monospace",
+              color: "var(--muted-foreground)",
+              marginBottom: 16,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              opacity: heroVisible ? 1 : 0,
+              transform: heroVisible ? "translateY(0)" : "translateY(12px)",
+              transition: "all 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
+            }}>
+              Ola Slettebak / InEqRe v2.3 / Oslo Børs
+            </div>
+            <h1 style={{
+              fontSize: 42,
+              fontWeight: 700,
+              marginBottom: 16,
+              color: "var(--foreground)",
+              letterSpacing: "-0.03em",
+              fontFamily: "system-ui, -apple-system, sans-serif",
+              opacity: heroVisible ? 1 : 0,
+              transform: heroVisible ? "translateY(0)" : "translateY(20px)",
+              transition: "all 0.7s cubic-bezier(0.4, 0, 0.2, 1) 0.1s",
+            }}>
+              Intelligence Equity Research
+            </h1>
+            <p style={{
+              fontSize: 15,
+              color: "var(--muted-foreground)",
+              lineHeight: 1.7,
+              maxWidth: 720,
+              opacity: heroVisible ? 1 : 0,
+              transform: heroVisible ? "translateY(0)" : "translateY(16px)",
+              transition: "all 0.7s cubic-bezier(0.4, 0, 0.2, 1) 0.25s",
+            }}>
+              A quantitative equity research platform for Oslo Børs.
+              Automated research aggregation with AI summarization, machine learning price predictions, factor-based backtesting, volatility modeling, and correlation analysis.
+            </p>
+          </header>
+
+          {/* Animated Stats */}
           <div style={{
-            fontSize: 11,
-            fontFamily: "monospace",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+            gap: 16,
+            marginBottom: 56,
+            opacity: heroVisible ? 1 : 0,
+            transform: heroVisible ? "translateY(0)" : "translateY(16px)",
+            transition: "all 0.7s cubic-bezier(0.4, 0, 0.2, 1) 0.4s",
+          }}>
+            <StatBox label="Securities Covered" value={stats ? securities : '...'} suffix="" />
+            <StatBox label="OHLCV Data Points" value={stats ? dataPoints.toLocaleString() : '...'} suffix={stats ? "pts" : ""} />
+            <StatBox label="Last Updated" value={lastUpdate} suffix="" live />
+          </div>
+
+          {/* Core Modules */}
+          <section ref={modulesReveal.ref} style={{ marginBottom: 56 }}>
+            <h2 style={{
+              fontWeight: 700,
+              marginBottom: 24,
+              color: "var(--foreground)",
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              fontSize: 12,
+              fontFamily: "monospace",
+              opacity: modulesReveal.visible ? 1 : 0,
+              transition: "opacity 0.5s ease",
+            }}>
+              // Explore
+            </h2>
+
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+              gap: 16
+            }}>
+              <FeatureCard
+                href="/stocks"
+                title="Stock Screener & Analytics"
+                description="Browse 131 OSE securities with interactive price charts, candlestick patterns, and deep per-stock analytics including volatility models, Monte Carlo simulations, ML predictions, and mean-reversion channels."
+                tags={[
+                  { label: "Charts", color: "var(--accent)" },
+                  { label: "ML", color: "var(--success)" },
+                  { label: "Monte Carlo", color: "var(--info)" },
+                ]}
+                visible={modulesReveal.visible}
+                delay={0}
+              />
+              <FeatureCard
+                href="/research"
+                title="Research Portal"
+                description="AI-summarized broker research from Pareto Securities & DNB Markets. Full-text search across reports with PDF viewer. Automated email ingestion and Claude-powered summaries."
+                tags={[
+                  { label: "AI Summaries", color: "var(--success)" },
+                  { label: "PDF", color: "var(--warning)" },
+                ]}
+                visible={modulesReveal.visible}
+                delay={1}
+              />
+              <FeatureCard
+                href="/correlation"
+                title="Correlation Matrix"
+                description="Interactive cross-sectional heatmap with configurable lookback windows (30d–2y). Rolling correlation time series and sector-level co-movement analysis."
+                tags={[
+                  { label: "Heatmap", color: "var(--info)" },
+                  { label: "Rolling", color: "var(--accent)" },
+                ]}
+                visible={modulesReveal.visible}
+                delay={2}
+              />
+              <FeatureCard
+                href="/options"
+                title="Options Analytics"
+                description="Black-Scholes pricing with full Greeks chain. IV skew visualization, open interest distribution, and a multi-leg P&L strategy builder with time-decay payoff diagrams."
+                tags={[
+                  { label: "Greeks", color: "var(--success)" },
+                  { label: "P&L Builder", color: "var(--accent)" },
+                  { label: "IV Skew", color: "var(--warning)" },
+                ]}
+                visible={modulesReveal.visible}
+                delay={3}
+              />
+            </div>
+          </section>
+
+          {/* Analytics Capabilities */}
+          <section ref={capabilitiesReveal.ref} style={{ marginBottom: 56 }}>
+            <h2 style={{
+              fontWeight: 700,
+              marginBottom: 24,
+              color: "var(--foreground)",
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              fontSize: 12,
+              fontFamily: "monospace",
+              opacity: capabilitiesReveal.visible ? 1 : 0,
+              transition: "opacity 0.5s ease",
+            }}>
+              // Analytics Engine
+            </h2>
+
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+              gap: 16
+            }}>
+              {[
+                { title: "Volatility Estimation", accent: "var(--accent)", text: "Yang-Zhang, Rogers-Satchell, Parkinson & Garman-Klass estimators. Rolling windows (20/60/120-day), EWMA smoothing, historical percentile ranking, and regime detection." },
+                { title: "Monte Carlo Simulation", accent: "var(--info)", text: "10,000-path GBM with configurable drift and volatility. Percentile bands (5th–95th), probability cones, and statistical scenario testing." },
+                { title: "Risk Metrics", accent: "var(--danger)", text: "Max drawdown with recovery tracking, Sharpe ratio, market beta vs OBX, expected daily/weekly moves (1σ), and rolling benchmark correlation." },
+                { title: "Std Deviation Channels", accent: "var(--success)", text: "Linear regression channels with ±1σ/±2σ bands. Auto-optimized windows (255–1530 bars) by R². Position classification and mean-reversion signals." },
+                { title: "ML Price Predictions", accent: "var(--warning)", text: "Ridge regression on 17 factors (momentum, volatility, fundamentals). Walk-forward validation, daily signals (-1 to +1), probability-weighted forecasts." },
+                { title: "Factor Backtesting", accent: "var(--accent)", text: "Strategy backtesting with signal thresholds and holding periods. Factor attribution, cumulative returns, hit rates, and per-ticker trade detail." },
+                { title: "Time Series Analysis", accent: "var(--info)", text: "Log-return decomposition, ACF diagnostics, monthly seasonality patterns, and 30-day rolling volatility correlation with OBX index." },
+                { title: "Research Aggregation", accent: "var(--success)", text: "Claude AI summarization via Anthropic API. IMAP ingestion from Pareto & DNB. PDF text extraction, document deduplication, and full-text search." },
+                { title: "Options Analytics", accent: "var(--warning)", text: "Black-Scholes pricing, IV solver, multi-leg P&L with time decay. Max pain, put/call ratios, IV term structure. Editable positions with strike stepping." },
+              ].map((cap, i) => (
+                <CapabilityCard
+                  key={cap.title}
+                  title={cap.title}
+                  accent={cap.accent}
+                  visible={capabilitiesReveal.visible}
+                  delay={i}
+                >
+                  {cap.text}
+                </CapabilityCard>
+              ))}
+            </div>
+          </section>
+
+          {/* Upcoming Projects */}
+          <section ref={upcomingReveal.ref} style={{ marginBottom: 56 }}>
+            <h2 style={{
+              fontWeight: 700,
+              marginBottom: 24,
+              color: "var(--foreground)",
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              fontSize: 12,
+              fontFamily: "monospace",
+              opacity: upcomingReveal.visible ? 1 : 0,
+              transition: "opacity 0.5s ease",
+            }}>
+              // Upcoming
+            </h2>
+
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+              gap: 16
+            }}>
+              {[
+                { title: "Commodities Integration", accent: "var(--warning)", text: "Brent crude, TTF/NBP gas, Nord Pool power, base metals. Cross-asset correlation with energy-exposed OSE equities. Sector beta decomposition and hedging ratios." },
+                { title: "FX Hedging Analytics", accent: "var(--info)", text: "Multi-currency exposure for NOK portfolios. Forward rate pricing via IRP, carry trade P&L, optimal hedge ratios. Currency beta for export-heavy equities." },
+                { title: "DCC-GARCH Correlation", accent: "var(--accent)", text: "Dynamic conditional correlation for time-varying co-movement. Copula models (Gaussian, Student-t) for tail dependence. VaR/CVaR and systemic risk indicators." },
+                { title: "Portfolio Optimizer", accent: "var(--success)", text: "Mean-variance optimization, efficient frontier, risk parity. Sector constraints, position sizing, turnover limits. Backtesting with transaction costs." },
+              ].map((cap, i) => (
+                <CapabilityCard
+                  key={cap.title}
+                  title={cap.title}
+                  accent={cap.accent}
+                  visible={upcomingReveal.visible}
+                  delay={i}
+                >
+                  {cap.text}
+                </CapabilityCard>
+              ))}
+            </div>
+          </section>
+
+          {/* Tech Stack Footer */}
+          <footer style={{
+            paddingTop: 28,
+            borderTop: "1px solid var(--border)",
+            fontSize: 11.5,
             color: "var(--muted-foreground)",
-            marginBottom: 16,
-            letterSpacing: "0.1em",
-            textTransform: "uppercase"
+            fontFamily: "monospace"
           }}>
-            Ola Slettebak / InEqRe v2.3 / Oslo Børs
-          </div>
-          <h1 style={{
-            fontSize: 42,
-            fontWeight: 700,
-            marginBottom: 16,
-            color: "var(--foreground)",
-            letterSpacing: "-0.03em",
-            fontFamily: "system-ui, -apple-system, sans-serif"
-          }}>
-            Intelligence Equity Research
-          </h1>
-          <p style={{ fontSize: 15, color: "var(--muted-foreground)", lineHeight: 1.7, maxWidth: 720 }}>
-            A quantitative equity research platform for Oslo Børs.
-            Automated research aggregation with AI summarization, machine learning price predictions, factor-based backtesting, volatility modeling, and correlation analysis.
-          </p>
-        </header>
+            <p style={{ marginBottom: 8, lineHeight: 1.6 }}>
+              <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Tech Stack:</strong> Next.js 16 · TypeScript · PostgreSQL 17 · Drizzle ORM · Python · scikit-learn · Interactive Brokers TWS API · Anthropic Claude API
+            </p>
+            <p style={{ marginBottom: 8, lineHeight: 1.6 }}>
+              <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Architecture:</strong> Server-side compute · Connection pooling · Transaction pooler (Supabase) · JWT authentication · Vercel edge deployment
+            </p>
+            <p style={{ lineHeight: 1.6 }}>
+              <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Data:</strong> Real-time OHLCV ingestion via IBKR · 160K+ daily data points · Supabase storage for PDF attachments
+            </p>
+          </footer>
 
-        {/* System Stats */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-          gap: 16,
-          marginBottom: 56
-        }}>
-          <StatBox label="Securities Covered" value={stats?.securities || '...'} suffix="" />
-          <StatBox label="OHLCV Data Points" value={stats ? Number(stats.data_points).toLocaleString() : '...'} suffix={stats ? "pts" : ""} />
-          <StatBox label="Last Updated" value={lastUpdate} suffix="" />
         </div>
-
-        {/* Navigation */}
-        <section style={{ marginBottom: 56 }}>
-          <h2 style={{
-            fontWeight: 700,
-            marginBottom: 20,
-            color: "var(--foreground)",
-            textTransform: "uppercase",
-            letterSpacing: "0.08em",
-            fontSize: 12,
-            fontFamily: "monospace"
-          }}>
-            // Core Modules
-          </h2>
-          
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <NavCard
-              href="/stocks"
-              title="Universe Explorer"
-              description="Browse covered securities with price history and fundamental filters"
-            />
-            <NavCard
-              href="/research"
-              title="Research Portal"
-              description="Password-protected analyst research repository with Claude AI summaries. Automated email ingestion from Pareto Securities, DNB Markets, and manual PDF uploads"
-            />
-            <NavCard
-              href="/correlation"
-              title="Correlation Analysis"
-              description="Cross-sectional correlation matrices with configurable lookback periods and rolling window analysis"
-            />
-          </div>
-        </section>
-
-        {/* Capabilities */}
-        <section style={{ marginBottom: 56 }}>
-          <h2 style={{
-            fontWeight: 700,
-            marginBottom: 20,
-            color: "var(--foreground)",
-            textTransform: "uppercase",
-            letterSpacing: "0.08em",
-            fontSize: 12,
-            fontFamily: "monospace"
-          }}>
-            // Analytics Capabilities
-          </h2>
-          
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-            gap: 16
-          }}>
-            <Capability title="Research Aggregation">
-              Automated email processing with Claude AI summarization (Anthropic API). IMAP-based ingestion from Pareto Securities, DNB Markets with full-text search. Manual PDF analysis using pdf-parse for text extraction and AI-generated summaries. Document deduplication and merge logic.
-            </Capability>
-            <Capability title="Volatility Estimation">
-              Yang-Zhang (gap-adjusted), Rogers-Satchell (drift-independent), Parkinson (high-low range), Garman-Klass (OHLC) estimators. Rolling windows (20/60/120-day), EWMA smoothing (λ=0.94/0.97), historical percentile ranking, and volatility regime detection.
-            </Capability>
-            <Capability title="Monte Carlo Simulation">
-              10,000-path Geometric Brownian Motion (GBM) with configurable drift (μ), volatility (σ), and time horizons. Price distribution analysis with percentile bands (5th/25th/50th/75th/95th). Probability cone visualization and statistical scenario testing.
-            </Capability>
-            <Capability title="Risk Metrics">
-              Maximum drawdown with recovery period tracking, annualized Sharpe ratio, market beta vs OBX index, and historical stress testing. Expected daily/weekly moves using 1σ normal distribution assumptions. Rolling correlation with benchmark indices.
-            </Capability>
-            <Capability title="Standard Deviation Channels">
-              Linear regression channels with configurable ±1σ and ±2σ bands. Automatic window optimization (255-1530 bars) by maximizing R². Fixed window analysis with preset time ranges. Position classification system (extreme high/low, elevated/depressed, within range). Mean reversion opportunity identification with distance-to-band analytics.
-            </Capability>
-            <Capability title="Time Series Analysis">
-              Log-return decomposition, autocorrelation function (ACF) diagnostics, monthly seasonality patterns with bar chart visualization. Rolling 30-day volatility correlation with OBX market index for co-movement analysis.
-            </Capability>
-            <Capability title="ML Price Predictions">
-              Ridge regression models trained on 17 predictive factors across momentum, mean reversion, volatility, and market regime categories. Walk-forward validation with expanding training windows. Daily signal generation (-1 to +1) with probability-weighted directional forecasts. Python ML service with scikit-learn integration.
-            </Capability>
-            <Capability title="Factor Backtesting">
-              Historical strategy backtesting with configurable signal thresholds and holding periods. Performance attribution by factor category (momentum, mean reversion, volatility). Cumulative return charts, hit rate analysis, and Sharpe ratio calculation. Per-ticker drill-down with trade-level detail.
-            </Capability>
-            <Capability title="Options Analytics">
-              Black-Scholes pricing with Greeks (Delta, Gamma, Theta, Vega). Options chain visualization with bid/ask, IV skew, and open interest distribution. P&L calculator with multi-leg strategy builder (spreads, straddles, condors, butterflies). Multi-time payoff diagrams showing time decay. Max pain calculation, put/call ratios, and IV term structure. Editable positions with valid strike stepping.
-            </Capability>
-          </div>
-        </section>
-
-        {/* Upcoming Projects */}
-        <section style={{ marginBottom: 56 }}>
-          <h2 style={{
-            fontWeight: 700,
-            marginBottom: 20,
-            color: "var(--foreground)",
-            textTransform: "uppercase",
-            letterSpacing: "0.08em",
-            fontSize: 12,
-            fontFamily: "monospace"
-          }}>
-            // Upcoming Projects
-          </h2>
-
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-            gap: 16
-          }}>
-            <Capability title="Commodities Integration">
-              Brent crude oil, natural gas (TTF/NBP), Nord Pool power prices, and base metals (copper, aluminum, zinc). Cross-asset correlation matrices with energy-exposed Oslo Børs equities (Equinor, Aker BP, subsea contractors). Sector-specific beta decomposition and hedging ratio calculations.
-            </Capability>
-            <Capability title="FX Hedging Analytics">
-              Multi-currency exposure analysis for NOK-denominated portfolios with USD, EUR, GBP revenue streams. Forward rate pricing using interest rate parity, carry trade P&L attribution, and optimal hedge ratio determination. Currency beta estimation for export-heavy Norwegian equities.
-            </Capability>
-            <Capability title="Advanced Correlation Models">
-              Dynamic Conditional Correlation (DCC-GARCH) for time-varying co-movement. Gaussian and Student-t copula models for tail dependence structure. VaR/CVaR calculation with historical simulation and parametric methods. Crisis period co-movement analysis and systemic risk indicators.
-            </Capability>
-            <Capability title="Portfolio Risk Optimizer">
-              Mean-variance optimization with efficient frontier calculation. Multi-asset portfolio construction with constraints (sector limits, position sizing, turnover). Risk parity and minimum variance allocation strategies. Backtesting framework with transaction costs and rebalancing logic.
-            </Capability>
-          </div>
-        </section>
-
-        {/* Tech Stack */}
-        <footer style={{
-          paddingTop: 28,
-          borderTop: "1px solid var(--border)",
-          fontSize: 11.5,
-          color: "var(--muted-foreground)",
-          fontFamily: "monospace"
-        }}>
-          <p style={{ marginBottom: 8, lineHeight: 1.6 }}>
-            <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Tech Stack:</strong> Next.js 16 · TypeScript · PostgreSQL 17 · Drizzle ORM · Python · scikit-learn · Interactive Brokers TWS API · Anthropic Claude API
-          </p>
-          <p style={{ marginBottom: 8, lineHeight: 1.6 }}>
-            <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Architecture:</strong> Server-side compute · Connection pooling · Transaction pooler (Supabase) · JWT authentication · Vercel edge deployment
-          </p>
-          <p style={{ lineHeight: 1.6 }}>
-            <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Data:</strong> Real-time OHLCV ingestion via IBKR · 160K+ daily data points · Supabase storage for PDF attachments
-          </p>
-        </footer>
-
-      </div>
-    </main>
+      </main>
+    </>
   );
 }
 
-// Sub-components
-function StatBox({ label, value, suffix }: { label: string; value: string | number; suffix: string }) {
+// ─── Sub-components ──────────────────────────────────────────────
+
+function StatBox({ label, value, suffix, live }: { label: string; value: string | number; suffix: string; live?: boolean }) {
   return (
     <div style={{
       background: "var(--card-bg)",
       border: "1px solid var(--border)",
-      borderRadius: 2,
+      borderRadius: 4,
       padding: "18px 20px"
     }}>
       <div style={{
@@ -245,9 +390,22 @@ function StatBox({ label, value, suffix }: { label: string; value: string | numb
         letterSpacing: "0.08em",
         marginBottom: 10,
         fontWeight: 700,
-        fontFamily: "monospace"
+        fontFamily: "monospace",
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
       }}>
         {label}
+        {live && (
+          <span style={{
+            width: 6,
+            height: 6,
+            borderRadius: "50%",
+            background: "var(--success)",
+            display: "inline-block",
+            animation: "pulse 2s ease-in-out infinite",
+          }} />
+        )}
       </div>
       <div style={{
         fontSize: 28,
@@ -269,54 +427,79 @@ function StatBox({ label, value, suffix }: { label: string; value: string | numb
   );
 }
 
-function NavCard({ href, title, description }: { href: string; title: string; description: string }) {
+function FeatureCard({ href, title, description, tags, visible, delay }: {
+  href: string;
+  title: string;
+  description: string;
+  tags: { label: string; color: string }[];
+  visible: boolean;
+  delay: number;
+}) {
   return (
     <Link
       href={href}
+      className="feature-card"
       style={{
         display: "block",
         background: "var(--card-bg)",
         border: "1px solid var(--border)",
-        borderRadius: 2,
-        padding: "18px 20px",
+        borderRadius: 6,
+        padding: "22px 24px",
         textDecoration: "none",
         color: "inherit",
-        transition: "all 0.15s ease"
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = "var(--foreground)";
-        e.currentTarget.style.transform = "translateX(4px)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = "var(--border)";
-        e.currentTarget.style.transform = "translateX(0)";
+        opacity: visible ? 1 : 0,
+        transform: visible ? "translateY(0)" : "translateY(20px)",
+        transition: `opacity 0.5s ease ${delay * 0.1}s, transform 0.5s ease ${delay * 0.1}s, border-color 0.25s ease, box-shadow 0.25s ease`,
       }}
     >
+      <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+        {tags.map(t => (
+          <span key={t.label} className="tag-pill" style={{
+            background: `color-mix(in srgb, ${t.color} 15%, transparent)`,
+            color: t.color,
+          }}>
+            {t.label}
+          </span>
+        ))}
+      </div>
       <h3 style={{
-        fontSize: 15,
+        fontSize: 16,
         fontWeight: 700,
         marginBottom: 8,
         color: "var(--foreground)",
         fontFamily: "monospace",
-        letterSpacing: "0.02em"
+        letterSpacing: "0.01em"
       }}>
-        → {title}
+        {title}
       </h3>
-      <p style={{ fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.6 }}>
+      <p style={{ fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.65 }}>
         {description}
       </p>
     </Link>
   );
 }
 
-function Capability({ title, children }: { title: string; children: React.ReactNode }) {
+function CapabilityCard({ title, accent, children, visible, delay }: {
+  title: string;
+  accent: string;
+  children: React.ReactNode;
+  visible: boolean;
+  delay: number;
+}) {
   return (
-    <div style={{
-      background: "var(--card-bg)",
-      border: "1px solid var(--border)",
-      borderRadius: 2,
-      padding: "14px 16px"
-    }}>
+    <div
+      className="cap-card"
+      style={{
+        background: "var(--card-bg)",
+        border: "1px solid var(--border)",
+        borderRadius: 4,
+        padding: "14px 16px",
+        borderLeft: `3px solid ${accent}`,
+        opacity: visible ? 1 : 0,
+        transform: visible ? "translateY(0)" : "translateY(16px)",
+        transition: `opacity 0.4s ease ${delay * 0.08}s, transform 0.4s ease ${delay * 0.08}s, border-color 0.2s ease, box-shadow 0.2s ease`,
+      }}
+    >
       <h4 style={{
         fontSize: 12,
         fontWeight: 700,
