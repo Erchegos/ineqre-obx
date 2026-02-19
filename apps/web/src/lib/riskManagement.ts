@@ -56,6 +56,7 @@ export interface DrawdownProtectionParams {
  * - Low & Contracting/Stable: Calm markets - full exposure
  */
 export const REGIME_EXPOSURE_SCALE: Record<VolatilityRegime, number> = {
+  'Crisis': 0.10,
   'Extreme High': 0.25,
   'Elevated': 0.50,
   'Normal': 1.00,
