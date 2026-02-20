@@ -272,6 +272,18 @@ export default function HomePage() {
                 visible={modulesReveal.visible}
                 delay={4}
               />
+              <FeatureCard
+                href="/portfolio"
+                title="Portfolio Optimizer"
+                description="Markowitz mean-variance optimization with 5 modes. Efficient frontier, ML-powered investment signals, risk decomposition, mode comparison, and portfolio-level risk alerts."
+                tags={[
+                  { label: "Optimization", color: "var(--success)" },
+                  { label: "ML Signals", color: "var(--accent)" },
+                  { label: "Risk", color: "var(--warning)" },
+                ]}
+                visible={modulesReveal.visible}
+                delay={5}
+              />
             </div>
           </section>
 
@@ -345,7 +357,6 @@ export default function HomePage() {
                 { title: "Commodities Integration", accent: "var(--warning)", text: "Brent crude, TTF/NBP gas, Nord Pool power, base metals. Cross-asset correlation with energy-exposed OSE equities. Sector beta decomposition and hedging ratios." },
                 { title: "FX Hedging Analytics", accent: "var(--info)", text: "Multi-currency exposure for NOK portfolios. Forward rate pricing via IRP, carry trade P&L, optimal hedge ratios. Currency beta for export-heavy equities." },
                 { title: "DCC-GARCH Correlation", accent: "var(--accent)", text: "Dynamic conditional correlation for time-varying co-movement. Copula models (Gaussian, Student-t) for tail dependence. VaR/CVaR and systemic risk indicators." },
-                { title: "Portfolio Optimizer", accent: "var(--success)", text: "Mean-variance optimization, efficient frontier, risk parity. Sector constraints, position sizing, turnover limits. Backtesting with transaction costs." },
               ].map((cap, i) => (
                 <CapabilityCard
                   key={cap.title}
