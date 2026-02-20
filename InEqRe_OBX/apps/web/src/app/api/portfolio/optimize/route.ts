@@ -7,6 +7,7 @@ import {
   OptimizationMode,
   CovarianceMethod,
   OptimizationConstraints,
+  OptimizationInput,
 } from '@/lib/portfolioOptimizer';
 
 export const dynamic = 'force-dynamic';
@@ -17,6 +18,10 @@ const DEFAULT_CONSTRAINTS: OptimizationConstraints = {
   maxSectorExposure: 0.30,
   excludeTickers: [],
 };
+
+const ALL_MODES: OptimizationMode[] = [
+  'equal', 'min_variance', 'max_sharpe', 'risk_parity', 'max_diversification',
+];
 
 export async function POST(req: NextRequest) {
   const authError = requireAuth(req);
@@ -132,24 +137,38 @@ export async function POST(req: NextRequest) {
       lastPrices.push(prices[prices.length - 1]);
     }
 
-    // 5. Fetch ML predictions for expected returns (Max Sharpe mode)
+    // 5. Fetch ML predictions for ALL holdings (always, not just max_sharpe)
+    const predQuery = `
+      SELECT DISTINCT ON (ticker) ticker, ensemble_prediction, gb_prediction, rf_prediction,
+             p05, p25, p50, p75, p95, confidence_score, prediction_date::text as prediction_date
+      FROM ml_predictions
+      WHERE ticker = ANY($1)
+      ORDER BY ticker, prediction_date DESC
+    `;
+    const predResult = await pool.query(predQuery, [tickers]);
+    type PredRow = {
+      ticker: string; ensemble_prediction: string; gb_prediction: string;
+      rf_prediction: string; p05: string; p25: string; p50: string;
+      p75: string; p95: string; confidence_score: string; prediction_date: string;
+    };
+    const predMap = new Map(
+      predResult.rows.map((r: PredRow) => [r.ticker, {
+        ensemble: Number(r.ensemble_prediction),
+        gb: Number(r.gb_prediction),
+        rf: Number(r.rf_prediction),
+        p05: Number(r.p05), p25: Number(r.p25), p50: Number(r.p50),
+        p75: Number(r.p75), p95: Number(r.p95),
+        confidence: Number(r.confidence_score || 0),
+        date: r.prediction_date,
+      }])
+    );
+
+    // Annualize for max_sharpe mode
     let expectedReturns: number[] | undefined;
     if (mode === 'max_sharpe') {
-      const predQuery = `
-        SELECT DISTINCT ON (ticker) ticker, ensemble_prediction
-        FROM ml_predictions
-        WHERE ticker = ANY($1)
-        ORDER BY ticker, prediction_date DESC
-      `;
-      const predResult = await pool.query(predQuery, [tickers]);
-      const predMap = new Map(
-        predResult.rows.map((r: { ticker: string; ensemble_prediction: string }) => [r.ticker, Number(r.ensemble_prediction)])
-      );
-
-      // Annualize monthly predictions: multiply by 12
       expectedReturns = tickers.map((t: string) => {
         const pred = predMap.get(t);
-        return pred !== undefined ? pred * 12 : 0;
+        return pred ? pred.ensemble * 12 : 0;
       });
     }
 
@@ -165,33 +184,114 @@ export async function POST(req: NextRequest) {
     );
     const sectors = tickers.map((t: string) => metaMap.get(t)?.sector || 'Unknown');
 
-    // 7. Run optimization
-    const result = optimizePortfolio({
-      tickers,
-      returns,
-      expectedReturns,
-      sectors,
+    // 7. Fetch factor data (momentum + fundamentals)
+    let factorMap: Map<string, Record<string, number>> = new Map();
+    try {
+      const factorQuery = `
+        SELECT DISTINCT ON (ft.ticker)
+          ft.ticker, ft.mom1m, ft.mom6m, ft.mom11m, ft.mom36m, ft.vol1m, ft.vol3m, ft.beta, ft.ivol,
+          ff.bm, ff.ep, ff.dy, ff.mktcap
+        FROM factor_technical ft
+        LEFT JOIN (
+          SELECT DISTINCT ON (ticker) ticker, bm, ep, dy, mktcap
+          FROM factor_fundamentals
+          ORDER BY ticker, date DESC
+        ) ff ON ft.ticker = ff.ticker
+        WHERE ft.ticker = ANY($1)
+        ORDER BY ft.ticker, ft.date DESC
+      `;
+      const factorResult = await pool.query(factorQuery, [tickers]);
+      factorMap = new Map(
+        factorResult.rows.map((r: Record<string, unknown>) => [r.ticker as string, {
+          mom1m: Number(r.mom1m || 0), mom6m: Number(r.mom6m || 0),
+          mom11m: Number(r.mom11m || 0), mom36m: Number(r.mom36m || 0),
+          vol1m: Number(r.vol1m || 0), vol3m: Number(r.vol3m || 0),
+          beta: Number(r.beta || 0), ivol: Number(r.ivol || 0),
+          bm: Number(r.bm || 0), ep: Number(r.ep || 0),
+          dy: Number(r.dy || 0), mktcap: Number(r.mktcap || 0),
+        }])
+      );
+    } catch { /* factor tables may not exist */ }
+
+    // 8. Fetch recent research document count and latest date per holding
+    let researchMap: Map<string, { count: number; latestDate: string }> = new Map();
+    try {
+      const researchQuery = `
+        SELECT ticker, COUNT(*) as cnt, MAX(received_at)::text as latest
+        FROM research_documents
+        WHERE ticker = ANY($1)
+          AND received_at >= NOW() - INTERVAL '90 days'
+        GROUP BY ticker
+      `;
+      const researchResult = await pool.query(researchQuery, [tickers]);
+      researchMap = new Map(
+        researchResult.rows.map((r: { ticker: string; cnt: string; latest: string }) =>
+          [r.ticker, { count: Number(r.cnt), latestDate: r.latest }]
+        )
+      );
+    } catch { /* research tables may not exist */ }
+
+    // 9. Run primary optimization
+    const baseInput: OptimizationInput = {
+      tickers, returns, expectedReturns, sectors,
       mode: mode as OptimizationMode,
       constraints: mergedConstraints,
       riskFreeRate,
       covarianceMethod: covarianceMethod as CovarianceMethod,
-    });
+    };
+    const result = optimizePortfolio(baseInput);
 
-    // 8. Compute beta to OBX
+    // 10. Run all modes for comparison
+    const modeComparison: Record<string, {
+      expectedReturn: number; volatility: number; sharpeRatio: number;
+      sortinoRatio: number; maxDrawdown: number; var95: number;
+      effectivePositions: number; diversificationRatio: number;
+      topHoldings: { ticker: string; weight: number }[];
+    }> = {};
+
+    for (const m of ALL_MODES) {
+      const modeInput: OptimizationInput = {
+        ...baseInput,
+        mode: m,
+        expectedReturns: m === 'max_sharpe'
+          ? tickers.map((t: string) => {
+              const pred = predMap.get(t);
+              return pred ? pred.ensemble * 12 : 0;
+            })
+          : undefined,
+      };
+      const modeResult = optimizePortfolio(modeInput);
+      modeComparison[m] = {
+        expectedReturn: modeResult.portfolioReturn,
+        volatility: modeResult.portfolioVolatility,
+        sharpeRatio: modeResult.sharpeRatio,
+        sortinoRatio: modeResult.sortinoRatio,
+        maxDrawdown: modeResult.maxDrawdown,
+        var95: modeResult.var95,
+        effectivePositions: modeResult.effectivePositions,
+        diversificationRatio: modeResult.diversificationRatio,
+        topHoldings: modeResult.weights
+          .map((w, i) => ({ ticker: tickers[i], weight: w }))
+          .filter(h => h.weight > 0.01)
+          .sort((a, b) => b.weight - a.weight)
+          .slice(0, 5),
+      };
+    }
+
+    // 11. Compute beta to OBX
     let betaToOBX = 0;
     let trackingError = 0;
+    const obxDailyRets: number[] = [];
     if (rawData['OBX'] && rawData['OBX'].length > 30) {
       const obxMap = new Map(rawData['OBX'].map(p => [p.date, p.price]));
       const obxPrices = trimmedDates.map(d => obxMap.get(d)).filter(p => p && p > 0) as number[];
 
       if (obxPrices.length > 30) {
-        const obxRets: number[] = [];
         for (let i = 1; i < obxPrices.length; i++) {
-          obxRets.push(Math.log(obxPrices[i] / obxPrices[i - 1]));
+          obxDailyRets.push(Math.log(obxPrices[i] / obxPrices[i - 1]));
         }
 
-        // Portfolio daily returns
-        const minLen = Math.min(obxRets.length, returns[0].length);
+        const minLen = Math.min(obxDailyRets.length, returns[0].length);
         const portDailyRets = [];
         for (let t = 0; t < minLen; t++) {
           let pr = 0;
@@ -201,9 +301,8 @@ export async function POST(req: NextRequest) {
           portDailyRets.push(pr);
         }
 
-        const obxSlice = obxRets.slice(0, minLen);
+        const obxSlice = obxDailyRets.slice(0, minLen);
 
-        // Beta = Cov(Rp, Rm) / Var(Rm)
         const meanP = portDailyRets.reduce((a, b) => a + b, 0) / minLen;
         const meanM = obxSlice.reduce((a, b) => a + b, 0) / minLen;
         let covPM = 0, varM = 0;
@@ -215,7 +314,6 @@ export async function POST(req: NextRequest) {
         varM /= (minLen - 1);
         betaToOBX = varM > 0 ? covPM / varM : 0;
 
-        // Tracking error = std(Rp - Rm)
         const activeReturns = portDailyRets.map((r, i) => r - obxSlice[i]);
         const meanActive = activeReturns.reduce((a, b) => a + b, 0) / minLen;
         const teVar = activeReturns.reduce((sum, r) => sum + (r - meanActive) ** 2, 0) / (minLen - 1);
@@ -223,43 +321,68 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 9. Fetch FX exposure
+    // 12. Compute per-holding beta to OBX
+    const holdingBetas: Map<string, number> = new Map();
+    if (obxDailyRets.length > 30) {
+      const minLen = Math.min(obxDailyRets.length, returns[0].length);
+      const obxSlice = obxDailyRets.slice(0, minLen);
+      const meanM = obxSlice.reduce((a, b) => a + b, 0) / minLen;
+      const varM = obxSlice.reduce((sum, r) => sum + (r - meanM) ** 2, 0) / (minLen - 1);
+
+      for (let i = 0; i < tickers.length; i++) {
+        const rets = returns[i].slice(0, minLen);
+        const meanI = rets.reduce((a, b) => a + b, 0) / minLen;
+        let covIM = 0;
+        for (let t = 0; t < minLen; t++) {
+          covIM += (rets[t] - meanI) * (obxSlice[t] - meanM);
+        }
+        covIM /= (minLen - 1);
+        holdingBetas.set(tickers[i], varM > 0 ? covIM / varM : 0);
+      }
+    }
+
+    // 13. Fetch FX exposure
     const fxQuery = `
       SELECT ticker, usd_revenue_pct, eur_revenue_pct, gbp_revenue_pct, nok_revenue_pct, other_revenue_pct
       FROM stock_fx_exposure
       WHERE ticker = ANY($1)
     `;
     let fxExposure: { currency: string; weightedExposure: number }[] = [];
+    const fxDataMap: Map<string, Record<string, number>> = new Map();
     try {
       const fxResult = await pool.query(fxQuery, [tickers]);
-      const fxMap = new Map(fxResult.rows.map((r: Record<string, unknown>) => [r.ticker as string, r]));
+      for (const r of fxResult.rows) {
+        fxDataMap.set(r.ticker as string, {
+          USD: Number(r.usd_revenue_pct || 0),
+          EUR: Number(r.eur_revenue_pct || 0),
+          GBP: Number(r.gbp_revenue_pct || 0),
+          NOK: Number(r.nok_revenue_pct || 0),
+          Other: Number(r.other_revenue_pct || 0),
+        });
+      }
 
       const currencies = ['USD', 'EUR', 'GBP', 'NOK', 'Other'];
-      const fxFields = ['usd_revenue_pct', 'eur_revenue_pct', 'gbp_revenue_pct', 'nok_revenue_pct', 'other_revenue_pct'];
-
-      fxExposure = currencies.map((cur, ci) => {
+      fxExposure = currencies.map(cur => {
         let weighted = 0;
         for (let i = 0; i < tickers.length; i++) {
-          const fx = fxMap.get(tickers[i]) as Record<string, unknown> | undefined;
-          const pct = fx ? Number(fx[fxFields[ci]] || 0) : (cur === 'NOK' ? 100 : 0);
+          const fx = fxDataMap.get(tickers[i]);
+          const pct = fx ? fx[cur] : (cur === 'NOK' ? 100 : 0);
           weighted += result.weights[i] * pct;
         }
         return { currency: cur, weightedExposure: weighted };
       });
     } catch {
-      // FX data may not exist for all tickers
       fxExposure = [{ currency: 'NOK', weightedExposure: 100 }];
     }
 
-    // 10. Fetch current regime for each holding
-    const holdingRegimes: { ticker: string; regime: string; volatility: number; percentile: number }[] = [];
-    // We'll compute a simple vol percentile from available data
+    // 14. Compute regime + vol metrics for each holding
+    const holdingRegimes: {
+      ticker: string; regime: string; volatility: number; percentile: number;
+    }[] = [];
     for (let i = 0; i < tickers.length; i++) {
       const rets = returns[i];
       const vol20 = Math.sqrt(rets.slice(-20).reduce((s, r) => s + r * r, 0) / 20) * Math.sqrt(252);
-      const vol252 = Math.sqrt(rets.reduce((s, r) => s + r * r, 0) / rets.length) * Math.sqrt(252);
 
-      // Simple percentile: where does current 20d vol sit vs all 20d rolling windows
       const allVols: number[] = [];
       for (let t = 20; t <= rets.length; t++) {
         const window = rets.slice(t - 20, t);
@@ -274,15 +397,154 @@ export async function POST(req: NextRequest) {
       else if (percentile > 30) regime = 'Normal';
       else regime = 'Low & Stable';
 
-      holdingRegimes.push({
-        ticker: tickers[i],
-        regime,
-        volatility: vol20,
-        percentile,
-      });
+      holdingRegimes.push({ ticker: tickers[i], regime, volatility: vol20, percentile });
     }
 
-    // 11. Sector allocation
+    // 15. Build per-holding intelligence signals
+    const holdingSignals = tickers.map((t: string, i: number) => {
+      const pred = predMap.get(t);
+      const factors = factorMap.get(t);
+      const research = researchMap.get(t);
+      const regime = holdingRegimes[i];
+      const beta = holdingBetas.get(t) ?? 0;
+      const rets = returns[i];
+
+      // Compute return metrics
+      const ret1m = rets.slice(-21).reduce((a, b) => a + b, 0);
+      const ret3m = rets.slice(-63).reduce((a, b) => a + b, 0);
+      const ret6m = rets.slice(-126).reduce((a, b) => a + b, 0);
+
+      // Compute drawdown from peak
+      let peak = 1, cumVal = 1, curDD = 0;
+      for (const r of rets.slice(-126)) {
+        cumVal *= (1 + r);
+        if (cumVal > peak) peak = cumVal;
+        curDD = (peak - cumVal) / peak;
+      }
+
+      // ML signal classification
+      let mlSignal: 'Strong Buy' | 'Buy' | 'Hold' | 'Sell' | 'Strong Sell' | 'N/A' = 'N/A';
+      let mlReturn = 0;
+      if (pred) {
+        mlReturn = pred.ensemble;
+        if (pred.ensemble > 0.04) mlSignal = 'Strong Buy';
+        else if (pred.ensemble > 0.015) mlSignal = 'Buy';
+        else if (pred.ensemble > -0.015) mlSignal = 'Hold';
+        else if (pred.ensemble > -0.04) mlSignal = 'Sell';
+        else mlSignal = 'Strong Sell';
+      }
+
+      // Momentum signal
+      let momentumSignal: 'Bullish' | 'Neutral' | 'Bearish' = 'Neutral';
+      if (factors) {
+        const momScore = (factors.mom1m > 0 ? 1 : -1) + (factors.mom6m > 0 ? 1 : -1) + (factors.mom11m > 0 ? 1 : -1);
+        if (momScore >= 2) momentumSignal = 'Bullish';
+        else if (momScore <= -2) momentumSignal = 'Bearish';
+      }
+
+      // Valuation signal
+      let valuationSignal: 'Cheap' | 'Fair' | 'Expensive' | 'N/A' = 'N/A';
+      if (factors && factors.ep > 0) {
+        if (factors.ep > 0.08) valuationSignal = 'Cheap';
+        else if (factors.ep > 0.04) valuationSignal = 'Fair';
+        else valuationSignal = 'Expensive';
+      }
+
+      // Composite conviction: weighted score from ML, momentum, valuation, regime
+      let conviction = 0;
+      let convictionFactors = 0;
+      if (pred) {
+        conviction += pred.ensemble > 0 ? 1 : -1;
+        conviction += Math.min(1, Math.max(-1, pred.ensemble * 10)); // scale
+        convictionFactors += 2;
+      }
+      if (momentumSignal === 'Bullish') { conviction += 1; convictionFactors += 1; }
+      else if (momentumSignal === 'Bearish') { conviction -= 1; convictionFactors += 1; }
+      if (valuationSignal === 'Cheap') { conviction += 0.5; convictionFactors += 1; }
+      else if (valuationSignal === 'Expensive') { conviction -= 0.5; convictionFactors += 1; }
+      if (regime.regime === 'Low & Stable') { conviction += 0.3; convictionFactors += 1; }
+      else if (regime.regime === 'Crisis' || regime.regime === 'Extreme High') { conviction -= 0.5; convictionFactors += 1; }
+
+      const normalizedConviction = convictionFactors > 0 ? conviction / convictionFactors : 0;
+
+      // Risk alerts for this holding
+      const alerts: string[] = [];
+      if (regime.percentile > 85) alerts.push('High volatility regime');
+      if (curDD > 0.15) alerts.push(`In ${(curDD * 100).toFixed(0)}% drawdown`);
+      if (beta > 1.5) alerts.push(`High beta (${beta.toFixed(1)})`);
+      if (pred && pred.ensemble < -0.03) alerts.push('Negative ML prediction');
+      if (factors && factors.vol1m > factors.vol3m * 1.5) alerts.push('Vol expanding');
+
+      return {
+        ticker: t,
+        mlSignal,
+        mlReturn,
+        mlConfidence: pred?.confidence ?? 0,
+        mlPercentiles: pred ? { p05: pred.p05, p25: pred.p25, p50: pred.p50, p75: pred.p75, p95: pred.p95 } : null,
+        momentumSignal,
+        momentum: {
+          ret1m: ret1m, ret3m: ret3m, ret6m: ret6m,
+          mom1m: factors?.mom1m ?? null,
+          mom6m: factors?.mom6m ?? null,
+        },
+        valuationSignal,
+        valuation: {
+          ep: factors?.ep ?? null,
+          bm: factors?.bm ?? null,
+          dy: factors?.dy ?? null,
+          mktcap: factors?.mktcap ?? null,
+        },
+        beta,
+        currentDrawdown: curDD,
+        conviction: normalizedConviction,
+        researchCount: research?.count ?? 0,
+        researchLatest: research?.latestDate ?? null,
+        alerts,
+      };
+    });
+
+    // 16. Generate portfolio-level risk alerts
+    const riskAlerts: { level: 'info' | 'warning' | 'critical'; message: string }[] = [];
+
+    // Concentration
+    if (result.herfindahlIndex > 0.15) {
+      riskAlerts.push({ level: 'warning', message: `High concentration (HHI ${(result.herfindahlIndex * 100).toFixed(0)}%). Consider diversifying.` });
+    }
+    // Regime
+    const crisisCount = holdingRegimes.filter(h => h.regime === 'Crisis' || h.regime === 'Extreme High').length;
+    if (crisisCount > tickers.length * 0.3) {
+      riskAlerts.push({ level: 'critical', message: `${crisisCount}/${tickers.length} holdings in high-volatility regime. Consider de-risking.` });
+    }
+    // Sector concentration
+    const sectorWts: Record<string, number> = {};
+    for (let i = 0; i < tickers.length; i++) {
+      const s = sectors[i];
+      sectorWts[s] = (sectorWts[s] || 0) + result.weights[i];
+    }
+    const topSectorWeight = Math.max(...Object.values(sectorWts) as number[]);
+    if (topSectorWeight > 0.4) {
+      riskAlerts.push({ level: 'warning', message: `Top sector weight ${(topSectorWeight * 100).toFixed(0)}% exceeds 40%. Sector risk elevated.` });
+    }
+    // Drawdown
+    if (result.maxDrawdown > 0.2) {
+      riskAlerts.push({ level: 'warning', message: `Historical max drawdown ${(result.maxDrawdown * 100).toFixed(0)}% is significant.` });
+    }
+    // Negative ML on large positions
+    const negMlLargePos = holdingSignals.filter(
+      (s, i) => s.mlSignal === 'Sell' || s.mlSignal === 'Strong Sell' ? result.weights[i] > 0.05 : false
+    );
+    if (negMlLargePos.length > 0) {
+      riskAlerts.push({
+        level: 'warning',
+        message: `Negative ML signal on ${negMlLargePos.map(s => s.ticker).join(', ')} (>5% weight). Review positions.`,
+      });
+    }
+    // Beta
+    if (betaToOBX > 1.3) {
+      riskAlerts.push({ level: 'info', message: `Portfolio beta ${betaToOBX.toFixed(2)} — amplified market exposure.` });
+    }
+
+    // 17. Sector allocation
     const sectorWeights: Record<string, number> = {};
     for (let i = 0; i < tickers.length; i++) {
       const s = sectors[i];
@@ -292,7 +554,7 @@ export async function POST(req: NextRequest) {
       .map(([sector, weight]) => ({ sector, weight }))
       .sort((a, b) => b.weight - a.weight);
 
-    // 12. Build response
+    // 18. Build response
     const response = {
       weights: tickers.map((t: string, i: number) => {
         const meta = metaMap.get(t);
@@ -338,6 +600,9 @@ export async function POST(req: NextRequest) {
         holdingRegimes,
       },
       stressScenarios: result.stressScenarios,
+      holdingSignals,
+      riskAlerts,
+      modeComparison,
       meta: {
         lookbackDays,
         covarianceMethod,

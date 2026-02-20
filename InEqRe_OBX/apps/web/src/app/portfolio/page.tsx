@@ -74,6 +74,41 @@ interface HoldingRegime {
   percentile: number;
 }
 
+interface HoldingSignal {
+  ticker: string;
+  mlSignal: 'Strong Buy' | 'Buy' | 'Hold' | 'Sell' | 'Strong Sell' | 'N/A';
+  mlReturn: number;
+  mlConfidence: number;
+  mlPercentiles: { p05: number; p25: number; p50: number; p75: number; p95: number } | null;
+  momentumSignal: 'Bullish' | 'Neutral' | 'Bearish';
+  momentum: { ret1m: number; ret3m: number; ret6m: number; mom1m: number | null; mom6m: number | null };
+  valuationSignal: 'Cheap' | 'Fair' | 'Expensive' | 'N/A';
+  valuation: { ep: number | null; bm: number | null; dy: number | null; mktcap: number | null };
+  beta: number;
+  currentDrawdown: number;
+  conviction: number;
+  researchCount: number;
+  researchLatest: string | null;
+  alerts: string[];
+}
+
+interface RiskAlert {
+  level: 'info' | 'warning' | 'critical';
+  message: string;
+}
+
+interface ModeMetrics {
+  expectedReturn: number;
+  volatility: number;
+  sharpeRatio: number;
+  sortinoRatio: number;
+  maxDrawdown: number;
+  var95: number;
+  effectivePositions: number;
+  diversificationRatio: number;
+  topHoldings: { ticker: string; weight: number }[];
+}
+
 interface OptimizationResult {
   weights: WeightItem[];
   metrics: Metrics;
@@ -85,6 +120,9 @@ interface OptimizationResult {
   fxExposure: { currency: string; weightedExposure: number }[];
   regimeContext: { holdingRegimes: HoldingRegime[] };
   stressScenarios: StressScenario[];
+  holdingSignals?: HoldingSignal[];
+  riskAlerts?: RiskAlert[];
+  modeComparison?: Record<string, ModeMetrics>;
   meta: {
     lookbackDays: number;
     covarianceMethod: string;
@@ -141,6 +179,27 @@ const MODE_LABELS: Record<string, string> = {
   max_sharpe: "Max Sharpe",
   risk_parity: "Risk Parity",
   max_diversification: "Max Diversification",
+};
+
+const SIGNAL_COLORS: Record<string, string> = {
+  "Strong Buy": "#00c853",
+  "Buy": "#4caf50",
+  "Hold": "#9e9e9e",
+  "Sell": "#ef5350",
+  "Strong Sell": "#d50000",
+  "N/A": "#616161",
+  "Bullish": "#4caf50",
+  "Neutral": "#9e9e9e",
+  "Bearish": "#ef5350",
+  "Cheap": "#4caf50",
+  "Fair": "#9e9e9e",
+  "Expensive": "#ef5350",
+};
+
+const ALERT_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  critical: { bg: "rgba(213,0,0,0.12)", border: "#d50000", text: "#ff5252" },
+  warning: { bg: "rgba(255,152,0,0.10)", border: "#f57c00", text: "#ffb74d" },
+  info: { bg: "rgba(33,150,243,0.08)", border: "#1976d2", text: "#64b5f6" },
 };
 
 // ============================================================================
@@ -839,6 +898,200 @@ export default function PortfolioPage() {
         </div>
       )}
 
+      {/* === RISK ALERTS === */}
+      {result && result.riskAlerts && result.riskAlerts.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
+          {result.riskAlerts.map((alert, i) => {
+            const colors = ALERT_COLORS[alert.level];
+            return (
+              <div key={i} style={{
+                padding: "8px 14px",
+                borderRadius: 4,
+                background: colors.bg,
+                borderLeft: `3px solid ${colors.border}`,
+                fontSize: 11,
+                fontFamily: "monospace",
+                color: colors.text,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}>
+                <span style={{ fontWeight: 700, fontSize: 10, textTransform: "uppercase", minWidth: 60 }}>
+                  {alert.level}
+                </span>
+                {alert.message}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* === MODE COMPARISON === */}
+      {result && result.modeComparison && (
+        <div style={{ ...cardStyle, marginBottom: 20 }}>
+          <div style={sectionTitle}>Strategy Comparison — All Optimization Modes</div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: "monospace" }}>
+              <thead>
+                <tr>
+                  {["Mode", "Return", "Vol", "Sharpe", "Sortino", "VaR 95%", "Max DD", "Eff. Pos", "Div Ratio", "Top Holdings"].map(h => (
+                    <th key={h} style={{
+                      padding: "8px 10px", textAlign: h === "Mode" || h === "Top Holdings" ? "left" : "right",
+                      borderBottom: "1px solid #30363d", color: "rgba(255,255,255,0.5)", fontSize: 10,
+                      fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap",
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(result.modeComparison).map(([modeKey, mc]) => {
+                  const isActive = modeKey === result.meta.mode;
+                  return (
+                    <tr key={modeKey} style={{
+                      borderBottom: "1px solid #30363d",
+                      background: isActive ? "rgba(59,130,246,0.08)" : "transparent",
+                    }}>
+                      <td style={{ padding: "6px 10px", fontWeight: 700, color: isActive ? "#3b82f6" : "#fff" }}>
+                        {MODE_LABELS[modeKey] || modeKey}
+                        {isActive && <span style={{ fontSize: 8, color: "#3b82f6", marginLeft: 4 }}>ACTIVE</span>}
+                      </td>
+                      <td style={{ padding: "6px 10px", textAlign: "right", color: mc.expectedReturn >= 0 ? "#10b981" : "#ef4444" }}>
+                        {(mc.expectedReturn * 100).toFixed(1)}%
+                      </td>
+                      <td style={{ padding: "6px 10px", textAlign: "right" }}>{(mc.volatility * 100).toFixed(1)}%</td>
+                      <td style={{
+                        padding: "6px 10px", textAlign: "right", fontWeight: 700,
+                        color: mc.sharpeRatio >= 0.5 ? "#10b981" : mc.sharpeRatio >= 0 ? "#f59e0b" : "#ef4444",
+                      }}>{mc.sharpeRatio.toFixed(2)}</td>
+                      <td style={{ padding: "6px 10px", textAlign: "right" }}>{mc.sortinoRatio.toFixed(2)}</td>
+                      <td style={{ padding: "6px 10px", textAlign: "right", color: "#ef4444" }}>{(mc.var95 * 100).toFixed(1)}%</td>
+                      <td style={{ padding: "6px 10px", textAlign: "right", color: "#ef4444" }}>{(mc.maxDrawdown * 100).toFixed(1)}%</td>
+                      <td style={{ padding: "6px 10px", textAlign: "right" }}>{mc.effectivePositions.toFixed(1)}</td>
+                      <td style={{ padding: "6px 10px", textAlign: "right" }}>{mc.diversificationRatio.toFixed(2)}</td>
+                      <td style={{ padding: "6px 10px", fontSize: 9, color: "rgba(255,255,255,0.6)" }}>
+                        {mc.topHoldings.map(h => `${h.ticker} ${(h.weight * 100).toFixed(0)}%`).join(", ")}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* === INVESTMENT SIGNALS === */}
+      {result && result.holdingSignals && result.holdingSignals.length > 0 && (
+        <div style={{ ...cardStyle, marginBottom: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <div style={sectionTitle}>Investment Signals</div>
+            <div style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.3)" }}>
+              ML + Momentum + Valuation + Regime
+            </div>
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: "monospace" }}>
+              <thead>
+                <tr>
+                  {["Ticker", "Weight", "ML Signal", "ML Ret (1m)", "Momentum", "Valuation", "Beta", "Drawdown", "Conviction", "Alerts"].map(h => (
+                    <th key={h} style={{
+                      padding: "8px 8px", textAlign: h === "Ticker" || h === "ML Signal" || h === "Momentum" || h === "Valuation" || h === "Alerts" ? "left" : "right",
+                      borderBottom: "1px solid #30363d", color: "rgba(255,255,255,0.5)", fontSize: 10,
+                      fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap",
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {result.holdingSignals
+                  .filter(s => {
+                    const w = result.weights.find(w => w.ticker === s.ticker);
+                    return w && w.weight > 0.001;
+                  })
+                  .sort((a, b) => {
+                    const wa = result.weights.find(w => w.ticker === a.ticker)?.weight ?? 0;
+                    const wb = result.weights.find(w => w.ticker === b.ticker)?.weight ?? 0;
+                    return wb - wa;
+                  })
+                  .map(sig => {
+                    const w = result.weights.find(w => w.ticker === sig.ticker);
+                    return (
+                      <tr key={sig.ticker} style={{ borderBottom: "1px solid #30363d" }}>
+                        <td style={{ padding: "6px 8px", fontWeight: 700 }}>
+                          <Link href={`/stocks/${sig.ticker}`} style={{ color: "#3b82f6", textDecoration: "none" }}>
+                            {sig.ticker}
+                          </Link>
+                        </td>
+                        <td style={{ padding: "6px 8px", textAlign: "right" }}>{((w?.weight ?? 0) * 100).toFixed(1)}%</td>
+                        <td style={{ padding: "6px 8px" }}>
+                          <span style={{
+                            display: "inline-block", padding: "1px 8px", borderRadius: 3, fontSize: 9,
+                            fontWeight: 700, background: SIGNAL_COLORS[sig.mlSignal], color: "#fff",
+                          }}>{sig.mlSignal}</span>
+                        </td>
+                        <td style={{
+                          padding: "6px 8px", textAlign: "right",
+                          color: sig.mlReturn > 0 ? "#4caf50" : sig.mlReturn < 0 ? "#ef5350" : "rgba(255,255,255,0.5)",
+                          fontWeight: 600,
+                        }}>
+                          {sig.mlReturn !== 0 ? `${(sig.mlReturn * 100).toFixed(1)}%` : "—"}
+                        </td>
+                        <td style={{ padding: "6px 8px" }}>
+                          <span style={{ color: SIGNAL_COLORS[sig.momentumSignal], fontWeight: 600, fontSize: 10 }}>
+                            {sig.momentumSignal}
+                          </span>
+                          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginLeft: 4 }}>
+                            {sig.momentum.ret1m !== null ? `${(sig.momentum.ret1m * 100).toFixed(1)}%` : ""}
+                          </span>
+                        </td>
+                        <td style={{ padding: "6px 8px" }}>
+                          <span style={{ color: SIGNAL_COLORS[sig.valuationSignal], fontWeight: 600, fontSize: 10 }}>
+                            {sig.valuationSignal}
+                          </span>
+                          {sig.valuation.ep !== null && sig.valuation.ep > 0 && (
+                            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginLeft: 4 }}>
+                              E/P {(sig.valuation.ep * 100).toFixed(1)}%
+                            </span>
+                          )}
+                        </td>
+                        <td style={{
+                          padding: "6px 8px", textAlign: "right",
+                          color: sig.beta > 1.3 ? "#f59e0b" : "rgba(255,255,255,0.6)",
+                        }}>
+                          {sig.beta.toFixed(2)}
+                        </td>
+                        <td style={{
+                          padding: "6px 8px", textAlign: "right",
+                          color: sig.currentDrawdown > 0.1 ? "#ef4444" : "rgba(255,255,255,0.5)",
+                        }}>
+                          {sig.currentDrawdown > 0.01 ? `-${(sig.currentDrawdown * 100).toFixed(1)}%` : "—"}
+                        </td>
+                        <td style={{ padding: "6px 8px", textAlign: "right" }}>
+                          <ConvictionBar value={sig.conviction} />
+                        </td>
+                        <td style={{ padding: "6px 8px", fontSize: 9, maxWidth: 180 }}>
+                          {sig.alerts.length > 0 ? (
+                            <span style={{ color: "#ffb74d" }}>{sig.alerts[0]}</span>
+                          ) : (
+                            <span style={{ color: "rgba(255,255,255,0.3)" }}>—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+          {/* Signal legend */}
+          <div style={{ display: "flex", gap: 16, marginTop: 10, fontSize: 9, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", flexWrap: "wrap" }}>
+            <span>ML Signal: GB/RF ensemble 1-month forecast</span>
+            <span>Momentum: 1m/6m/11m trend alignment</span>
+            <span>Valuation: E/P percentile vs universe</span>
+            <span>Conviction: Weighted composite score</span>
+          </div>
+        </div>
+      )}
+
       {/* === EFFICIENT FRONTIER (full width) === */}
       {result && (
         <div style={{ marginBottom: 20 }}>
@@ -1500,6 +1753,30 @@ function MetricCard({ label, value, color }: { label: string; value: string; col
       <div style={{ fontSize: 16, fontWeight: 700, fontFamily: "monospace", color: color || "#fff" }}>
         {value}
       </div>
+    </div>
+  );
+}
+
+function ConvictionBar({ value }: { value: number }) {
+  // value ranges from -1 (bearish) to +1 (bullish)
+  const clamped = Math.max(-1, Math.min(1, value));
+  const pct = (clamped + 1) / 2 * 100; // 0-100
+  const color = clamped > 0.3 ? "#4caf50" : clamped > 0 ? "#81c784" : clamped > -0.3 ? "#ffb74d" : "#ef5350";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
+      <div style={{ width: 50, height: 6, background: "#1a1a2e", borderRadius: 3, position: "relative", overflow: "hidden" }}>
+        <div style={{
+          position: "absolute",
+          left: "50%", top: 0, bottom: 0,
+          width: `${Math.abs(pct - 50)}%`,
+          marginLeft: pct >= 50 ? 0 : `${pct - 50}%`,
+          background: color,
+          borderRadius: 3,
+        }} />
+      </div>
+      <span style={{ fontSize: 10, fontWeight: 600, color, minWidth: 32, textAlign: "right" }}>
+        {clamped > 0 ? "+" : ""}{(clamped * 100).toFixed(0)}
+      </span>
     </div>
   );
 }
