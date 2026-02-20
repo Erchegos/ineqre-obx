@@ -52,6 +52,7 @@ InEqRe_OBX/
 | **FX Hedging** | `/fx-hedging` | `apps/web/src/app/fx-hedging/page.tsx` |
 | **Options List** | `/options` | `apps/web/src/app/options/page.tsx` |
 | **Options Analysis** | `/options/[ticker]` | `apps/web/src/app/options/[ticker]/page.tsx` |
+| **Portfolio Optimizer** | `/portfolio` | `apps/web/src/app/portfolio/page.tsx` |
 
 ---
 
@@ -110,6 +111,17 @@ All endpoints in `apps/web/src/app/api/`
 | `POST /api/research/auth` | Password authentication |
 | `POST /api/research/generate-summaries` | AI summary generation |
 
+### Portfolio APIs (Password-Protected)
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/portfolio/auth` | Password authentication (same creds as research) |
+| `POST /api/portfolio/optimize` | Mean-variance optimization (5 modes, risk decomposition, efficient frontier) |
+| `GET /api/portfolio/configs` | List saved portfolio configurations |
+| `POST /api/portfolio/configs` | Save new portfolio configuration |
+| `GET /api/portfolio/configs/[id]` | Load specific portfolio configuration |
+| `PUT /api/portfolio/configs/[id]` | Update portfolio configuration |
+| `DELETE /api/portfolio/configs/[id]` | Delete portfolio configuration |
+
 ### FX APIs
 | Endpoint | Purpose |
 |----------|---------|
@@ -160,6 +172,7 @@ All in `apps/web/src/lib/`
 | `parameterValidation.ts` | Strategy parameter validation |
 | `market.ts` | Market-level calculations |
 | `price-data-adapter.ts` | Price data normalization |
+| `portfolioOptimizer.ts` | Markowitz optimization: covariance (sample/Ledoit-Wolf/EWMA), 5 modes (EW/MinVar/MaxSharpe/RiskParity/MaxDiv), projected gradient descent, risk decomposition, efficient frontier |
 
 ---
 
@@ -258,6 +271,11 @@ Schema files in `packages/db/src/schema/`
 |-------|---------|
 | `obxEquities` | OSE daily data (VWAP, trades, turnover) |
 | `obxFeatures` | Market proxy metrics |
+
+### Portfolio Management
+| Table | Purpose |
+|-------|---------|
+| `portfolio_configs` | Saved portfolio configurations (tickers, weights, mode, constraints) |
 
 ---
 
@@ -499,6 +517,42 @@ The options module (`/options/[ticker]`) provides:
 - Supported tickers: EQNR, BORR, FLNG, FRO (US-listed with valid OI/volume)
 - Max pain computed in JS (iterates each strike as hypothetical settlement price)
 - OPTN badge on stocks list only shows for `.US`-suffixed tickers
+
+---
+
+## Portfolio Optimizer Details
+
+Located at `/portfolio`. Password-protected (same credentials as research portal).
+
+### Optimization Modes (Long-Only, Sum-to-1)
+| Mode | Objective | Needs Expected Returns |
+|------|-----------|----------------------|
+| Equal Weight | `w_i = 1/N` | No |
+| Min Variance | Minimize `w'Σw` via projected gradient descent | No |
+| Max Sharpe | Maximize `(w'μ - rf) / √(w'Σw)` | Yes (ML predictions) |
+| Risk Parity | Equalize risk contributions `RC_i = w_i × (Σw)_i / σ_p` | No |
+| Max Diversification | Maximize `(w'σ) / √(w'Σw)` | No |
+
+### Covariance Methods
+- **Ledoit-Wolf Shrinkage** (default): Shrinks sample covariance toward diagonal target
+- **EWMA** (λ=0.94): Exponentially weighted, recent data emphasized
+- **Sample**: Raw sample covariance (unstable for large N/T ratios)
+
+### Dashboard Sections
+- **Risk Dashboard**: 12 metric cards (return, vol, Sharpe, Sortino, VaR, CVaR, drawdown, beta, tracking error, HHI, effective positions, diversification ratio)
+- **Efficient Frontier**: Scatter plot with current portfolio highlighted
+- **Weight Distribution**: Horizontal bar chart
+- **Risk Decomposition**: Sortable table with marginal contribution, component VaR, % of total risk
+- **Correlation Heatmap**: Color-coded matrix of portfolio holdings
+- **Sector Allocation**: Pie chart with legend
+- **FX Exposure**: Revenue-weighted currency breakdown (NOK/USD/EUR/GBP)
+- **Regime Status**: Per-holding volatility regime classification
+- **Stress Scenarios**: Vol doubles, correlations→1, crisis de-risking
+- **Holdings Table**: Full detail with links to stock pages
+
+### Persistence
+- Save/load named portfolios via `portfolio_configs` table
+- CRUD API at `/api/portfolio/configs`
 
 ---
 
