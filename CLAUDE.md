@@ -1,8 +1,29 @@
-# InEqRe (Intelligence Equity Research) v2.3
+# InEqRe (Intelligence Equity Research) v2.4
 
 Quantitative equity research platform for Oslo Stock Exchange (OSE). Combines automated research aggregation, ML price predictions, volatility modeling, and strategy backtesting.
 
 > **Maintenance Note**: Update this file whenever changes are pushed to git. Add new features, APIs, components, or modify existing entries to keep documentation current.
+
+---
+
+## Git & Deployment
+
+**IMPORTANT**: There are TWO git repos in this project. Only push to the **inner** one:
+
+| Repo | Path | Remote | Deploys to |
+|------|------|--------|------------|
+| **Inner (CORRECT)** | `InEqRe_OBX/` | `git@github.com:Erchegos/ineqre-obx.git` | Vercel (production) |
+| Outer (DO NOT USE) | `code/` (parent dir) | Same remote (broken mirror) | Nothing — wrong file paths |
+
+**Always `cd InEqRe_OBX/` before running git commands.** The outer repo commits files at `InEqRe_OBX/apps/web/...` paths which Vercel cannot find. The inner repo uses correct `apps/web/...` paths.
+
+```bash
+# Correct workflow:
+cd InEqRe_OBX/
+git add <files>
+git commit -m "message"
+git push
+```
 
 ## Tech Stack
 - **Frontend**: Next.js 15, React 19, TypeScript, Recharts, Tailwind CSS 4
@@ -538,9 +559,40 @@ Located at `/portfolio`. Password-protected (same credentials as research portal
 - **EWMA** (λ=0.94): Exponentially weighted, recent data emphasized
 - **Sample**: Raw sample covariance (unstable for large N/T ratios)
 
+### Efficient Frontier
+- Analytical Markowitz closed-form: `σ² = (Cr² - 2Ar + B) / D` via matrix inversion
+- Custom SVG chart (not Recharts) with smooth parabola + Capital Market Line through tangency
+- Clipped to plot area, responsive sizing
+
+### Investment Intelligence (API-enriched)
+The optimize API (`POST /api/portfolio/optimize`) enriches results with:
+
+**Per-Holding Signals** (`holdingSignals[]`):
+- **ML Signal**: Strong Buy / Buy / Hold / Sell / Strong Sell (thresholds: >4%, >1.5%, >-1.5%, >-4%)
+- **Momentum Signal**: Bullish / Neutral / Bearish (from alignment of mom1m/mom6m/mom11m)
+- **Valuation Signal**: Cheap / Fair / Expensive (E/P thresholds: >8%, >4%)
+- **Conviction Score**: Weighted composite [-1, +1] of ML prediction, momentum, valuation, vol regime
+- **Per-holding beta**: Cov(R_i, R_OBX) / Var(R_OBX)
+- **Research count**: Documents in last 90 days per holding
+
+**Mode Comparison** (`modeComparison{}`):
+- Server-side runs all 5 optimization modes in parallel
+- Returns metrics for each: return, vol, Sharpe, Sortino, drawdown, VaR, effective positions
+
+**Risk Alerts** (`riskAlerts[]`):
+- Concentration risk (HHI > 15%)
+- Regime risk (>30% holdings in Crisis/Extreme High)
+- Sector concentration (>40% single sector)
+- Drawdown alert (>20%)
+- Negative ML on large positions (>5% weight)
+- High portfolio beta (>1.3)
+
 ### Dashboard Sections
+- **Risk Alerts Banner**: Color-coded critical/warning/info alerts
+- **Mode Comparison Table**: All 5 modes side-by-side with key metrics
+- **Investment Signals Table**: Per-holding ML, momentum, valuation, conviction bar
 - **Risk Dashboard**: 12 metric cards (return, vol, Sharpe, Sortino, VaR, CVaR, drawdown, beta, tracking error, HHI, effective positions, diversification ratio)
-- **Efficient Frontier**: Scatter plot with current portfolio highlighted
+- **Efficient Frontier**: Custom SVG with parabola + CML
 - **Weight Distribution**: Horizontal bar chart
 - **Risk Decomposition**: Sortable table with marginal contribution, component VaR, % of total risk
 - **Correlation Heatmap**: Color-coded matrix of portfolio holdings
