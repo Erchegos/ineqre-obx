@@ -34,6 +34,7 @@ interface OptionData {
   openInterest: number;
   volume: number;
   undPrice: number;
+  synthetic?: boolean;
 }
 
 interface ChainRow {
@@ -1043,9 +1044,9 @@ export default function OptionsPage() {
                     >
                       <td style={{ ...tdStyle, color: "#666", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{fmtOI(row.call?.openInterest)}</td>
                       <td style={{ ...tdStyle, color: row.call?.volume ? "#60a5fa" : "#333", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call?.volume || "--"}</td>
-                      <td style={{ ...tdStyle, color: "#22c55e", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "short")} title="Sell Call at bid">{row.call?.bid?.toFixed(2) || "--"}</td>
-                      <td style={{ ...tdStyle, color: "#ef4444", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")} title="Buy Call at ask">{row.call?.ask?.toFixed(2) || "--"}</td>
-                      <td style={{ ...tdStyle, fontWeight: 600, color: "#e5e5e5", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call?.last?.toFixed(2) || (midCall ? <span style={{ color: "#444" }}>{midCall}</span> : "--")}</td>
+                      <td style={{ ...tdStyle, color: (row.call as OptionData)?.synthetic ? "#1a5c2e" : "#22c55e", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "short")} title={`Sell Call at bid${(row.call as OptionData)?.synthetic ? " (theoretical)" : ""}`}>{row.call?.bid?.toFixed(2) || "--"}</td>
+                      <td style={{ ...tdStyle, color: (row.call as OptionData)?.synthetic ? "#7a2020" : "#ef4444", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")} title={`Buy Call at ask${(row.call as OptionData)?.synthetic ? " (theoretical)" : ""}`}>{row.call?.ask?.toFixed(2) || "--"}</td>
+                      <td style={{ ...tdStyle, fontWeight: 600, color: (row.call as OptionData)?.synthetic ? "#666" : "#e5e5e5", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call?.last?.toFixed(2) || (midCall ? <span style={{ color: "#444" }}>{midCall}</span> : "--")}</td>
                       <td style={{ ...tdStyle, color: "#60a5fa", fontWeight: 600, cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call?.iv ? (row.call.iv * 100).toFixed(1) : "--"}</td>
                       {showGreeks && <>
                         <td style={{ ...tdStyle, color: deltaColor(g?.cd), cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call ? g?.cd.toFixed(3) : "--"}</td>
@@ -1088,9 +1089,9 @@ export default function OptionsPage() {
                         <td style={{ ...tdStyle, color: "#a78bfa", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put ? g?.pv.toFixed(3) : "--"}</td>
                       </>}
                       <td style={{ ...tdStyle, color: "#60a5fa", fontWeight: 600, cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put?.iv ? (row.put.iv * 100).toFixed(1) : "--"}</td>
-                      <td style={{ ...tdStyle, color: "#22c55e", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "short")} title="Sell Put at bid">{row.put?.bid?.toFixed(2) || "--"}</td>
-                      <td style={{ ...tdStyle, color: "#ef4444", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")} title="Buy Put at ask">{row.put?.ask?.toFixed(2) || "--"}</td>
-                      <td style={{ ...tdStyle, fontWeight: 600, color: "#e5e5e5", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put?.last?.toFixed(2) || (midPut ? <span style={{ color: "#444" }}>{midPut}</span> : "--")}</td>
+                      <td style={{ ...tdStyle, color: (row.put as OptionData)?.synthetic ? "#1a5c2e" : "#22c55e", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "short")} title={`Sell Put at bid${(row.put as OptionData)?.synthetic ? " (theoretical)" : ""}`}>{row.put?.bid?.toFixed(2) || "--"}</td>
+                      <td style={{ ...tdStyle, color: (row.put as OptionData)?.synthetic ? "#7a2020" : "#ef4444", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")} title={`Buy Put at ask${(row.put as OptionData)?.synthetic ? " (theoretical)" : ""}`}>{row.put?.ask?.toFixed(2) || "--"}</td>
+                      <td style={{ ...tdStyle, fontWeight: 600, color: (row.put as OptionData)?.synthetic ? "#666" : "#e5e5e5", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put?.last?.toFixed(2) || (midPut ? <span style={{ color: "#444" }}>{midPut}</span> : "--")}</td>
                       <td style={{ ...tdStyle, color: row.put?.volume ? "#60a5fa" : "#333", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put?.volume || "--"}</td>
                       <td style={{ ...tdStyle, color: "#666", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{fmtOI(row.put?.openInterest)}</td>
                     </tr>
@@ -1106,7 +1107,7 @@ export default function OptionsPage() {
         </section>
 
         <div style={{ fontSize: 10, color: "#333", textAlign: "center", padding: "4px 0 16px", fontFamily: "monospace" }}>
-          Data pre-loaded from Yahoo Finance (15-min delayed)
+          Data pre-loaded from Yahoo Finance (15-min delayed) | <span style={{ color: "#1a5c2e" }}>Dimmed</span> bid/ask = Black-Scholes theoretical
           {data?.lastUpdated && <> | Last refresh: {new Date(data.lastUpdated).toLocaleString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</>}
         </div>
       </main>

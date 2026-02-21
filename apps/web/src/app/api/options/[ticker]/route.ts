@@ -107,6 +107,10 @@ export async function GET(
       .sort(([a], [b]) => a - b)
       .map(([strike, { call, put }]) => ({ strike, call, put }));
 
+    // Synthesize bid/ask for options with 0 bid/ask
+    // Uses Black-Scholes theoretical price with a spread that widens for OTM options
+    fillSyntheticBidAsk(chainRows, underlyingPrice, expiry);
+
     // Build OI distribution
     const oiDistribution = chainRows.map(row => ({
       strike: row.strike,
@@ -227,4 +231,91 @@ function calculateMaxPain(
   }
 
   return { strike: maxPainStrike, value: minPain };
+}
+
+// ─── Synthetic Bid/Ask Fill ─────────────────────────────────────
+// Standard normal CDF approximation (Abramowitz & Stegun)
+function normCDF(x: number): number {
+  const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
+  const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+  const sign = x < 0 ? -1 : 1;
+  const t = 1.0 / (1.0 + p * Math.abs(x));
+  const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x / 2);
+  return 0.5 * (1.0 + sign * y);
+}
+
+// Simple Black-Scholes price (no Greeks needed here)
+function bsPrice(type: "call" | "put", S: number, K: number, T: number, r: number, sigma: number): number {
+  if (T <= 0 || sigma <= 0) return Math.max(0, type === "call" ? S - K : K - S);
+  const d1 = (Math.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * Math.sqrt(T));
+  const d2 = d1 - sigma * Math.sqrt(T);
+  if (type === "call") {
+    return S * normCDF(d1) - K * Math.exp(-r * T) * normCDF(d2);
+  } else {
+    return K * Math.exp(-r * T) * normCDF(-d2) - S * normCDF(-d1);
+  }
+}
+
+/**
+ * Fill synthetic bid/ask for options where bid=0 and ask=0.
+ * Uses the last price if available, otherwise Black-Scholes theoretical price.
+ * Spread widens for more OTM options (5-25% of mid price).
+ */
+function fillSyntheticBidAsk(
+  chainRows: Array<{ strike: number; call: Record<string, unknown> | null; put: Record<string, unknown> | null }>,
+  underlyingPrice: number,
+  expiry: string
+) {
+  const T = Math.max(daysToExpiry(expiry), 1) / 365;
+  const r = 0.04;
+
+  // Find a reasonable fallback IV from strikes that have real IV data
+  let fallbackIV = 0.30;
+  const sorted = [...chainRows].sort((a, b) => Math.abs(a.strike - underlyingPrice) - Math.abs(b.strike - underlyingPrice));
+  for (const row of sorted) {
+    for (const side of [row.call, row.put]) {
+      const iv = side ? (side.iv as number) || 0 : 0;
+      if (iv >= 0.05 && iv < 2.0) { fallbackIV = iv; break; }
+    }
+    if (fallbackIV !== 0.30) break;
+  }
+
+  for (const row of chainRows) {
+    const moneyness = Math.abs(row.strike - underlyingPrice) / underlyingPrice;
+    // Spread: 5% near ATM, up to 25% for deep OTM
+    const spreadPct = Math.min(0.05 + moneyness * 0.5, 0.25);
+
+    for (const [side, type] of [[row.call, "call"], [row.put, "put"]] as const) {
+      if (!side) continue;
+      const bid = side.bid as number;
+      const ask = side.ask as number;
+
+      if (bid > 0 && ask > 0) continue; // Real quotes exist
+
+      const last = side.last as number;
+      const iv = ((side.iv as number) >= 0.05 && (side.iv as number) < 2.0)
+        ? (side.iv as number)
+        : fallbackIV;
+
+      let mid: number;
+      if (last > 0) {
+        mid = last;
+      } else {
+        // No last price — calculate theoretical price via BS
+        mid = bsPrice(type, underlyingPrice, row.strike, T, r, iv);
+      }
+
+      if (mid < 0.01) mid = 0.01; // Floor at 1 cent
+
+      const halfSpread = mid * spreadPct / 2;
+      side.bid = Math.max(0.01, parseFloat((mid - halfSpread).toFixed(2)));
+      side.ask = parseFloat((mid + halfSpread).toFixed(2));
+      // Also fill last if it was 0
+      if ((side.last as number) === 0) {
+        side.last = parseFloat(mid.toFixed(2));
+      }
+      // Mark as synthetic so frontend can style differently
+      side.synthetic = true;
+    }
+  }
 }
