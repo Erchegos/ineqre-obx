@@ -376,56 +376,57 @@ function optimizeEqualWeight(n: number): number[] {
 }
 
 /**
- * Minimum Variance: minimize w'Sigma*w via projected gradient descent.
+ * Minimum Variance: closed-form solution w* = Σ⁻¹1 / (1'Σ⁻¹1).
+ * Falls back to inverse-variance weighting if matrix is singular.
+ * Constraints applied iteratively after the analytical solution.
  */
 function optimizeMinVariance(
   cov: number[][],
   tickers: string[],
   sectors: string[],
-  constraints: OptimizationConstraints,
-  maxIter: number = 1000,
-  tol: number = 1e-10
+  constraints: OptimizationConstraints
 ): number[] {
   const n = cov.length;
-  let w = new Array(n).fill(1 / n);
-  let prevObj = portfolioVariance(w, cov);
 
-  const lr0 = 0.5;
+  // Closed-form: w* = Σ⁻¹ * 1 / (1' * Σ⁻¹ * 1)
+  const covInv = invertMatrix(cov);
 
-  for (let iter = 0; iter < maxIter; iter++) {
-    // Gradient: d/dw (w'Sigma*w) = 2 * Sigma * w
-    const grad = matVecMul(cov, w).map(g => 2 * g);
+  if (covInv) {
+    const ones = new Array(n).fill(1);
+    const SigInvOnes = matVecMul(covInv, ones);
+    const denom = dotProduct(ones, SigInvOnes);
 
-    // Adaptive learning rate
-    const lr = lr0 / (1 + iter * 0.01);
+    if (denom > 1e-12) {
+      let w = SigInvOnes.map(v => v / denom);
 
-    // Gradient step
-    const wNew = w.map((wi, i) => wi - lr * grad[i]);
+      // Handle negative weights (long-only): clamp and re-normalize
+      w = w.map(wi => Math.max(0, wi));
+      w = normalize(w);
 
-    // Project onto simplex
-    let wProj = projectOntoSimplex(wNew);
+      // Apply constraints iteratively (3 rounds for convergence)
+      for (let round = 0; round < 3; round++) {
+        w = applyConstraints(w, tickers, sectors, constraints);
+        w = normalize(w);
+      }
 
-    // Apply constraints
-    wProj = applyConstraints(wProj, tickers, sectors, constraints);
-    wProj = normalize(wProj);
-
-    const obj = portfolioVariance(wProj, cov);
-
-    // Accept step if it improves objective
-    if (obj < prevObj) {
-      w = wProj;
-      prevObj = obj;
+      return w;
     }
-
-    // Convergence check
-    if (iter > 50 && Math.abs(obj - prevObj) < tol) break;
   }
 
+  // Fallback: inverse-variance weighting
+  const invVar = cov.map((row, i) => row[i] > 1e-12 ? 1 / row[i] : 0);
+  let w = normalize(invVar);
+  for (let round = 0; round < 3; round++) {
+    w = applyConstraints(w, tickers, sectors, constraints);
+    w = normalize(w);
+  }
   return w;
 }
 
 /**
- * Maximum Sharpe: maximize (w'mu - rf) / sqrt(w'Sigma*w).
+ * Maximum Sharpe: closed-form tangency portfolio.
+ * w* = Σ⁻¹(μ − rf·1) / 1'Σ⁻¹(μ − rf·1)
+ * Falls back to return-scaled inverse-variance if singular.
  */
 function optimizeMaxSharpe(
   cov: number[][],
@@ -433,55 +434,52 @@ function optimizeMaxSharpe(
   riskFreeRate: number,
   tickers: string[],
   sectors: string[],
-  constraints: OptimizationConstraints,
-  maxIter: number = 1000
+  constraints: OptimizationConstraints
 ): number[] {
   const n = cov.length;
-  let w = new Array(n).fill(1 / n);
 
-  // Daily risk-free rate
+  // Excess returns (daily scale, matching covariance)
   const rfDaily = riskFreeRate / 252;
-  // Daily expected returns
-  const muDaily = mu.map(m => m / 252);
+  const excessMu = mu.map(m => m / 252 - rfDaily);
 
-  let bestSharpe = -Infinity;
-  let bestW = [...w];
+  const covInv = invertMatrix(cov);
 
-  const lr0 = 0.3;
+  if (covInv) {
+    const SigInvExcess = matVecMul(covInv, excessMu);
+    const ones = new Array(n).fill(1);
+    const denom = dotProduct(ones, SigInvExcess);
 
-  for (let iter = 0; iter < maxIter; iter++) {
-    const sigW = matVecMul(cov, w);
-    const portVar = dotProduct(w, sigW);
-    const portVol = Math.sqrt(Math.max(1e-12, portVar));
-    const portRet = dotProduct(w, muDaily);
-    const excess = portRet - rfDaily;
+    if (Math.abs(denom) > 1e-12) {
+      let w = SigInvExcess.map(v => v / denom);
 
-    // Gradient of negative Sharpe
-    // d(-Sharpe)/dw = -(mu * portVol - excess * sigW / portVol) / portVar
-    const grad = muDaily.map((mi, i) =>
-      -(mi * portVol - excess * sigW[i] / portVol) / portVar
-    );
+      // Long-only: clamp negatives
+      w = w.map(wi => Math.max(0, wi));
+      const wSum = w.reduce((a, b) => a + b, 0);
+      if (wSum > 1e-12) {
+        w = w.map(wi => wi / wSum);
 
-    const lr = lr0 / (1 + iter * 0.01);
-    const wNew = w.map((wi, i) => wi - lr * grad[i]);
+        for (let round = 0; round < 3; round++) {
+          w = applyConstraints(w, tickers, sectors, constraints);
+          w = normalize(w);
+        }
 
-    let wProj = projectOntoSimplex(wNew);
-    wProj = applyConstraints(wProj, tickers, sectors, constraints);
-    wProj = normalize(wProj);
-
-    const newVol = portfolioVol(wProj, cov);
-    const newRet = dotProduct(wProj, muDaily);
-    const newSharpe = newVol > 0 ? (newRet - rfDaily) / newVol : 0;
-
-    if (newSharpe > bestSharpe) {
-      bestSharpe = newSharpe;
-      bestW = [...wProj];
+        return w;
+      }
     }
-
-    w = wProj;
   }
 
-  return bestW;
+  // Fallback: weight by excess return / variance (reward-to-risk)
+  const rtr = mu.map((m, i) => {
+    const excess = m - riskFreeRate;
+    const vol = cov[i][i] > 1e-12 ? cov[i][i] : 1;
+    return Math.max(0, excess / vol);
+  });
+  let w = normalize(rtr);
+  for (let round = 0; round < 3; round++) {
+    w = applyConstraints(w, tickers, sectors, constraints);
+    w = normalize(w);
+  }
+  return w;
 }
 
 /**
@@ -535,52 +533,42 @@ function optimizeRiskParity(
 
 /**
  * Maximum Diversification: maximize DR = (w'sigma) / sqrt(w'Sigma*w).
+ * Closed-form: w* ∝ Σ⁻¹σ (equivalent to min-variance on correlation matrix).
  */
 function optimizeMaxDiversification(
   cov: number[][],
   tickers: string[],
   sectors: string[],
-  constraints: OptimizationConstraints,
-  maxIter: number = 1000
+  constraints: OptimizationConstraints
 ): number[] {
   const n = cov.length;
-  const sigma = cov.map((row, i) => Math.sqrt(Math.max(0, row[i])));
-  let w = new Array(n).fill(1 / n);
-  let bestDR = -Infinity;
-  let bestW = [...w];
+  const sigma = cov.map((row, i) => Math.sqrt(Math.max(1e-12, row[i])));
 
-  const lr0 = 0.3;
-
-  for (let iter = 0; iter < maxIter; iter++) {
-    const sigW = matVecMul(cov, w);
-    const portVar = dotProduct(w, sigW);
-    const portVol = Math.sqrt(Math.max(1e-12, portVar));
-    const wSigma = dotProduct(w, sigma);
-
-    // Gradient of -DR
-    const grad = sigma.map((si, i) =>
-      -(si * portVol - wSigma * sigW[i] / portVol) / portVar
-    );
-
-    const lr = lr0 / (1 + iter * 0.01);
-    const wNew = w.map((wi, i) => wi - lr * grad[i]);
-
-    let wProj = projectOntoSimplex(wNew);
-    wProj = applyConstraints(wProj, tickers, sectors, constraints);
-    wProj = normalize(wProj);
-
-    const newVol = portfolioVol(wProj, cov);
-    const newDR = newVol > 0 ? dotProduct(wProj, sigma) / newVol : 0;
-
-    if (newDR > bestDR) {
-      bestDR = newDR;
-      bestW = [...wProj];
+  // Closed-form: w* ∝ Σ⁻¹σ
+  const covInv = invertMatrix(cov);
+  if (covInv) {
+    const SigInvSigma = matVecMul(covInv, sigma);
+    // Clamp negatives (long-only) and normalize
+    let w = SigInvSigma.map(v => Math.max(0, v));
+    const wSum = w.reduce((a, b) => a + b, 0);
+    if (wSum > 1e-12) {
+      w = w.map(wi => wi / wSum);
+      for (let round = 0; round < 3; round++) {
+        w = applyConstraints(w, tickers, sectors, constraints);
+        w = normalize(w);
+      }
+      return w;
     }
-
-    w = wProj;
   }
 
-  return bestW;
+  // Fallback: weight by inverse volatility (maximizes diversification heuristically)
+  const invVol = sigma.map(s => s > 1e-12 ? 1 / s : 0);
+  let w = normalize(invVol);
+  for (let round = 0; round < 3; round++) {
+    w = applyConstraints(w, tickers, sectors, constraints);
+    w = normalize(w);
+  }
+  return w;
 }
 
 // ============================================================================
