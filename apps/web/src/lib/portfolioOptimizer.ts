@@ -316,40 +316,102 @@ function projectOntoSimplex(v: number[]): number[] {
 /**
  * Apply box constraints (max/min position, sector limits).
  */
-function applyConstraints(
+/**
+ * Apply box + sector constraints and renormalize to sum=1.
+ * Uses iterative projection: clip-to-box → scale-sector → redistribute excess.
+ * Converges in ~20 rounds even for highly concentrated portfolios.
+ */
+function applyConstraintsAndNormalize(
   w: number[],
   tickers: string[],
   sectors: string[],
-  constraints: OptimizationConstraints
+  constraints: OptimizationConstraints,
+  maxRounds: number = 50
 ): number[] {
-  const result = [...w];
+  let result = [...w];
+  const n = result.length;
+  const maxPos = constraints.maxPositionSize;
+  const minPos = constraints.minPositionSize;
+  const maxSec = constraints.maxSectorExposure;
 
-  // Box constraints
-  for (let i = 0; i < result.length; i++) {
-    if (result[i] > constraints.maxPositionSize) {
-      result[i] = constraints.maxPositionSize;
+  for (let round = 0; round < maxRounds; round++) {
+    let changed = false;
+
+    // 1. Long-only + box constraints
+    for (let i = 0; i < n; i++) {
+      if (result[i] < 0) { result[i] = 0; changed = true; }
+      if (minPos > 0) {
+        // Force inclusion: every position gets at least minPos
+        if (result[i] < minPos) { result[i] = minPos; changed = true; }
+      } else {
+        // Allow exclusion: zero out tiny positions
+        if (result[i] > 0 && result[i] < 0.005) { result[i] = 0; changed = true; }
+      }
+      if (result[i] > maxPos) { result[i] = maxPos; changed = true; }
     }
-    if (result[i] > 0 && result[i] < constraints.minPositionSize) {
-      result[i] = 0; // Below minimum → zero out
+
+    // 2. Sector constraints
+    const sectorWeights: Record<string, { total: number; indices: number[] }> = {};
+    for (let i = 0; i < n; i++) {
+      const s = sectors[i] || 'Unknown';
+      if (!sectorWeights[s]) sectorWeights[s] = { total: 0, indices: [] };
+      sectorWeights[s].total += result[i];
+      sectorWeights[s].indices.push(i);
     }
-  }
-
-  // Sector constraints
-  const sectorWeights: Record<string, { total: number; indices: number[] }> = {};
-  for (let i = 0; i < sectors.length; i++) {
-    const s = sectors[i] || 'Unknown';
-    if (!sectorWeights[s]) sectorWeights[s] = { total: 0, indices: [] };
-    sectorWeights[s].total += result[i];
-    sectorWeights[s].indices.push(i);
-  }
-
-  for (const sec of Object.values(sectorWeights)) {
-    if (sec.total > constraints.maxSectorExposure && sec.total > 0) {
-      const scale = constraints.maxSectorExposure / sec.total;
-      for (const idx of sec.indices) {
-        result[idx] *= scale;
+    for (const sec of Object.values(sectorWeights)) {
+      if (sec.total > maxSec && sec.total > 0) {
+        const scale = maxSec / sec.total;
+        for (const idx of sec.indices) result[idx] *= scale;
+        changed = true;
       }
     }
+
+    // 3. Normalize to sum=1
+    const sum = result.reduce((a, b) => a + b, 0);
+    if (sum <= 0) { result = new Array(n).fill(1 / n); continue; }
+
+    if (Math.abs(sum - 1) > 1e-10) {
+      const capped = result.map(wi => wi >= maxPos - 1e-10);
+      const zero = result.map(wi => wi < 1e-12);
+      const free = result.map((_, i) => !capped[i] && !zero[i]);
+
+      const cappedSum = result.reduce((s, wi, i) => s + (capped[i] ? wi : 0), 0);
+      const freeSum = result.reduce((s, wi, i) => s + (free[i] ? wi : 0), 0);
+      const targetFree = 1 - cappedSum;
+
+      if (targetFree <= 1e-12) {
+        // Too many capped positions exceed budget — scale them down proportionally
+        for (let i = 0; i < n; i++) {
+          result[i] = capped[i] ? result[i] * (1 / cappedSum) : 0;
+        }
+        changed = true;
+      } else if (freeSum > 1e-12) {
+        // Scale free (non-capped, non-zero) positions to fill remaining
+        const freeScale = targetFree / freeSum;
+        for (let i = 0; i < n; i++) {
+          if (free[i]) result[i] *= freeScale;
+        }
+      } else {
+        // All non-zero positions are capped but sum < 1 — must activate zero positions
+        const zeroIdx: number[] = [];
+        for (let i = 0; i < n; i++) if (zero[i]) zeroIdx.push(i);
+        if (zeroIdx.length > 0) {
+          const deficit = targetFree;
+          const perZero = Math.min(deficit / zeroIdx.length, maxPos);
+          for (const idx of zeroIdx) result[idx] = perZero;
+          changed = true;
+        } else {
+          // No zero positions — everyone is capped, scale down
+          result = result.map(wi => wi / sum);
+          changed = true;
+        }
+      }
+    }
+
+    // Check convergence
+    const allBoxOk = result.every(wi => wi <= maxPos + 1e-10);
+    const sumOk = Math.abs(result.reduce((a, b) => a + b, 0) - 1) < 1e-8;
+    if (!changed && allBoxOk && sumOk) break;
   }
 
   return result;
@@ -403,11 +465,7 @@ function optimizeMinVariance(
       w = w.map(wi => Math.max(0, wi));
       w = normalize(w);
 
-      // Apply constraints iteratively (3 rounds for convergence)
-      for (let round = 0; round < 3; round++) {
-        w = applyConstraints(w, tickers, sectors, constraints);
-        w = normalize(w);
-      }
+      w = applyConstraintsAndNormalize(w, tickers, sectors, constraints);
 
       return w;
     }
@@ -416,10 +474,7 @@ function optimizeMinVariance(
   // Fallback: inverse-variance weighting
   const invVar = cov.map((row, i) => row[i] > 1e-12 ? 1 / row[i] : 0);
   let w = normalize(invVar);
-  for (let round = 0; round < 3; round++) {
-    w = applyConstraints(w, tickers, sectors, constraints);
-    w = normalize(w);
-  }
+  w = applyConstraintsAndNormalize(w, tickers, sectors, constraints);
   return w;
 }
 
@@ -458,10 +513,7 @@ function optimizeMaxSharpe(
       if (wSum > 1e-12) {
         w = w.map(wi => wi / wSum);
 
-        for (let round = 0; round < 3; round++) {
-          w = applyConstraints(w, tickers, sectors, constraints);
-          w = normalize(w);
-        }
+        w = applyConstraintsAndNormalize(w, tickers, sectors, constraints);
 
         return w;
       }
@@ -475,10 +527,7 @@ function optimizeMaxSharpe(
     return Math.max(0, excess / vol);
   });
   let w = normalize(rtr);
-  for (let round = 0; round < 3; round++) {
-    w = applyConstraints(w, tickers, sectors, constraints);
-    w = normalize(w);
-  }
+  w = applyConstraintsAndNormalize(w, tickers, sectors, constraints);
   return w;
 }
 
@@ -520,9 +569,8 @@ function optimizeRiskParity(
     // Normalize
     let wNorm = normalize(wNew);
 
-    // Apply constraints
-    wNorm = applyConstraints(wNorm, tickers, sectors, constraints);
-    wNorm = normalize(wNorm);
+    // Apply constraints (already normalizes to sum=1)
+    wNorm = applyConstraintsAndNormalize(wNorm, tickers, sectors, constraints);
 
     // Damped update for stability
     w = w.map((wi, i) => 0.5 * wi + 0.5 * wNorm[i]);
@@ -553,10 +601,7 @@ function optimizeMaxDiversification(
     const wSum = w.reduce((a, b) => a + b, 0);
     if (wSum > 1e-12) {
       w = w.map(wi => wi / wSum);
-      for (let round = 0; round < 3; round++) {
-        w = applyConstraints(w, tickers, sectors, constraints);
-        w = normalize(w);
-      }
+      w = applyConstraintsAndNormalize(w, tickers, sectors, constraints);
       return w;
     }
   }
@@ -564,10 +609,7 @@ function optimizeMaxDiversification(
   // Fallback: weight by inverse volatility (maximizes diversification heuristically)
   const invVol = sigma.map(s => s > 1e-12 ? 1 / s : 0);
   let w = normalize(invVol);
-  for (let round = 0; round < 3; round++) {
-    w = applyConstraints(w, tickers, sectors, constraints);
-    w = normalize(w);
-  }
+  w = applyConstraintsAndNormalize(w, tickers, sectors, constraints);
   return w;
 }
 

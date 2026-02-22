@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
       tickers,
       mode = 'min_variance',
       constraints = {},
+      forceIncludeAll = true,
       lookbackDays = 504,
       portfolioValueNOK = 10_000_000,
       riskFreeRate = 0.045,
@@ -242,10 +243,16 @@ export async function POST(req: NextRequest) {
     const result = optimizePortfolio(baseInput);
 
     // 10. Run all modes for comparison
+    const mlReturnsAnnualized = tickers.map((t: string) => {
+      const pred = predMap.get(t);
+      return pred ? pred.ensemble * 12 : 0;
+    });
+
     const modeComparison: Record<string, {
       expectedReturn: number; volatility: number; sharpeRatio: number;
       sortinoRatio: number; maxDrawdown: number; var95: number;
       effectivePositions: number; diversificationRatio: number;
+      mlExpectedReturn: number; mlSharpe: number;
       topHoldings: { ticker: string; weight: number }[];
     }> = {};
 
@@ -261,6 +268,13 @@ export async function POST(req: NextRequest) {
           : undefined,
       };
       const modeResult = optimizePortfolio(modeInput);
+
+      // Compute ML-based expected return for this mode's weights
+      const mlExpRet = modeResult.weights.reduce((sum, w, i) => sum + w * mlReturnsAnnualized[i], 0);
+      const mlSharpe = modeResult.portfolioVolatility > 0
+        ? (mlExpRet - riskFreeRate) / modeResult.portfolioVolatility
+        : 0;
+
       modeComparison[m] = {
         expectedReturn: modeResult.portfolioReturn,
         volatility: modeResult.portfolioVolatility,
@@ -270,6 +284,8 @@ export async function POST(req: NextRequest) {
         var95: modeResult.var95,
         effectivePositions: modeResult.effectivePositions,
         diversificationRatio: modeResult.diversificationRatio,
+        mlExpectedReturn: mlExpRet,
+        mlSharpe,
         topHoldings: modeResult.weights
           .map((w, i) => ({ ticker: tickers[i], weight: w }))
           .filter(h => h.weight > 0.01)
@@ -373,6 +389,135 @@ export async function POST(req: NextRequest) {
       });
     } catch {
       fxExposure = [{ currency: 'NOK', weightedExposure: 100 }];
+    }
+
+    // 13b. Fetch multivariate portfolio regime from ML service (non-blocking)
+    type RegimeState = {
+      current_state: number;
+      current_state_label: string;
+      current_probs: number[];
+      state_labels: string[];
+      transition_matrix: number[][];
+      state_stats: {
+        label: string;
+        mean_return: number;
+        annualized_vol: number;
+        avg_correlation: number;
+        expected_duration_days: number;
+        frequency: number;
+        n_observations: number;
+        per_asset_returns: Record<string, number>;
+      }[];
+      regime_history: {
+        state: number;
+        label: string;
+        probs: number[];
+        date?: string;
+      }[];
+      regime_conditional_returns: Record<string, Record<string, number>>;
+      bic: number;
+      n_observations: number;
+    };
+    let portfolioRegime: RegimeState | null = null;
+    try {
+      const mlServiceUrl = process.env.ML_SERVICE_URL || 'http://localhost:8000';
+      const regimeResponse = await fetch(`${mlServiceUrl}/regime/multivariate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tickers, benchmark: 'OBX', n_states: 3 }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (regimeResponse.ok) {
+        portfolioRegime = await regimeResponse.json();
+      }
+    } catch {
+      // ML service not available — continue with per-holding regime only
+    }
+
+    // 13c. Fetch spectral clustering from ML service (non-blocking)
+    type ClusterAssignment = {
+      cluster_id: number;
+      z_score: number;
+      half_life: number | null;
+      signal: string;
+    };
+    type ClusterInfo = {
+      id: number;
+      tickers: string[];
+      n_members: number;
+      half_life: number | null;
+      z_score: number;
+      ou_mu: number;
+      ou_sigma: number;
+      ou_phi: number;
+      intra_cluster_correlation: number;
+      mean_reversion_signal: string;
+    };
+    let clusterData: {
+      n_clusters: number;
+      clusters: ClusterInfo[];
+      assignments: Record<string, ClusterAssignment>;
+      silhouette_score: number;
+    } | null = null;
+    try {
+      const mlServiceUrl2 = process.env.ML_SERVICE_URL || 'http://localhost:8000';
+      const clusterResponse = await fetch(`${mlServiceUrl2}/clustering/spectral`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tickers, benchmark: 'OBX' }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (clusterResponse.ok) {
+        clusterData = await clusterResponse.json();
+      }
+    } catch {
+      // ML service not available — continue without clustering
+    }
+
+    // 13d. Fetch combined signals from ML service (non-blocking)
+    type CombinedSignal = {
+      ticker: string;
+      combined_signal: number;
+      classification: string;
+      component_signals: Record<string, number>;
+      weights_used: Record<string, number>;
+      regime_adjusted: boolean;
+    };
+    let combinedSignals: CombinedSignal[] | null = null;
+    try {
+      const mlServiceUrl3 = process.env.ML_SERVICE_URL || 'http://localhost:8000';
+      // Build signal combine request from data we already have
+      const mlPreds: Record<string, number> = {};
+      const momData: Record<string, Record<string, number>> = {};
+      const valData: Record<string, Record<string, number>> = {};
+      for (const t of tickers) {
+        const pred = predMap.get(t);
+        if (pred) mlPreds[t] = pred.ensemble;
+        const factors = factorMap.get(t);
+        if (factors) {
+          momData[t] = { mom1m: factors.mom1m, mom6m: factors.mom6m, mom11m: factors.mom11m };
+          valData[t] = { ep: factors.ep, bm: factors.bm, dy: factors.dy };
+        }
+      }
+      const combineResponse = await fetch(`${mlServiceUrl3}/signals/combine`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tickers,
+          ml_predictions: Object.keys(mlPreds).length > 0 ? mlPreds : null,
+          momentum_data: Object.keys(momData).length > 0 ? momData : null,
+          valuation_data: Object.keys(valData).length > 0 ? valData : null,
+          cluster_assignments: clusterData?.assignments ?? null,
+          regime_label: portfolioRegime?.current_state_label ?? null,
+        }),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (combineResponse.ok) {
+        const combineResult = await combineResponse.json();
+        combinedSignals = combineResult.signals;
+      }
+    } catch {
+      // ML service not available
     }
 
     // 14. Compute regime + vol metrics for each holding
@@ -500,6 +645,8 @@ export async function POST(req: NextRequest) {
         researchCount: research?.count ?? 0,
         researchLatest: research?.latestDate ?? null,
         alerts,
+        cluster: clusterData?.assignments?.[t] ?? null,
+        combinedSignal: combinedSignals?.find(s => s.ticker === t) ?? null,
       };
     });
 
@@ -598,7 +745,9 @@ export async function POST(req: NextRequest) {
       fxExposure,
       regimeContext: {
         holdingRegimes,
+        portfolioRegime,
       },
+      clusterAnalysis: clusterData,
       stressScenarios: result.stressScenarios,
       holdingSignals,
       riskAlerts,

@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, Bar, Cell, PieChart, Pie,
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
 } from "recharts";
 
 // ============================================================================
@@ -90,6 +91,36 @@ interface HoldingSignal {
   researchCount: number;
   researchLatest: string | null;
   alerts: string[];
+  cluster?: {
+    cluster_id: number;
+    z_score: number;
+    half_life: number | null;
+    signal: string;
+  } | null;
+  combinedSignal?: {
+    combined_signal: number;
+    classification: string;
+    component_signals: Record<string, number>;
+    weights_used: Record<string, number>;
+    regime_adjusted: boolean;
+  } | null;
+}
+
+interface ClusterInfo {
+  id: number;
+  tickers: string[];
+  n_members: number;
+  half_life: number | null;
+  z_score: number;
+  intra_cluster_correlation: number;
+  mean_reversion_signal: string;
+}
+
+interface ClusterAnalysis {
+  n_clusters: number;
+  clusters: ClusterInfo[];
+  assignments: Record<string, { cluster_id: number; z_score: number; half_life: number | null; signal: string }>;
+  silhouette_score: number;
 }
 
 interface RiskAlert {
@@ -106,6 +137,8 @@ interface ModeMetrics {
   var95: number;
   effectivePositions: number;
   diversificationRatio: number;
+  mlExpectedReturn: number;
+  mlSharpe: number;
   topHoldings: { ticker: string; weight: number }[];
 }
 
@@ -118,7 +151,36 @@ interface OptimizationResult {
   correlationMatrix: { tickers: string[]; values: number[][] };
   sectorAllocation: { sector: string; weight: number }[];
   fxExposure: { currency: string; weightedExposure: number }[];
-  regimeContext: { holdingRegimes: HoldingRegime[] };
+  regimeContext: {
+    holdingRegimes: HoldingRegime[];
+    portfolioRegime?: {
+      current_state: number;
+      current_state_label: string;
+      current_probs: number[];
+      state_labels: string[];
+      transition_matrix: number[][];
+      state_stats: {
+        label: string;
+        mean_return: number;
+        annualized_vol: number;
+        avg_correlation: number;
+        expected_duration_days: number;
+        frequency: number;
+        n_observations: number;
+        per_asset_returns: Record<string, number>;
+      }[];
+      regime_history: {
+        state: number;
+        label: string;
+        probs: number[];
+        date?: string;
+      }[];
+      regime_conditional_returns: Record<string, Record<string, number>>;
+      bic: number;
+      n_observations: number;
+    } | null;
+  };
+  clusterAnalysis?: ClusterAnalysis | null;
   stressScenarios: StressScenario[];
   holdingSignals?: HoldingSignal[];
   riskAlerts?: RiskAlert[];
@@ -165,6 +227,26 @@ const REGIME_COLORS: Record<string, string> = {
   "Normal": "#9E9E9E",
   "Low & Contracting": "#2196F3",
   "Low & Stable": "#4CAF50",
+};
+
+const HMM_REGIME_COLORS: Record<string, string> = {
+  "Crisis": "#FF1744",
+  "Neutral": "#FF9800",
+  "Bull": "#4CAF50",
+  "Bear": "#FF1744",
+};
+
+const CLUSTER_COLORS = [
+  "#3b82f6", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6",
+  "#06b6d4", "#f97316", "#ec4899",
+];
+
+const MR_SIGNAL_COLORS: Record<string, string> = {
+  "Strong Buy": "#00c853",
+  "Buy": "#4caf50",
+  "Neutral": "#9e9e9e",
+  "Sell": "#ef5350",
+  "Strong Sell": "#d50000",
 };
 
 const SECTOR_COLORS = [
@@ -256,6 +338,7 @@ export default function PortfolioPage() {
   const [covMethod, setCovMethod] = useState("shrinkage");
   const [maxPosition, setMaxPosition] = useState(0.10);
   const [maxSector, setMaxSector] = useState(0.30);
+  const [forceIncludeAll, setForceIncludeAll] = useState(true);
 
   // Results
   const [result, setResult] = useState<OptimizationResult | null>(null);
@@ -272,6 +355,8 @@ export default function PortfolioPage() {
   const [riskSortAsc, setRiskSortAsc] = useState(false);
   const [holdingSortKey, setHoldingSortKey] = useState<string>("weight");
   const [holdingSortAsc, setHoldingSortAsc] = useState(false);
+  const [hoveredMode, setHoveredMode] = useState<string | null>(null);
+  const [hoveredAsset, setHoveredAsset] = useState<string | null>(null);
 
   // Check for existing session
   useEffect(() => {
@@ -374,14 +459,15 @@ export default function PortfolioPage() {
     setSelectedTickers(selectedTickers.filter(t => t !== ticker));
   };
 
-  // Run optimization
-  const runOptimization = async () => {
+  // Run optimization (accepts optional overrideMode for strategy switching)
+  const runOptimization = async (overrideMode?: string) => {
     if (selectedTickers.length < 2) {
       setError("Select at least 2 tickers");
       return;
     }
     setLoading(true);
     setError(null);
+    const useMode = overrideMode || mode;
     try {
       const res = await fetch("/api/portfolio/optimize", {
         method: "POST",
@@ -391,13 +477,14 @@ export default function PortfolioPage() {
         },
         body: JSON.stringify({
           tickers: selectedTickers,
-          mode,
+          mode: useMode,
           constraints: {
             maxPositionSize: maxPosition,
-            minPositionSize: 0.01,
+            minPositionSize: forceIncludeAll ? 0.01 : 0,
             maxSectorExposure: maxSector,
             excludeTickers: [],
           },
+          forceIncludeAll,
           lookbackDays,
           portfolioValueNOK,
           riskFreeRate: 0.045,
@@ -566,6 +653,16 @@ export default function PortfolioPage() {
 
   return (
     <main style={{ padding: "20px 24px", maxWidth: 1400, margin: "0 auto" }}>
+      {/* Loading bar for strategy switching */}
+      {loading && result && (
+        <>
+          <style dangerouslySetInnerHTML={{ __html: "@keyframes loadSlide{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}" }} />
+          <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: 2, zIndex: 100, background: "#0d1117", overflow: "hidden" }}>
+            <div style={{ height: "100%", width: "40%", background: "linear-gradient(90deg, transparent, #3b82f6, #10b981, transparent)", animation: "loadSlide 1.2s ease-in-out infinite" }} />
+          </div>
+        </>
+      )}
+
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
@@ -584,316 +681,537 @@ export default function PortfolioPage() {
         </button>
       </div>
 
-      {/* === CONSTRUCTION + RISK DASHBOARD === */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 16, marginBottom: 20 }}>
-        {/* LEFT: Construction Panel */}
-        <div style={cardStyle}>
-          <div style={sectionTitle}>Portfolio Construction</div>
-
-          {/* Saved Configs */}
-          {configs.length > 0 && (
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", marginBottom: 4 }}>
-                SAVED PORTFOLIOS
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                {configs.map(c => (
-                  <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <button
-                      onClick={() => loadConfig(c)}
-                      style={{ ...btnStyle(false), flex: 1, textAlign: "left", fontSize: 10, padding: "4px 8px" }}
-                    >
-                      {c.name} ({c.tickers.length} tickers)
-                    </button>
-                    <button
-                      onClick={() => deleteConfig(c.id)}
-                      style={{ background: "none", border: "none", color: "#ef4444", fontSize: 10, cursor: "pointer", fontFamily: "monospace" }}
-                    >
-                      x
-                    </button>
+      {/* === SAVED PORTFOLIOS BAR === */}
+      {configs.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", letterSpacing: "0.08em" }}>
+              SAVED PORTFOLIOS
+            </div>
+            <div style={{ flex: 1, height: 1, background: "#30363d" }} />
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {configs.map(c => {
+              const isLoaded = selectedTickers.length === c.tickers.length && c.tickers.every(t => selectedTickers.includes(t));
+              return (
+                <div
+                  key={c.id}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    padding: "8px 14px", borderRadius: 6,
+                    background: isLoaded ? "rgba(59,130,246,0.12)" : "#161b22",
+                    border: `1px solid ${isLoaded ? "rgba(59,130,246,0.4)" : "#30363d"}`,
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                  onClick={() => loadConfig(c)}
+                >
+                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: isLoaded ? "#3b82f6" : "#484f58" }} />
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, fontFamily: "monospace", color: isLoaded ? "#3b82f6" : "#fff" }}>
+                      {c.name}
+                    </div>
+                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>
+                      {c.tickers.length} assets · {MODE_LABELS[c.optimization_mode] || c.optimization_mode} · {c.covariance_method}
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Ticker Input */}
-          <div style={{ marginBottom: 12, position: "relative" }}>
-            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", marginBottom: 4 }}>
-              ADD TICKERS ({selectedTickers.length} selected)
-            </div>
-            <input
-              value={tickerInput}
-              onChange={e => setTickerInput(e.target.value)}
-              placeholder="Search ticker or name..."
-              style={{
-                width: "100%",
-                padding: "8px 10px",
-                background: "#0d1117",
-                border: "1px solid #30363d",
-                borderRadius: 4,
-                color: "#fff",
-                fontSize: 12,
-                fontFamily: "monospace",
-                boxSizing: "border-box",
-              }}
-            />
-            {/* Dropdown */}
-            {filteredStocks.length > 0 && (
-              <div style={{
-                position: "absolute",
-                top: "100%",
-                left: 0,
-                right: 0,
-                background: "#161b22",
-                border: "1px solid #30363d",
-                borderRadius: 4,
-                zIndex: 10,
-                maxHeight: 200,
-                overflowY: "auto",
-              }}>
-                {filteredStocks.map(s => (
-                  <div
-                    key={s.ticker}
-                    onClick={() => addTicker(s.ticker)}
-                    style={{
-                      padding: "6px 10px",
-                      fontSize: 11,
-                      fontFamily: "monospace",
-                      cursor: "pointer",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      borderBottom: "1px solid #30363d",
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.background = "#0d1117")}
-                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); deleteConfig(c.id); }}
+                    style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", fontSize: 14, cursor: "pointer", fontFamily: "monospace", padding: "0 4px", lineHeight: 1 }}
+                    onMouseEnter={e => (e.currentTarget.style.color = "#ef4444")}
+                    onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.2)")}
                   >
-                    <span style={{ fontWeight: 600 }}>{s.ticker}</span>
-                    <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 10 }}>{s.name.slice(0, 20)}</span>
-                  </div>
-                ))}
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* === PORTFOLIO CONSTRUCTION === */}
+      <div style={{ ...cardStyle, marginBottom: 20, padding: 0, overflow: "hidden" }}>
+        {/* Step 1: Asset Selection */}
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid #30363d" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+            <span style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              width: 22, height: 22, borderRadius: "50%", background: "#3b82f6", color: "#fff",
+              fontSize: 11, fontWeight: 800, fontFamily: "monospace",
+            }}>1</span>
+            <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "monospace", color: "#fff" }}>Select Assets</span>
+            <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>
+              Choose equities from the OSE universe for your portfolio
+            </span>
+          </div>
+
+          <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+            {/* Ticker Input */}
+            <div style={{ flex: 1, position: "relative" }}>
+              <div style={{ position: "relative" }}>
+                <input
+                  value={tickerInput}
+                  onChange={e => setTickerInput(e.target.value)}
+                  placeholder={selectedTickers.length === 0 ? "Type to search by ticker or company name..." : "Add more tickers..."}
+                  style={{
+                    width: "100%",
+                    padding: "10px 14px",
+                    paddingLeft: 36,
+                    background: "#0d1117",
+                    border: "1px solid #30363d",
+                    borderRadius: 6,
+                    color: "#fff",
+                    fontSize: 13,
+                    fontFamily: "monospace",
+                    boxSizing: "border-box",
+                    outline: "none",
+                  }}
+                  onFocus={e => (e.currentTarget.style.borderColor = "#3b82f6")}
+                  onBlur={e => (e.currentTarget.style.borderColor = "#30363d")}
+                />
+                <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "rgba(255,255,255,0.3)", fontSize: 14 }}>
+                  +
+                </span>
               </div>
-            )}
+
+              {/* Enhanced Dropdown */}
+              {filteredStocks.length > 0 && (
+                <div style={{
+                  position: "absolute",
+                  top: "calc(100% + 4px)",
+                  left: 0,
+                  right: 0,
+                  background: "#161b22",
+                  border: "1px solid #3b82f6",
+                  borderRadius: 6,
+                  zIndex: 20,
+                  maxHeight: 280,
+                  overflowY: "auto",
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+                }}>
+                  {filteredStocks.map(s => {
+                    const sectorColor = SECTOR_COLORS[availableStocks.findIndex(a => a.sector === s.sector) % SECTOR_COLORS.length] || "#484f58";
+                    return (
+                      <div
+                        key={s.ticker}
+                        onClick={() => addTicker(s.ticker)}
+                        style={{
+                          padding: "8px 14px",
+                          fontSize: 12,
+                          fontFamily: "monospace",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          borderBottom: "1px solid #21262d",
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.background = "rgba(59,130,246,0.08)")}
+                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                      >
+                        <span style={{ fontWeight: 700, color: "#fff", minWidth: 50 }}>{s.ticker}</span>
+                        <span style={{ color: "rgba(255,255,255,0.5)", flex: 1, fontSize: 11 }}>{s.name}</span>
+                        <span style={{
+                          fontSize: 8, padding: "2px 6px", borderRadius: 3,
+                          background: `${sectorColor}20`, color: sectorColor,
+                          fontWeight: 600, whiteSpace: "nowrap",
+                        }}>{s.sector}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Selected count */}
+            <div style={{
+              padding: "10px 16px", borderRadius: 6, background: "#0d1117",
+              border: "1px solid #30363d", textAlign: "center", minWidth: 80,
+            }}>
+              <div style={{ fontSize: 20, fontWeight: 800, fontFamily: "monospace", color: selectedTickers.length >= 2 ? "#3b82f6" : "#ef4444" }}>
+                {selectedTickers.length}
+              </div>
+              <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
+                {selectedTickers.length === 1 ? "ASSET" : "ASSETS"}
+              </div>
+            </div>
           </div>
 
           {/* Selected Tickers Chips */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 14 }}>
-            {selectedTickers.map(t => (
-              <span key={t} style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
-                padding: "3px 8px",
-                background: "#0d1117",
-                borderRadius: 3,
-                fontSize: 10,
-                fontFamily: "monospace",
-                fontWeight: 600,
-                border: "1px solid #30363d",
-              }}>
-                {t}
-                <span onClick={() => removeTicker(t)} style={{ cursor: "pointer", color: "rgba(255,255,255,0.5)" }}>
-                  x
-                </span>
-              </span>
-            ))}
-          </div>
-
-          {/* Mode */}
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", marginBottom: 4 }}>
-              OPTIMIZATION MODE
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-              {Object.entries(MODE_LABELS).map(([key, label]) => (
-                <button key={key} onClick={() => setMode(key)} style={btnStyle(mode === key)}>
-                  {label}
+          {selectedTickers.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+              {selectedTickers.map(t => {
+                const stock = availableStocks.find(s => s.ticker === t);
+                const sectorIdx = stock ? availableStocks.findIndex(a => a.sector === stock.sector) : 0;
+                const sectorColor = SECTOR_COLORS[sectorIdx % SECTOR_COLORS.length] || "#484f58";
+                return (
+                  <span key={t} style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "5px 10px",
+                    background: "#0d1117",
+                    borderRadius: 5,
+                    fontSize: 11,
+                    fontFamily: "monospace",
+                    fontWeight: 600,
+                    border: "1px solid #30363d",
+                    borderLeft: `3px solid ${sectorColor}`,
+                  }}>
+                    {t}
+                    {stock && <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", fontWeight: 400 }}>{stock.name.slice(0, 12)}</span>}
+                    <span
+                      onClick={() => removeTicker(t)}
+                      style={{ cursor: "pointer", color: "rgba(255,255,255,0.3)", fontSize: 12, lineHeight: 1, marginLeft: 2 }}
+                      onMouseEnter={e => (e.currentTarget.style.color = "#ef4444")}
+                      onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.3)")}
+                    >
+                      ×
+                    </span>
+                  </span>
+                );
+              })}
+              {selectedTickers.length > 0 && (
+                <button
+                  onClick={() => setSelectedTickers([])}
+                  style={{
+                    padding: "5px 10px", borderRadius: 5, fontSize: 9, fontFamily: "monospace",
+                    background: "none", border: "1px dashed #30363d", color: "rgba(255,255,255,0.3)",
+                    cursor: "pointer",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = "#ef4444"; e.currentTarget.style.color = "#ef4444"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = "#30363d"; e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}
+                >
+                  Clear all
                 </button>
-              ))}
+              )}
             </div>
+          )}
+        </div>
+
+        {/* Step 2: Strategy Configuration */}
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid #30363d" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+            <span style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              width: 22, height: 22, borderRadius: "50%", background: "#10b981", color: "#fff",
+              fontSize: 11, fontWeight: 800, fontFamily: "monospace",
+            }}>2</span>
+            <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "monospace", color: "#fff" }}>Configure Strategy</span>
+            <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>
+              Choose optimization objective and parameters
+            </span>
           </div>
 
-          {/* Parameters */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
-            <div>
-              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", marginBottom: 2 }}>VALUE (NOK)</div>
+          {/* Optimization Mode Cards */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, marginBottom: 14 }}>
+            {([
+              { key: "equal", label: "Equal Weight", desc: "1/N allocation across all assets", icon: "=" },
+              { key: "min_variance", label: "Min Variance", desc: "Minimize portfolio volatility via Markowitz", icon: "▽" },
+              { key: "max_sharpe", label: "Max Sharpe", desc: "Maximize risk-adjusted return using ML forecasts", icon: "△" },
+              { key: "risk_parity", label: "Risk Parity", desc: "Equalize risk contribution per asset", icon: "⊜" },
+              { key: "max_diversification", label: "Max Diversification", desc: "Maximize diversification ratio w/σ", icon: "◎" },
+            ] as const).map(opt => {
+              const isActive = mode === opt.key;
+              const modeColor = ({ equal: "#9e9e9e", min_variance: "#3b82f6", max_sharpe: "#10b981", risk_parity: "#f59e0b", max_diversification: "#8b5cf6" } as Record<string, string>)[opt.key] || "#fff";
+              return (
+                <button
+                  key={opt.key}
+                  onClick={() => setMode(opt.key)}
+                  style={{
+                    padding: "12px 10px",
+                    borderRadius: 6,
+                    border: `1px solid ${isActive ? modeColor : "#30363d"}`,
+                    background: isActive ? `${modeColor}15` : "#0d1117",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    transition: "all 0.15s ease",
+                    position: "relative",
+                    overflow: "hidden",
+                  }}
+                >
+                  {isActive && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: modeColor }} />}
+                  <div style={{ fontSize: 16, marginBottom: 4, filter: isActive ? "none" : "grayscale(0.5)", opacity: isActive ? 1 : 0.5 }}>{opt.icon}</div>
+                  <div style={{
+                    fontSize: 10, fontWeight: 700, fontFamily: "monospace",
+                    color: isActive ? modeColor : "rgba(255,255,255,0.7)",
+                    marginBottom: 4,
+                  }}>
+                    {opt.label}
+                  </div>
+                  <div style={{ fontSize: 8, color: "rgba(255,255,255,0.35)", fontFamily: "monospace", lineHeight: 1.4 }}>
+                    {opt.desc}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Parameters Row */}
+          <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
+            <div style={{ flex: "0 0 auto" }}>
+              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", marginBottom: 4, letterSpacing: "0.05em" }}>
+                PORTFOLIO VALUE (NOK)
+              </div>
               <input
                 type="number"
                 value={portfolioValueNOK}
                 onChange={e => setPortfolioValueNOK(Number(e.target.value))}
                 style={{
-                  width: "100%", padding: "6px 8px", background: "#0d1117",
-                  border: "1px solid #30363d", borderRadius: 4,
-                  color: "#fff", fontSize: 11, fontFamily: "monospace", boxSizing: "border-box",
+                  width: 140, padding: "8px 10px", background: "#0d1117",
+                  border: "1px solid #30363d", borderRadius: 5,
+                  color: "#fff", fontSize: 12, fontFamily: "monospace", boxSizing: "border-box",
                 }}
               />
             </div>
-            <div>
-              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", marginBottom: 2 }}>LOOKBACK</div>
-              <div style={{ display: "flex", gap: 2 }}>
-                {[{ l: "1Y", v: 252 }, { l: "2Y", v: 504 }, { l: "3Y", v: 756 }].map(tf => (
-                  <button key={tf.v} onClick={() => setLookbackDays(tf.v)} style={{ ...btnStyle(lookbackDays === tf.v), padding: "6px 8px" }}>
+            <div style={{ flex: "0 0 auto" }}>
+              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", marginBottom: 4, letterSpacing: "0.05em" }}>
+                LOOKBACK WINDOW
+              </div>
+              <div style={{ display: "flex", gap: 3 }}>
+                {[{ l: "1Y", v: 252, desc: "252 days" }, { l: "2Y", v: 504, desc: "504 days" }, { l: "3Y", v: 756, desc: "756 days" }].map(tf => (
+                  <button key={tf.v} onClick={() => setLookbackDays(tf.v)} title={tf.desc} style={{
+                    ...btnStyle(lookbackDays === tf.v), padding: "8px 12px", borderRadius: 5,
+                  }}>
                     {tf.l}
                   </button>
                 ))}
               </div>
             </div>
-            <div>
-              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", marginBottom: 2 }}>MAX POS %</div>
+            <div style={{ flex: "0 0 auto" }}>
+              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", marginBottom: 4, letterSpacing: "0.05em" }}>
+                MAX POSITION
+              </div>
               <input
                 type="number"
                 value={Math.round(maxPosition * 100)}
                 onChange={e => setMaxPosition(Number(e.target.value) / 100)}
                 min={1} max={100}
                 style={{
-                  width: "100%", padding: "6px 8px", background: "#0d1117",
-                  border: "1px solid #30363d", borderRadius: 4,
-                  color: "#fff", fontSize: 11, fontFamily: "monospace", boxSizing: "border-box",
+                  width: 70, padding: "8px 10px", background: "#0d1117",
+                  border: "1px solid #30363d", borderRadius: 5,
+                  color: "#fff", fontSize: 12, fontFamily: "monospace", boxSizing: "border-box",
+                  textAlign: "center",
                 }}
               />
+              <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", marginLeft: 4 }}>%</span>
             </div>
-            <div>
-              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", marginBottom: 2 }}>COV METHOD</div>
-              <div style={{ display: "flex", gap: 2 }}>
-                {["shrinkage", "ewma", "sample"].map(cm => (
-                  <button key={cm} onClick={() => setCovMethod(cm)} style={{ ...btnStyle(covMethod === cm), padding: "6px 6px", fontSize: 9 }}>
-                    {cm.toUpperCase()}
+            <div style={{ flex: "0 0 auto" }}>
+              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", marginBottom: 4, letterSpacing: "0.05em" }}>
+                COVARIANCE METHOD
+              </div>
+              <div style={{ display: "flex", gap: 3 }}>
+                {([
+                  { key: "shrinkage", label: "SHRINKAGE", desc: "Ledoit-Wolf shrinkage toward diagonal" },
+                  { key: "ewma", label: "EWMA", desc: "Exponentially weighted, λ=0.94" },
+                  { key: "sample", label: "SAMPLE", desc: "Raw sample covariance matrix" },
+                ] as const).map(cm => (
+                  <button key={cm.key} onClick={() => setCovMethod(cm.key)} title={cm.desc} style={{
+                    ...btnStyle(covMethod === cm.key), padding: "8px 8px", fontSize: 9, borderRadius: 5,
+                  }}>
+                    {cm.label}
                   </button>
                 ))}
               </div>
             </div>
-          </div>
-
-          {/* Optimize Button */}
-          <button
-            onClick={runOptimization}
-            disabled={loading || selectedTickers.length < 2}
-            style={{
-              width: "100%",
-              padding: "12px 0",
-              background: loading ? "#30363d" : "#3b82f6",
-              color: "#fff",
-              border: "none",
-              borderRadius: 4,
-              fontSize: 13,
-              fontWeight: 700,
-              fontFamily: "monospace",
-              cursor: loading ? "wait" : "pointer",
-              letterSpacing: "0.05em",
-            }}
-          >
-            {loading ? "OPTIMIZING..." : "OPTIMIZE PORTFOLIO"}
-          </button>
-
-          {/* Save Button */}
-          {result && (
-            <div style={{ marginTop: 8 }}>
-              {!showSaveForm ? (
-                <button onClick={() => setShowSaveForm(true)} style={{ ...btnStyle(false), width: "100%", fontSize: 10 }}>
-                  Save Portfolio
+            <div style={{ flex: "0 0 auto" }}>
+              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", marginBottom: 4, letterSpacing: "0.05em" }}>
+                ALLOCATION
+              </div>
+              <div style={{ display: "flex", gap: 3 }}>
+                <button onClick={() => setForceIncludeAll(true)} title="All selected tickers get weight ≥ 1%" style={{
+                  ...btnStyle(forceIncludeAll), padding: "8px 8px", fontSize: 9, borderRadius: 5,
+                }}>
+                  ALL INCLUDED
                 </button>
-              ) : (
-                <div style={{ display: "flex", gap: 4 }}>
-                  <input
-                    value={saveName}
-                    onChange={e => setSaveName(e.target.value)}
-                    placeholder="Portfolio name..."
+                <button onClick={() => setForceIncludeAll(false)} title="Optimizer may exclude tickers (0% weight)" style={{
+                  ...btnStyle(!forceIncludeAll), padding: "8px 8px", fontSize: 9, borderRadius: 5,
+                }}>
+                  ALLOW ZERO
+                </button>
+              </div>
+            </div>
+            <div style={{ flex: 1 }} />
+
+            {/* Optimize Button */}
+            <button
+              onClick={() => runOptimization()}
+              disabled={loading || selectedTickers.length < 2}
+              style={{
+                padding: "10px 32px",
+                background: loading ? "#30363d" : selectedTickers.length < 2 ? "#21262d" : "linear-gradient(135deg, #3b82f6, #2563eb)",
+                color: selectedTickers.length < 2 ? "rgba(255,255,255,0.3)" : "#fff",
+                border: "none",
+                borderRadius: 6,
+                fontSize: 13,
+                fontWeight: 700,
+                fontFamily: "monospace",
+                cursor: loading ? "wait" : selectedTickers.length < 2 ? "not-allowed" : "pointer",
+                letterSpacing: "0.05em",
+                boxShadow: selectedTickers.length >= 2 && !loading ? "0 2px 12px rgba(59,130,246,0.3)" : "none",
+              }}
+            >
+              {loading ? "OPTIMIZING..." : "OPTIMIZE"}
+            </button>
+          </div>
+        </div>
+
+        {/* Step 3: Results Summary (only when results exist) */}
+        {result && m ? (
+          <div style={{ padding: "16px 20px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  width: 22, height: 22, borderRadius: "50%", background: "#f59e0b", color: "#000",
+                  fontSize: 11, fontWeight: 800, fontFamily: "monospace",
+                }}>3</span>
+                <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "monospace", color: "#fff" }}>Results</span>
+                <span style={{
+                  padding: "2px 8px", borderRadius: 3, fontSize: 9, fontWeight: 600,
+                  background: "rgba(245,158,11,0.15)", color: "#f59e0b", fontFamily: "monospace",
+                  border: "1px solid rgba(245,158,11,0.3)",
+                }}>
+                  {MODE_LABELS[result.meta.mode]}
+                </span>
+              </div>
+
+              {/* Save / Load Buttons */}
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                {showSaveForm ? (
+                  <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                    <input
+                      value={saveName}
+                      onChange={e => setSaveName(e.target.value)}
+                      placeholder="Portfolio name..."
+                      autoFocus
+                      onKeyDown={e => { if (e.key === "Enter" && saveName) saveConfig(); if (e.key === "Escape") setShowSaveForm(false); }}
+                      style={{
+                        padding: "6px 10px", background: "#0d1117", width: 180,
+                        border: "1px solid #3b82f6", borderRadius: 5,
+                        color: "#fff", fontSize: 11, fontFamily: "monospace",
+                        outline: "none",
+                      }}
+                    />
+                    <button
+                      onClick={saveConfig}
+                      disabled={!saveName}
+                      style={{
+                        ...btnStyle(true), padding: "6px 14px", borderRadius: 5,
+                        opacity: saveName ? 1 : 0.4,
+                      }}
+                    >
+                      Save
+                    </button>
+                    <button onClick={() => setShowSaveForm(false)} style={{ ...btnStyle(false), padding: "6px 8px", borderRadius: 5 }}>
+                      ×
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowSaveForm(true)}
                     style={{
-                      flex: 1, padding: "6px 8px", background: "#0d1117",
-                      border: "1px solid #30363d", borderRadius: 4,
-                      color: "#fff", fontSize: 11, fontFamily: "monospace",
+                      padding: "6px 14px", borderRadius: 5, fontSize: 10, fontWeight: 600,
+                      fontFamily: "monospace", cursor: "pointer",
+                      background: "none", border: "1px solid #30363d", color: "rgba(255,255,255,0.6)",
                     }}
-                  />
-                  <button onClick={saveConfig} style={btnStyle(true)}>Save</button>
-                  <button onClick={() => setShowSaveForm(false)} style={btnStyle(false)}>x</button>
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = "#3b82f6"; e.currentTarget.style.color = "#3b82f6"; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = "#30363d"; e.currentTarget.style.color = "rgba(255,255,255,0.6)"; }}
+                  >
+                    Save Portfolio
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Key Metrics Strip */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8 }}>
+              {[
+                { label: "Expected Return", value: `${(m.expectedReturn * 100).toFixed(1)}%`, color: m.expectedReturn >= 0 ? "#10b981" : "#ef4444", desc: "Annualized" },
+                { label: "Volatility", value: `${(m.volatility * 100).toFixed(1)}%`, color: "#fff", desc: "Annualized σ" },
+                { label: "Sharpe Ratio", value: m.sharpeRatio.toFixed(2), color: m.sharpeRatio >= 1 ? "#10b981" : m.sharpeRatio >= 0.5 ? "#f59e0b" : "#ef4444", desc: "(R-Rf)/σ" },
+                { label: "VaR 95%", value: `${(m.var95 * 100).toFixed(1)}%`, color: "#ef4444", desc: "1-day loss" },
+                { label: "Max Drawdown", value: `${(m.maxDrawdown * 100).toFixed(1)}%`, color: "#ef4444", desc: "Peak-to-trough" },
+                { label: "Eff. Positions", value: m.effectivePositions.toFixed(1), color: m.effectivePositions >= 3 ? "#10b981" : "#f59e0b", desc: `HHI ${(m.herfindahlIndex * 100).toFixed(0)}` },
+              ].map(item => (
+                <div key={item.label} style={{
+                  padding: "10px 12px", borderRadius: 5,
+                  background: "#0d1117", border: "1px solid #30363d",
+                }}>
+                  <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", letterSpacing: "0.05em", marginBottom: 2 }}>
+                    {item.label}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                    <span style={{ fontSize: 18, fontWeight: 800, fontFamily: "monospace", color: item.color }}>
+                      {item.value}
+                    </span>
+                    <span style={{ fontSize: 8, color: "rgba(255,255,255,0.25)", fontFamily: "monospace" }}>
+                      {item.desc}
+                    </span>
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
-          )}
 
-          {error && (
-            <div style={{ color: "#ef4444", fontSize: 11, marginTop: 8, fontFamily: "monospace" }}>
-              {error}
+            {/* Additional metrics row */}
+            <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.4)", flexWrap: "wrap" }}>
+              <span>Sortino: <span style={{ color: "rgba(255,255,255,0.7)", fontWeight: 600 }}>{m.sortinoRatio.toFixed(2)}</span></span>
+              <span>CVaR 99%: <span style={{ color: "#ef4444", fontWeight: 600 }}>{(m.cvar99 * 100).toFixed(1)}%</span></span>
+              <span>Beta to OBX: <span style={{ color: "rgba(255,255,255,0.7)", fontWeight: 600 }}>{m.betaToOBX.toFixed(2)}</span></span>
+              <span>Tracking Error: <span style={{ color: "rgba(255,255,255,0.7)", fontWeight: 600 }}>{(m.trackingError * 100).toFixed(1)}%</span></span>
+              <span>Diversification: <span style={{ color: "rgba(255,255,255,0.7)", fontWeight: 600 }}>{m.diversificationRatio.toFixed(2)}</span></span>
+              <span style={{ marginLeft: "auto", color: "rgba(255,255,255,0.25)" }}>
+                {result.meta.commonDates} days · {result.meta.covarianceMethod}{result.meta.shrinkageIntensity !== undefined ? ` (δ=${result.meta.shrinkageIntensity.toFixed(3)})` : ""} · Rf {(result.meta.riskFreeRate * 100).toFixed(1)}%
+              </span>
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div style={{ padding: "20px", textAlign: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "center" }}>
+              <span style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                width: 22, height: 22, borderRadius: "50%", background: "#30363d", color: "rgba(255,255,255,0.4)",
+                fontSize: 11, fontWeight: 800, fontFamily: "monospace",
+              }}>3</span>
+              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", fontFamily: "monospace" }}>
+                {selectedTickers.length < 2
+                  ? "Select at least 2 assets to begin optimization"
+                  : "Click OPTIMIZE to compute optimal weights, risk metrics, and ML signals"
+                }
+              </span>
+            </div>
+          </div>
+        )}
 
-        {/* RIGHT: Risk Dashboard */}
-        <div style={cardStyle}>
-          <div style={sectionTitle}>Risk Dashboard</div>
-          {!m ? (
-            <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, fontFamily: "monospace", padding: "40px 0", textAlign: "center" }}>
-              Select tickers and click OPTIMIZE to see results
-            </div>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-              <MetricCard label="Expected Return" value={`${(m.expectedReturn * 100).toFixed(1)}%`} color={m.expectedReturn >= 0 ? "#10b981" : "#ef4444"} />
-              <MetricCard label="Volatility" value={`${(m.volatility * 100).toFixed(1)}%`} />
-              <MetricCard label="Sharpe Ratio" value={m.sharpeRatio.toFixed(2)} color={m.sharpeRatio >= 0.5 ? "#10b981" : m.sharpeRatio >= 0 ? "#f59e0b" : "#ef4444"} />
-              <MetricCard label="Sortino Ratio" value={m.sortinoRatio.toFixed(2)} color={m.sortinoRatio >= 1 ? "#10b981" : "#f59e0b"} />
-              <MetricCard label="VaR 95%" value={`${(m.var95 * 100).toFixed(1)}%`} color="#ef4444" />
-              <MetricCard label="CVaR 99%" value={`${(m.cvar99 * 100).toFixed(1)}%`} color="#ef4444" />
-              <MetricCard label="Max Drawdown" value={`${(m.maxDrawdown * 100).toFixed(1)}%`} color="#ef4444" />
-              <MetricCard label="Beta to OBX" value={m.betaToOBX.toFixed(2)} />
-              <MetricCard label="Eff. Positions" value={m.effectivePositions.toFixed(1)} />
-              <MetricCard label="Tracking Error" value={`${(m.trackingError * 100).toFixed(1)}%`} />
-              <MetricCard label="Diversification" value={m.diversificationRatio.toFixed(2)} />
-              <MetricCard label="HHI" value={(m.herfindahlIndex * 100).toFixed(0)} />
-            </div>
-          )}
-        </div>
+        {error && (
+          <div style={{ padding: "8px 20px 12px", color: "#ef4444", fontSize: 11, fontFamily: "monospace" }}>
+            {error}
+          </div>
+        )}
       </div>
 
-      {/* === OPTIMAL WEIGHTS SUMMARY === */}
+      {/* === OPTIMAL WEIGHTS STRIP === */}
       {result && m && (
         <div style={{
-          ...cardStyle,
-          marginBottom: 20,
-          background: "linear-gradient(135deg, rgba(59,130,246,0.08) 0%, rgba(16,185,129,0.08) 100%)",
-          border: "1px solid rgba(59,130,246,0.3)",
+          display: "flex", alignItems: "center", gap: 12, padding: "10px 16px",
+          marginBottom: 12, borderRadius: 6,
+          background: "linear-gradient(135deg, rgba(59,130,246,0.06) 0%, rgba(16,185,129,0.06) 100%)",
+          border: "1px solid rgba(59,130,246,0.2)",
         }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
-            <div>
-              <div style={{ ...sectionTitle, marginBottom: 6 }}>Optimal Portfolio — {MODE_LABELS[result.meta.mode]}</div>
-              <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
-                {result.weights.filter(w => w.weight > 0.005).sort((a, b) => b.weight - a.weight).map(w => (
-                  <div key={w.ticker} style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 14, fontWeight: 800, fontFamily: "monospace", color: "#fff" }}>
-                      {(w.weight * 100).toFixed(1)}%
-                    </div>
-                    <div style={{ fontSize: 10, fontWeight: 600, fontFamily: "monospace", color: "#3b82f6" }}>
-                      {w.ticker}
-                    </div>
-                  </div>
-                ))}
+          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>
+            WEIGHTS
+          </div>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", flex: 1 }}>
+            {result.weights.filter(w => w.weight > 0.005).sort((a, b) => b.weight - a.weight).map(w => (
+              <div key={w.ticker} style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                <span style={{ fontSize: 12, fontWeight: 800, fontFamily: "monospace", color: "#3b82f6" }}>
+                  {w.ticker}
+                </span>
+                <span style={{ fontSize: 11, fontWeight: 600, fontFamily: "monospace", color: "rgba(255,255,255,0.7)" }}>
+                  {(w.weight * 100).toFixed(1)}%
+                </span>
               </div>
-            </div>
-            <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 18, fontWeight: 800, fontFamily: "monospace", color: m.expectedReturn >= 0 ? "#10b981" : "#ef4444" }}>
-                  {(m.expectedReturn * 100).toFixed(1)}%
-                </div>
-                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace" }}>RETURN</div>
-              </div>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 18, fontWeight: 800, fontFamily: "monospace" }}>
-                  {(m.volatility * 100).toFixed(1)}%
-                </div>
-                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace" }}>VOL</div>
-              </div>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 18, fontWeight: 800, fontFamily: "monospace", color: m.sharpeRatio >= 0.5 ? "#10b981" : "#f59e0b" }}>
-                  {m.sharpeRatio.toFixed(2)}
-                </div>
-                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace" }}>SHARPE</div>
-              </div>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 18, fontWeight: 800, fontFamily: "monospace", color: "#ef4444" }}>
-                  {(m.var95 * 100).toFixed(1)}%
-                </div>
-                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace" }}>VaR 95%</div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       )}
@@ -927,170 +1245,458 @@ export default function PortfolioPage() {
       )}
 
       {/* === MODE COMPARISON === */}
-      {result && result.modeComparison && (
-        <div style={{ ...cardStyle, marginBottom: 20 }}>
-          <div style={sectionTitle}>Strategy Comparison — All Optimization Modes</div>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: "monospace" }}>
-              <thead>
-                <tr>
-                  {["Mode", "Return", "Vol", "Sharpe", "Sortino", "VaR 95%", "Max DD", "Eff. Pos", "Div Ratio", "Top Holdings"].map(h => (
-                    <th key={h} style={{
-                      padding: "8px 10px", textAlign: h === "Mode" || h === "Top Holdings" ? "left" : "right",
-                      borderBottom: "1px solid #30363d", color: "rgba(255,255,255,0.5)", fontSize: 10,
-                      fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap",
-                    }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(result.modeComparison).map(([modeKey, mc]) => {
-                  const isActive = modeKey === result.meta.mode;
-                  return (
-                    <tr key={modeKey} style={{
-                      borderBottom: "1px solid #30363d",
-                      background: isActive ? "rgba(59,130,246,0.08)" : "transparent",
-                    }}>
-                      <td style={{ padding: "6px 10px", fontWeight: 700, color: isActive ? "#3b82f6" : "#fff" }}>
-                        {MODE_LABELS[modeKey] || modeKey}
-                        {isActive && <span style={{ fontSize: 8, color: "#3b82f6", marginLeft: 4 }}>ACTIVE</span>}
-                      </td>
-                      <td style={{ padding: "6px 10px", textAlign: "right", color: mc.expectedReturn >= 0 ? "#10b981" : "#ef4444" }}>
-                        {(mc.expectedReturn * 100).toFixed(1)}%
-                      </td>
-                      <td style={{ padding: "6px 10px", textAlign: "right" }}>{(mc.volatility * 100).toFixed(1)}%</td>
-                      <td style={{
-                        padding: "6px 10px", textAlign: "right", fontWeight: 700,
-                        color: mc.sharpeRatio >= 0.5 ? "#10b981" : mc.sharpeRatio >= 0 ? "#f59e0b" : "#ef4444",
-                      }}>{mc.sharpeRatio.toFixed(2)}</td>
-                      <td style={{ padding: "6px 10px", textAlign: "right" }}>{mc.sortinoRatio.toFixed(2)}</td>
-                      <td style={{ padding: "6px 10px", textAlign: "right", color: "#ef4444" }}>{(mc.var95 * 100).toFixed(1)}%</td>
-                      <td style={{ padding: "6px 10px", textAlign: "right", color: "#ef4444" }}>{(mc.maxDrawdown * 100).toFixed(1)}%</td>
-                      <td style={{ padding: "6px 10px", textAlign: "right" }}>{mc.effectivePositions.toFixed(1)}</td>
-                      <td style={{ padding: "6px 10px", textAlign: "right" }}>{mc.diversificationRatio.toFixed(2)}</td>
-                      <td style={{ padding: "6px 10px", fontSize: 9, color: "rgba(255,255,255,0.6)" }}>
-                        {mc.topHoldings.map(h => `${h.ticker} ${(h.weight * 100).toFixed(0)}%`).join(", ")}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      {result && result.modeComparison && (() => {
+        const MODE_COLORS: Record<string, string> = {
+          equal: "#9e9e9e", min_variance: "#3b82f6", max_sharpe: "#10b981",
+          risk_parity: "#f59e0b", max_diversification: "#8b5cf6",
+        };
+        const entries = Object.entries(result.modeComparison);
+        const highlightedMode = hoveredMode || result.meta.mode;
+        // Normalize for radar: scale each metric to 0-100 based on range across modes
+        const allSharpes = entries.map(([, mc]) => mc.mlSharpe);
+        const allReturns = entries.map(([, mc]) => mc.mlExpectedReturn * 100);
+        const allStability = entries.map(([, mc]) => (1 - mc.maxDrawdown) * 100);
+        const allDiv = entries.map(([, mc]) => mc.diversificationRatio);
+        const allPos = entries.map(([, mc]) => mc.effectivePositions);
+        const norm = (v: number, arr: number[]) => {
+          const mn = Math.min(...arr); const mx = Math.max(...arr);
+          return mx > mn ? ((v - mn) / (mx - mn)) * 80 + 20 : 50;
+        };
+        const radarData = [
+          { metric: "Return", ...Object.fromEntries(entries.map(([k, mc]) => [k, norm(mc.mlExpectedReturn * 100, allReturns)])) },
+          { metric: "Sharpe", ...Object.fromEntries(entries.map(([k, mc]) => [k, norm(mc.mlSharpe, allSharpes)])) },
+          { metric: "Stability", ...Object.fromEntries(entries.map(([k, mc]) => [k, norm((1 - mc.maxDrawdown) * 100, allStability)])) },
+          { metric: "Diversification", ...Object.fromEntries(entries.map(([k, mc]) => [k, norm(mc.diversificationRatio, allDiv)])) },
+          { metric: "Breadth", ...Object.fromEntries(entries.map(([k, mc]) => [k, norm(mc.effectivePositions, allPos)])) },
+        ];
+        const hlColor = MODE_COLORS[highlightedMode] || "#fff";
+        const hlMetrics = result.modeComparison[highlightedMode];
+        return (
+          <div style={{ ...cardStyle, marginBottom: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <div style={sectionTitle}>Strategy Comparison — All Optimization Modes</div>
+              <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", fontFamily: "monospace" }}>
+                Hover to preview · Click to switch
+              </span>
+            </div>
+            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", marginBottom: 12 }}>
+              ML Return uses XGB/LGBM forward predictions. Hist. metrics use backward-looking data. Max Sharpe optimizes for ML Sharpe.
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 16 }}>
+              {/* Radar Chart — responds to hoveredMode */}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                <ResponsiveContainer width="100%" height={260}>
+                  <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="75%">
+                    <PolarGrid stroke="#30363d" />
+                    <PolarAngleAxis dataKey="metric" tick={{ fontSize: 9, fill: "rgba(255,255,255,0.5)", fontFamily: "monospace" }} />
+                    <PolarRadiusAxis tick={false} domain={[0, 100]} axisLine={false} />
+                    {/* Render non-highlighted modes first (behind) */}
+                    {entries.filter(([key]) => key !== highlightedMode).map(([key]) => (
+                      <Radar key={key} name={MODE_LABELS[key] || key} dataKey={key}
+                        stroke={MODE_COLORS[key] || "#fff"} fill={MODE_COLORS[key] || "#fff"}
+                        fillOpacity={0.02}
+                        strokeWidth={0.8}
+                        strokeDasharray="4 3"
+                        strokeOpacity={0.4}
+                      />
+                    ))}
+                    {/* Highlighted mode on top */}
+                    <Radar key={highlightedMode} name={MODE_LABELS[highlightedMode] || highlightedMode} dataKey={highlightedMode}
+                      stroke={hlColor} fill={hlColor}
+                      fillOpacity={0.25}
+                      strokeWidth={2.5}
+                    />
+                  </RadarChart>
+                </ResponsiveContainer>
+                {/* Hovered mode summary under radar */}
+                <div style={{ textAlign: "center", marginTop: 4, minHeight: 36 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, fontFamily: "monospace", color: hlColor }}>
+                    {MODE_LABELS[highlightedMode] || highlightedMode}
+                    {highlightedMode === result.meta.mode && <span style={{ fontSize: 8, marginLeft: 4, opacity: 0.7 }}>ACTIVE</span>}
+                  </div>
+                  {hlMetrics && (
+                    <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 2, fontSize: 9, fontFamily: "monospace" }}>
+                      <span style={{ color: hlMetrics.mlExpectedReturn >= 0 ? "#10b981" : "#ef4444" }}>
+                        Ret {(hlMetrics.mlExpectedReturn * 100).toFixed(1)}%
+                      </span>
+                      <span style={{ color: "rgba(255,255,255,0.5)" }}>
+                        Vol {(hlMetrics.volatility * 100).toFixed(1)}%
+                      </span>
+                      <span style={{ color: hlMetrics.mlSharpe >= 1 ? "#10b981" : "#f59e0b" }}>
+                        SR {hlMetrics.mlSharpe.toFixed(2)}
+                      </span>
+                      <span style={{ color: "#ef4444" }}>
+                        DD {(hlMetrics.maxDrawdown * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
 
-      {/* === INVESTMENT SIGNALS === */}
-      {result && result.holdingSignals && result.holdingSignals.length > 0 && (
-        <div style={{ ...cardStyle, marginBottom: 20 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <div style={sectionTitle}>Investment Signals</div>
-            <div style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.3)" }}>
-              ML + Momentum + Valuation + Regime
+              {/* Table — hover highlights radar, click switches */}
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: "monospace" }}>
+                  <thead>
+                    <tr>
+                      {[
+                        { h: "Mode", align: "left" },
+                        { h: "Hist. Return", align: "right" },
+                        { h: "ML Return", align: "right" },
+                        { h: "Vol", align: "right" },
+                        { h: "Hist. Sharpe", align: "right" },
+                        { h: "ML Sharpe", align: "right" },
+                        { h: "Sortino", align: "right" },
+                        { h: "VaR 95%", align: "right" },
+                        { h: "Max DD", align: "right" },
+                        { h: "Eff. Pos", align: "right" },
+                      ].map(col => (
+                        <th key={col.h} style={{
+                          padding: "8px 6px", textAlign: col.align as "left" | "right",
+                          borderBottom: "1px solid #30363d", color: "rgba(255,255,255,0.5)", fontSize: 9,
+                          fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap",
+                        }}>{col.h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {entries.map(([modeKey, mc]) => {
+                      const isActive = modeKey === result.meta.mode;
+                      const isHovered = modeKey === hoveredMode;
+                      const mColor = MODE_COLORS[modeKey] || "#fff";
+                      return (
+                        <tr
+                          key={modeKey}
+                          onClick={() => { if (!isActive && !loading) { setMode(modeKey); runOptimization(modeKey); } }}
+                          onMouseEnter={() => setHoveredMode(modeKey)}
+                          onMouseLeave={() => setHoveredMode(null)}
+                          style={{
+                            borderBottom: "1px solid #30363d",
+                            background: isHovered ? `${mColor}15` : isActive ? `${mColor}10` : "transparent",
+                            cursor: isActive ? "default" : "pointer",
+                            transition: "background 0.1s ease",
+                          }}
+                        >
+                          <td style={{ padding: "6px 6px", fontWeight: 700 }}>
+                            <span style={{
+                              display: "inline-block", width: 4, height: 14,
+                              background: mColor, borderRadius: 2, marginRight: 6, verticalAlign: "middle",
+                              boxShadow: isHovered ? `0 0 8px ${mColor}60` : "none",
+                            }} />
+                            <span style={{ color: isActive || isHovered ? mColor : "#fff" }}>
+                              {MODE_LABELS[modeKey] || modeKey}
+                            </span>
+                            {isActive && <span style={{ fontSize: 8, color: mColor, marginLeft: 4, fontWeight: 800 }}>ACTIVE</span>}
+                          </td>
+                          <td style={{ padding: "6px 6px", textAlign: "right", color: mc.expectedReturn >= 0 ? "#10b981" : "#ef4444" }}>
+                            {(mc.expectedReturn * 100).toFixed(1)}%
+                          </td>
+                          <td style={{ padding: "6px 6px", textAlign: "right", fontWeight: 700, color: mc.mlExpectedReturn >= 0 ? "#10b981" : "#ef4444" }}>
+                            {(mc.mlExpectedReturn * 100).toFixed(1)}%
+                          </td>
+                          <td style={{ padding: "6px 6px", textAlign: "right" }}>{(mc.volatility * 100).toFixed(1)}%</td>
+                          <td style={{ padding: "6px 6px", textAlign: "right", color: "rgba(255,255,255,0.5)" }}>
+                            {mc.sharpeRatio.toFixed(2)}
+                          </td>
+                          <td style={{
+                            padding: "6px 6px", textAlign: "right", fontWeight: 700,
+                            color: mc.mlSharpe >= 1 ? "#10b981" : mc.mlSharpe >= 0.5 ? "#f59e0b" : "#ef4444",
+                          }}>{mc.mlSharpe.toFixed(2)}</td>
+                          <td style={{ padding: "6px 6px", textAlign: "right" }}>{mc.sortinoRatio.toFixed(2)}</td>
+                          <td style={{ padding: "6px 6px", textAlign: "right", color: "#ef4444" }}>{(mc.var95 * 100).toFixed(1)}%</td>
+                          <td style={{ padding: "6px 6px", textAlign: "right", color: "#ef4444" }}>{(mc.maxDrawdown * 100).toFixed(1)}%</td>
+                          <td style={{ padding: "6px 6px", textAlign: "right" }}>{mc.effectivePositions.toFixed(1)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {loading && (
+                  <div style={{
+                    padding: "8px 0", textAlign: "center", fontSize: 10, fontFamily: "monospace",
+                    color: "#3b82f6", letterSpacing: "0.1em",
+                  }}>
+                    Switching strategy...
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: "monospace" }}>
-              <thead>
-                <tr>
-                  {["Ticker", "Weight", "ML Signal", "ML Ret (1m)", "Momentum", "Valuation", "Beta", "Drawdown", "Conviction", "Alerts"].map(h => (
-                    <th key={h} style={{
-                      padding: "8px 8px", textAlign: h === "Ticker" || h === "ML Signal" || h === "Momentum" || h === "Valuation" || h === "Alerts" ? "left" : "right",
-                      borderBottom: "1px solid #30363d", color: "rgba(255,255,255,0.5)", fontSize: 10,
-                      fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap",
-                    }}>{h}</th>
+        );
+      })()}
+
+      {/* Results sections — dimmed during strategy switch */}
+      <div style={{ opacity: loading && result ? 0.4 : 1, transition: "opacity 0.3s ease", pointerEvents: loading && result ? "none" : "auto" }}>
+
+      {/* === PORTFOLIO ALPHA INTELLIGENCE === */}
+      {result && result.holdingSignals && result.holdingSignals.length > 0 && (() => {
+        const signals = result.holdingSignals
+          .filter(s => { const w = result.weights.find(w => w.ticker === s.ticker); return w && w.weight > 0.001; })
+          .sort((a, b) => {
+            const wa = result.weights.find(w => w.ticker === a.ticker)?.weight ?? 0;
+            const wb = result.weights.find(w => w.ticker === b.ticker)?.weight ?? 0;
+            return wb - wa;
+          });
+        const total = signals.length;
+
+        // Portfolio-level weighted alpha score
+        const avgCombined = signals.reduce((sum, s) => {
+          const w = result.weights.find(w => w.ticker === s.ticker)?.weight ?? 0;
+          return sum + w * (s.combinedSignal?.combined_signal ?? s.conviction ?? 0);
+        }, 0);
+
+        const signalDist = {
+          strongBuy: signals.filter(s => (s.combinedSignal?.classification ?? s.mlSignal) === "Strong Buy").length,
+          buy: signals.filter(s => (s.combinedSignal?.classification ?? s.mlSignal) === "Buy").length,
+          hold: signals.filter(s => { const c = s.combinedSignal?.classification ?? s.mlSignal; return c === "Hold" || c === "N/A"; }).length,
+          sell: signals.filter(s => (s.combinedSignal?.classification ?? s.mlSignal) === "Sell").length,
+          strongSell: signals.filter(s => (s.combinedSignal?.classification ?? s.mlSignal) === "Strong Sell").length,
+        };
+        const bullishPct = (signalDist.strongBuy + signalDist.buy) / total * 100;
+
+        let alphaLabel = "Neutral";
+        let alphaColor = "#9e9e9e";
+        if (avgCombined > 0.35) { alphaLabel = "Strong Bullish"; alphaColor = "#00c853"; }
+        else if (avgCombined > 0.12) { alphaLabel = "Bullish"; alphaColor = "#4caf50"; }
+        else if (avgCombined > -0.12) { alphaLabel = "Neutral"; alphaColor = "#ff9800"; }
+        else if (avgCombined > -0.35) { alphaLabel = "Bearish"; alphaColor = "#ef5350"; }
+        else { alphaLabel = "Strong Bearish"; alphaColor = "#d50000"; }
+
+        return (
+          <div style={{ marginBottom: 20 }}>
+            {/* ── Alpha Score Hero ── */}
+            <div style={{
+              ...cardStyle, marginBottom: 12, padding: 20,
+              background: `linear-gradient(135deg, ${alphaColor}12 0%, #161b22 50%, ${alphaColor}08 100%)`,
+              borderLeft: `3px solid ${alphaColor}`,
+            }}>
+              <div style={{ display: "grid", gridTemplateColumns: "180px 1fr 1fr", gap: 24, alignItems: "center" }}>
+                {/* Score Gauge */}
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: 6 }}>
+                    PORTFOLIO ALPHA
+                  </div>
+                  <div style={{ fontSize: 40, fontWeight: 800, fontFamily: "monospace", color: alphaColor, lineHeight: 1 }}>
+                    {avgCombined > 0 ? "+" : ""}{avgCombined.toFixed(2)}
+                  </div>
+                  <div style={{ fontSize: 11, fontWeight: 700, fontFamily: "monospace", color: alphaColor, marginTop: 4, letterSpacing: "0.08em" }}>
+                    {alphaLabel.toUpperCase()}
+                  </div>
+                  {/* Gauge bar */}
+                  <div style={{ marginTop: 10, height: 6, background: "#21262d", borderRadius: 3, position: "relative", overflow: "hidden" }}>
+                    <div style={{
+                      position: "absolute",
+                      left: avgCombined >= 0 ? "50%" : `${(0.5 + avgCombined / 2) * 100}%`,
+                      top: 0, bottom: 0,
+                      width: `${Math.abs(avgCombined) * 50}%`,
+                      background: `linear-gradient(${avgCombined >= 0 ? "90deg" : "270deg"}, ${alphaColor}60, ${alphaColor})`,
+                      borderRadius: 3,
+                    }} />
+                    <div style={{ position: "absolute", left: "50%", top: -1, bottom: -1, width: 1, background: "rgba(255,255,255,0.25)" }} />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "rgba(255,255,255,0.25)", fontFamily: "monospace", marginTop: 2 }}>
+                    <span>SELL</span><span>HOLD</span><span>BUY</span>
+                  </div>
+                </div>
+
+                {/* Signal Distribution */}
+                <div>
+                  <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: 8 }}>
+                    SIGNAL DISTRIBUTION
+                  </div>
+                  <div style={{ display: "flex", height: 28, borderRadius: 5, overflow: "hidden", marginBottom: 8, border: "1px solid #30363d" }}>
+                    {signalDist.strongBuy > 0 && <div style={{ flex: signalDist.strongBuy, background: "linear-gradient(180deg, #00e676, #00c853)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, color: "#fff" }}>{signalDist.strongBuy}</div>}
+                    {signalDist.buy > 0 && <div style={{ flex: signalDist.buy, background: "linear-gradient(180deg, #66bb6a, #4caf50)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, color: "#fff" }}>{signalDist.buy}</div>}
+                    {signalDist.hold > 0 && <div style={{ flex: signalDist.hold, background: "linear-gradient(180deg, #bdbdbd, #9e9e9e)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, color: "#fff" }}>{signalDist.hold}</div>}
+                    {signalDist.sell > 0 && <div style={{ flex: signalDist.sell, background: "linear-gradient(180deg, #ef5350, #e53935)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, color: "#fff" }}>{signalDist.sell}</div>}
+                    {signalDist.strongSell > 0 && <div style={{ flex: signalDist.strongSell, background: "linear-gradient(180deg, #ff1744, #d50000)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, color: "#fff" }}>{signalDist.strongSell}</div>}
+                  </div>
+                  <div style={{ display: "flex", gap: 10, fontSize: 9, fontFamily: "monospace", flexWrap: "wrap" }}>
+                    {signalDist.strongBuy > 0 && <span style={{ color: "#00c853" }}>Strong Buy {signalDist.strongBuy}</span>}
+                    {signalDist.buy > 0 && <span style={{ color: "#4caf50" }}>Buy {signalDist.buy}</span>}
+                    {signalDist.hold > 0 && <span style={{ color: "#9e9e9e" }}>Hold {signalDist.hold}</span>}
+                    {signalDist.sell > 0 && <span style={{ color: "#ef5350" }}>Sell {signalDist.sell}</span>}
+                    {signalDist.strongSell > 0 && <span style={{ color: "#d50000" }}>Strong Sell {signalDist.strongSell}</span>}
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 11, fontFamily: "monospace" }}>
+                    <span style={{ fontWeight: 700, color: "#4caf50" }}>{bullishPct.toFixed(0)}%</span>
+                    <span style={{ color: "rgba(255,255,255,0.5)" }}> of holdings are bullish</span>
+                  </div>
+                </div>
+
+                {/* Quick Metrics */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  {[
+                    { label: "AVG ML RETURN", value: `${(signals.reduce((s, sig) => s + sig.mlReturn, 0) / total * 100).toFixed(1)}%`, color: signals.reduce((s, sig) => s + sig.mlReturn, 0) / total > 0 ? "#10b981" : "#ef4444" },
+                    { label: "BULLISH MOM", value: `${signals.filter(s => s.momentumSignal === "Bullish").length}/${total}`, color: "#4caf50" },
+                    { label: "CHEAP STOCKS", value: `${signals.filter(s => s.valuationSignal === "Cheap").length}/${total}`, color: "#f59e0b" },
+                    { label: "IN DRAWDOWN", value: `${signals.filter(s => s.currentDrawdown > 0.05).length}/${total}`, color: signals.filter(s => s.currentDrawdown > 0.05).length > total / 2 ? "#ef4444" : "#10b981" },
+                  ].map(item => (
+                    <div key={item.label} style={{ padding: "8px 10px", borderRadius: 4, background: "#0d1117", border: "1px solid #30363d" }}>
+                      <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", letterSpacing: "0.05em", marginBottom: 2 }}>{item.label}</div>
+                      <div style={{ fontSize: 16, fontWeight: 800, fontFamily: "monospace", color: item.color }}>{item.value}</div>
+                    </div>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                {result.holdingSignals
-                  .filter(s => {
-                    const w = result.weights.find(w => w.ticker === s.ticker);
-                    return w && w.weight > 0.001;
-                  })
-                  .sort((a, b) => {
-                    const wa = result.weights.find(w => w.ticker === a.ticker)?.weight ?? 0;
-                    const wb = result.weights.find(w => w.ticker === b.ticker)?.weight ?? 0;
-                    return wb - wa;
-                  })
-                  .map(sig => {
-                    const w = result.weights.find(w => w.ticker === sig.ticker);
-                    return (
-                      <tr key={sig.ticker} style={{ borderBottom: "1px solid #30363d" }}>
-                        <td style={{ padding: "6px 8px", fontWeight: 700 }}>
-                          <Link href={`/stocks/${sig.ticker}`} style={{ color: "#3b82f6", textDecoration: "none" }}>
-                            {sig.ticker}
-                          </Link>
-                        </td>
-                        <td style={{ padding: "6px 8px", textAlign: "right" }}>{((w?.weight ?? 0) * 100).toFixed(1)}%</td>
-                        <td style={{ padding: "6px 8px" }}>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Holdings Signal Cards ── */}
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(signals.length, 3)}, 1fr)`, gap: 12 }}>
+              {signals.map(sig => {
+                const w = result.weights.find(w => w.ticker === sig.ticker);
+                const weight = w?.weight ?? 0;
+                const combined = sig.combinedSignal?.combined_signal ?? sig.conviction ?? 0;
+                const classification = sig.combinedSignal?.classification ?? sig.mlSignal;
+                const classColor = SIGNAL_COLORS[classification] || "#616161";
+
+                // Component signals
+                const components = sig.combinedSignal?.component_signals ?? {};
+                const componentList = [
+                  { key: "ml", label: "ML", value: components["ml"] ?? (sig.mlReturn > 0 ? Math.min(1, sig.mlReturn * 10) : Math.max(-1, sig.mlReturn * 10)), color: "#3b82f6" },
+                  { key: "momentum", label: "MOM", value: components["momentum"] ?? (sig.momentumSignal === "Bullish" ? 0.6 : sig.momentumSignal === "Bearish" ? -0.6 : 0), color: "#10b981" },
+                  { key: "valuation", label: "VAL", value: components["valuation"] ?? (sig.valuationSignal === "Cheap" ? 0.5 : sig.valuationSignal === "Expensive" ? -0.5 : 0), color: "#f59e0b" },
+                  { key: "cluster", label: "CLU", value: components["cluster"] ?? (sig.cluster ? -sig.cluster.z_score / 3 : 0), color: "#8b5cf6" },
+                  { key: "regime", label: "REG", value: components["regime"] ?? 0, color: "#06b6d4" },
+                  { key: "cnn", label: "CNN", value: components["cnn"] ?? 0, color: "#ec4899" },
+                ];
+
+                return (
+                  <div key={sig.ticker} style={{
+                    ...cardStyle, padding: 0, overflow: "hidden",
+                    borderTop: `3px solid ${classColor}`,
+                  }}>
+                    {/* Card Header */}
+                    <div style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      padding: "10px 14px", background: `${classColor}08`,
+                    }}>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                        <Link href={`/stocks/${sig.ticker}`} style={{ fontSize: 16, fontWeight: 800, fontFamily: "monospace", color: "#fff", textDecoration: "none" }}>
+                          {sig.ticker}
+                        </Link>
+                        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>
+                          {(weight * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                      <span style={{
+                        padding: "3px 12px", borderRadius: 4, fontSize: 10, fontWeight: 700,
+                        background: classColor, color: "#fff", fontFamily: "monospace", letterSpacing: "0.05em",
+                      }}>
+                        {classification}
+                      </span>
+                    </div>
+
+                    <div style={{ padding: "10px 14px 14px" }}>
+                      {/* Combined Signal Bar */}
+                      <div style={{ marginBottom: 14 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", marginBottom: 4 }}>
+                          <span>COMBINED SIGNAL</span>
+                          <span style={{ color: classColor, fontWeight: 800, fontSize: 11 }}>
+                            {combined > 0 ? "+" : ""}{combined.toFixed(2)}
+                          </span>
+                        </div>
+                        <div style={{ height: 12, background: "#0d1117", borderRadius: 6, position: "relative", overflow: "hidden", border: "1px solid #21262d" }}>
+                          {/* Background gradient track */}
+                          <div style={{
+                            position: "absolute", left: 0, right: 0, top: 0, bottom: 0,
+                            background: "linear-gradient(90deg, #d50000 0%, #ef5350 20%, #424242 50%, #4caf50 80%, #00c853 100%)",
+                            opacity: 0.12,
+                          }} />
+                          {/* Signal fill */}
+                          <div style={{
+                            position: "absolute",
+                            left: combined >= 0 ? "50%" : `${(0.5 + combined / 2) * 100}%`,
+                            top: 1, bottom: 1,
+                            width: `${Math.abs(combined) / 2 * 100}%`,
+                            background: `linear-gradient(${combined >= 0 ? "90deg" : "270deg"}, ${classColor}80, ${classColor})`,
+                            borderRadius: 5,
+                            boxShadow: `0 0 10px ${classColor}40`,
+                          }} />
+                          {/* Center line */}
+                          <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, background: "rgba(255,255,255,0.15)" }} />
+                        </div>
+                      </div>
+
+                      {/* Component Signal Breakdown */}
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 3, marginBottom: 12 }}>
+                        {componentList.map(comp => {
+                          const val = comp.value;
+                          const intensity = Math.min(1, Math.abs(val));
+                          const dotColor = val > 0.15 ? "#4caf50" : val < -0.15 ? "#ef5350" : "#616161";
+                          return (
+                            <div key={comp.key} style={{
+                              display: "flex", alignItems: "center", gap: 4,
+                              padding: "4px 6px", borderRadius: 3,
+                              background: "#0d1117",
+                            }}>
+                              <div style={{
+                                width: 7, height: 7, borderRadius: "50%",
+                                background: dotColor,
+                                boxShadow: intensity > 0.3 ? `0 0 6px ${dotColor}80` : "none",
+                              }} />
+                              <span style={{ fontSize: 8, fontFamily: "monospace", color: "rgba(255,255,255,0.4)" }}>{comp.label}</span>
+                              <span style={{ fontSize: 8, fontFamily: "monospace", color: dotColor, fontWeight: 700, marginLeft: "auto" }}>
+                                {val > 0 ? "+" : ""}{val.toFixed(2)}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Tags Row */}
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+                        <span style={{
+                          padding: "2px 7px", borderRadius: 3, fontSize: 9, fontWeight: 600, fontFamily: "monospace",
+                          background: `${SIGNAL_COLORS[sig.momentumSignal]}18`, color: SIGNAL_COLORS[sig.momentumSignal],
+                          border: `1px solid ${SIGNAL_COLORS[sig.momentumSignal]}30`,
+                        }}>{sig.momentumSignal}</span>
+                        <span style={{
+                          padding: "2px 7px", borderRadius: 3, fontSize: 9, fontWeight: 600, fontFamily: "monospace",
+                          background: `${SIGNAL_COLORS[sig.valuationSignal]}18`, color: SIGNAL_COLORS[sig.valuationSignal],
+                          border: `1px solid ${SIGNAL_COLORS[sig.valuationSignal]}30`,
+                        }}>{sig.valuationSignal}</span>
+                        {sig.mlReturn !== 0 && (
                           <span style={{
-                            display: "inline-block", padding: "1px 8px", borderRadius: 3, fontSize: 9,
-                            fontWeight: 700, background: SIGNAL_COLORS[sig.mlSignal], color: "#fff",
-                          }}>{sig.mlSignal}</span>
-                        </td>
-                        <td style={{
-                          padding: "6px 8px", textAlign: "right",
-                          color: sig.mlReturn > 0 ? "#4caf50" : sig.mlReturn < 0 ? "#ef5350" : "rgba(255,255,255,0.5)",
-                          fontWeight: 600,
-                        }}>
-                          {sig.mlReturn !== 0 ? `${(sig.mlReturn * 100).toFixed(1)}%` : "—"}
-                        </td>
-                        <td style={{ padding: "6px 8px" }}>
-                          <span style={{ color: SIGNAL_COLORS[sig.momentumSignal], fontWeight: 600, fontSize: 10 }}>
-                            {sig.momentumSignal}
-                          </span>
-                          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginLeft: 4 }}>
-                            {sig.momentum.ret1m !== null ? `${(sig.momentum.ret1m * 100).toFixed(1)}%` : ""}
-                          </span>
-                        </td>
-                        <td style={{ padding: "6px 8px" }}>
-                          <span style={{ color: SIGNAL_COLORS[sig.valuationSignal], fontWeight: 600, fontSize: 10 }}>
-                            {sig.valuationSignal}
-                          </span>
-                          {sig.valuation.ep !== null && sig.valuation.ep > 0 && (
-                            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginLeft: 4 }}>
-                              E/P {(sig.valuation.ep * 100).toFixed(1)}%
-                            </span>
-                          )}
-                        </td>
-                        <td style={{
-                          padding: "6px 8px", textAlign: "right",
-                          color: sig.beta > 1.3 ? "#f59e0b" : "rgba(255,255,255,0.6)",
-                        }}>
-                          {sig.beta.toFixed(2)}
-                        </td>
-                        <td style={{
-                          padding: "6px 8px", textAlign: "right",
-                          color: sig.currentDrawdown > 0.1 ? "#ef4444" : "rgba(255,255,255,0.5)",
-                        }}>
-                          {sig.currentDrawdown > 0.01 ? `-${(sig.currentDrawdown * 100).toFixed(1)}%` : "—"}
-                        </td>
-                        <td style={{ padding: "6px 8px", textAlign: "right" }}>
-                          <ConvictionBar value={sig.conviction} />
-                        </td>
-                        <td style={{ padding: "6px 8px", fontSize: 9, maxWidth: 180 }}>
-                          {sig.alerts.length > 0 ? (
-                            <span style={{ color: "#ffb74d" }}>{sig.alerts[0]}</span>
-                          ) : (
-                            <span style={{ color: "rgba(255,255,255,0.3)" }}>—</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
+                            padding: "2px 7px", borderRadius: 3, fontSize: 9, fontWeight: 600, fontFamily: "monospace",
+                            background: sig.mlReturn > 0 ? "rgba(76,175,80,0.12)" : "rgba(244,67,54,0.12)",
+                            color: sig.mlReturn > 0 ? "#4caf50" : "#ef5350",
+                            border: `1px solid ${sig.mlReturn > 0 ? "rgba(76,175,80,0.3)" : "rgba(244,67,54,0.3)"}`,
+                          }}>ML {sig.mlReturn > 0 ? "+" : ""}{(sig.mlReturn * 100).toFixed(1)}%</span>
+                        )}
+                        {sig.beta > 1.2 && (
+                          <span style={{
+                            padding: "2px 7px", borderRadius: 3, fontSize: 9, fontWeight: 600, fontFamily: "monospace",
+                            background: "rgba(255,152,0,0.12)", color: "#f59e0b", border: "1px solid rgba(255,152,0,0.3)",
+                          }}>β {sig.beta.toFixed(1)}</span>
+                        )}
+                      </div>
+
+                      {/* Drawdown + Alert */}
+                      {(sig.currentDrawdown > 0.03 || sig.alerts.length > 0) && (
+                        <div style={{ fontSize: 9, fontFamily: "monospace", color: "#ffb74d", padding: "4px 8px", background: "rgba(255,152,0,0.06)", borderRadius: 3, border: "1px solid rgba(255,152,0,0.15)" }}>
+                          {sig.currentDrawdown > 0.03 ? `${(sig.currentDrawdown * 100).toFixed(1)}% drawdown` : ""}
+                          {sig.currentDrawdown > 0.03 && sig.alerts.length > 0 ? " · " : ""}
+                          {sig.alerts.length > 0 ? sig.alerts[0] : ""}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Legend */}
+            <div style={{ display: "flex", gap: 14, marginTop: 8, fontSize: 8, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", flexWrap: "wrap", justifyContent: "center" }}>
+              <span>ML: XGB/LGBM 1m forecast</span>
+              <span>MOM: 1m/6m/11m trend</span>
+              <span>VAL: E/P, B/M, D/Y</span>
+              <span>CLU: OU mean-reversion</span>
+              <span>REG: HMM regime state</span>
+              <span>CNN: 1D-CNN+Transformer</span>
+            </div>
           </div>
-          {/* Signal legend */}
-          <div style={{ display: "flex", gap: 16, marginTop: 10, fontSize: 9, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", flexWrap: "wrap" }}>
-            <span>ML Signal: GB/RF ensemble 1-month forecast</span>
-            <span>Momentum: 1m/6m/11m trend alignment</span>
-            <span>Valuation: E/P percentile vs universe</span>
-            <span>Conviction: Weighted composite score</span>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* === EFFICIENT FRONTIER (full width) === */}
       {result && (
@@ -1124,14 +1730,28 @@ export default function PortfolioPage() {
                 return sh > bestSh ? p : best;
               }, efficientPart[0] || frontier[0]);
 
-              // ── coordinate system (larger) ──
-              const W = 900, H = 500;
-              const mg = { top: 20, right: 30, bottom: 48, left: 58 };
+              // Mode portfolio coordinates from comparison
+              const MODE_COLORS_EF: Record<string, string> = {
+                equal: "#9e9e9e", min_variance: "#3b82f6", max_sharpe: "#10b981",
+                risk_parity: "#f59e0b", max_diversification: "#8b5cf6",
+              };
+              const modePortfolios = result.modeComparison
+                ? Object.entries(result.modeComparison).map(([key, mc]) => ({
+                    key, vol: mc.volatility * 100, ret: mc.expectedReturn * 100,
+                    label: MODE_LABELS[key] || key,
+                    color: MODE_COLORS_EF[key] || "#fff",
+                    isActive: key === result.meta.mode,
+                  }))
+                : [];
+
+              // ── coordinate system ──
+              const W = 900, H = 520;
+              const mg = { top: 24, right: 30, bottom: 50, left: 58 };
               const plotW = W - mg.left - mg.right;
               const plotH = H - mg.top - mg.bottom;
 
-              const allVols = [...frontier.map(p => p.vol), ...assets.map(a => a.vol), portfolio.vol, 0];
-              const allRets = [...frontier.map(p => p.ret), ...assets.map(a => a.ret), portfolio.ret, rfPct];
+              const allVols = [...frontier.map(p => p.vol), ...assets.map(a => a.vol), portfolio.vol, ...modePortfolios.map(mp => mp.vol), 0];
+              const allRets = [...frontier.map(p => p.ret), ...assets.map(a => a.ret), portfolio.ret, ...modePortfolios.map(mp => mp.ret), rfPct];
               const volMax = Math.max(...allVols) * 1.12;
               const retMin = Math.min(...allRets) - 3;
               const retMax = Math.max(...allRets) + 4;
@@ -1176,86 +1796,185 @@ export default function PortfolioPage() {
               const cmlEndVol = volMax;
               const cmlEndRet = rfPct + cmlSharpe * cmlEndVol;
 
-              // ── asset labels ──
-              const labels = assets.map((a) => ({
-                ...a, px: toX(a.vol), py: toY(a.ret), ly: toY(a.ret) - 12,
-              }));
+              // ── asset labels with weight + collision resolution ──
+              const labels = assets.map((a) => {
+                const w = result.weights.find(wi => wi.ticker === a.ticker)?.weight ?? 0;
+                return { ...a, px: toX(a.vol), py: toY(a.ret), ly: toY(a.ret) - 10, lx: toX(a.vol) + 7, weight: w };
+              });
+              // Multi-pass collision detection: push overlapping labels apart
               labels.sort((a, b) => a.py - b.py);
-              for (let i = 1; i < labels.length; i++) {
-                if (Math.abs(labels[i].ly - labels[i - 1].ly) < 13 && Math.abs(labels[i].px - labels[i - 1].px) < 60) {
-                  labels[i].ly = labels[i - 1].ly + 14;
+              for (let pass = 0; pass < 3; pass++) {
+                for (let i = 1; i < labels.length; i++) {
+                  for (let j = 0; j < i; j++) {
+                    const dy = Math.abs(labels[i].ly - labels[j].ly);
+                    const dx = Math.abs(labels[i].lx - labels[j].lx);
+                    if (dy < 13 && dx < 50) {
+                      labels[i].ly = labels[j].ly + 13;
+                    }
+                  }
                 }
               }
 
-              // Check if portfolio and min-var overlap (within 2% vol and 2% ret)
+              const hoveredLabel = hoveredAsset ? labels.find(l => l.ticker === hoveredAsset) : null;
+
+              // Check if portfolio and min-var overlap
               const mvPx = toX(minVarPt.vol), mvPy = toY(minVarPt.ret);
               const pfPx = toX(portfolio.vol), pfPy = toY(portfolio.ret);
               const pfMvOverlap = Math.abs(mvPx - pfPx) < 30 && Math.abs(mvPy - pfPy) < 25;
 
               return (
-                <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}>
+                <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}
+                  onMouseLeave={() => setHoveredAsset(null)}
+                >
                   <defs>
                     <clipPath id="plotArea">
                       <rect x={mg.left} y={mg.top} width={plotW} height={plotH} />
                     </clipPath>
+                    <filter id="dotGlow" x="-100%" y="-100%" width="300%" height="300%">
+                      <feGaussianBlur stdDeviation="4" result="blur" />
+                      <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                    </filter>
+                    <filter id="portfolioGlow" x="-100%" y="-100%" width="300%" height="300%">
+                      <feGaussianBlur stdDeviation="6" result="blur" />
+                      <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                    </filter>
+                    <linearGradient id="efAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#60a5fa" stopOpacity={0.12} />
+                      <stop offset="100%" stopColor="#60a5fa" stopOpacity={0.01} />
+                    </linearGradient>
+                    <linearGradient id="efStrokeGrad" x1="0" y1="1" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#3b82f6" />
+                      <stop offset="50%" stopColor="#60a5fa" />
+                      <stop offset="100%" stopColor="#93c5fd" />
+                    </linearGradient>
+                    <linearGradient id="cmlGrad" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#f97316" stopOpacity={0.8} />
+                      <stop offset="100%" stopColor="#f97316" stopOpacity={0.15} />
+                    </linearGradient>
                   </defs>
 
                   {/* Plot background */}
-                  <rect x={mg.left} y={mg.top} width={plotW} height={plotH} fill="#0d1117" rx={2} />
+                  <rect x={mg.left} y={mg.top} width={plotW} height={plotH} fill="#0d1117" rx={4} />
 
-                  {/* Clipped content — everything inside the plot area */}
+                  {/* Clipped content */}
                   <g clipPath="url(#plotArea)">
                     {/* Grid */}
                     {volTicks.map(v => (
-                      <line key={`gv${v}`} x1={toX(v)} y1={mg.top} x2={toX(v)} y2={mg.top + plotH} stroke="#21262d" strokeWidth={0.5} />
+                      <line key={`gv${v}`} x1={toX(v)} y1={mg.top} x2={toX(v)} y2={mg.top + plotH} stroke="#1c2333" strokeWidth={0.5} />
                     ))}
                     {retTicks.map(r => (
-                      <line key={`gr${r}`} x1={mg.left} y1={toY(r)} x2={mg.left + plotW} y2={toY(r)} stroke="#21262d" strokeWidth={0.5} />
+                      <line key={`gr${r}`} x1={mg.left} y1={toY(r)} x2={mg.left + plotW} y2={toY(r)} stroke="#1c2333" strokeWidth={0.5} />
                     ))}
 
                     {/* Rf horizontal */}
                     <line x1={mg.left} y1={toY(rfPct)} x2={mg.left + plotW} y2={toY(rfPct)}
-                      stroke="#f97316" strokeWidth={0.5} strokeDasharray="3 3" opacity={0.25} />
+                      stroke="#f97316" strokeWidth={0.5} strokeDasharray="3 3" opacity={0.15} />
 
-                    {/* CML — clipped to plot area */}
+                    {/* CML */}
                     <line x1={toX(0)} y1={toY(rfPct)} x2={toX(cmlEndVol)} y2={toY(cmlEndRet)}
-                      stroke="#f97316" strokeWidth={1.2} strokeDasharray="8 5" opacity={0.5} />
+                      stroke="url(#cmlGrad)" strokeWidth={1.2} strokeDasharray="8 5" />
 
-                    {/* Full bullet (thin, dashed) */}
-                    {fullPath && <path d={fullPath} fill="none" stroke="#3b82f6" strokeWidth={1} strokeDasharray="4 3" opacity={0.3} />}
+                    {/* Frontier area fill */}
+                    {efficientPath && (() => {
+                      const lastPt = efficientSorted[efficientSorted.length - 1];
+                      const firstPt = efficientSorted[0];
+                      const areaPath = efficientPath + ` L ${toX(lastPt.vol).toFixed(1)},${(mg.top + plotH).toFixed(1)} L ${toX(firstPt.vol).toFixed(1)},${(mg.top + plotH).toFixed(1)} Z`;
+                      return <path d={areaPath} fill="url(#efAreaGrad)" />;
+                    })()}
 
-                    {/* Efficient frontier (bold) */}
-                    {efficientPath && <path d={efficientPath} fill="none" stroke="#60a5fa" strokeWidth={2.5} />}
+                    {/* Full frontier (thin, dashed) */}
+                    {fullPath && <path d={fullPath} fill="none" stroke="#3b82f6" strokeWidth={0.8} strokeDasharray="4 3" opacity={0.2} />}
 
-                    {/* Asset dots */}
-                    {labels.map((a, i) => (
-                      <g key={`a${i}`}>
-                        <circle cx={a.px} cy={a.py} r={4} fill="#8b5cf6" opacity={0.6} stroke="#a78bfa" strokeWidth={0.8} />
-                        <text x={a.px + 7} y={a.ly} textAnchor="start"
-                          fill="#c4b5fd" fontSize={9} fontFamily="monospace" fontWeight={600}>{a.ticker}</text>
+                    {/* Efficient frontier (gradient stroke) */}
+                    {efficientPath && <path d={efficientPath} fill="none" stroke="url(#efStrokeGrad)" strokeWidth={2.5} />}
+
+                    {/* Asset dots — interactive, weight-proportional */}
+                    {labels.map((a, i) => {
+                      const isHov = hoveredAsset === a.ticker;
+                      const baseR = Math.max(2.5, 2.5 + a.weight * 16);
+                      const r = isHov ? baseR + 1.5 : baseR;
+                      const dimmed = hoveredAsset !== null && !isHov;
+                      return (
+                        <g key={`a${i}`}
+                          onMouseEnter={() => setHoveredAsset(a.ticker)}
+                          style={{ cursor: "pointer" }}
+                        >
+                          {/* Hover ring */}
+                          {isHov && (
+                            <circle cx={a.px} cy={a.py} r={r + 5} fill="none" stroke="#c4b5fd" strokeWidth={0.8} opacity={0.3}>
+                              <animate attributeName="r" from={r + 3} to={r + 10} dur="1.5s" repeatCount="indefinite" />
+                              <animate attributeName="opacity" from="0.4" to="0" dur="1.5s" repeatCount="indefinite" />
+                            </circle>
+                          )}
+                          {/* Dot */}
+                          <circle cx={a.px} cy={a.py} r={r}
+                            fill={isHov ? "#a78bfa" : "#8b5cf6"}
+                            opacity={isHov ? 0.95 : (dimmed ? 0.25 : 0.65)}
+                            stroke={isHov ? "#c4b5fd" : "#a78bfa"}
+                            strokeWidth={isHov ? 2 : 0.8}
+                            filter={isHov ? "url(#dotGlow)" : undefined}
+                          />
+                          {/* Label */}
+                          <text x={isHov ? a.px + r + 6 : a.lx} y={isHov ? a.py + 4 : a.ly}
+                            textAnchor="start"
+                            fill={isHov ? "#fff" : (dimmed ? "rgba(196,181,253,0.2)" : "#c4b5fd")}
+                            fontSize={isHov ? 10 : 8}
+                            fontFamily="monospace"
+                            fontWeight={isHov ? 700 : 600}
+                          >
+                            {a.ticker}
+                          </text>
+                        </g>
+                      );
+                    })}
+
+                    {/* Mode comparison portfolios (non-active, dashed rings) */}
+                    {modePortfolios.filter(mp => !mp.isActive).map(mp => (
+                      <g key={`mode-${mp.key}`}>
+                        <circle cx={toX(mp.vol)} cy={toY(mp.ret)} r={5}
+                          fill="none" stroke={mp.color} strokeWidth={1.5}
+                          strokeDasharray="3 2"
+                          opacity={hoveredMode === mp.key ? 0.9 : 0.4}
+                        />
+                        {hoveredMode === mp.key && (
+                          <>
+                            <circle cx={toX(mp.vol)} cy={toY(mp.ret)} r={2} fill={mp.color} />
+                            <text x={toX(mp.vol) + 8} y={toY(mp.ret) + 4}
+                              fill={mp.color} fontSize={8} fontFamily="monospace" fontWeight={600}>
+                              {mp.label}
+                            </text>
+                          </>
+                        )}
                       </g>
                     ))}
 
-                    {/* Min-Variance — label to the left */}
-                    <circle cx={mvPx} cy={mvPy} r={5} fill="none" stroke="#94a3b8" strokeWidth={1.5} />
-                    <circle cx={mvPx} cy={mvPy} r={2} fill="#94a3b8" />
+                    {/* Min-Variance */}
+                    <circle cx={mvPx} cy={mvPy} r={6} fill="none" stroke="#94a3b8" strokeWidth={1.5} />
+                    <circle cx={mvPx} cy={mvPy} r={2.5} fill="#94a3b8" />
                     {!pfMvOverlap && (
                       <text x={mvPx - 9} y={mvPy + 4} textAnchor="end"
                         fill="#94a3b8" fontSize={8} fontFamily="monospace" fontWeight={600}>Min Var</text>
                     )}
 
-                    {/* Tangency (M) — label to the right */}
-                    <circle cx={toX(tangencyPt.vol)} cy={toY(tangencyPt.ret)} r={6} fill="none" stroke="#10b981" strokeWidth={2} />
-                    <circle cx={toX(tangencyPt.vol)} cy={toY(tangencyPt.ret)} r={2.5} fill="#10b981" />
-                    <text x={toX(tangencyPt.vol) + 10} y={toY(tangencyPt.ret) + 4} textAnchor="start"
+                    {/* Tangency (M) */}
+                    <circle cx={toX(tangencyPt.vol)} cy={toY(tangencyPt.ret)} r={7} fill="none" stroke="#10b981" strokeWidth={2} />
+                    <circle cx={toX(tangencyPt.vol)} cy={toY(tangencyPt.ret)} r={3} fill="#10b981" />
+                    <text x={toX(tangencyPt.vol) + 11} y={toY(tangencyPt.ret) + 4} textAnchor="start"
                       fill="#10b981" fontSize={9} fontFamily="monospace" fontWeight={700}>M</text>
 
-                    {/* Portfolio (diamond) — label above-left */}
-                    <polygon
-                      points={`${pfPx},${pfPy - 7} ${pfPx + 7},${pfPy} ${pfPx},${pfPy + 7} ${pfPx - 7},${pfPy}`}
-                      fill="#f59e0b" stroke="#fbbf24" strokeWidth={1.2}
-                    />
-                    <text x={pfPx - 10} y={pfPy - 10} textAnchor="end"
+                    {/* Portfolio (diamond) — with glow and pulse */}
+                    <g filter="url(#portfolioGlow)">
+                      <polygon
+                        points={`${pfPx},${pfPy - 8} ${pfPx + 8},${pfPy} ${pfPx},${pfPy + 8} ${pfPx - 8},${pfPy}`}
+                        fill="#f59e0b" stroke="#fbbf24" strokeWidth={1.5}
+                      />
+                    </g>
+                    {/* Pulse ring */}
+                    <circle cx={pfPx} cy={pfPy} r={12} fill="none" stroke="#f59e0b" strokeWidth={1}>
+                      <animate attributeName="r" from="10" to="22" dur="2s" repeatCount="indefinite" />
+                      <animate attributeName="opacity" from="0.5" to="0" dur="2s" repeatCount="indefinite" />
+                    </circle>
+                    <text x={pfPx - 10} y={pfPy - 14} textAnchor="end"
                       fill="#fbbf24" fontSize={9} fontFamily="monospace" fontWeight={700}>
                       {pfMvOverlap ? "Portfolio (Min Var)" : "Portfolio"}
                     </text>
@@ -1264,6 +1983,27 @@ export default function PortfolioPage() {
                     <circle cx={toX(0)} cy={toY(rfPct)} r={3.5} fill="#f97316" stroke="#fb923c" strokeWidth={1} />
                     <text x={toX(0) + 8} y={toY(rfPct) + 4} textAnchor="start"
                       fill="#fb923c" fontSize={8.5} fontFamily="monospace" fontWeight={600}>Rf {rfPct.toFixed(1)}%</text>
+
+                    {/* Tooltip for hovered asset */}
+                    {hoveredLabel && (() => {
+                      const ttW = 150, ttH = 54;
+                      const tx = hoveredLabel.px + 15 + ttW > mg.left + plotW ? hoveredLabel.px - ttW - 15 : hoveredLabel.px + 15;
+                      const ty = hoveredLabel.py - 32 < mg.top ? hoveredLabel.py + 15 : hoveredLabel.py - 32;
+                      return (
+                        <g>
+                          <rect x={tx} y={ty} width={ttW} height={ttH} fill="#1c2333" stroke="#60a5fa" strokeWidth={1} rx={5} opacity={0.95} />
+                          <text x={tx + 10} y={ty + 16} fill="#fff" fontSize={11} fontFamily="monospace" fontWeight={700}>
+                            {hoveredLabel.ticker}
+                          </text>
+                          <text x={tx + 10} y={ty + 30} fill="rgba(255,255,255,0.6)" fontSize={9} fontFamily="monospace">
+                            Vol: {hoveredLabel.vol.toFixed(1)}%  Ret: {hoveredLabel.ret.toFixed(1)}%
+                          </text>
+                          <text x={tx + 10} y={ty + 43} fill="rgba(255,255,255,0.6)" fontSize={9} fontFamily="monospace">
+                            Weight: {(hoveredLabel.weight * 100).toFixed(1)}%
+                          </text>
+                        </g>
+                      );
+                    })()}
                   </g>
 
                   {/* Axes (outside clip) */}
@@ -1295,13 +2035,18 @@ export default function PortfolioPage() {
               );
             })()}
             {/* Legend */}
-            <div style={{ display: "flex", justifyContent: "center", gap: 14, marginTop: 6, fontSize: 8.5, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", flexWrap: "wrap" }}>
-              <span><span style={{ display: "inline-block", width: 12, height: 2.5, background: "#60a5fa", borderRadius: 1, verticalAlign: "middle", marginRight: 3 }} />Efficient Frontier</span>
-              <span><span style={{ display: "inline-block", width: 12, height: 2, background: "#3b82f6", borderRadius: 1, verticalAlign: "middle", marginRight: 3, opacity: 0.5 }} />Feasible Set</span>
+            <div style={{ display: "flex", justifyContent: "center", gap: 14, marginTop: 8, fontSize: 8.5, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", flexWrap: "wrap" }}>
+              <span><span style={{ display: "inline-block", width: 14, height: 2.5, background: "linear-gradient(90deg, #3b82f6, #93c5fd)", borderRadius: 1, verticalAlign: "middle", marginRight: 3 }} />Efficient Frontier</span>
+              <span><span style={{ display: "inline-block", width: 12, height: 2, background: "#3b82f6", borderRadius: 1, verticalAlign: "middle", marginRight: 3, opacity: 0.4 }} />Feasible Set</span>
               <span><span style={{ display: "inline-block", width: 12, height: 1.5, background: "#f97316", borderRadius: 1, verticalAlign: "middle", marginRight: 3, opacity: 0.5 }} />CML</span>
               <span><span style={{ display: "inline-block", width: 6, height: 6, background: "#8b5cf6", borderRadius: "50%", verticalAlign: "middle", marginRight: 3, opacity: 0.7 }} />Assets</span>
               <span><span style={{ display: "inline-block", width: 6, height: 6, border: "1.5px solid #10b981", borderRadius: "50%", verticalAlign: "middle", marginRight: 3 }} />Tangency</span>
               <span><span style={{ display: "inline-block", width: 7, height: 7, background: "#f59e0b", transform: "rotate(45deg)", verticalAlign: "middle", marginRight: 3 }} />Portfolio</span>
+              <span style={{ color: "rgba(255,255,255,0.25)" }}>|</span>
+              <span><span style={{ display: "inline-block", width: 6, height: 6, border: "1.5px dashed #9e9e9e", borderRadius: "50%", verticalAlign: "middle", marginRight: 3 }} />Mode Portfolios</span>
+            </div>
+            <div style={{ textAlign: "center", marginTop: 4, fontSize: 8, color: "rgba(255,255,255,0.25)", fontFamily: "monospace" }}>
+              Hover over assets to see details · Dot size = portfolio weight · Strategy positions shown on hover in comparison table
             </div>
           </div>
         </div>
@@ -1418,11 +2163,11 @@ export default function PortfolioPage() {
         </div>
       )}
 
-      {/* === CORRELATION + SECTOR + FX === */}
+      {/* === CORRELATION + SECTOR === */}
       {result && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, marginBottom: 20 }}>
           {/* Correlation Heatmap */}
-          <div style={{ ...cardStyle, gridColumn: result.correlationMatrix.tickers.length > 8 ? "1 / -1" : undefined }}>
+          <div style={cardStyle}>
             <div style={sectionTitle}>Correlation Matrix</div>
             <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: 500 }}>
               <table style={{ borderCollapse: "collapse", fontSize: 11, fontFamily: "monospace" }}>
@@ -1473,7 +2218,7 @@ export default function PortfolioPage() {
                             fontSize: 10,
                             fontWeight: i === j ? 700 : 400,
                             minWidth: 48,
-                            color: absV > 0.4 && i !== j ? "#fff" : "#fff",
+                            color: "#fff",
                             borderRadius: 2,
                           }}>
                             {v.toFixed(2)}
@@ -1491,162 +2236,303 @@ export default function PortfolioPage() {
             </div>
           </div>
 
-          {/* Sector + FX */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {/* Sector Allocation */}
-            <div style={cardStyle}>
-              <div style={sectionTitle}>Sector Allocation</div>
-              <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-                <ResponsiveContainer width="50%" height={160}>
-                  <PieChart>
-                    <Pie
-                      data={result.sectorAllocation.filter(s => s.weight > 0.005)}
-                      dataKey="weight"
-                      nameKey="sector"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={30}
-                      outerRadius={65}
-                      strokeWidth={1}
-                      stroke="#161b22"
-                    >
-                      {result.sectorAllocation.filter(s => s.weight > 0.005).map((_, i) => (
-                        <Cell key={i} fill={SECTOR_COLORS[i % SECTOR_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{ backgroundColor: "#161b22", border: "1px solid #30363d", fontSize: 10, fontFamily: "monospace", color: "#e6edf3" }} itemStyle={{ color: "#e6edf3" }}
-                      formatter={(v: unknown) => [`${(Number(v) * 100).toFixed(1)}%`]}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div style={{ flex: 1, fontSize: 10, fontFamily: "monospace" }}>
-                  {result.sectorAllocation.filter(s => s.weight > 0.005).map((s, i) => (
-                    <div key={s.sector} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}>
-                      <span>
-                        <span style={{
-                          display: "inline-block",
-                          width: 8,
-                          height: 8,
-                          borderRadius: 2,
-                          background: SECTOR_COLORS[i % SECTOR_COLORS.length],
-                          marginRight: 6,
-                          verticalAlign: "middle",
-                        }} />
-                        {s.sector}
-                      </span>
-                      <span style={{ fontWeight: 600 }}>{(s.weight * 100).toFixed(1)}%</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* FX Exposure */}
-            <div style={cardStyle}>
-              <div style={sectionTitle}>FX Exposure (Revenue-Weighted)</div>
-              <ResponsiveContainer width="100%" height={100}>
-                <BarChart data={result.fxExposure.filter(f => f.weightedExposure > 0.5)} layout="vertical" margin={{ left: 40, right: 20 }}>
-                  <XAxis type="number" tickFormatter={(v: number) => `${v.toFixed(0)}%`} tick={{ fontSize: 9, fontFamily: "monospace", fill: "rgba(255,255,255,0.5)" }} />
-                  <YAxis dataKey="currency" type="category" tick={{ fontSize: 10, fontFamily: "monospace", fill: "rgba(255,255,255,0.5)" }} width={35} />
-                  <Tooltip contentStyle={{ backgroundColor: "#161b22", border: "1px solid #30363d", fontSize: 10, fontFamily: "monospace", color: "#e6edf3" }} itemStyle={{ color: "#e6edf3" }} />
-                  <Bar dataKey="weightedExposure" radius={[0, 3, 3, 0]}>
-                    {result.fxExposure.filter(f => f.weightedExposure > 0.5).map((f, i) => (
-                      <Cell key={i} fill={f.currency === "NOK" ? "#10b981" : f.currency === "USD" ? "#3b82f6" : f.currency === "EUR" ? "#f59e0b" : "#8b5cf6"} />
+          {/* Sector Allocation */}
+          <div style={cardStyle}>
+            <div style={sectionTitle}>Sector Allocation</div>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+              <ResponsiveContainer width="100%" height={180}>
+                <PieChart>
+                  <Pie
+                    data={result.sectorAllocation.filter(s => s.weight > 0.005)}
+                    dataKey="weight"
+                    nameKey="sector"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={35}
+                    outerRadius={75}
+                    strokeWidth={1}
+                    stroke="#161b22"
+                  >
+                    {result.sectorAllocation.filter(s => s.weight > 0.005).map((_, i) => (
+                      <Cell key={i} fill={SECTOR_COLORS[i % SECTOR_COLORS.length]} />
                     ))}
-                  </Bar>
-                </BarChart>
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ backgroundColor: "#161b22", border: "1px solid #30363d", fontSize: 10, fontFamily: "monospace", color: "#e6edf3" }} itemStyle={{ color: "#e6edf3" }}
+                    formatter={(v: unknown) => [`${(Number(v) * 100).toFixed(1)}%`]}
+                  />
+                </PieChart>
               </ResponsiveContainer>
+            </div>
+            <div style={{ fontSize: 10, fontFamily: "monospace" }}>
+              {result.sectorAllocation.filter(s => s.weight > 0.005).sort((a, b) => b.weight - a.weight).map((s, i) => (
+                <div key={s.sector} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "3px 0" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{
+                      display: "inline-block",
+                      width: 8,
+                      height: 8,
+                      borderRadius: 2,
+                      background: SECTOR_COLORS[i % SECTOR_COLORS.length],
+                    }} />
+                    {s.sector}
+                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{ width: 60, height: 4, background: "#21262d", borderRadius: 2, overflow: "hidden" }}>
+                      <div style={{ width: `${s.weight * 100}%`, height: "100%", background: SECTOR_COLORS[i % SECTOR_COLORS.length], borderRadius: 2 }} />
+                    </div>
+                    <span style={{ fontWeight: 600, minWidth: 38, textAlign: "right" }}>{(s.weight * 100).toFixed(1)}%</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       )}
 
-      {/* === REGIME + STRESS === */}
-      {result && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
-          {/* Regime Context */}
-          <div style={cardStyle}>
-            <div style={sectionTitle}>Holdings Regime Status</div>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10, fontFamily: "monospace" }}>
-                <thead>
-                  <tr>
-                    <th style={{ padding: "6px 8px", textAlign: "left", borderBottom: "1px solid #30363d", color: "rgba(255,255,255,0.5)", fontSize: 9 }}>TICKER</th>
-                    <th style={{ padding: "6px 8px", textAlign: "left", borderBottom: "1px solid #30363d", color: "rgba(255,255,255,0.5)", fontSize: 9 }}>REGIME</th>
-                    <th style={{ padding: "6px 8px", textAlign: "right", borderBottom: "1px solid #30363d", color: "rgba(255,255,255,0.5)", fontSize: 9 }}>VOL</th>
-                    <th style={{ padding: "6px 8px", textAlign: "right", borderBottom: "1px solid #30363d", color: "rgba(255,255,255,0.5)", fontSize: 9 }}>PCTILE</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.regimeContext.holdingRegimes
-                    .filter(h => {
-                      const w = result.weights.find(w => w.ticker === h.ticker);
-                      return w && w.weight > 0.001;
-                    })
-                    .sort((a, b) => b.percentile - a.percentile)
-                    .map(h => (
-                    <tr key={h.ticker} style={{ borderBottom: "1px solid #30363d" }}>
-                      <td style={{ padding: "4px 8px", fontWeight: 600 }}>{h.ticker}</td>
-                      <td style={{ padding: "4px 8px" }}>
-                        <span style={{
-                          display: "inline-block",
-                          padding: "1px 6px",
-                          borderRadius: 3,
-                          fontSize: 9,
-                          fontWeight: 600,
-                          background: REGIME_COLORS[h.regime] || "#9E9E9E",
-                          color: "#fff",
-                        }}>
-                          {h.regime}
-                        </span>
-                      </td>
-                      <td style={{ padding: "4px 8px", textAlign: "right" }}>{(h.volatility * 100).toFixed(1)}%</td>
-                      <td style={{ padding: "4px 8px", textAlign: "right" }}>{h.percentile.toFixed(0)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {/* === PORTFOLIO REGIME (Multivariate HMM) === */}
+      {result?.regimeContext?.portfolioRegime && (() => {
+        const pr = result.regimeContext.portfolioRegime;
+        const currentColor = HMM_REGIME_COLORS[pr.current_state_label] || "#9E9E9E";
+        const currentStats = pr.state_stats[pr.current_state];
+        return (
+          <div style={{ ...cardStyle, marginBottom: 20, borderLeft: `3px solid ${currentColor}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div style={sectionTitle}>Portfolio Regime (3-State HMM)</div>
+              <span style={{
+                display: "inline-block",
+                padding: "3px 12px",
+                borderRadius: 4,
+                fontSize: 11,
+                fontWeight: 700,
+                background: currentColor,
+                color: "#fff",
+                fontFamily: "monospace",
+              }}>
+                {pr.current_state_label.toUpperCase()}
+              </span>
             </div>
-          </div>
 
-          {/* Stress Scenarios */}
-          <div style={cardStyle}>
-            <div style={sectionTitle}>Stress Scenarios</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {result.stressScenarios.map(s => (
-                <div key={s.name} style={{
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
+              {/* State probabilities */}
+              <div>
+                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginBottom: 6, fontFamily: "monospace" }}>STATE PROBABILITIES</div>
+                {pr.state_labels.map((label, i) => {
+                  const prob = pr.current_probs[i];
+                  const color = HMM_REGIME_COLORS[label] || "#9E9E9E";
+                  return (
+                    <div key={label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.7)", fontFamily: "monospace", width: 50 }}>{label}</span>
+                      <div style={{ flex: 1, height: 4, background: "#21262d", borderRadius: 2, overflow: "hidden" }}>
+                        <div style={{ width: `${prob * 100}%`, height: "100%", background: color, borderRadius: 2 }} />
+                      </div>
+                      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", width: 36, textAlign: "right" }}>
+                        {(prob * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Current state stats */}
+              <div>
+                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginBottom: 6, fontFamily: "monospace" }}>CURRENT REGIME STATS</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  {[
+                    { label: "Ann. Return", value: `${(currentStats.mean_return * 100).toFixed(1)}%` },
+                    { label: "Ann. Vol", value: `${(currentStats.annualized_vol * 100).toFixed(1)}%` },
+                    { label: "Avg Corr", value: currentStats.avg_correlation.toFixed(2) },
+                    { label: "Exp. Duration", value: `${currentStats.expected_duration_days.toFixed(0)}d` },
+                    { label: "Frequency", value: `${(currentStats.frequency * 100).toFixed(0)}%` },
+                  ].map(item => (
+                    <div key={item.label} style={{ display: "flex", justifyContent: "space-between", fontSize: 10, fontFamily: "monospace" }}>
+                      <span style={{ color: "rgba(255,255,255,0.5)" }}>{item.label}</span>
+                      <span style={{ color: "rgba(255,255,255,0.9)", fontWeight: 600 }}>{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Transition matrix */}
+              <div>
+                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginBottom: 6, fontFamily: "monospace" }}>TRANSITION MATRIX</div>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 9, fontFamily: "monospace" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ padding: "2px 4px", borderBottom: "1px solid #30363d", color: "rgba(255,255,255,0.3)", textAlign: "left" }}></th>
+                      {pr.state_labels.map(l => (
+                        <th key={l} style={{ padding: "2px 4px", borderBottom: "1px solid #30363d", color: HMM_REGIME_COLORS[l] || "#9E9E9E", textAlign: "right" }}>
+                          {l.slice(0, 3)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pr.transition_matrix.map((row, i) => (
+                      <tr key={i}>
+                        <td style={{ padding: "2px 4px", color: HMM_REGIME_COLORS[pr.state_labels[i]] || "#9E9E9E", fontWeight: 600 }}>
+                          {pr.state_labels[i].slice(0, 3)}
+                        </td>
+                        {row.map((p, j) => (
+                          <td key={j} style={{
+                            padding: "2px 4px",
+                            textAlign: "right",
+                            color: i === j ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)",
+                            fontWeight: i === j ? 700 : 400,
+                          }}>
+                            {(p * 100).toFixed(0)}%
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Regime-conditional expected returns (top 5 assets) */}
+            {pr.regime_conditional_returns[pr.current_state_label] && (
+              <div>
+                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginBottom: 6, fontFamily: "monospace" }}>
+                  REGIME-CONDITIONAL EXPECTED RETURNS ({pr.current_state_label.toUpperCase()})
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {Object.entries(pr.regime_conditional_returns[pr.current_state_label])
+                    .sort(([, a], [, b]) => b - a)
+                    .slice(0, 10)
+                    .map(([ticker, ret]) => (
+                      <div key={ticker} style={{
+                        padding: "3px 8px",
+                        borderRadius: 3,
+                        background: ret > 0 ? "rgba(76,175,80,0.15)" : "rgba(244,67,54,0.15)",
+                        border: `1px solid ${ret > 0 ? "rgba(76,175,80,0.3)" : "rgba(244,67,54,0.3)"}`,
+                        fontSize: 9,
+                        fontFamily: "monospace",
+                      }}>
+                        <span style={{ color: "rgba(255,255,255,0.7)", marginRight: 4 }}>{ticker}</span>
+                        <span style={{ color: ret > 0 ? "#4caf50" : "#ef5350", fontWeight: 600 }}>
+                          {ret > 0 ? "+" : ""}{(ret * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* === CLUSTER ANALYSIS (Spectral Clustering + OU) === */}
+      {result?.clusterAnalysis && (
+        <div style={{ ...cardStyle, marginBottom: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <div style={sectionTitle}>Spectral Clusters (Residual Correlation)</div>
+            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>
+              {result.clusterAnalysis.n_clusters} clusters | silhouette {result.clusterAnalysis.silhouette_score.toFixed(2)}
+            </span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(result.clusterAnalysis.n_clusters, 4)}, 1fr)`, gap: 12 }}>
+            {result.clusterAnalysis.clusters.map(cluster => {
+              const color = CLUSTER_COLORS[cluster.id % CLUSTER_COLORS.length];
+              const signalColor = MR_SIGNAL_COLORS[cluster.mean_reversion_signal] || "#9e9e9e";
+              return (
+                <div key={cluster.id} style={{
                   padding: 12,
-                  borderRadius: 4,
-                  border: "1px solid #30363d",
+                  borderRadius: 6,
                   background: "#0d1117",
+                  border: `1px solid ${color}40`,
+                  borderTop: `3px solid ${color}`,
                 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                    <span style={{ fontWeight: 600, fontSize: 11, fontFamily: "monospace" }}>{s.name}</span>
-                    <span style={{ color: "#ef4444", fontWeight: 700, fontSize: 12, fontFamily: "monospace" }}>
-                      Vol: {(s.portfolioVol * 100).toFixed(1)}%
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color, fontFamily: "monospace" }}>
+                      Cluster {cluster.id + 1}
+                    </span>
+                    <span style={{
+                      fontSize: 8, fontWeight: 600, padding: "1px 6px", borderRadius: 3,
+                      background: signalColor, color: "#fff",
+                    }}>
+                      {cluster.mean_reversion_signal}
                     </span>
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                    <span style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace" }}>
-                      {s.description}
-                    </span>
-                    <span style={{ color: "#ef4444", fontSize: 11, fontFamily: "monospace" }}>
-                      VaR95: {(s.var95 * 100).toFixed(1)}%
-                    </span>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginBottom: 8 }}>
+                    {cluster.tickers.map(t => (
+                      <span key={t} style={{
+                        fontSize: 8, fontWeight: 600, padding: "1px 4px", borderRadius: 2,
+                        background: `${color}20`, color, fontFamily: "monospace",
+                      }}>
+                        {t}
+                      </span>
+                    ))}
                   </div>
-                  {/* Comparison bar */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
-                    <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", width: 40 }}>Base</span>
-                    <div style={{ height: 6, background: "#3b82f6", borderRadius: 3, width: `${Math.min(100, (m!.volatility / s.portfolioVol) * 100)}%` }} />
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
-                    <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", width: 40 }}>Stress</span>
-                    <div style={{ height: 6, background: "#ef4444", borderRadius: 3, width: "100%" }} />
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 9, fontFamily: "monospace" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: "rgba(255,255,255,0.4)" }}>Z-Score</span>
+                      <span style={{
+                        fontWeight: 600,
+                        color: Math.abs(cluster.z_score) > 2 ? "#ef5350" : Math.abs(cluster.z_score) > 1 ? "#ff9800" : "rgba(255,255,255,0.7)",
+                      }}>
+                        {cluster.z_score > 0 ? "+" : ""}{cluster.z_score.toFixed(2)}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: "rgba(255,255,255,0.4)" }}>Half-Life</span>
+                      <span style={{ color: "rgba(255,255,255,0.7)" }}>
+                        {cluster.half_life ? `${cluster.half_life.toFixed(0)}d` : "N/A"}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: "rgba(255,255,255,0.4)" }}>Intra-Corr</span>
+                      <span style={{ color: "rgba(255,255,255,0.7)" }}>
+                        {cluster.intra_cluster_correlation.toFixed(2)}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* === HOLDINGS REGIME === */}
+      {result && result.regimeContext.holdingRegimes.length > 0 && (
+        <div style={{ ...cardStyle, marginBottom: 20 }}>
+          <div style={sectionTitle}>Holdings Regime Status</div>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(result.regimeContext.holdingRegimes.filter(h => { const w = result.weights.find(w => w.ticker === h.ticker); return w && w.weight > 0.001; }).length, 6)}, 1fr)`, gap: 10 }}>
+            {result.regimeContext.holdingRegimes
+              .filter(h => { const w = result.weights.find(w => w.ticker === h.ticker); return w && w.weight > 0.001; })
+              .sort((a, b) => b.percentile - a.percentile)
+              .map(h => {
+                const color = REGIME_COLORS[h.regime] || "#9E9E9E";
+                return (
+                  <div key={h.ticker} style={{
+                    padding: 12, borderRadius: 6, background: "#0d1117",
+                    border: `1px solid ${color}30`, borderTop: `3px solid ${color}`,
+                    textAlign: "center",
+                  }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, fontFamily: "monospace", marginBottom: 4 }}>{h.ticker}</div>
+                    <span style={{
+                      display: "inline-block", padding: "2px 8px", borderRadius: 3,
+                      fontSize: 9, fontWeight: 700, background: color, color: "#fff", marginBottom: 6,
+                    }}>{h.regime}</span>
+                    <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 6, fontSize: 10, fontFamily: "monospace" }}>
+                      <div>
+                        <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)" }}>VOL</div>
+                        <div style={{ fontWeight: 700 }}>{(h.volatility * 100).toFixed(1)}%</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)" }}>PCTILE</div>
+                        <div style={{ fontWeight: 700, color }}>{h.percentile.toFixed(0)}</div>
+                      </div>
+                    </div>
+                    {/* Vol percentile bar */}
+                    <div style={{ marginTop: 6, height: 4, background: "#21262d", borderRadius: 2, overflow: "hidden" }}>
+                      <div style={{ width: `${h.percentile}%`, height: "100%", background: color, borderRadius: 2 }} />
+                    </div>
+                  </div>
+                );
+              })}
           </div>
         </div>
       )}
@@ -1694,7 +2580,6 @@ export default function PortfolioPage() {
               </thead>
               <tbody>
                 {sortedWeights.filter(w => w.weight > 0.001).map(w => {
-                  const regime = result.regimeContext.holdingRegimes.find(h => h.ticker === w.ticker);
                   return (
                     <tr key={w.ticker} style={{ borderBottom: "1px solid #30363d" }}>
                       <td style={{ padding: "6px 10px", fontWeight: 700 }}>
@@ -1723,14 +2608,10 @@ export default function PortfolioPage() {
         </div>
       )}
 
-      {/* Meta info */}
-      {result && (
-        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", textAlign: "center", paddingBottom: 40 }}>
-          Mode: {MODE_LABELS[result.meta.mode]} | Lookback: {result.meta.commonDates} days |
-          Covariance: {result.meta.covarianceMethod}{result.meta.shrinkageIntensity !== undefined ? ` (δ=${result.meta.shrinkageIntensity.toFixed(3)})` : ""} |
-          Risk-free: {(result.meta.riskFreeRate * 100).toFixed(1)}%
-        </div>
-      )}
+      </div>{/* end results dimmer */}
+
+      {/* Bottom spacer */}
+      <div style={{ paddingBottom: 40 }} />
     </main>
   );
 }
@@ -1757,26 +2638,3 @@ function MetricCard({ label, value, color }: { label: string; value: string; col
   );
 }
 
-function ConvictionBar({ value }: { value: number }) {
-  // value ranges from -1 (bearish) to +1 (bullish)
-  const clamped = Math.max(-1, Math.min(1, value));
-  const pct = (clamped + 1) / 2 * 100; // 0-100
-  const color = clamped > 0.3 ? "#4caf50" : clamped > 0 ? "#81c784" : clamped > -0.3 ? "#ffb74d" : "#ef5350";
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
-      <div style={{ width: 50, height: 6, background: "#1a1a2e", borderRadius: 3, position: "relative", overflow: "hidden" }}>
-        <div style={{
-          position: "absolute",
-          left: "50%", top: 0, bottom: 0,
-          width: `${Math.abs(pct - 50)}%`,
-          marginLeft: pct >= 50 ? 0 : `${pct - 50}%`,
-          background: color,
-          borderRadius: 3,
-        }} />
-      </div>
-      <span style={{ fontSize: 10, fontWeight: 600, color, minWidth: 32, textAlign: "right" }}>
-        {clamped > 0 ? "+" : ""}{(clamped * 100).toFixed(0)}
-      </span>
-    </div>
-  );
-}

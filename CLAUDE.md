@@ -1,4 +1,4 @@
-# InEqRe (Intelligence Equity Research) v2.4
+# InEqRe (Intelligence Equity Research) v3.0
 
 Quantitative equity research platform for Oslo Stock Exchange (OSE). Combines automated research aggregation, ML price predictions, volatility modeling, and strategy backtesting.
 
@@ -193,7 +193,7 @@ All in `apps/web/src/lib/`
 | `parameterValidation.ts` | Strategy parameter validation |
 | `market.ts` | Market-level calculations |
 | `price-data-adapter.ts` | Price data normalization |
-| `portfolioOptimizer.ts` | Markowitz optimization: covariance (sample/Ledoit-Wolf/EWMA), 5 modes (EW/MinVar/MaxSharpe/RiskParity/MaxDiv), projected gradient descent, risk decomposition, efficient frontier |
+| `portfolioOptimizer.ts` | Markowitz optimization: covariance (sample/Ledoit-Wolf/EWMA), 5 modes (EW/MinVar/MaxSharpe/RiskParity/MaxDiv), closed-form solutions + iterative constraint projection, risk decomposition, efficient frontier |
 
 ---
 
@@ -416,27 +416,52 @@ Required in `.env`:
 **Fundamental (8)**: bm, ep, dy, sp, sg, mktcap, nokvol
 
 ### Model
-- **Type**: Ridge regression ensemble (60% GB + 40% RF)
+- **Type**: XGBoost (50%) + LightGBM (50%) ensemble (replaced GB/RF v2)
 - **Target**: 1-month forward returns
-- **Output**: Point estimate + percentiles (p05, p25, p50, p75, p95)
-- **Versions**: v2.0_19factor_enhanced, v2.1_optimized (ticker-specific)
+- **Output**: Point estimate + percentiles (p05, p25, p50, p75, p95) + SHAP importance
+- **Versions**: v3.0_xgb_lgbm
 
-### Python ML Service (Volatility Models)
-Located in `ml-service/`. FastAPI service for advanced volatility models.
+### Python ML Service
+Located in `ml-service/`. FastAPI service v2.0 for ML predictions, volatility models, regime detection, clustering, and signal generation.
 
-**Endpoints** (all POST, receive returns array):
+**Volatility Endpoints** (GET):
 | Endpoint | Purpose |
 |----------|---------|
-| `/volatility/garch` | GARCH(1,1) fitting, conditional vol series, forecasts |
-| `/volatility/regime` | 2-state MSGARCH (HMM + per-state GARCH), transition matrix |
-| `/volatility/var` | Historical, Parametric, GARCH VaR/ES at 95%/99% |
-| `/volatility/var-backtest` | Kupiec POF + Christoffersen independence tests |
-| `/volatility/jumps` | Statistical jump detection (3σ threshold) |
-| `/volatility/full` | Combined: all models in one call |
+| `/volatility/garch/{ticker}` | GARCH(1,1) fitting, conditional vol series, forecasts |
+| `/volatility/regime/{ticker}` | 2-state MSGARCH (HMM + per-state GARCH), transition matrix |
+| `/volatility/var/{ticker}` | Historical, Parametric, GARCH VaR/ES at 95%/99% |
+| `/volatility/var-backtest/{ticker}` | Kupiec POF + Christoffersen independence tests |
+| `/volatility/jumps/{ticker}` | Statistical jump detection (3σ threshold) |
+| `/volatility/full/{ticker}` | Combined: all models in one call |
 
-**Dependencies**: `arch>=7.0`, `hmmlearn>=0.3`, `statsmodels>=0.14`, `fastapi`, `uvicorn`
+**Alpha Engine Endpoints** (POST):
+| Endpoint | Purpose |
+|----------|---------|
+| `/regime/multivariate` | 3-state HMM (Bull/Neutral/Crisis) on multivariate features |
+| `/clustering/spectral` | Spectral clustering on residual correlations + OU z-scores |
+| `/signals/cnn` | 1D CNN + Transformer signal generation (PyTorch) |
+| `/signals/combine` | 6-signal weighted combiner (regime-adjusted) |
+| `/signals/backtest` | Walk-forward backtest engine |
+| `/train` | Train XGBoost/LightGBM ensemble |
+| `/predict` | Generate prediction for ticker/date |
+
+**Dependencies**: `arch>=6.0`, `hmmlearn>=0.3`, `xgboost>=2.0`, `lightgbm>=4.0`, `shap>=0.43`, `torch>=2.0`, `fastapi`, `uvicorn`
 
 **Start**: `cd ml-service && source venv/bin/activate && uvicorn app.main:app --port 8000`
+
+### Alpha Engine Architecture
+```
+Signal Sources (6):
+  ML (XGB/LGBM):  25% — 1-month return prediction
+  CNN:            20% — 1D CNN + Transformer pattern detection
+  Momentum:       15% — 1m/6m/11m trend alignment
+  Valuation:      15% — E/P, B/M, D/Y composite
+  Cluster (MR):   15% — OU mean-reversion z-score
+  Regime:         10% — 3-state HMM portfolio regime
+
+Crisis mode: Regime → 30%, CNN → 10%, others adjusted
+Output: Combined signal [-1, 1] per ticker
+```
 
 ---
 
@@ -559,21 +584,41 @@ Located at `/portfolio`. Password-protected (same credentials as research portal
 - **EWMA** (λ=0.94): Exponentially weighted, recent data emphasized
 - **Sample**: Raw sample covariance (unstable for large N/T ratios)
 
+### Constraint Enforcement
+- Iterative projection algorithm (50 rounds) in `applyConstraintsAndNormalize()`
+- Box constraints: `[minPos, maxPos]` per position, long-only
+- Sector exposure cap (default 30%)
+- When capped positions don't sum to 1, deficit redistributed to zero-weight positions
+- **Allocation modes**: "All Included" (minPos=1%, forces every ticker) vs "Allow Zero" (minPos=0, optimizer may exclude)
+
 ### Efficient Frontier
-- Analytical Markowitz closed-form: `σ² = (Cr² - 2Ar + B) / D` via matrix inversion
-- Custom SVG chart (not Recharts) with smooth parabola + Capital Market Line through tangency
-- Clipped to plot area, responsive sizing
+- Interactive custom SVG chart with Catmull-Rom splines + Capital Market Line through tangency
+- SVG gradient fills, glow filters, animated pulse on portfolio marker
+- Weight-proportional asset dots with hover tooltips (ticker, vol, return, weight)
+- Mode comparison portfolio positions overlaid on frontier (visible on strategy table hover)
+- Multi-pass label collision detection to prevent overlaps
 
 ### Investment Intelligence (API-enriched)
 The optimize API (`POST /api/portfolio/optimize`) enriches results with:
 
 **Per-Holding Signals** (`holdingSignals[]`):
-- **ML Signal**: Strong Buy / Buy / Hold / Sell / Strong Sell (thresholds: >4%, >1.5%, >-1.5%, >-4%)
+- **Combined Signal**: 6-source weighted blend [-1, +1] → Strong Buy / Buy / Hold / Sell / Strong Sell
+- **ML Signal**: XGB/LGBM ensemble 1-month forecast (thresholds: >4%, >1.5%, >-1.5%, >-4%)
 - **Momentum Signal**: Bullish / Neutral / Bearish (from alignment of mom1m/mom6m/mom11m)
 - **Valuation Signal**: Cheap / Fair / Expensive (E/P thresholds: >8%, >4%)
-- **Conviction Score**: Weighted composite [-1, +1] of ML prediction, momentum, valuation, vol regime
+- **Cluster Signal**: OU mean-reversion z-score from spectral clustering
 - **Per-holding beta**: Cov(R_i, R_OBX) / Var(R_OBX)
 - **Research count**: Documents in last 90 days per holding
+
+**Portfolio Regime** (`regimeContext.portfolioRegime`):
+- 3-state multivariate HMM (Bull / Neutral / Crisis)
+- Features: cross-sectional returns, realized vol, avg pairwise correlation
+- Output: state probs, transition matrix, regime-conditional expected returns
+
+**Cluster Analysis** (`clusterAnalysis`):
+- Spectral clustering on residual correlation matrix (market factor removed)
+- Auto-selects K clusters via silhouette score
+- OU half-life and z-score per cluster for mean-reversion signals
 
 **Mode Comparison** (`modeComparison{}`):
 - Server-side runs all 5 optimization modes in parallel
@@ -587,20 +632,30 @@ The optimize API (`POST /api/portfolio/optimize`) enriches results with:
 - Negative ML on large positions (>5% weight)
 - High portfolio beta (>1.3)
 
+### Dashboard Layout (3-step workflow)
+1. **Select Assets**: Ticker search with sector badges, chips with sector-colored borders, clear all
+2. **Configure Strategy**: 5 mode cards with icons/descriptions, parameters row (portfolio value, lookback, max position, covariance method, allocation mode)
+3. **Results**: 6 key metric cards, secondary metrics strip, save/load portfolio
+
 ### Dashboard Sections
+- **Saved Portfolios Bar**: Card tiles at top with active state, load/delete
+- **Weights Strip**: Compact weight display sorted by allocation
 - **Risk Alerts Banner**: Color-coded critical/warning/info alerts
-- **Mode Comparison Table**: All 5 modes side-by-side with key metrics
-- **Investment Signals Table**: Per-holding ML, momentum, valuation, conviction bar
-- **Risk Dashboard**: 12 metric cards (return, vol, Sharpe, Sortino, VaR, CVaR, drawdown, beta, tracking error, HHI, effective positions, diversification ratio)
-- **Efficient Frontier**: Custom SVG with parabola + CML
+- **Mode Comparison**: Interactive RadarChart (instant hover response) + table with Hist/ML Return & Sharpe; hover highlights radar, click switches strategy with loading bar
+- **Portfolio Alpha Intelligence**: Combined 6-source signal gauge, signal distribution bar, per-holding signal cards with component breakdown (ML, MOM, VAL, CLU, REG, CNN)
+- **Efficient Frontier**: Interactive SVG with gradient fills, hover tooltips, mode positions overlay, animated portfolio marker
 - **Weight Distribution**: Horizontal bar chart
 - **Risk Decomposition**: Sortable table with marginal contribution, component VaR, % of total risk
-- **Correlation Heatmap**: Color-coded matrix of portfolio holdings
-- **Sector Allocation**: Pie chart with legend
-- **FX Exposure**: Revenue-weighted currency breakdown (NOK/USD/EUR/GBP)
-- **Regime Status**: Per-holding volatility regime classification
-- **Stress Scenarios**: Vol doubles, correlations→1, crisis de-risking
+- **Correlation + Sector**: 2:1 grid with heatmap and pie chart with progress bars
+- **Portfolio Regime Panel**: 3-state HMM state probs, transition matrix, regime-conditional returns
+- **Cluster Analysis Panel**: Spectral clusters with z-scores, half-lives, MR signals
+- **Holdings Regime**: Per-holding volatility regime cards
 - **Holdings Table**: Full detail with links to stock pages
+
+### Loading States
+- Animated gradient loading bar (fixed top) during strategy switching
+- Results sections dim to 40% opacity with pointer-events disabled
+- Radar chart responds instantly to hover (no API call needed)
 
 ### Persistence
 - Save/load named portfolios via `portfolio_configs` table
