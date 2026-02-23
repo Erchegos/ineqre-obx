@@ -593,10 +593,10 @@ Located at `/portfolio`. Password-protected (same credentials as research portal
 
 ### Efficient Frontier
 - Interactive custom SVG chart with Catmull-Rom splines + Capital Market Line through tangency
-- SVG gradient fills, glow filters, animated pulse on portfolio marker
+- SVG gradient fills, animated pulse on compact diamond portfolio marker
 - Weight-proportional asset dots with hover tooltips (ticker, vol, return, weight)
-- Mode comparison portfolio positions overlaid on frontier (visible on strategy table hover)
-- Multi-pass label collision detection to prevent overlaps
+- Mode comparison portfolio positions with permanent abbreviated labels (EW/MV/MS/RP/MD)
+- Multi-pass label collision detection for all markers (assets, modes, Min Var, tangency M)
 
 ### Investment Intelligence (API-enriched)
 The optimize API (`POST /api/portfolio/optimize`) enriches results with:
