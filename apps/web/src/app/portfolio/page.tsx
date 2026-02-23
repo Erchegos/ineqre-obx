@@ -1820,7 +1820,7 @@ export default function PortfolioPage() {
               // Check if portfolio and min-var overlap
               const mvPx = toX(minVarPt.vol), mvPy = toY(minVarPt.ret);
               const pfPx = toX(portfolio.vol), pfPy = toY(portfolio.ret);
-              const pfMvOverlap = Math.abs(mvPx - pfPx) < 30 && Math.abs(mvPy - pfPy) < 25;
+
 
               return (
                 <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}
@@ -1928,56 +1928,100 @@ export default function PortfolioPage() {
                       );
                     })}
 
-                    {/* Mode comparison portfolios (non-active, dashed rings) */}
-                    {modePortfolios.filter(mp => !mp.isActive).map(mp => (
-                      <g key={`mode-${mp.key}`}>
-                        <circle cx={toX(mp.vol)} cy={toY(mp.ret)} r={5}
-                          fill="none" stroke={mp.color} strokeWidth={1.5}
-                          strokeDasharray="3 2"
-                          opacity={hoveredMode === mp.key ? 0.9 : 0.4}
-                        />
-                        {hoveredMode === mp.key && (
-                          <>
-                            <circle cx={toX(mp.vol)} cy={toY(mp.ret)} r={2} fill={mp.color} />
-                            <text x={toX(mp.vol) + 8} y={toY(mp.ret) + 4}
-                              fill={mp.color} fontSize={8} fontFamily="monospace" fontWeight={600}>
-                              {mp.label}
+                    {/* Mode comparison portfolios (non-active, dashed rings with labels) */}
+                    {(() => {
+                      const MODE_ABBREV: Record<string, string> = {
+                        equal: "EW", min_variance: "MV", max_sharpe: "MS",
+                        risk_parity: "RP", max_diversification: "MD",
+                      };
+                      const nonActive = modePortfolios.filter(mp => !mp.isActive);
+                      const mLabels = nonActive.map(mp => ({
+                        ...mp, px: toX(mp.vol), py: toY(mp.ret),
+                        lx: toX(mp.vol) + 9, ly: toY(mp.ret) + 3,
+                        abbrev: MODE_ABBREV[mp.key] || mp.key.slice(0, 2).toUpperCase(),
+                      }));
+                      mLabels.sort((a, b) => a.py - b.py);
+                      for (let pass = 0; pass < 3; pass++) {
+                        for (let i = 1; i < mLabels.length; i++) {
+                          for (let j = 0; j < i; j++) {
+                            if (Math.abs(mLabels[i].ly - mLabels[j].ly) < 11 && Math.abs(mLabels[i].lx - mLabels[j].lx) < 30) {
+                              mLabels[i].ly = mLabels[j].ly + 11;
+                            }
+                          }
+                        }
+                      }
+                      return mLabels.map(mp => {
+                        const isHov = hoveredMode === mp.key;
+                        return (
+                          <g key={`mode-${mp.key}`}>
+                            <circle cx={mp.px} cy={mp.py} r={5}
+                              fill="none" stroke={mp.color} strokeWidth={1.5}
+                              strokeDasharray="3 2"
+                              opacity={isHov ? 0.9 : 0.5}
+                            />
+                            {isHov && <circle cx={mp.px} cy={mp.py} r={2} fill={mp.color} />}
+                            <text x={mp.lx} y={mp.ly}
+                              fill={mp.color} fontSize={8} fontFamily="monospace"
+                              fontWeight={isHov ? 700 : 600} opacity={isHov ? 1 : 0.7}>
+                              {mp.abbrev}
                             </text>
-                          </>
-                        )}
-                      </g>
-                    ))}
+                          </g>
+                        );
+                      });
+                    })()}
 
-                    {/* Min-Variance */}
-                    <circle cx={mvPx} cy={mvPy} r={6} fill="none" stroke="#94a3b8" strokeWidth={1.5} />
-                    <circle cx={mvPx} cy={mvPy} r={2.5} fill="#94a3b8" />
-                    {!pfMvOverlap && (
-                      <text x={mvPx - 9} y={mvPy + 4} textAnchor="end"
-                        fill="#94a3b8" fontSize={8} fontFamily="monospace" fontWeight={600}>Min Var</text>
-                    )}
-
-                    {/* Tangency (M) */}
-                    <circle cx={toX(tangencyPt.vol)} cy={toY(tangencyPt.ret)} r={7} fill="none" stroke="#10b981" strokeWidth={2} />
-                    <circle cx={toX(tangencyPt.vol)} cy={toY(tangencyPt.ret)} r={3} fill="#10b981" />
-                    <text x={toX(tangencyPt.vol) + 11} y={toY(tangencyPt.ret) + 4} textAnchor="start"
-                      fill="#10b981" fontSize={9} fontFamily="monospace" fontWeight={700}>M</text>
-
-                    {/* Portfolio (diamond) — with glow and pulse */}
-                    <g filter="url(#portfolioGlow)">
-                      <polygon
-                        points={`${pfPx},${pfPy - 8} ${pfPx + 8},${pfPy} ${pfPx},${pfPy + 8} ${pfPx - 8},${pfPy}`}
-                        fill="#f59e0b" stroke="#fbbf24" strokeWidth={1.5}
-                      />
-                    </g>
-                    {/* Pulse ring */}
-                    <circle cx={pfPx} cy={pfPy} r={12} fill="none" stroke="#f59e0b" strokeWidth={1}>
-                      <animate attributeName="r" from="10" to="22" dur="2s" repeatCount="indefinite" />
-                      <animate attributeName="opacity" from="0.5" to="0" dur="2s" repeatCount="indefinite" />
-                    </circle>
-                    <text x={pfPx - 10} y={pfPy - 14} textAnchor="end"
-                      fill="#fbbf24" fontSize={9} fontFamily="monospace" fontWeight={700}>
-                      {pfMvOverlap ? "Portfolio (Min Var)" : "Portfolio"}
-                    </text>
+                    {/* Special markers: Min Var, Tangency, Portfolio — with collision-resolved labels */}
+                    {(() => {
+                      const tPx = toX(tangencyPt.vol), tPy = toY(tangencyPt.ret);
+                      type SLabel = { id: string; lx: number; ly: number; anchor: "start" | "end" | "middle"; color: string; text: string; fs: number; fw: number };
+                      const sLabels: SLabel[] = [
+                        { id: "tan", lx: tPx + 9, ly: tPy + 3, anchor: "start", color: "#10b981", text: "M", fs: 9, fw: 700 },
+                        { id: "mv", lx: mvPx - 9, ly: mvPy + 4, anchor: "end", color: "#94a3b8", text: "Min Var", fs: 8, fw: 600 },
+                      ];
+                      // Collision resolution between special labels
+                      for (let pass = 0; pass < 3; pass++) {
+                        for (let i = 0; i < sLabels.length; i++) {
+                          for (let j = i + 1; j < sLabels.length; j++) {
+                            const a = sLabels[i], b = sLabels[j];
+                            const aW = a.text.length * 6;
+                            const bW = b.text.length * 6;
+                            const aL = a.anchor === "end" ? a.lx - aW : a.lx;
+                            const aR = a.anchor === "end" ? a.lx : a.lx + aW;
+                            const bL = b.anchor === "end" ? b.lx - bW : b.lx;
+                            const bR = b.anchor === "end" ? b.lx : b.lx + bW;
+                            if (aL < bR + 4 && bL < aR + 4 && Math.abs(a.ly - b.ly) < 14) {
+                              if (b.ly >= a.ly) { b.ly = a.ly + 14; } else { a.ly = b.ly + 14; }
+                            }
+                          }
+                        }
+                      }
+                      return (
+                        <>
+                          {/* Min-Variance dot */}
+                          <circle cx={mvPx} cy={mvPy} r={6} fill="none" stroke="#94a3b8" strokeWidth={1.5} />
+                          <circle cx={mvPx} cy={mvPy} r={2.5} fill="#94a3b8" />
+                          {/* Tangency dot */}
+                          <circle cx={tPx} cy={tPy} r={7} fill="none" stroke="#10b981" strokeWidth={2} />
+                          <circle cx={tPx} cy={tPy} r={3} fill="#10b981" />
+                          {/* Portfolio diamond with pulse */}
+                          <polygon
+                            points={`${pfPx},${pfPy - 5} ${pfPx + 5},${pfPy} ${pfPx},${pfPy + 5} ${pfPx - 5},${pfPy}`}
+                            fill="#f59e0b" stroke="#fbbf24" strokeWidth={1.2}
+                          />
+                          <circle cx={pfPx} cy={pfPy} r={8} fill="none" stroke="#f59e0b" strokeWidth={0.8}>
+                            <animate attributeName="r" from="7" to="15" dur="2s" repeatCount="indefinite" />
+                            <animate attributeName="opacity" from="0.4" to="0" dur="2s" repeatCount="indefinite" />
+                          </circle>
+                          {/* Collision-resolved labels */}
+                          {sLabels.map(sl => (
+                            <text key={sl.id} x={sl.lx} y={sl.ly} textAnchor={sl.anchor}
+                              fill={sl.color} fontSize={sl.fs} fontFamily="monospace" fontWeight={sl.fw}>
+                              {sl.text}
+                            </text>
+                          ))}
+                        </>
+                      );
+                    })()}
 
                     {/* Rf */}
                     <circle cx={toX(0)} cy={toY(rfPct)} r={3.5} fill="#f97316" stroke="#fb923c" strokeWidth={1} />

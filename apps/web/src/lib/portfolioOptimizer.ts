@@ -856,8 +856,8 @@ function computeEfficientFrontier(
   const minRet = Math.min(...muD);
   const maxRet = Math.max(...muD);
   const range = maxRet - minRet;
-  const sweepMin = minRet - range * 0.2;
-  const sweepMax = maxRet + range * 0.1;
+  const sweepMin = minRet - range * 0.3;
+  const sweepMax = maxRet + range * 0.4;
 
   const points: EfficientFrontierPoint[] = [];
 
