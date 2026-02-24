@@ -121,18 +121,26 @@ async function fetchPrices(
   })).reverse();
 }
 
-async function fetchMarketPrices(limit: number): Promise<number[]> {
+// Fetch OBX prices aligned by date with the stock's dates
+async function fetchMarketPricesAligned(
+  stockDates: string[]
+): Promise<Map<string, number>> {
   const tableName = await getPriceTable();
   const q = `
-    SELECT close
+    SELECT TO_CHAR(date, 'YYYY-MM-DD') as date, close
     FROM public.${tableName}
     WHERE upper(ticker) = 'OBX'
       AND close IS NOT NULL
-      AND EXTRACT(DOW FROM date::date) NOT IN (0, 6)
-    ORDER BY date DESC LIMIT $1
+      AND date >= $1::date
+      AND date <= $2::date
+    ORDER BY date ASC
   `;
-  const result = await pool.query(q, [limit]);
-  return result.rows.map(r => Number(r.close)).reverse();
+  const result = await pool.query(q, [stockDates[0], stockDates[stockDates.length - 1]]);
+  const map = new Map<string, number>();
+  for (const r of result.rows) {
+    map.set(String(r.date), Number(r.close));
+  }
+  return map;
 }
 
 async function getFullDateRange(ticker: string): Promise<{ start: string; end: string } | null> {
@@ -200,21 +208,47 @@ export async function GET(
       ? dates.slice(firstValidAdjIndex)
       : dates;
 
-    // Fetch Market Data for Beta (align length roughly)
-    let marketReturns: number[] | null = null;
-    let adjMarketReturns: number[] | null = null;
+    // Fetch Market Data for Beta — aligned by DATE (not position)
+    let rawBeta = 0;
+    let adjBeta = 0;
     try {
-      const marketCloses = await fetchMarketPrices(limit);
-      if (marketCloses.length >= closes.length) {
-         // Trim to match exactly if needed, or just use simpler alignment
-         const alignedMarket = marketCloses.slice(-closes.length);
-         marketReturns = computeReturns(alignedMarket);
+      const obxMap = await fetchMarketPricesAligned(dates);
 
-         // Also align market returns for adjusted series
-         if (hasValidAdjClose && marketCloses.length >= adjCloses.length) {
-           const adjAlignedMarket = marketCloses.slice(-adjCloses.length);
-           adjMarketReturns = computeReturns(adjAlignedMarket);
-         }
+      // Build date-aligned pairs for raw series: only dates where both stock AND OBX have data
+      const rawPairs: { stockClose: number; obxClose: number }[] = [];
+      for (let i = 0; i < dates.length; i++) {
+        const obxClose = obxMap.get(dates[i]);
+        if (obxClose !== undefined) {
+          rawPairs.push({ stockClose: closes[i], obxClose });
+        }
+      }
+      if (rawPairs.length >= 20) {
+        rawBeta = computeBeta(
+          computeReturns(rawPairs.map(p => p.stockClose)),
+          computeReturns(rawPairs.map(p => p.obxClose))
+        );
+      }
+
+      // Build date-aligned pairs for adjusted series
+      if (hasValidAdjClose) {
+        const adjPairs: { stockClose: number; obxClose: number }[] = [];
+        const adjPrices = prices.slice(firstValidAdjIndex);
+        for (const p of adjPrices) {
+          const obxClose = obxMap.get(p.date);
+          if (obxClose !== undefined) {
+            adjPairs.push({ stockClose: p.adj_close, obxClose });
+          }
+        }
+        if (adjPairs.length >= 20) {
+          adjBeta = computeBeta(
+            computeReturns(adjPairs.map(p => p.stockClose)),
+            computeReturns(adjPairs.map(p => p.obxClose))
+          );
+        } else {
+          adjBeta = rawBeta; // Fallback
+        }
+      } else {
+        adjBeta = rawBeta;
       }
     } catch (e) { console.warn("Beta calc failed", e); }
 
@@ -222,18 +256,20 @@ export async function GET(
     // 1. Adjusted (Total Return) - Uses only valid adj_close data
     const adjStats = calculateMetrics(
         adjCloses,
-        adjMarketReturns || marketReturns,
+        null, // Beta computed separately via date-aligned method
         adjCloses[0],
         adjCloses[adjCloses.length - 1]
     );
+    adjStats.metrics.beta = adjBeta;
 
     // 2. Raw (Price Return) - Uses all close data
     const rawStats = calculateMetrics(
         closes,
-        marketReturns,
+        null, // Beta computed separately via date-aligned method
         closes[0],
         closes[closes.length - 1]
     );
+    rawStats.metrics.beta = rawBeta;
 
     // Helper to format returns series with dates
     const formatReturns = (rets: number[], dateArr: string[]) => rets.map((r, i) => ({
