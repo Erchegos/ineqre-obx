@@ -20,5 +20,9 @@ RUN mkdir -p /tmp/models
 
 EXPOSE 8000
 
-# Run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Prevent PyTorch OpenMP/MKL multi-threading from crashing uvicorn
+ENV OMP_NUM_THREADS=1
+ENV MKL_NUM_THREADS=1
+
+# Run with 2 workers for concurrent request handling
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--timeout-keep-alive", "120"]
