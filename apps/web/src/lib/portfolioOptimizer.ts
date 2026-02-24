@@ -504,7 +504,9 @@ function optimizeMaxSharpe(
     const ones = new Array(n).fill(1);
     const denom = dotProduct(ones, SigInvExcess);
 
-    if (Math.abs(denom) > 1e-12) {
+    // Only use tangency formula when denom > 0 (positive excess returns dominate).
+    // When denom < 0, the formula produces the MIN Sharpe portfolio — wrong direction.
+    if (denom > 1e-12) {
       let w = SigInvExcess.map(v => v / denom);
 
       // Long-only: clamp negatives
@@ -520,13 +522,17 @@ function optimizeMaxSharpe(
     }
   }
 
-  // Fallback: weight by excess return / variance (reward-to-risk)
+  // Fallback: reward-to-risk weighting
+  // Works for both positive and negative excess returns — least-negative gets most weight
   const rtr = mu.map((m, i) => {
     const excess = m - riskFreeRate;
-    const vol = cov[i][i] > 1e-12 ? cov[i][i] : 1;
-    return Math.max(0, excess / vol);
+    const vol = cov[i][i] > 1e-12 ? Math.sqrt(cov[i][i] * 252) : 1;
+    return excess / vol;
   });
-  let w = normalize(rtr);
+  // Shift so all values are positive (best risk-adjusted stock gets highest weight)
+  const minRtr = Math.min(...rtr);
+  const shifted = rtr.map(r => r - minRtr + 0.01);
+  let w = normalize(shifted);
   w = applyConstraintsAndNormalize(w, tickers, sectors, constraints);
   return w;
 }
