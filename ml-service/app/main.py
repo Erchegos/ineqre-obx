@@ -7,6 +7,17 @@ Target: 1-month forward returns with probability distributions
 Includes: Multivariate HMM regime detection, spectral clustering, SHAP importance
 """
 
+# Prevent PyTorch OpenMP/MKL multi-threading from crashing uvicorn workers
+import os
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+
+try:
+    import torch
+    torch.set_num_threads(1)
+except ImportError:
+    pass
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel

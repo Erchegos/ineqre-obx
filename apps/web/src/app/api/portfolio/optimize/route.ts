@@ -475,7 +475,7 @@ export async function POST(req: NextRequest) {
       const clusterResponse = await fetch(`${mlServiceUrl2}/clustering/spectral`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tickers, benchmark: 'OBX' }),
+        body: JSON.stringify({ tickers, lookback_days: lookbackDays, benchmark: 'OBX' }),
         signal: AbortSignal.timeout(15000),
       });
       if (clusterResponse.ok) {
@@ -492,8 +492,8 @@ export async function POST(req: NextRequest) {
       const cnnResponse = await fetch(`${mlServiceUrl3}/signals/cnn`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tickers, lookback_days: 1260, epochs: 30, window: 60 }),
-        signal: AbortSignal.timeout(30000), // CNN training takes longer
+        body: JSON.stringify({ tickers, lookback_days: 504, epochs: 5, window: 60 }),
+        signal: AbortSignal.timeout(60000), // CNN training takes ~15-30s
       });
       if (cnnResponse.ok) {
         const cnnResult = await cnnResponse.json();
