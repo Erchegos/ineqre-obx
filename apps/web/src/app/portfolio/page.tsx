@@ -193,6 +193,9 @@ interface OptimizationResult {
     portfolioValueNOK: number;
     commonDates: number;
     shrinkageIntensity?: number;
+    constraintAdjusted?: boolean;
+    originalMaxPosition?: number;
+    effectiveMaxPosition?: number;
   };
 }
 
@@ -1436,6 +1439,20 @@ export default function PortfolioPage() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* === CONSTRAINT ADJUSTMENT WARNING === */}
+      {result && result.meta.constraintAdjusted && (
+        <div style={{
+          padding: "8px 14px", borderRadius: 4, marginBottom: 8,
+          background: "rgba(245,158,11,0.08)", borderLeft: "3px solid #f59e0b",
+          fontSize: 11, fontFamily: "monospace", color: "#f59e0b",
+          display: "flex", alignItems: "center", gap: 8,
+        }}>
+          <span style={{ fontWeight: 700, fontSize: 10, textTransform: "uppercase", minWidth: 60 }}>ADJUSTED</span>
+          Max position raised from {((result.meta.originalMaxPosition ?? 0) * 100).toFixed(0)}% to {((result.meta.effectiveMaxPosition ?? 0) * 100).toFixed(0)}% — {selectedTickers.length} tickers require at least {(100 / selectedTickers.length).toFixed(1)}% each for full investment.
+          {" "}Use &quot;ALLOW ZERO&quot; to keep strict position limits.
         </div>
       )}
 

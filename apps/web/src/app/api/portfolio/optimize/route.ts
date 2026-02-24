@@ -68,6 +68,17 @@ export async function POST(req: NextRequest) {
       ...constraints,
     };
 
+    // Auto-adjust maxPositionSize if infeasible for fully-invested portfolio
+    // With N tickers and minPos > 0, need N × maxPos >= 1
+    let constraintAdjusted = false;
+    let originalMaxPosition = mergedConstraints.maxPositionSize;
+    const minFullWeight = 1 / tickers.length;
+    if (mergedConstraints.minPositionSize > 0 && mergedConstraints.maxPositionSize < minFullWeight) {
+      // Give ~5% room above equal-weight for optimizer to differentiate
+      mergedConstraints.maxPositionSize = Math.min(1, minFullWeight + 0.05);
+      constraintAdjusted = true;
+    }
+
     const tableName = await getPriceTable();
 
     // 1. Fetch prices for all tickers + OBX benchmark
@@ -760,6 +771,9 @@ export async function POST(req: NextRequest) {
         portfolioValueNOK,
         commonDates: trimmedDates.length,
         shrinkageIntensity: result.shrinkageIntensity,
+        constraintAdjusted,
+        originalMaxPosition: constraintAdjusted ? originalMaxPosition : undefined,
+        effectiveMaxPosition: mergedConstraints.maxPositionSize,
       },
     };
 
