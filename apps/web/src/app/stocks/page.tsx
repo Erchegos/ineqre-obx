@@ -36,13 +36,13 @@ export default function StocksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<keyof StockData>("completenessPct");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc"); // Default: highest completeness first
+  const [sortBy, setSortBy] = useState<keyof StockData>("rows");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc"); // Default: most data (biggest companies) first
   const [selectedAssetTypes, setSelectedAssetTypes] = useState<Set<AssetType>>(
     new Set(['equity']) // Default to equities only
   );
   const [selectedSectors, setSelectedSectors] = useState<Set<string>>(new Set());
-  const [tierFilter, setTierFilter] = useState<'all' | 'tierA' | 'tierAB' | 'ml' | 'options'>('all');
+  const [tierFilter, setTierFilter] = useState<'all' | 'tierA' | 'tierAB' | 'ml' | 'options'>('tierAB');
   const [tickersWithFactors, setTickersWithFactors] = useState<Set<string>>(new Set());
   const [tickersWithOptimizer, setTickersWithOptimizer] = useState<Set<string>>(new Set());
   const [tickersWithOptions, setTickersWithOptions] = useState<Set<string>>(new Set());
@@ -928,19 +928,60 @@ export default function StocksPage() {
                       {stock.ticker}
                     </span>
                   </td>
-                  <td style={{ padding: "8px 16px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                  <td style={{ padding: "8px 12px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
                       {tickersWithFactors.has(stock.ticker) && (
-                        <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 5px", borderRadius: 2, background: '#10b981', color: '#fff', fontFamily: 'monospace' }}>ML</span>
+                        <span style={{
+                          fontSize: 9.5,
+                          fontWeight: 600,
+                          padding: "3px 8px",
+                          borderRadius: 10,
+                          background: "rgba(16, 185, 129, 0.12)",
+                          color: "#10b981",
+                          border: "1px solid rgba(16, 185, 129, 0.3)",
+                          fontFamily: "monospace",
+                          letterSpacing: "0.04em",
+                        }}>ML</span>
                       )}
                       {tickersWithOptimizer.has(stock.ticker) && (
-                        <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 5px", borderRadius: 2, background: '#8b5cf6', color: '#fff', fontFamily: 'monospace' }}>OPT</span>
+                        <span style={{
+                          fontSize: 9.5,
+                          fontWeight: 600,
+                          padding: "3px 8px",
+                          borderRadius: 10,
+                          background: "rgba(139, 92, 246, 0.12)",
+                          color: "#a78bfa",
+                          border: "1px solid rgba(139, 92, 246, 0.3)",
+                          fontFamily: "monospace",
+                          letterSpacing: "0.04em",
+                        }}>OPT</span>
                       )}
                       {hasOptions(stock.ticker) && (
-                        <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 5px", borderRadius: 2, background: '#f59e0b', color: '#fff', fontFamily: 'monospace' }}>OPTN</span>
+                        <span style={{
+                          fontSize: 9.5,
+                          fontWeight: 600,
+                          padding: "3px 8px",
+                          borderRadius: 10,
+                          background: "rgba(245, 158, 11, 0.12)",
+                          color: "#fbbf24",
+                          border: "1px solid rgba(245, 158, 11, 0.3)",
+                          fontFamily: "monospace",
+                          letterSpacing: "0.04em",
+                        }}>OPTN</span>
                       )}
                       {selectedAssetTypes.size > 1 && stock.asset_type !== 'equity' && (
-                        <span style={{ fontSize: 9, fontWeight: 600, padding: "2px 5px", borderRadius: 2, background: stock.asset_type === 'index' ? '#3b82f6' : stock.asset_type === 'commodity_etf' ? '#f59e0b' : stock.asset_type === 'index_etf' ? '#8b5cf6' : 'var(--muted)', color: '#fff', fontFamily: 'monospace', textTransform: 'uppercase' }}>
+                        <span style={{
+                          fontSize: 9.5,
+                          fontWeight: 600,
+                          padding: "3px 8px",
+                          borderRadius: 10,
+                          background: stock.asset_type === 'index' ? 'rgba(59, 130, 246, 0.12)' : stock.asset_type === 'commodity_etf' ? 'rgba(245, 158, 11, 0.12)' : stock.asset_type === 'index_etf' ? 'rgba(139, 92, 246, 0.12)' : 'rgba(156, 163, 175, 0.12)',
+                          color: stock.asset_type === 'index' ? '#60a5fa' : stock.asset_type === 'commodity_etf' ? '#fbbf24' : stock.asset_type === 'index_etf' ? '#a78bfa' : 'var(--muted)',
+                          border: `1px solid ${stock.asset_type === 'index' ? 'rgba(59, 130, 246, 0.3)' : stock.asset_type === 'commodity_etf' ? 'rgba(245, 158, 11, 0.3)' : stock.asset_type === 'index_etf' ? 'rgba(139, 92, 246, 0.3)' : 'rgba(156, 163, 175, 0.3)'}`,
+                          fontFamily: "monospace",
+                          letterSpacing: "0.04em",
+                          textTransform: "uppercase",
+                        }}>
                           {stock.asset_type === 'index' ? 'IDX' : stock.asset_type === 'commodity_etf' ? 'C-ETF' : stock.asset_type === 'index_etf' ? 'I-ETF' : stock.asset_type}
                         </span>
                       )}
