@@ -321,7 +321,7 @@ async function main() {
         const conId = await client.resolveContractId(symbol, exchange, SecType.STK, currency);
 
         // Fetch headlines
-        const headlines = await client.getHistoricalNews(conId, PROVIDER_CODES, startDt, endDt, 50);
+        const headlines = await client.getHistoricalNews(conId, PROVIDER_CODES, startDt, endDt, 300);
 
         let newCount = 0;
         for (const h of headlines) {

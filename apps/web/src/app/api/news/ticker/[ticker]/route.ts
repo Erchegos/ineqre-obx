@@ -79,12 +79,18 @@ export async function GET(
       FROM news_events e
       JOIN news_ticker_map tm ON tm.news_event_id = e.id
       LEFT JOIN LATERAL (
-        SELECT p.close, LAG(p.close) OVER (ORDER BY p.date) AS prev_close
-        FROM public.${priceTable} p
-        WHERE upper(p.ticker) = $1
-          AND p.close IS NOT NULL
-          AND p.date BETWEEN (e.published_at::date - INTERVAL '3 days') AND (e.published_at::date + INTERVAL '1 day')
-        ORDER BY p.date DESC
+        SELECT
+          p1.close,
+          (SELECT p2.close FROM public.${priceTable} p2
+           WHERE upper(p2.ticker) = $1 AND p2.close IS NOT NULL
+             AND p2.date < p1.date ORDER BY p2.date DESC LIMIT 1
+          ) AS prev_close
+        FROM public.${priceTable} p1
+        WHERE upper(p1.ticker) = $1
+          AND p1.close IS NOT NULL
+          AND p1.date <= (e.published_at::date + INTERVAL '1 day')
+          AND p1.date >= (e.published_at::date - INTERVAL '3 days')
+        ORDER BY p1.date DESC
         LIMIT 1
       ) pd ON true
       WHERE ${where}
