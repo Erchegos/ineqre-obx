@@ -65,13 +65,49 @@ def _momentum_signal(mom1m: float, mom6m: float, mom11m: float) -> float:
 def _valuation_signal(metrics: dict) -> float:
     """
     Composite valuation score from up to 5 metrics.
-    Each available metric produces a sub-score; final = average of available sub-scores.
+
+    Uses sector-relative z-scores if available (z_ep, z_bm, etc.),
+    otherwise falls back to absolute thresholds.
+    For E/P, B/M, D/Y, S/P: positive z = above sector median = cheaper.
+    For EV/EBITDA: positive z = above sector median = MORE expensive, so invert.
     """
+    # Check if z-scores are available
+    has_z = any(
+        metrics.get(f"z_{m}") is not None and metrics.get(f"z_{m}") != 0
+        for m in ["ep", "bm", "dy", "sp", "ev_ebitda"]
+    )
+
+    if has_z:
+        return _valuation_signal_zscore(metrics)
+    return _valuation_signal_absolute(metrics)
+
+
+def _valuation_signal_zscore(metrics: dict) -> float:
+    """Sector-relative z-score based valuation signal."""
+    z_scores: list[float] = []
+
+    for m in ["ep", "bm", "dy", "sp"]:
+        z = metrics.get(f"z_{m}")
+        if z is not None and z != 0:
+            # Positive z = above sector median = cheaper → positive signal
+            z_scores.append(_normalize_signal(z / 2))  # z=2 → signal=1
+
+    z_ev = metrics.get("z_ev_ebitda")
+    if z_ev is not None and z_ev != 0:
+        # Positive z = above sector median = MORE expensive → INVERT
+        z_scores.append(_normalize_signal(-z_ev / 2))
+
+    if not z_scores:
+        return 0.0
+    return _normalize_signal(sum(z_scores) / len(z_scores))
+
+
+def _valuation_signal_absolute(metrics: dict) -> float:
+    """Absolute threshold based valuation signal (fallback)."""
     sub_scores: list[float] = []
 
     ep = metrics.get("ep", 0) or 0
     if ep != 0:
-        # E/P (earnings yield): higher = cheaper
         if ep > 0.08:
             sub_scores.append(1.0)
         elif ep > 0.04:
@@ -83,7 +119,6 @@ def _valuation_signal(metrics: dict) -> float:
 
     bm = metrics.get("bm", 0) or 0
     if bm != 0:
-        # B/M (book-to-market): higher = cheaper
         if bm > 1.0:
             sub_scores.append(1.0)
         elif bm > 0.5:
@@ -95,7 +130,6 @@ def _valuation_signal(metrics: dict) -> float:
 
     dy = metrics.get("dy", 0) or 0
     if dy != 0:
-        # D/Y: moderate 2-8% is ideal
         if 0.02 < dy < 0.08:
             sub_scores.append(0.5)
         elif dy > 0:
@@ -105,7 +139,6 @@ def _valuation_signal(metrics: dict) -> float:
 
     ev_ebitda = metrics.get("ev_ebitda", 0) or 0
     if ev_ebitda > 0:
-        # EV/EBITDA: lower = cheaper
         if ev_ebitda < 6:
             sub_scores.append(1.0)
         elif ev_ebitda < 10:
@@ -117,7 +150,6 @@ def _valuation_signal(metrics: dict) -> float:
 
     sp = metrics.get("sp", 0) or 0
     if sp > 0:
-        # S/P (sales/price): higher = cheaper
         if sp > 1.0:
             sub_scores.append(0.5)
         elif sp > 0.5:

@@ -84,7 +84,7 @@ interface HoldingSignal {
   momentumSignal: 'Bullish' | 'Neutral' | 'Bearish';
   momentum: { ret1m: number; ret3m: number; ret6m: number; mom1m: number | null; mom6m: number | null };
   valuationSignal: 'Cheap' | 'Fair' | 'Expensive' | 'N/A';
-  valuation: { ep: number | null; bm: number | null; dy: number | null; mktcap: number | null };
+  valuation: { ep: number | null; bm: number | null; dy: number | null; ev_ebitda: number | null; sp: number | null; mktcap: number | null; zScores: { ep: number | null; bm: number | null; dy: number | null; sp: number | null; ev_ebitda: number | null } | null };
   beta: number;
   currentDrawdown: number;
   conviction: number;
@@ -1939,7 +1939,7 @@ export default function PortfolioPage() {
               >
                 <span>ML: XGB/LGBM 1m forecast</span>
                 <span>MOM: 1m/6m/11m trend</span>
-                <span>VAL: E/P, B/M, D/Y</span>
+                <span>VAL: Sector z-scores</span>
                 <span>CLU: OU mean-reversion</span>
                 <span>REG: HMM regime state</span>
                 <span>CNN: 1D-CNN+Transformer</span>
@@ -1951,7 +1951,7 @@ export default function PortfolioPage() {
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 20px" }}>
                     <div><span style={{ color: "#4CAF50" }}>ML</span> — XGBoost/LightGBM ensemble trained on 19 factors (momentum, volatility, fundamentals). Predicts 1-month forward returns. Signal = prediction × 20 scaled to [-1,1]. Per-ticker.</div>
                     <div><span style={{ color: "#FF9800" }}>MOM</span> — Momentum composite: 1-month (40%), 6-month (30%), 11-month (30%) price trends. Positive momentum → buy signal. Per-ticker.</div>
-                    <div><span style={{ color: "#F44336" }}>VAL</span> — Composite valuation score across 5 metrics: E/P (earnings yield), B/M (book-to-market), D/Y (dividend yield), EV/EBITDA, S/P (sales/price). Each available metric scored independently, then averaged. Cheap stocks → positive signal. Per-ticker.</div>
+                    <div><span style={{ color: "#F44336" }}>VAL</span> — Sector-relative valuation using z-scores (MAD-based) across 5 multiples: E/P, B/M, D/Y, EV/EBITDA, S/P. Each metric compared to sector peers; z=+1 means 1 MAD cheaper than median. EV/EBITDA inverted (lower=cheaper). Falls back to absolute thresholds if sector data unavailable. Per-ticker.</div>
                     <div><span style={{ color: "#2196F3" }}>CLU</span> — Spectral clustering groups correlated stocks, then fits Ornstein-Uhlenbeck mean-reversion models per cluster. Negative z-score = dislocated below fair value → buy. Per-cluster.</div>
                     <div><span style={{ color: "#9C27B0" }}>REG</span> — Hidden Markov Model detects market regime (Bull/Neutral/Crisis) from cross-asset returns. Bull → +0.8, Neutral → 0.0, Crisis → -0.8. Same for all tickers (market-level signal).</div>
                     <div><span style={{ color: "#00BCD4" }}>CNN</span> — 1D-CNN + Transformer trained on 60-day return windows. Detects residual patterns in price series. Signal ∈ [-1,1] where positive → expected up-move. Per-ticker.</div>

@@ -71,12 +71,13 @@ const SKIP_TICKERS = new Set([
 
 interface FundamentalData {
   ticker: string;
-  bm: number | null;      // Book-to-Market = 1/PB
-  ep: number | null;      // Earnings/Price = 1/PE
-  dy: number | null;      // Dividend yield (decimal)
-  sp: number | null;      // Sales/Price = Revenue / MarketCap
-  sg: number | null;      // Sales growth (YoY)
-  mktcap: number | null;  // Market cap in NOK
+  bm: number | null;        // Book-to-Market = 1/PB
+  ep: number | null;        // Earnings/Price = 1/PE
+  dy: number | null;        // Dividend yield (decimal)
+  sp: number | null;        // Sales/Price = Revenue / MarketCap
+  sg: number | null;        // Sales growth (YoY)
+  mktcap: number | null;    // Market cap in NOK
+  ev_ebitda: number | null;  // EV/EBITDA (trailing)
 }
 
 async function fetchFundamentals(
@@ -93,12 +94,14 @@ async function fetchFundamentals(
     ]);
 
     const fd = summary.financialData as Record<string, unknown> || {};
+    const dks = summary.defaultKeyStatistics as Record<string, unknown> || {};
     const pe = quote.trailingPE;
     const pb = quote.priceToBook;
     const divYield = quote.dividendYield; // Percentage (e.g. 5.96)
     const revenue = fd.totalRevenue as number | undefined;
     const mktcap = quote.marketCap;
     const revGrowth = fd.revenueGrowth as number | undefined;
+    const evEbitda = dks.enterpriseToEbitda as number | undefined;
 
     // Calculate derived factors
     const bm = pb ? 1 / pb : null;
@@ -107,7 +110,7 @@ async function fetchFundamentals(
     const sp = revenue && mktcap ? revenue / mktcap : null;
     const sg = revGrowth ?? null;
 
-    return { ticker, bm, ep, dy, sp, sg, mktcap: mktcap ?? null };
+    return { ticker, bm, ep, dy, sp, sg, mktcap: mktcap ?? null, ev_ebitda: evEbitda ?? null };
   } catch (err: any) {
     console.warn(`  [${ticker}] Yahoo Finance error: ${err.message?.substring(0, 100)}`);
     return null;
@@ -161,8 +164,8 @@ async function main() {
 
     // Upsert into factor_fundamentals for today's date
     await pool.query(
-      `INSERT INTO factor_fundamentals (ticker, date, bm, ep, dy, sp, sg, mktcap, report_date, is_forward_filled)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $2, false)
+      `INSERT INTO factor_fundamentals (ticker, date, bm, ep, dy, sp, sg, mktcap, ev_ebitda, report_date, is_forward_filled)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $2, false)
        ON CONFLICT (ticker, date) DO UPDATE SET
          bm = EXCLUDED.bm,
          ep = EXCLUDED.ep,
@@ -170,9 +173,10 @@ async function main() {
          sp = EXCLUDED.sp,
          sg = EXCLUDED.sg,
          mktcap = EXCLUDED.mktcap,
+         ev_ebitda = EXCLUDED.ev_ebitda,
          report_date = EXCLUDED.report_date,
          is_forward_filled = false`,
-      [ticker, today, data.bm, data.ep, data.dy, data.sp, data.sg, data.mktcap]
+      [ticker, today, data.bm, data.ep, data.dy, data.sp, data.sg, data.mktcap, data.ev_ebitda]
     );
 
     // If backfill mode, also fill all dates in factor_technical that don't have fundamentals
@@ -186,16 +190,17 @@ async function main() {
            sp = COALESCE(sp, $6::numeric),
            sg = COALESCE(sg, $7::numeric),
            mktcap = COALESCE(mktcap, $8::numeric),
+           ev_ebitda = COALESCE(ev_ebitda, $9::numeric),
            report_date = COALESCE(report_date, $2::date),
            is_forward_filled = CASE WHEN bm IS NULL THEN true ELSE is_forward_filled END
          WHERE ticker = $1 AND bm IS NULL`,
-        [ticker, today, data.bm, data.ep, data.dy, data.sp, data.sg, data.mktcap]
+        [ticker, today, data.bm, data.ep, data.dy, data.sp, data.sg, data.mktcap, data.ev_ebitda]
       );
 
       // Second: insert for dates in factor_technical that have no factor_fundamentals row at all
       const insertResult = await pool.query(
-        `INSERT INTO factor_fundamentals (ticker, date, bm, ep, dy, sp, sg, mktcap, nokvol, report_date, is_forward_filled)
-         SELECT $1::varchar, ft.date, $3::numeric, $4::numeric, $5::numeric, $6::numeric, $7::numeric, $8::numeric, NULL, $2::date, true
+        `INSERT INTO factor_fundamentals (ticker, date, bm, ep, dy, sp, sg, mktcap, ev_ebitda, nokvol, report_date, is_forward_filled)
+         SELECT $1::varchar, ft.date, $3::numeric, $4::numeric, $5::numeric, $6::numeric, $7::numeric, $8::numeric, $9::numeric, NULL, $2::date, true
          FROM factor_technical ft
          WHERE ft.ticker = $1::varchar
            AND NOT EXISTS (
@@ -203,12 +208,13 @@ async function main() {
              WHERE ff.ticker = ft.ticker AND ff.date = ft.date
            )
          ON CONFLICT (ticker, date) DO NOTHING`,
-        [ticker, today, data.bm, data.ep, data.dy, data.sp, data.sg, data.mktcap]
+        [ticker, today, data.bm, data.ep, data.dy, data.sp, data.sg, data.mktcap, data.ev_ebitda]
       );
       const backfilled = (updateResult.rowCount || 0) + (insertResult.rowCount || 0);
       console.log(
         `  [${ticker}] OK: bm=${data.bm?.toFixed(3) ?? 'N/A'} ep=${data.ep?.toFixed(3) ?? 'N/A'} ` +
         `dy=${data.dy?.toFixed(3) ?? 'N/A'} sp=${data.sp?.toFixed(3) ?? 'N/A'} ` +
+        `ev_ebitda=${data.ev_ebitda?.toFixed(1) ?? 'N/A'} ` +
         `sg=${data.sg != null ? (data.sg * 100).toFixed(1) + '%' : 'N/A'} ` +
         `mktcap=${data.mktcap ? (data.mktcap / 1e9).toFixed(0) + 'B' : 'N/A'} ` +
         `(backfilled ${backfilled} dates)`
@@ -217,6 +223,7 @@ async function main() {
       console.log(
         `  [${ticker}] OK: bm=${data.bm?.toFixed(3) ?? 'N/A'} ep=${data.ep?.toFixed(3) ?? 'N/A'} ` +
         `dy=${data.dy?.toFixed(3) ?? 'N/A'} sp=${data.sp?.toFixed(3) ?? 'N/A'} ` +
+        `ev_ebitda=${data.ev_ebitda?.toFixed(1) ?? 'N/A'} ` +
         `sg=${data.sg != null ? (data.sg * 100).toFixed(1) + '%' : 'N/A'} ` +
         `mktcap=${data.mktcap ? (data.mktcap / 1e9).toFixed(0) + 'B' : 'N/A'}`
       );

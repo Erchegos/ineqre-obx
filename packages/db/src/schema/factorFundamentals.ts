@@ -43,6 +43,7 @@ export const factorFundamentals = pgTable(
     sp: numeric("sp", { precision: 12, scale: 6 }),
     sg: numeric("sg", { precision: 12, scale: 6 }),
     mktcap: numeric("mktcap", { precision: 20, scale: 2 }),
+    evEbitda: numeric("ev_ebitda", { precision: 12, scale: 6 }),
 
     // Metadata
     reportDate: date("report_date"),

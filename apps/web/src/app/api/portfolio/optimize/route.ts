@@ -202,19 +202,13 @@ export async function POST(req: NextRequest) {
       const factorQuery = `
         SELECT DISTINCT ON (ft.ticker)
           ft.ticker, ft.mom1m, ft.mom6m, ft.mom11m, ft.mom36m, ft.vol1m, ft.vol3m, ft.beta, ft.ivol,
-          ff.bm, ff.ep, ff.dy, ff.sp, ff.mktcap,
-          fs.ev_ebitda, fs.ebitda_ttm
+          ff.bm, ff.ep, ff.dy, ff.sp, ff.mktcap, ff.ev_ebitda
         FROM factor_technical ft
         LEFT JOIN (
-          SELECT DISTINCT ON (ticker) ticker, bm, ep, dy, sp, mktcap
+          SELECT DISTINCT ON (ticker) ticker, bm, ep, dy, sp, mktcap, ev_ebitda
           FROM factor_fundamentals
           ORDER BY ticker, date DESC
         ) ff ON ft.ticker = ff.ticker
-        LEFT JOIN (
-          SELECT DISTINCT ON (ticker) ticker, ev_ebitda, ebitda_ttm
-          FROM fundamentals_snapshot
-          ORDER BY ticker, as_of_date DESC
-        ) fs ON ft.ticker = fs.ticker
         WHERE ft.ticker = ANY($1)
         ORDER BY ft.ticker, ft.date DESC
       `;
@@ -222,7 +216,6 @@ export async function POST(req: NextRequest) {
       factorMap = new Map(
         factorResult.rows.map((r: Record<string, unknown>) => {
           const mktcap = Number(r.mktcap || 0);
-          const ebitdaTtm = Number(r.ebitda_ttm || 0);
           return [r.ticker as string, {
             mom1m: Number(r.mom1m || 0), mom6m: Number(r.mom6m || 0),
             mom11m: Number(r.mom11m || 0), mom36m: Number(r.mom36m || 0),
@@ -231,11 +224,78 @@ export async function POST(req: NextRequest) {
             bm: Number(r.bm || 0), ep: Number(r.ep || 0),
             dy: Number(r.dy || 0), sp: Number(r.sp || 0), mktcap,
             ev_ebitda: Number(r.ev_ebitda || 0),
-            fcf_yield: mktcap > 0 && ebitdaTtm > 0 ? ebitdaTtm / mktcap : 0,
           }];
         })
       );
     } catch { /* factor tables may not exist */ }
+
+    // 7b. Fetch universe fundamentals + sectors for peer-relative valuation scoring
+    type UniverseFactor = { ticker: string; sector: string; ep: number; bm: number; dy: number; sp: number; ev_ebitda: number };
+    let universeFactors: UniverseFactor[] = [];
+    let sectorZScores: Map<string, Record<string, number>> = new Map();
+    try {
+      const universeQuery = `
+        SELECT DISTINCT ON (ff.ticker)
+          ff.ticker, COALESCE(s.sector, 'Unknown') as sector,
+          ff.ep, ff.bm, ff.dy, ff.sp, ff.ev_ebitda
+        FROM factor_fundamentals ff
+        JOIN stocks s ON ff.ticker = s.ticker
+        WHERE s.asset_type = 'equity' OR s.asset_type IS NULL
+        ORDER BY ff.ticker, ff.date DESC
+      `;
+      const universeResult = await pool.query(universeQuery);
+      universeFactors = universeResult.rows.map((r: Record<string, unknown>) => ({
+        ticker: r.ticker as string,
+        sector: r.sector as string,
+        ep: Number(r.ep || 0),
+        bm: Number(r.bm || 0),
+        dy: Number(r.dy || 0),
+        sp: Number(r.sp || 0),
+        ev_ebitda: Number(r.ev_ebitda || 0),
+      }));
+
+      // Compute sector-relative z-scores
+      const valMetrics = ['ep', 'bm', 'dy', 'sp', 'ev_ebitda'] as const;
+      const sectorGroups: Record<string, UniverseFactor[]> = {};
+      for (const f of universeFactors) {
+        if (!sectorGroups[f.sector]) sectorGroups[f.sector] = [];
+        sectorGroups[f.sector].push(f);
+      }
+
+      // Universe-wide medians as fallback
+      const uMedians: Record<string, number> = {};
+      const uMads: Record<string, number> = {};
+      for (const m of valMetrics) {
+        const vals = universeFactors.map(f => f[m]).filter(v => v > 0).sort((a, b) => a - b);
+        if (vals.length > 0) {
+          const med = vals[Math.floor(vals.length / 2)];
+          uMedians[m] = med;
+          const devs = vals.map(v => Math.abs(v - med)).sort((a, b) => a - b);
+          uMads[m] = devs[Math.floor(devs.length / 2)] || 1;
+        }
+      }
+
+      for (const f of universeFactors) {
+        const peers = sectorGroups[f.sector];
+        const zs: Record<string, number> = {};
+        for (const m of valMetrics) {
+          const raw = f[m];
+          if (raw <= 0) { zs[m] = 0; continue; }
+          const peerVals = peers.map(p => p[m]).filter(v => v > 0).sort((a, b) => a - b);
+          let median: number, mad: number;
+          if (peerVals.length >= 3) {
+            median = peerVals[Math.floor(peerVals.length / 2)];
+            const devs = peerVals.map(v => Math.abs(v - median)).sort((a, b) => a - b);
+            mad = devs[Math.floor(devs.length / 2)] || 1;
+          } else {
+            median = uMedians[m] || 1;
+            mad = uMads[m] || 1;
+          }
+          zs[m] = (raw - median) / (mad * 1.4826);
+        }
+        sectorZScores.set(f.ticker, zs);
+      }
+    } catch { /* universe query may fail */ }
 
     // 8. Fetch recent research document count and latest date per holding
     let researchMap: Map<string, { count: number; latestDate: string }> = new Map();
@@ -539,10 +599,21 @@ export async function POST(req: NextRequest) {
         const factors = factorMap.get(t);
         if (factors) {
           momData[t] = { mom1m: factors.mom1m, mom6m: factors.mom6m, mom11m: factors.mom11m };
-          valData[t] = {
-            ep: factors.ep, bm: factors.bm, dy: factors.dy,
-            sp: factors.sp, ev_ebitda: factors.ev_ebitda, fcf_yield: factors.fcf_yield,
-          };
+          // Include sector z-scores if available, else raw values
+          const zs = sectorZScores.get(t);
+          if (zs && Object.values(zs).some(v => v !== 0)) {
+            valData[t] = {
+              ep: factors.ep, bm: factors.bm, dy: factors.dy,
+              sp: factors.sp, ev_ebitda: factors.ev_ebitda,
+              z_ep: zs.ep || 0, z_bm: zs.bm || 0, z_dy: zs.dy || 0,
+              z_sp: zs.sp || 0, z_ev_ebitda: zs.ev_ebitda || 0,
+            };
+          } else {
+            valData[t] = {
+              ep: factors.ep, bm: factors.bm, dy: factors.dy,
+              sp: factors.sp, ev_ebitda: factors.ev_ebitda,
+            };
+          }
         }
       }
       const combineResponse = await fetch(`${mlServiceUrl4}/signals/combine`, {
@@ -634,9 +705,26 @@ export async function POST(req: NextRequest) {
         else if (momScore <= -2) momentumSignal = 'Bearish';
       }
 
-      // Valuation signal
+      // Valuation signal — sector-relative z-scores
       let valuationSignal: 'Cheap' | 'Fair' | 'Expensive' | 'N/A' = 'N/A';
-      if (factors && factors.ep > 0) {
+      const tickerZScores = sectorZScores.get(t);
+      if (tickerZScores) {
+        // For E/P, B/M, D/Y, S/P: higher = cheaper → positive z = cheap
+        // For EV/EBITDA: lower = cheaper → INVERT z-score
+        const zMetrics: number[] = [];
+        if (tickerZScores.ep) zMetrics.push(tickerZScores.ep);
+        if (tickerZScores.bm) zMetrics.push(tickerZScores.bm);
+        if (tickerZScores.dy) zMetrics.push(tickerZScores.dy);
+        if (tickerZScores.sp) zMetrics.push(tickerZScores.sp);
+        if (tickerZScores.ev_ebitda) zMetrics.push(-tickerZScores.ev_ebitda); // invert
+        if (zMetrics.length > 0) {
+          const avgZ = zMetrics.reduce((a, b) => a + b, 0) / zMetrics.length;
+          if (avgZ > 0.5) valuationSignal = 'Cheap';
+          else if (avgZ > -0.5) valuationSignal = 'Fair';
+          else valuationSignal = 'Expensive';
+        }
+      } else if (factors && factors.ep > 0) {
+        // Fallback to absolute thresholds if no z-scores available
         if (factors.ep > 0.08) valuationSignal = 'Cheap';
         else if (factors.ep > 0.04) valuationSignal = 'Fair';
         else valuationSignal = 'Expensive';
@@ -652,8 +740,9 @@ export async function POST(req: NextRequest) {
       }
       if (momentumSignal === 'Bullish') { conviction += 1; convictionFactors += 1; }
       else if (momentumSignal === 'Bearish') { conviction -= 1; convictionFactors += 1; }
-      if (valuationSignal === 'Cheap') { conviction += 0.5; convictionFactors += 1; }
-      else if (valuationSignal === 'Expensive') { conviction -= 0.5; convictionFactors += 1; }
+      if (valuationSignal === 'Cheap') { conviction += 0.7; convictionFactors += 1; }
+      else if (valuationSignal === 'Fair') { conviction += 0.1; convictionFactors += 1; }
+      else if (valuationSignal === 'Expensive') { conviction -= 0.7; convictionFactors += 1; }
       if (regime.regime === 'Low & Stable') { conviction += 0.3; convictionFactors += 1; }
       else if (regime.regime === 'Crisis' || regime.regime === 'Extreme High') { conviction -= 0.5; convictionFactors += 1; }
 
@@ -684,7 +773,16 @@ export async function POST(req: NextRequest) {
           ep: factors?.ep ?? null,
           bm: factors?.bm ?? null,
           dy: factors?.dy ?? null,
+          ev_ebitda: factors?.ev_ebitda ?? null,
+          sp: factors?.sp ?? null,
           mktcap: factors?.mktcap ?? null,
+          zScores: tickerZScores ? {
+            ep: tickerZScores.ep || null,
+            bm: tickerZScores.bm || null,
+            dy: tickerZScores.dy || null,
+            sp: tickerZScores.sp || null,
+            ev_ebitda: tickerZScores.ev_ebitda || null,
+          } : null,
         },
         beta,
         currentDrawdown: curDD,
