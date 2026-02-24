@@ -1791,13 +1791,14 @@ export default function PortfolioPage() {
 
                 // Component signals
                 const components = sig.combinedSignal?.component_signals ?? {};
+                const weightsUsed = sig.combinedSignal?.weights_used ?? {};
                 const componentList = [
-                  { key: "ml", label: "ML", value: components["ml"] ?? (sig.mlReturn > 0 ? Math.min(1, sig.mlReturn * 10) : Math.max(-1, sig.mlReturn * 10)), color: "#3b82f6" },
-                  { key: "momentum", label: "MOM", value: components["momentum"] ?? (sig.momentumSignal === "Bullish" ? 0.6 : sig.momentumSignal === "Bearish" ? -0.6 : 0), color: "#10b981" },
-                  { key: "valuation", label: "VAL", value: components["valuation"] ?? (sig.valuationSignal === "Cheap" ? 0.5 : sig.valuationSignal === "Expensive" ? -0.5 : 0), color: "#f59e0b" },
-                  { key: "cluster", label: "CLU", value: components["cluster"] ?? (sig.cluster ? -sig.cluster.z_score / 3 : 0), color: "#8b5cf6" },
-                  { key: "regime", label: "REG", value: components["regime"] ?? 0, color: "#06b6d4" },
-                  { key: "cnn", label: "CNN", value: components["cnn"] ?? 0, color: "#ec4899" },
+                  { key: "ml", label: "ML", value: components["ml"] ?? (sig.mlReturn > 0 ? Math.min(1, sig.mlReturn * 10) : Math.max(-1, sig.mlReturn * 10)), color: "#3b82f6", available: (weightsUsed["ml"] ?? 0) > 0 || !sig.combinedSignal },
+                  { key: "momentum", label: "MOM", value: components["momentum"] ?? (sig.momentumSignal === "Bullish" ? 0.6 : sig.momentumSignal === "Bearish" ? -0.6 : 0), color: "#10b981", available: (weightsUsed["momentum"] ?? 0) > 0 || !sig.combinedSignal },
+                  { key: "valuation", label: "VAL", value: components["valuation"] ?? (sig.valuationSignal === "Cheap" ? 0.5 : sig.valuationSignal === "Expensive" ? -0.5 : 0), color: "#f59e0b", available: (weightsUsed["valuation"] ?? 0) > 0 || !sig.combinedSignal },
+                  { key: "cluster", label: "CLU", value: components["cluster"] ?? (sig.cluster ? -sig.cluster.z_score / 3 : 0), color: "#8b5cf6", available: (weightsUsed["cluster"] ?? 0) > 0 },
+                  { key: "regime", label: "REG", value: components["regime"] ?? 0, color: "#06b6d4", available: (weightsUsed["regime"] ?? 0) > 0 },
+                  { key: "cnn", label: "CNN", value: components["cnn"] ?? 0, color: "#ec4899", available: (weightsUsed["cnn"] ?? 0) > 0 },
                 ];
 
                 return (
@@ -1861,13 +1862,15 @@ export default function PortfolioPage() {
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 3, marginBottom: 12 }}>
                         {componentList.map(comp => {
                           const val = comp.value;
-                          const intensity = Math.min(1, Math.abs(val));
-                          const dotColor = val > 0.15 ? "#4caf50" : val < -0.15 ? "#ef5350" : "#616161";
+                          const isAvailable = comp.available;
+                          const intensity = isAvailable ? Math.min(1, Math.abs(val)) : 0;
+                          const dotColor = !isAvailable ? "#30363d" : val > 0.15 ? "#4caf50" : val < -0.15 ? "#ef5350" : "#616161";
                           return (
                             <div key={comp.key} style={{
                               display: "flex", alignItems: "center", gap: 4,
                               padding: "4px 6px", borderRadius: 3,
                               background: "#0d1117",
+                              opacity: isAvailable ? 1 : 0.4,
                             }}>
                               <div style={{
                                 width: 7, height: 7, borderRadius: "50%",
@@ -1875,8 +1878,8 @@ export default function PortfolioPage() {
                                 boxShadow: intensity > 0.3 ? `0 0 6px ${dotColor}80` : "none",
                               }} />
                               <span style={{ fontSize: 8, fontFamily: "monospace", color: "rgba(255,255,255,0.4)" }}>{comp.label}</span>
-                              <span style={{ fontSize: 8, fontFamily: "monospace", color: dotColor, fontWeight: 700, marginLeft: "auto" }}>
-                                {val > 0 ? "+" : ""}{val.toFixed(2)}
+                              <span style={{ fontSize: 8, fontFamily: "monospace", color: isAvailable ? dotColor : "#30363d", fontWeight: 700, marginLeft: "auto" }}>
+                                {isAvailable ? `${val > 0 ? "+" : ""}${val.toFixed(2)}` : "—"}
                               </span>
                             </div>
                           );

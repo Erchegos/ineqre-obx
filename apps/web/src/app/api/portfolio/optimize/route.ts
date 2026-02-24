@@ -485,7 +485,27 @@ export async function POST(req: NextRequest) {
       // ML service not available — continue without clustering
     }
 
-    // 13d. Fetch combined signals from ML service (non-blocking)
+    // 13d. Fetch CNN signals from ML service (non-blocking)
+    let cnnSignals: Record<string, number> | null = null;
+    try {
+      const mlServiceUrl3 = process.env.ML_SERVICE_URL || 'http://localhost:8000';
+      const cnnResponse = await fetch(`${mlServiceUrl3}/signals/cnn`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tickers, lookback_days: 1260, epochs: 30, window: 60 }),
+        signal: AbortSignal.timeout(30000), // CNN training takes longer
+      });
+      if (cnnResponse.ok) {
+        const cnnResult = await cnnResponse.json();
+        if (cnnResult.signals) {
+          cnnSignals = cnnResult.signals;
+        }
+      }
+    } catch {
+      // ML service not available — CNN signals will be null
+    }
+
+    // 13e. Fetch combined signals from ML service (non-blocking)
     type CombinedSignal = {
       ticker: string;
       combined_signal: number;
@@ -496,7 +516,7 @@ export async function POST(req: NextRequest) {
     };
     let combinedSignals: CombinedSignal[] | null = null;
     try {
-      const mlServiceUrl3 = process.env.ML_SERVICE_URL || 'http://localhost:8000';
+      const mlServiceUrl4 = process.env.ML_SERVICE_URL || 'http://localhost:8000';
       // Build signal combine request from data we already have
       const mlPreds: Record<string, number> = {};
       const momData: Record<string, Record<string, number>> = {};
@@ -510,12 +530,13 @@ export async function POST(req: NextRequest) {
           valData[t] = { ep: factors.ep, bm: factors.bm, dy: factors.dy };
         }
       }
-      const combineResponse = await fetch(`${mlServiceUrl3}/signals/combine`, {
+      const combineResponse = await fetch(`${mlServiceUrl4}/signals/combine`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tickers,
           ml_predictions: Object.keys(mlPreds).length > 0 ? mlPreds : null,
+          cnn_signals: cnnSignals,
           momentum_data: Object.keys(momData).length > 0 ? momData : null,
           valuation_data: Object.keys(valData).length > 0 ? valData : null,
           cluster_assignments: clusterData?.assignments ?? null,
