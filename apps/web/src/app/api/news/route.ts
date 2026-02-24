@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
       idx++;
     }
 
-    conditions.push(`e.published_at > NOW() - INTERVAL '14 days'`);
+    conditions.push(`e.published_at > NOW() - INTERVAL '30 days'`);
 
     const where = conditions.join(" AND ");
 

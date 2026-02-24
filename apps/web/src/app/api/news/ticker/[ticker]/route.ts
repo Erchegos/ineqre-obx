@@ -30,7 +30,7 @@ export async function GET(
     const conditions: string[] = [
       "tm.ticker = $1",
       "e.severity >= $2",
-      "e.published_at > NOW() - INTERVAL '14 days'",
+      "e.published_at > NOW() - INTERVAL '30 days'",
     ];
     const queryParams: any[] = [ticker.toUpperCase(), severityMin];
     let idx = 3;
