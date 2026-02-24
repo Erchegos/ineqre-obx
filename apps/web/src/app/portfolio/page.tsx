@@ -343,7 +343,7 @@ export default function PortfolioPage() {
   const [portfolioValueNOK, setPortfolioValueNOK] = useState(10_000_000);
   const [lookbackDays, setLookbackDays] = useState(504);
   const [covMethod, setCovMethod] = useState("shrinkage");
-  const [maxPosition, setMaxPosition] = useState(0.10);
+  const [maxPosition, setMaxPosition] = useState(0.20);
   const [maxSector, setMaxSector] = useState(0.30);
   const [forceIncludeAll, setForceIncludeAll] = useState(true);
 
@@ -1240,10 +1240,17 @@ export default function PortfolioPage() {
                 MAX POSITION
               </div>
               <input
-                type="number"
-                value={Math.round(maxPosition * 100)}
-                onChange={e => setMaxPosition(Number(e.target.value) / 100)}
-                min={1} max={100}
+                type="text"
+                inputMode="numeric"
+                value={maxPosition > 0 ? String(Math.round(maxPosition * 100)) : ""}
+                onChange={e => {
+                  const raw = e.target.value.replace(/[^0-9]/g, "");
+                  if (raw === "") { setMaxPosition(0); return; }
+                  const num = Math.min(100, Math.max(0, parseInt(raw, 10)));
+                  setMaxPosition(num / 100);
+                }}
+                onBlur={() => { if (maxPosition <= 0) setMaxPosition(0.20); }}
+                placeholder="20"
                 style={{
                   width: 70, padding: "8px 10px", background: "#0d1117",
                   border: "1px solid #30363d", borderRadius: 5,

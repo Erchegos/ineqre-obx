@@ -13,7 +13,7 @@ import {
 export const dynamic = 'force-dynamic';
 
 const DEFAULT_CONSTRAINTS: OptimizationConstraints = {
-  maxPositionSize: 0.10,
+  maxPositionSize: 0.20,
   minPositionSize: 0.01,
   maxSectorExposure: 0.30,
   excludeTickers: [],
