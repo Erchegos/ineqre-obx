@@ -284,6 +284,18 @@ export default function HomePage() {
                 visible={modulesReveal.visible}
                 delay={5}
               />
+              <FeatureCard
+                href="/news"
+                title="News Feed"
+                description="AI-classified news events from Dow Jones and IBKR providers. Severity scoring, sentiment analysis, ticker and sector mapping. Explains significant price moves with correlated news."
+                tags={[
+                  { label: "AI Classified", color: "var(--success)" },
+                  { label: "Sentiment", color: "var(--accent)" },
+                  { label: "Live", color: "var(--warning)" },
+                ]}
+                visible={modulesReveal.visible}
+                delay={6}
+              />
             </div>
           </section>
 

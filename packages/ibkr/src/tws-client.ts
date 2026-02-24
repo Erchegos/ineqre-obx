@@ -76,6 +76,23 @@ export interface PriceData {
   volume: number;
 }
 
+export interface NewsHeadline {
+  time: string;
+  providerCode: string;
+  articleId: string;
+  headline: string;
+}
+
+export interface NewsArticle {
+  articleType: number;
+  articleText: string;
+}
+
+export interface NewsProvider {
+  code: string;
+  name: string;
+}
+
 export class TWSClient {
   private ib: IBApi;
   private config: Required<TWSConfig>;
@@ -171,6 +188,61 @@ export class TWSClient {
         count,
         wap: WAP,
       });
+    });
+
+    // Contract details handler (for resolving ticker → conId)
+    (this.ib as any).on(EventName.contractDetails, (reqId: number, details: any) => {
+      const pending = this.pendingRequests.get(reqId);
+      if (pending) {
+        pending.data.push(details);
+      }
+    });
+
+    (this.ib as any).on(EventName.contractDetailsEnd, (reqId: number) => {
+      const pending = this.pendingRequests.get(reqId);
+      if (pending) {
+        clearTimeout(pending.timeout);
+        pending.resolve(pending.data);
+        this.pendingRequests.delete(reqId);
+      }
+    });
+
+    // Historical news handler
+    (this.ib as any).on(EventName.historicalNews, (reqId: number, time: string, providerCode: string, articleId: string, headline: string) => {
+      const pending = this.pendingRequests.get(reqId);
+      if (pending) {
+        pending.data.push({ time, providerCode, articleId, headline });
+      }
+    });
+
+    (this.ib as any).on(EventName.historicalNewsEnd, (reqId: number, _hasMore: boolean) => {
+      const pending = this.pendingRequests.get(reqId);
+      if (pending) {
+        clearTimeout(pending.timeout);
+        pending.resolve(pending.data);
+        this.pendingRequests.delete(reqId);
+      }
+    });
+
+    // News article handler
+    (this.ib as any).on(EventName.newsArticle, (reqId: number, articleType: number, articleText: string) => {
+      const pending = this.pendingRequests.get(reqId);
+      if (pending) {
+        clearTimeout(pending.timeout);
+        pending.resolve({ articleType, articleText });
+        this.pendingRequests.delete(reqId);
+      }
+    });
+
+    // News providers handler
+    (this.ib as any).on(EventName.newsProviders, (providers: any[]) => {
+      // newsProviders doesn't use reqId — resolve via special key
+      const pending = this.pendingRequests.get(-99);
+      if (pending) {
+        clearTimeout(pending.timeout);
+        pending.resolve(providers);
+        this.pendingRequests.delete(-99);
+      }
     });
   }
 
@@ -490,6 +562,170 @@ export class TWSClient {
     } catch {
       return false;
     }
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // News API Methods
+  // ════════════════════════════════════════════════════════════════
+
+  /**
+   * Resolve a ticker symbol to an IBKR contract ID (conId).
+   * Required for news requests which use conId, not symbol.
+   */
+  async resolveContractId(
+    symbol: string,
+    exchange: string,
+    secType: SecType = SecType.STK,
+    currency: string = "NOK"
+  ): Promise<number> {
+    if (!this.connected) {
+      throw new Error("Not connected to IB Gateway. Call connect() first.");
+    }
+
+    const contract: IBContract = {
+      symbol: symbol.toUpperCase(),
+      exchange: exchange.toUpperCase(),
+      currency: currency.toUpperCase(),
+      secType,
+    };
+
+    const reqId = this.getNextRequestId();
+
+    return new Promise<number>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pendingRequests.delete(reqId);
+        reject(new Error(`Contract resolution timeout for ${symbol}`));
+      }, this.config.requestTimeout);
+
+      this.pendingRequests.set(reqId, {
+        resolve: (details: any[]) => {
+          if (details.length === 0) {
+            reject(new Error(`No contract found for ${symbol} on ${exchange}`));
+            return;
+          }
+          const conId = details[0]?.contract?.conId ?? details[0]?.summary?.conId;
+          if (!conId) {
+            reject(new Error(`No conId in contract details for ${symbol}`));
+            return;
+          }
+          resolve(conId);
+        },
+        reject,
+        timeout,
+        data: [],
+      });
+
+      this.ib.reqContractDetails(reqId, contract);
+    });
+  }
+
+  /**
+   * Get list of available news providers for this account.
+   */
+  async getNewsProviders(): Promise<NewsProvider[]> {
+    if (!this.connected) {
+      throw new Error("Not connected to IB Gateway. Call connect() first.");
+    }
+
+    return new Promise<NewsProvider[]>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pendingRequests.delete(-99);
+        reject(new Error("News providers request timeout"));
+      }, this.config.requestTimeout);
+
+      this.pendingRequests.set(-99, {
+        resolve: (providers: any[]) => {
+          resolve(
+            (providers || []).map((p: any) => ({
+              code: p.providerCode ?? p.code ?? "",
+              name: p.providerName ?? p.name ?? "",
+            }))
+          );
+        },
+        reject,
+        timeout,
+        data: [],
+      });
+
+      this.ib.reqNewsProviders();
+    });
+  }
+
+  /**
+   * Fetch historical news headlines for a contract.
+   * @param conId IBKR contract ID (use resolveContractId() first)
+   * @param providerCodes Comma-separated provider codes (e.g., "BRFG,BRFUPDN,DJNL")
+   * @param startDateTime Start date "yyyy-MM-dd HH:mm:ss"
+   * @param endDateTime End date "yyyy-MM-dd HH:mm:ss"
+   * @param totalResults Max headlines (1-300)
+   */
+  async getHistoricalNews(
+    conId: number,
+    providerCodes: string = "BRFG+BRFUPDN+DJNL",
+    startDateTime: string,
+    endDateTime: string,
+    totalResults: number = 100
+  ): Promise<NewsHeadline[]> {
+    if (!this.connected) {
+      throw new Error("Not connected to IB Gateway. Call connect() first.");
+    }
+
+    const reqId = this.getNextRequestId();
+
+    return new Promise<NewsHeadline[]>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pendingRequests.delete(reqId);
+        reject(new Error(`Historical news request timeout (conId: ${conId})`));
+      }, this.config.requestTimeout);
+
+      this.pendingRequests.set(reqId, {
+        resolve,
+        reject,
+        timeout,
+        data: [],
+      });
+
+      this.ib.reqHistoricalNews(
+        reqId,
+        conId,
+        providerCodes,
+        startDateTime,
+        endDateTime,
+        totalResults
+      );
+    });
+  }
+
+  /**
+   * Fetch the full text of a news article.
+   * @param providerCode Provider code from headline (e.g., "BRFG")
+   * @param articleId Article ID from headline
+   */
+  async getNewsArticle(
+    providerCode: string,
+    articleId: string
+  ): Promise<NewsArticle> {
+    if (!this.connected) {
+      throw new Error("Not connected to IB Gateway. Call connect() first.");
+    }
+
+    const reqId = this.getNextRequestId();
+
+    return new Promise<NewsArticle>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pendingRequests.delete(reqId);
+        reject(new Error(`News article request timeout (${articleId})`));
+      }, this.config.requestTimeout);
+
+      this.pendingRequests.set(reqId, {
+        resolve,
+        reject,
+        timeout,
+        data: [],
+      });
+
+      this.ib.reqNewsArticle(reqId, providerCode, articleId);
+    });
   }
 
   /**

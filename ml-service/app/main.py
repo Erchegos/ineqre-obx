@@ -2,8 +2,9 @@
 ML Prediction Microservice for Oslo Børs Predictive Factors
 FastAPI service for training ensemble models and generating predictions
 
-Models: Gradient Boosting (60%) + Random Forest (40%)
+Models: XGBoost (50%) + LightGBM (50%) ensemble
 Target: 1-month forward returns with probability distributions
+Includes: Multivariate HMM regime detection, spectral clustering, SHAP importance
 """
 
 from fastapi import FastAPI, HTTPException
@@ -12,9 +13,9 @@ from pydantic import BaseModel
 from typing import Dict, List, Optional
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
+from .models.ml_models import create_xgb_model, create_lgbm_model, HAS_XGB, HAS_LGBM
 import joblib
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -22,7 +23,7 @@ import os
 import json
 from datetime import datetime
 
-app = FastAPI(title="Oslo Børs ML Prediction Service", version="1.1.0")
+app = FastAPI(title="Oslo Børs ML Prediction Service", version="2.0.0")
 
 # Enable CORS for Next.js frontend
 app.add_middleware(
@@ -36,6 +37,18 @@ app.add_middleware(
 # Volatility models router (GARCH, MSGARCH, VaR, Jump Detection)
 from .volatility_router import router as volatility_router
 app.include_router(volatility_router)
+
+# Multivariate regime detection router (3-state HMM)
+from .regime_router import router as regime_router
+app.include_router(regime_router)
+
+# Spectral clustering + OU mean-reversion router
+from .clustering_router import router as clustering_router
+app.include_router(clustering_router)
+
+# CNN signals, signal combiner, and backtest router
+from .signals_router import router as signals_router
+app.include_router(signals_router)
 
 # Feature columns (19 predictive factors)
 FEATURE_COLUMNS = [
@@ -190,50 +203,38 @@ async def train_models(request: TrainRequest):
         X_train_scaled = scaler.fit_transform(X_train)
         X_test_scaled = scaler.transform(X_test)
 
-        print("Training Gradient Boosting model...")
-        # Train Gradient Boosting
-        gb_model = GradientBoostingRegressor(
-            n_estimators=200,
-            learning_rate=0.05,
-            max_depth=5,
-            min_samples_split=20,
-            min_samples_leaf=10,
-            subsample=0.8,
-            random_state=42,
-            verbose=0
-        )
-        gb_model.fit(X_train_scaled, y_train)
+        print("Training XGBoost model...")
+        xgb_model = create_xgb_model()
+        xgb_model.fit(X_train_scaled, y_train)
 
-        print("Training Random Forest model...")
-        # Train Random Forest
-        rf_model = RandomForestRegressor(
-            n_estimators=200,
-            max_depth=10,
-            min_samples_split=20,
-            min_samples_leaf=10,
-            max_features='sqrt',
-            random_state=42,
-            n_jobs=-1,
-            verbose=0
-        )
-        rf_model.fit(X_train_scaled, y_train)
+        print("Training LightGBM model...")
+        lgbm_model = create_lgbm_model()
+        lgbm_model.fit(X_train_scaled, y_train)
 
         # Evaluate
-        gb_train_r2 = gb_model.score(X_train_scaled, y_train)
-        gb_test_r2 = gb_model.score(X_test_scaled, y_test)
-        rf_train_r2 = rf_model.score(X_train_scaled, y_train)
-        rf_test_r2 = rf_model.score(X_test_scaled, y_test)
+        xgb_train_r2 = xgb_model.score(X_train_scaled, y_train)
+        xgb_test_r2 = xgb_model.score(X_test_scaled, y_test)
+        lgbm_train_r2 = lgbm_model.score(X_train_scaled, y_train)
+        lgbm_test_r2 = lgbm_model.score(X_test_scaled, y_test)
 
-        # Ensemble R²
-        gb_pred_test = gb_model.predict(X_test_scaled)
-        rf_pred_test = rf_model.predict(X_test_scaled)
-        ensemble_pred_test = 0.6 * gb_pred_test + 0.4 * rf_pred_test
+        # Ensemble R² (50/50 blend)
+        xgb_pred_test = xgb_model.predict(X_test_scaled)
+        lgbm_pred_test = lgbm_model.predict(X_test_scaled)
+        ensemble_pred_test = 0.5 * xgb_pred_test + 0.5 * lgbm_pred_test
 
         from sklearn.metrics import r2_score, mean_squared_error
         ensemble_test_r2 = r2_score(y_test, ensemble_pred_test)
         ensemble_test_mse = mean_squared_error(y_test, ensemble_pred_test)
 
-        print(f"GB Test R²: {gb_test_r2:.4f}, RF Test R²: {rf_test_r2:.4f}, Ensemble R²: {ensemble_test_r2:.4f}")
+        # Alias for backward compat in model save
+        gb_model = xgb_model
+        rf_model = lgbm_model
+        gb_test_r2 = xgb_test_r2
+        rf_test_r2 = lgbm_test_r2
+        gb_train_r2 = xgb_train_r2
+        rf_train_r2 = lgbm_train_r2
+
+        print(f"XGB Test R²: {xgb_test_r2:.4f}, LGBM Test R²: {lgbm_test_r2:.4f}, Ensemble R²: {ensemble_test_r2:.4f}")
 
         # Save models
         model_dir = f'/tmp/models/{request.model_version}'
@@ -272,9 +273,9 @@ async def train_models(request: TrainRequest):
             len(train_df),
             float((gb_train_r2 + rf_train_r2) / 2),
             float(ensemble_test_r2),
-            json.dumps({'n_estimators': 200, 'learning_rate': 0.05}),
-            json.dumps({'n_estimators': 200, 'max_depth': 10}),
-            json.dumps({'gb': 0.6, 'rf': 0.4}),
+            json.dumps({'model': 'xgboost', 'n_estimators': 300, 'learning_rate': 0.05, 'max_depth': 6}),
+            json.dumps({'model': 'lightgbm', 'n_estimators': 300, 'learning_rate': 0.05, 'num_leaves': 31}),
+            json.dumps({'xgb': 0.5, 'lgbm': 0.5}),
             True
         ))
         conn.commit()
@@ -369,16 +370,12 @@ async def predict(request: PredictRequest):
         gb_pred = models['gb'].predict(X_scaled)[0]
         rf_pred = models['rf'].predict(X_scaled)[0]
 
-        # Ensemble (weighted average)
-        ensemble_pred = 0.6 * gb_pred + 0.4 * rf_pred
+        # Ensemble (50/50 blend)
+        ensemble_pred = 0.5 * gb_pred + 0.5 * rf_pred
 
-        # Estimate prediction uncertainty (from tree variance)
-        # Get predictions from individual trees
-        gb_tree_preds = np.array([tree.predict(X_scaled)[0] for tree in models['gb'].estimators_[:, 0]])
-        rf_tree_preds = np.array([tree.predict(X_scaled)[0] for tree in models['rf'].estimators_])
-
-        all_predictions = np.concatenate([gb_tree_preds, rf_tree_preds])
-        pred_std = np.std(all_predictions)
+        # Estimate prediction uncertainty from model disagreement
+        pred_diff = abs(gb_pred - rf_pred)
+        pred_std = max(pred_diff / 2, 0.005)  # minimum uncertainty
 
         # Generate percentiles (assume normal distribution)
         percentiles = {
@@ -389,11 +386,13 @@ async def predict(request: PredictRequest):
             'p95': float(ensemble_pred + 1.645 * pred_std)
         }
 
-        # Feature importance
+        # Feature importance (normalized)
         gb_importance = dict(zip(feature_cols, models['gb'].feature_importances_))
         rf_importance = dict(zip(feature_cols, models['rf'].feature_importances_))
+        gb_total = sum(gb_importance.values()) or 1
+        rf_total = sum(rf_importance.values()) or 1
         combined_importance = {
-            k: float(0.6 * gb_importance.get(k, 0) + 0.4 * rf_importance.get(k, 0))
+            k: float(0.5 * gb_importance.get(k, 0) / gb_total + 0.5 * rf_importance.get(k, 0) / rf_total)
             for k in feature_cols
         }
 
