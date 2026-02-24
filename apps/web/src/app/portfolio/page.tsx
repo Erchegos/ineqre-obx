@@ -448,7 +448,7 @@ export default function PortfolioPage() {
   };
 
   // Signal explanation toggle
-  const [showSignalGuide, setShowSignalGuide] = useState(false);
+  const [showSignalGuide, setShowSignalGuide] = useState(true);
 
   // Sector browser state
   const [showSectorBrowser, setShowSectorBrowser] = useState(false);
