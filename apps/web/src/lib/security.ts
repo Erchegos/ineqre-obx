@@ -125,14 +125,14 @@ export function requireAuth(req: NextRequest): NextResponse | null {
  * Get authenticated user info from request.
  * Returns null if not authenticated.
  */
-export function getAuthUser(req: NextRequest): { tokenId: string } | null {
+export function getAuthUser(req: NextRequest): { tokenId: string; profile: string } | null {
   const payload = extractAndVerifyToken(req);
 
   if (!payload || !payload.tokenId) {
     return null;
   }
 
-  return { tokenId: payload.tokenId.toString() };
+  return { tokenId: payload.tokenId.toString(), profile: payload.profile?.toString() || 'default' };
 }
 
 // ============================================================================

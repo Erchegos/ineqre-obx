@@ -568,7 +568,13 @@ The options module (`/options/[ticker]`) provides:
 
 ## Portfolio Optimizer Details
 
-Located at `/portfolio`. Password-protected (same credentials as research portal).
+Located at `/portfolio`. Password-protected with per-user profiles (each password maps to a profile via `research_access_tokens.description`).
+
+### Profile System
+- Each login password maps to a profile name (from `description` column in `research_access_tokens`)
+- JWT token includes `profile` field, displayed in header badge
+- Saved portfolios are scoped by profile — each user only sees their own configs
+- `portfolio_configs.profile` column (VARCHAR 50) stores the profile name
 
 ### Optimization Modes (Long-Only, Sum-to-1)
 | Mode | Objective | Needs Expected Returns |
@@ -657,9 +663,16 @@ The optimize API (`POST /api/portfolio/optimize`) enriches results with:
 - Results sections dim to 40% opacity with pointer-events disabled
 - Radar chart responds instantly to hover (no API call needed)
 
+### Sector Browser (Ticker Picker)
+- Collapsible "BROWSE BY SECTOR" panel below ticker input
+- Stocks grouped by sector with color-coded headers, stock count
+- Click stock to add, "ADD ALL" to add entire sector
+- Filter + sort (A-Z, Price, Data quality) within browser
+- Data quality badges (A/B/C) based on price history rows
+
 ### Persistence
-- Save/load named portfolios via `portfolio_configs` table
-- CRUD API at `/api/portfolio/configs`
+- Save/load named portfolios via `portfolio_configs` table (scoped by profile)
+- CRUD API at `/api/portfolio/configs` (filtered by JWT profile)
 
 ---
 

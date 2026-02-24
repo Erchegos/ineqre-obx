@@ -214,6 +214,8 @@ interface StockOption {
   ticker: string;
   name: string;
   sector: string;
+  last_close: number;
+  rows: number;
 }
 
 // ============================================================================
@@ -324,6 +326,7 @@ const btnStyle = (active: boolean): React.CSSProperties => ({
 export default function PortfolioPage() {
   // Auth state
   const [token, setToken] = useState<string | null>(null);
+  const [profileName, setProfileName] = useState<string>("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
@@ -361,7 +364,8 @@ export default function PortfolioPage() {
   // Check for existing session
   useEffect(() => {
     const saved = sessionStorage.getItem("portfolio_token");
-    if (saved) setToken(saved);
+    const savedProfile = sessionStorage.getItem("portfolio_profile");
+    if (saved) { setToken(saved); setProfileName(savedProfile || ""); }
   }, []);
 
   // Fetch available stocks when authenticated
@@ -377,10 +381,12 @@ export default function PortfolioPage() {
             setAvailableStocks(
               (data.stocks || data)
                 .filter((s: StockOption & { asset_type?: string }) => s.asset_type === "equity" || !s.asset_type)
-                .map((s: StockOption & { ticker: string; name: string; sector: string }) => ({
+                .map((s: any) => ({
                   ticker: s.ticker,
                   name: s.name || s.ticker,
                   sector: s.sector || "Unknown",
+                  last_close: Number(s.last_close || 0),
+                  rows: Number(s.rows || 0),
                 }))
             );
           }
@@ -425,7 +431,9 @@ export default function PortfolioPage() {
       if (res.ok) {
         const data = await res.json();
         setToken(data.token);
+        setProfileName(data.profile || "");
         sessionStorage.setItem("portfolio_token", data.token);
+        sessionStorage.setItem("portfolio_profile", data.profile || "");
       } else {
         setAuthError("Invalid password");
       }
@@ -435,6 +443,53 @@ export default function PortfolioPage() {
       setAuthLoading(false);
     }
   };
+
+  // Sector browser state
+  const [showSectorBrowser, setShowSectorBrowser] = useState(false);
+  const [expandedSectors, setExpandedSectors] = useState<Set<string>>(new Set());
+  const [sectorSort, setSectorSort] = useState<'name' | 'price' | 'data'>('name');
+  const [sectorSearchFilter, setSectorSearchFilter] = useState('');
+
+  // Stable sector color map
+  const sectorColorMap = useMemo(() => {
+    const allSectors = Array.from(new Set(availableStocks.map(s => s.sector || "Unknown"))).sort();
+    const map: Record<string, string> = {};
+    allSectors.forEach((sector, i) => {
+      map[sector] = SECTOR_COLORS[i % SECTOR_COLORS.length];
+    });
+    return map;
+  }, [availableStocks]);
+
+  // Sector-grouped stocks for the browser
+  const sectorGroups = useMemo(() => {
+    const groups: Record<string, StockOption[]> = {};
+    let stocks = availableStocks.filter(s => !selectedTickers.includes(s.ticker));
+    if (sectorSearchFilter) {
+      const q = sectorSearchFilter.toUpperCase();
+      stocks = stocks.filter(s =>
+        s.ticker.includes(q) || s.name.toUpperCase().includes(q)
+      );
+    }
+    for (const stock of stocks) {
+      const sector = stock.sector || "Unknown";
+      if (!groups[sector]) groups[sector] = [];
+      groups[sector].push(stock);
+    }
+    for (const sector of Object.keys(groups)) {
+      groups[sector].sort((a, b) => {
+        if (sectorSort === 'name') return a.name.localeCompare(b.name);
+        if (sectorSort === 'price') return b.last_close - a.last_close;
+        return b.rows - a.rows;
+      });
+    }
+    return groups;
+  }, [availableStocks, selectedTickers, sectorSort, sectorSearchFilter]);
+
+  const sortedSectorNames = useMemo(() => {
+    return Object.keys(sectorGroups).sort((a, b) =>
+      sectorGroups[b].length - sectorGroups[a].length
+    );
+  }, [sectorGroups]);
 
   // Ticker management
   const filteredStocks = useMemo(() => {
@@ -672,9 +727,14 @@ export default function PortfolioPage() {
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: "4px 0 0", fontFamily: "monospace", letterSpacing: "-0.02em" }}>
             Portfolio Optimizer
           </h1>
+          {profileName && (
+            <span style={{ fontSize: 10, color: "#3b82f6", fontFamily: "monospace", fontWeight: 600, padding: "2px 8px", background: "rgba(59,130,246,0.1)", borderRadius: 3, border: "1px solid rgba(59,130,246,0.2)" }}>
+              {profileName}
+            </span>
+          )}
         </div>
         <button
-          onClick={() => { setToken(null); sessionStorage.removeItem("portfolio_token"); }}
+          onClick={() => { setToken(null); setProfileName(""); sessionStorage.removeItem("portfolio_token"); sessionStorage.removeItem("portfolio_profile"); }}
           style={{ ...btnStyle(false), fontSize: 10 }}
         >
           Logout
@@ -791,7 +851,7 @@ export default function PortfolioPage() {
                   boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
                 }}>
                   {filteredStocks.map(s => {
-                    const sectorColor = SECTOR_COLORS[availableStocks.findIndex(a => a.sector === s.sector) % SECTOR_COLORS.length] || "#484f58";
+                    const sectorColor = sectorColorMap[s.sector] || "#484f58";
                     return (
                       <div
                         key={s.ticker}
@@ -837,13 +897,176 @@ export default function PortfolioPage() {
             </div>
           </div>
 
+          {/* Sector Browser Toggle */}
+          <button
+            onClick={() => setShowSectorBrowser(!showSectorBrowser)}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "6px 0", marginTop: 8,
+              background: "none", border: "none",
+              color: showSectorBrowser ? "#3b82f6" : "rgba(255,255,255,0.4)",
+              fontSize: 10, fontFamily: "monospace", cursor: "pointer",
+              letterSpacing: "0.05em",
+            }}
+            onMouseEnter={e => { if (!showSectorBrowser) e.currentTarget.style.color = "#3b82f6"; }}
+            onMouseLeave={e => { if (!showSectorBrowser) e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}
+          >
+            {showSectorBrowser ? "▲ HIDE SECTOR BROWSER" : "▼ BROWSE BY SECTOR"}
+            <span style={{ fontSize: 9, opacity: 0.6 }}>
+              ({availableStocks.filter(s => !selectedTickers.includes(s.ticker)).length} available)
+            </span>
+          </button>
+
+          {/* Sector Browser Panel */}
+          {showSectorBrowser && (
+            <div style={{
+              marginTop: 4, padding: 12,
+              background: "#0d1117", border: "1px solid #30363d",
+              borderRadius: 6, maxHeight: 420, overflowY: "auto",
+            }}>
+              {/* Top bar: filter + sort */}
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+                <input
+                  value={sectorSearchFilter}
+                  onChange={e => setSectorSearchFilter(e.target.value)}
+                  placeholder="Filter stocks..."
+                  style={{
+                    flex: 1, padding: "6px 10px",
+                    background: "#161b22", border: "1px solid #21262d",
+                    borderRadius: 4, color: "#fff", fontSize: 11,
+                    fontFamily: "monospace", outline: "none",
+                  }}
+                />
+                <div style={{ display: "flex", gap: 2 }}>
+                  {(['name', 'price', 'data'] as const).map(key => (
+                    <button
+                      key={key}
+                      onClick={() => setSectorSort(key)}
+                      style={{
+                        padding: "4px 8px", borderRadius: 3,
+                        fontSize: 9, fontWeight: 600, fontFamily: "monospace",
+                        border: `1px solid ${sectorSort === key ? "#3b82f6" : "#21262d"}`,
+                        background: sectorSort === key ? "#3b82f6" : "transparent",
+                        color: sectorSort === key ? "#fff" : "rgba(255,255,255,0.4)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {key === 'name' ? 'A-Z' : key === 'price' ? 'PRICE' : 'DATA'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sector groups */}
+              {sortedSectorNames.map(sector => {
+                const stocks = sectorGroups[sector];
+                if (!stocks || stocks.length === 0) return null;
+                const isExpanded = expandedSectors.has(sector);
+                const color = sectorColorMap[sector] || "#484f58";
+
+                return (
+                  <div key={sector} style={{ marginBottom: 2 }}>
+                    {/* Sector header */}
+                    <button
+                      onClick={() => {
+                        setExpandedSectors(prev => {
+                          const next = new Set(prev);
+                          if (next.has(sector)) next.delete(sector); else next.add(sector);
+                          return next;
+                        });
+                      }}
+                      style={{
+                        width: "100%", display: "flex", alignItems: "center", gap: 8,
+                        padding: "8px 10px",
+                        background: isExpanded ? `${color}10` : "transparent",
+                        border: "none",
+                        borderBottom: `1px solid ${isExpanded ? color + "30" : "#21262d"}`,
+                        cursor: "pointer",
+                        borderRadius: isExpanded ? "4px 4px 0 0" : 4,
+                      }}
+                      onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = "#161b2280"; }}
+                      onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = isExpanded ? `${color}10` : "transparent"; }}
+                    >
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                      <span style={{ fontSize: 11, fontWeight: 700, fontFamily: "monospace", color: isExpanded ? color : "#fff", flex: 1, textAlign: "left" }}>
+                        {sector}
+                      </span>
+                      <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", fontFamily: "monospace" }}>
+                        {stocks.length}
+                      </span>
+                      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", transition: "transform 0.15s", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>
+                        ▾
+                      </span>
+                    </button>
+
+                    {/* Stock list within sector */}
+                    {isExpanded && (
+                      <div style={{ background: `${color}05`, borderLeft: `2px solid ${color}30`, marginBottom: 4, borderRadius: "0 0 4px 4px" }}>
+                        {stocks.map(stock => (
+                          <div
+                            key={stock.ticker}
+                            onClick={() => addTicker(stock.ticker)}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 10,
+                              padding: "6px 12px 6px 16px", cursor: "pointer",
+                              borderBottom: "1px solid rgba(33,38,45,0.3)",
+                              fontSize: 11, fontFamily: "monospace",
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.background = `${color}15`)}
+                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                          >
+                            <span style={{ fontWeight: 700, color: "#fff", minWidth: 60 }}>{stock.ticker}</span>
+                            <span style={{ flex: 1, color: "rgba(255,255,255,0.5)", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {stock.name}
+                            </span>
+                            {stock.last_close > 0 && (
+                              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", minWidth: 55, textAlign: "right" }}>
+                                {stock.last_close > 100 ? stock.last_close.toFixed(0) : stock.last_close.toFixed(1)}
+                              </span>
+                            )}
+                            <span style={{
+                              fontSize: 8, padding: "1px 5px", borderRadius: 2,
+                              background: stock.rows > 2000 ? "rgba(16,185,129,0.15)" : stock.rows > 500 ? "rgba(245,158,11,0.15)" : "rgba(239,68,68,0.1)",
+                              color: stock.rows > 2000 ? "#10b981" : stock.rows > 500 ? "#f59e0b" : "#ef4444",
+                              fontWeight: 600,
+                            }}>
+                              {stock.rows > 2000 ? 'A' : stock.rows > 500 ? 'B' : 'C'}
+                            </span>
+                            <span style={{ color: "#3b82f6", fontSize: 14, opacity: 0.5, lineHeight: 1 }}>+</span>
+                          </div>
+                        ))}
+                        <button
+                          onClick={() => {
+                            const newTickers = stocks.filter(s => !selectedTickers.includes(s.ticker)).map(s => s.ticker);
+                            setSelectedTickers(prev => [...prev, ...newTickers]);
+                          }}
+                          style={{
+                            width: "100%", padding: "5px 16px",
+                            background: "none", border: "none",
+                            borderTop: `1px solid ${color}20`,
+                            color, fontSize: 9, fontFamily: "monospace",
+                            fontWeight: 600, cursor: "pointer", textAlign: "left",
+                            letterSpacing: "0.05em",
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.background = `${color}10`)}
+                          onMouseLeave={e => (e.currentTarget.style.background = "none")}
+                        >
+                          + ADD ALL {sector.toUpperCase()} ({stocks.length})
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {/* Selected Tickers Chips */}
           {selectedTickers.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
               {selectedTickers.map(t => {
                 const stock = availableStocks.find(s => s.ticker === t);
-                const sectorIdx = stock ? availableStocks.findIndex(a => a.sector === stock.sector) : 0;
-                const sectorColor = SECTOR_COLORS[sectorIdx % SECTOR_COLORS.length] || "#484f58";
+                const sectorColor = stock ? (sectorColorMap[stock.sector] || "#484f58") : "#484f58";
                 return (
                   <span key={t} style={{
                     display: "inline-flex",

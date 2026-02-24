@@ -1,23 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
-import { requireAuth } from '@/lib/security';
+import { requireAuth, getAuthUser } from '@/lib/security';
 
 export const dynamic = 'force-dynamic';
 
-/** GET /api/portfolio/configs — List all saved portfolios */
+/** GET /api/portfolio/configs — List saved portfolios (filtered by profile) */
 export async function GET(req: NextRequest) {
   const authError = requireAuth(req);
   if (authError) return authError;
+
+  const user = getAuthUser(req);
+  const profile = user?.profile || 'default';
 
   try {
     const result = await pool.query(
       `SELECT id, name, description, tickers, weights, optimization_mode,
               constraints, portfolio_value_nok, lookback_days, covariance_method,
-              created_at, updated_at
+              profile, created_at, updated_at
        FROM portfolio_configs
-       ORDER BY updated_at DESC`
+       WHERE profile = $1
+       ORDER BY updated_at DESC`,
+      [profile]
     );
-    return NextResponse.json({ configs: result.rows });
+    return NextResponse.json({ configs: result.rows, profile });
   } catch (error) {
     console.error('Portfolio configs list error:', error);
     return NextResponse.json({ error: 'Failed to load configs' }, { status: 500 });
@@ -28,6 +33,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const authError = requireAuth(req);
   if (authError) return authError;
+
+  const user = getAuthUser(req);
+  const profile = user?.profile || 'default';
 
   try {
     const body = await req.json();
@@ -43,8 +51,8 @@ export async function POST(req: NextRequest) {
     const result = await pool.query(
       `INSERT INTO portfolio_configs
         (name, description, tickers, weights, optimization_mode, constraints,
-         portfolio_value_nok, lookback_days, covariance_method)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         portfolio_value_nok, lookback_days, covariance_method, profile)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         name,
@@ -56,6 +64,7 @@ export async function POST(req: NextRequest) {
         portfolio_value_nok || 10000000,
         lookback_days || 504,
         covariance_method || 'shrinkage',
+        profile,
       ]
     );
 

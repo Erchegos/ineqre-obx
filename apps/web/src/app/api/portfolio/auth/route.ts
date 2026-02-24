@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     const { password } = validation.data;
 
     const result = await pool.query(
-      `SELECT id, token_hash
+      `SELECT id, token_hash, description
        FROM research_access_tokens
        WHERE is_active = true
        AND (expires_at IS NULL OR expires_at > NOW())`
@@ -42,13 +42,14 @@ export async function POST(req: NextRequest) {
           [row.id]
         );
 
+        const profile = row.description || 'default';
         const token = sign(
-          { tokenId: row.id, scope: 'portfolio' },
+          { tokenId: row.id, scope: 'portfolio', profile },
           getJwtSecret(),
           { expiresIn: '4h' }
         );
 
-        return secureJsonResponse({ token });
+        return secureJsonResponse({ token, profile });
       }
     }
 
