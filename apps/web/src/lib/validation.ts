@@ -94,6 +94,11 @@ export const periodSchema = z
  * Authentication request body
  */
 export const authRequestSchema = z.object({
+  username: z
+    .string()
+    .min(1, 'Username is required')
+    .max(64, 'Username must be at most 64 characters')
+    .optional(),
   password: z
     .string()
     .min(1, 'Password is required')

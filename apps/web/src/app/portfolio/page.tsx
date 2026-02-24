@@ -327,9 +327,10 @@ const btnStyle = (active: boolean): React.CSSProperties => ({
 // ============================================================================
 
 export default function PortfolioPage() {
-  // Auth state
+  // Auth state — no persistence, require login each page load
   const [token, setToken] = useState<string | null>(null);
   const [profileName, setProfileName] = useState<string>("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
@@ -364,12 +365,7 @@ export default function PortfolioPage() {
   const [hoveredMode, setHoveredMode] = useState<string | null>(null);
   const [hoveredAsset, setHoveredAsset] = useState<string | null>(null);
 
-  // Check for existing session
-  useEffect(() => {
-    const saved = sessionStorage.getItem("portfolio_token");
-    const savedProfile = sessionStorage.getItem("portfolio_profile");
-    if (saved) { setToken(saved); setProfileName(savedProfile || ""); }
-  }, []);
+  // No session restore — always require fresh login
 
   // Fetch available stocks when authenticated
   useEffect(() => {
@@ -410,6 +406,7 @@ export default function PortfolioPage() {
         headers: { Authorization: `Bearer ${token}` },
         cache: "no-store",
       });
+      if (res.status === 401) { setToken(null); setProfileName(""); return; }
       if (res.ok) {
         const data = await res.json();
         setConfigs(data.configs || []);
@@ -429,22 +426,31 @@ export default function PortfolioPage() {
       const res = await fetch("/api/portfolio/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ username: username || undefined, password }),
       });
       if (res.ok) {
         const data = await res.json();
         setToken(data.token);
         setProfileName(data.profile || "");
-        sessionStorage.setItem("portfolio_token", data.token);
-        sessionStorage.setItem("portfolio_profile", data.profile || "");
       } else {
-        setAuthError("Invalid password");
+        setAuthError("Invalid username or password");
       }
     } catch {
       setAuthError("Connection error");
     } finally {
       setAuthLoading(false);
     }
+  };
+
+  // Auto-logout on 401 from any API call
+  const handleAuthError = (res: Response) => {
+    if (res.status === 401) {
+      setToken(null);
+      setProfileName("");
+      setError("Session expired. Please sign in again.");
+      return true;
+    }
+    return false;
   };
 
   // Signal explanation toggle
@@ -554,6 +560,7 @@ export default function PortfolioPage() {
       });
 
       if (!res.ok) {
+        if (handleAuthError(res)) return;
         const errData = await res.json().catch(() => ({ error: "Request failed" }));
         setError(errData.error || `Error ${res.status}`);
         return;
@@ -612,10 +619,11 @@ export default function PortfolioPage() {
   // Delete config
   const deleteConfig = async (id: number) => {
     try {
-      await fetch(`/api/portfolio/configs/${id}`, {
+      const res = await fetch(`/api/portfolio/configs/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (handleAuthError(res)) return;
       loadConfigs();
     } catch (e) {
       console.error("Delete failed:", e);
@@ -646,43 +654,62 @@ export default function PortfolioPage() {
   // ============================================================================
 
   if (!token) {
+    const inputStyle = {
+      width: "100%",
+      padding: "10px 12px",
+      background: "#0d1117",
+      border: "1px solid #30363d",
+      borderRadius: 4,
+      color: "#fff",
+      fontSize: 13,
+      fontFamily: "monospace",
+      marginBottom: 12,
+      boxSizing: "border-box" as const,
+    };
     return (
-      <main style={{ padding: 24, maxWidth: 400, margin: "120px auto" }}>
+      <main style={{ padding: 24, maxWidth: 380, margin: "100px auto" }}>
         <form
-          style={cardStyle}
+          style={{ ...cardStyle, padding: 28 }}
           onSubmit={e => { e.preventDefault(); handleLogin(); }}
         >
-          <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4, fontFamily: "monospace" }}>
-            Portfolio Optimizer
+          <div style={{ textAlign: "center", marginBottom: 24 }}>
+            <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "monospace", letterSpacing: "-0.02em" }}>
+              Portfolio Optimizer
+            </div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", marginTop: 4 }}>
+              Sign in to access your portfolio
+            </div>
           </div>
-          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 20, fontFamily: "monospace" }}>
-            Authenticate to access portfolio management
+          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", marginBottom: 4, letterSpacing: "0.05em" }}>
+            USERNAME
+          </div>
+          <input
+            type="text"
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+            placeholder="Enter username"
+            autoFocus
+            autoComplete="username"
+            style={inputStyle}
+          />
+          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", marginBottom: 4, letterSpacing: "0.05em" }}>
+            PASSWORD
           </div>
           <input
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
-            placeholder="Password"
-            autoFocus
-            style={{
-              width: "100%",
-              padding: "10px 12px",
-              background: "#0d1117",
-              border: "1px solid #30363d",
-              borderRadius: 4,
-              color: "#fff",
-              fontSize: 13,
-              fontFamily: "monospace",
-              marginBottom: 12,
-              boxSizing: "border-box",
-            }}
+            placeholder="Enter password"
+            autoComplete="current-password"
+            style={inputStyle}
           />
           <button
             type="submit"
-            disabled={authLoading || !password}
+            disabled={authLoading || !password || !username}
             style={{
               width: "100%",
-              padding: "10px 0",
+              padding: "11px 0",
+              marginTop: 4,
               background: authLoading ? "#30363d" : "#3b82f6",
               color: "#fff",
               border: "none",
@@ -691,13 +718,14 @@ export default function PortfolioPage() {
               fontWeight: 600,
               fontFamily: "monospace",
               cursor: authLoading ? "wait" : "pointer",
-              opacity: authLoading ? 0.6 : 1,
+              opacity: (authLoading || !password || !username) ? 0.5 : 1,
+              transition: "opacity 0.15s",
             }}
           >
-            {authLoading ? "Authenticating..." : "Login"}
+            {authLoading ? "Signing in..." : "Sign In"}
           </button>
           {authError && (
-            <div style={{ color: "#ef4444", fontSize: 12, marginTop: 8, fontFamily: "monospace" }}>
+            <div style={{ color: "#ef4444", fontSize: 11, marginTop: 10, fontFamily: "monospace", textAlign: "center" }}>
               {authError}
             </div>
           )}
@@ -740,7 +768,7 @@ export default function PortfolioPage() {
           )}
         </div>
         <button
-          onClick={() => { setToken(null); setProfileName(""); sessionStorage.removeItem("portfolio_token"); sessionStorage.removeItem("portfolio_profile"); }}
+          onClick={() => { setToken(null); setProfileName(""); setUsername(""); setPassword(""); }}
           style={{ ...btnStyle(false), fontSize: 10 }}
         >
           Logout

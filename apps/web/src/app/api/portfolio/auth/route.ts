@@ -9,8 +9,9 @@ import { getJwtSecret, safeErrorResponse, secureJsonResponse, logSecurityEvent }
 /**
  * POST /api/portfolio/auth
  *
- * Authenticate with password to receive a JWT token.
- * Reuses the same research_access_tokens table (same password).
+ * Authenticate with username + password to receive a JWT token.
+ * Username maps to `description` field in research_access_tokens.
+ * Only active, non-expired tokens are checked.
  */
 export async function POST(req: NextRequest) {
   const rateLimitResult = rateLimit(req, 'auth');
@@ -25,14 +26,23 @@ export async function POST(req: NextRequest) {
       return validation.response;
     }
 
-    const { password } = validation.data;
+    const { username, password } = validation.data;
 
-    const result = await pool.query(
-      `SELECT id, token_hash, description
-       FROM research_access_tokens
-       WHERE is_active = true
-       AND (expires_at IS NULL OR expires_at > NOW())`
-    );
+    // If username provided, only check that specific account
+    // Otherwise fall back to checking all active tokens (legacy behavior)
+    const query = username
+      ? `SELECT id, token_hash, description
+         FROM research_access_tokens
+         WHERE is_active = true
+           AND description = $1
+           AND (expires_at IS NULL OR expires_at > NOW())`
+      : `SELECT id, token_hash, description
+         FROM research_access_tokens
+         WHERE is_active = true
+           AND (expires_at IS NULL OR expires_at > NOW())`;
+
+    const params = username ? [username] : [];
+    const result = await pool.query(query, params);
 
     for (const row of result.rows) {
       const isValid = await bcrypt.compare(password, row.token_hash);
@@ -46,15 +56,15 @@ export async function POST(req: NextRequest) {
         const token = sign(
           { tokenId: row.id, scope: 'portfolio', profile },
           getJwtSecret(),
-          { expiresIn: '4h' }
+          { expiresIn: '8h' }
         );
 
         return secureJsonResponse({ token, profile });
       }
     }
 
-    logSecurityEvent('auth_failed', { reason: 'invalid_password', endpoint: 'portfolio' }, req);
-    return secureJsonResponse({ error: 'Authentication failed' }, { status: 401 });
+    logSecurityEvent('auth_failed', { reason: 'invalid_credentials', endpoint: 'portfolio', username: username || 'none' }, req);
+    return secureJsonResponse({ error: 'Invalid username or password' }, { status: 401 });
   } catch (error) {
     return safeErrorResponse(error, 'Authentication failed');
   }
