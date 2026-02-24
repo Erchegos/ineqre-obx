@@ -1952,6 +1952,44 @@ export default function PortfolioPage() {
                         )}
                       </div>
 
+                      {/* VAL Breakdown — sector z-scores */}
+                      {sig.valuation.zScores && (
+                        <div style={{ marginBottom: 8, padding: "6px 8px", background: "rgba(245,158,11,0.04)", borderRadius: 4, border: "1px solid rgba(245,158,11,0.12)" }}>
+                          <div style={{ fontSize: 8, fontFamily: "monospace", color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em", marginBottom: 4 }}>
+                            VAL PEER Z-SCORES <span style={{ color: "rgba(255,255,255,0.25)" }}>vs sector</span>
+                          </div>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 3 }}>
+                            {([
+                              { key: "ep" as const, label: "E/P", invert: false },
+                              { key: "bm" as const, label: "P/B", invert: false },
+                              { key: "dy" as const, label: "DY", invert: false },
+                              { key: "ev_ebitda" as const, label: "EV/EB", invert: true },
+                              { key: "sp" as const, label: "S/P", invert: false },
+                            ]).map(metric => {
+                              const z = sig.valuation.zScores?.[metric.key];
+                              const raw = sig.valuation[metric.key];
+                              const hasData = z != null && z !== 0;
+                              // For most metrics, positive z = cheap (good). For EV/EBITDA, negative z = cheap.
+                              const effectiveZ = hasData ? (metric.invert ? -(z as number) : (z as number)) : 0;
+                              const zColor = !hasData ? "#30363d" : effectiveZ > 0.5 ? "#4caf50" : effectiveZ < -0.5 ? "#ef5350" : "#9e9e9e";
+                              return (
+                                <div key={metric.key} style={{ textAlign: "center" }}>
+                                  <div style={{ fontSize: 7, fontFamily: "monospace", color: "rgba(255,255,255,0.35)", marginBottom: 1 }}>{metric.label}</div>
+                                  <div style={{ fontSize: 10, fontWeight: 700, fontFamily: "monospace", color: zColor }}>
+                                    {hasData ? `${effectiveZ > 0 ? "+" : ""}${effectiveZ.toFixed(1)}` : "—"}
+                                  </div>
+                                  {raw != null && raw !== 0 && (
+                                    <div style={{ fontSize: 7, fontFamily: "monospace", color: "rgba(255,255,255,0.25)" }}>
+                                      {metric.key === "ev_ebitda" ? `${raw.toFixed(1)}×` : metric.key === "dy" ? `${(raw * 100).toFixed(1)}%` : raw.toFixed(2)}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Drawdown + Alert */}
                       {(sig.currentDrawdown > 0.03 || sig.alerts.length > 0) && (
                         <div style={{ fontSize: 9, fontFamily: "monospace", color: "#ffb74d", padding: "4px 8px", background: "rgba(255,152,0,0.06)", borderRadius: 3, border: "1px solid rgba(255,152,0,0.15)" }}>
