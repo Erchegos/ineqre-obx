@@ -211,6 +211,8 @@ export async function GET(
     // Fetch Market Data for Beta — aligned by DATE (not position)
     let rawBeta = 0;
     let adjBeta = 0;
+    let rawBetaDataPoints = 0;
+    let adjBetaDataPoints = 0;
     try {
       const obxMap = await fetchMarketPricesAligned(dates);
 
@@ -222,6 +224,7 @@ export async function GET(
           rawPairs.push({ stockClose: closes[i], obxClose });
         }
       }
+      rawBetaDataPoints = rawPairs.length;
       if (rawPairs.length >= 20) {
         rawBeta = computeBeta(
           computeReturns(rawPairs.map(p => p.stockClose)),
@@ -239,6 +242,7 @@ export async function GET(
             adjPairs.push({ stockClose: p.adj_close, obxClose });
           }
         }
+        adjBetaDataPoints = adjPairs.length;
         if (adjPairs.length >= 20) {
           adjBeta = computeBeta(
             computeReturns(adjPairs.map(p => p.stockClose)),
@@ -246,6 +250,7 @@ export async function GET(
           );
         } else {
           adjBeta = rawBeta; // Fallback
+          adjBetaDataPoints = rawBetaDataPoints;
         }
       } else {
         adjBeta = rawBeta;
@@ -305,6 +310,11 @@ export async function GET(
         adjustedStart: adjDates[0], // When valid adj_close data begins
         fullStart: fullDateRange?.start, // Earliest data in database
         fullEnd: fullDateRange?.end, // Latest data in database
+      },
+      betaInfo: {
+        rawDataPoints: rawBetaDataPoints,
+        adjDataPoints: adjBetaDataPoints,
+        benchmark: "OBX",
       },
     });
 

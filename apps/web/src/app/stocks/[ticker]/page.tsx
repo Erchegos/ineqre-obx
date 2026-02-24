@@ -47,6 +47,11 @@ type AnalyticsData = {
     fullStart?: string; // Earliest data available in database
     fullEnd?: string; // Latest data available in database
   };
+  betaInfo?: {
+    rawDataPoints: number;
+    adjDataPoints: number;
+    benchmark: string;
+  };
 };
 
 type StdChannelData = {
@@ -994,14 +999,17 @@ export default function StockTickerPage() {
               {[
                 { label: "VOL", value: fmtPct(activeStats.volatility) },
                 { label: "SHARPE", value: fmtNum(activeStats.sharpeRatio, 2) },
-                { label: "β", value: fmtNum(activeStats.beta, 2) },
+                { label: "β", value: fmtNum(activeStats.beta, 2), tooltip: data?.betaInfo ? `vs ${data.betaInfo.benchmark} · ${data.betaInfo.rawDataPoints} days overlap` : undefined, warn: data?.betaInfo && data.betaInfo.rawDataPoints < 200 },
                 { label: "DD", value: fmtPct(activeStats.maxDrawdown), color: "#ef4444" },
                 { label: "RET", value: fmtPct(activeStats.totalReturn), color: activeStats.totalReturn >= 0 ? "#22c55e" : "#ef4444" },
                 ...(cagr !== null ? [{ label: "CAGR", value: fmtPct(cagr), color: cagr >= 0 ? "#22c55e" : "#ef4444" }] : []),
               ].map((m) => (
-                <div key={m.label} style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                <div key={m.label} style={{ display: "flex", alignItems: "baseline", gap: 4 }} title={(m as any).tooltip || undefined}>
                   <span style={{ fontSize: 9, color: "var(--muted-foreground)", fontWeight: 700, letterSpacing: "0.04em" }}>{m.label}</span>
                   <span style={{ fontSize: 12, fontWeight: 600, color: m.color || "var(--foreground)" }}>{m.value}</span>
+                  {(m as any).warn && (
+                    <span style={{ fontSize: 8, color: "#f59e0b", fontWeight: 600 }} title={(m as any).tooltip}>*</span>
+                  )}
                 </div>
               ))}
             </>
@@ -1184,11 +1192,12 @@ export default function StockTickerPage() {
               { label: "VaR 95%", value: fmtPct(activeStats.var95), color: "var(--foreground)" },
               { label: "CVaR 95%", value: fmtPct(activeStats.cvar95), color: "var(--foreground)" },
               { label: "SHARPE", value: fmtNum(activeStats.sharpeRatio, 3), color: "var(--foreground)" },
+              { label: `β vs ${data.betaInfo?.benchmark || "OBX"}`, value: fmtNum(activeStats.beta, 3), color: "var(--foreground)", sub: data.betaInfo ? `${data.betaInfo.rawDataPoints}d overlap` : undefined, warn: data.betaInfo && data.betaInfo.rawDataPoints < 200 },
             ].map((m) => (
               <div key={m.label} style={{
                 padding: "6px 8px",
                 background: "rgba(255,255,255,0.02)",
-                border: "1px solid var(--border)",
+                border: `1px solid ${(m as any).warn ? "rgba(245,158,11,0.3)" : "var(--border)"}`,
                 borderRadius: 3,
               }}>
                 <div style={{ fontSize: 8, fontWeight: 700, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3, fontFamily: "monospace" }}>
@@ -1197,6 +1206,11 @@ export default function StockTickerPage() {
                 <div style={{ fontSize: 15, fontWeight: 700, color: m.color, fontFamily: "monospace" }}>
                   {m.value}
                 </div>
+                {(m as any).sub && (
+                  <div style={{ fontSize: 8, color: (m as any).warn ? "#f59e0b" : "var(--muted-foreground)", marginTop: 1, fontFamily: "monospace" }}>
+                    {(m as any).sub}{(m as any).warn ? " ⚠" : ""}
+                  </div>
+                )}
               </div>
             ))}
           </div>

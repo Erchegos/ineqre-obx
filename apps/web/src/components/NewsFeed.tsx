@@ -231,8 +231,21 @@ export default function NewsFeed({
   }
 
   if (events.length === 0) {
-    return <div style={{ padding: 8, fontFamily: "monospace", fontSize: 10, color: "var(--muted-foreground)" }}>No news events{ticker ? ` for ${ticker}` : ""}.</div>;
+    return (
+      <div style={{ padding: compact ? 8 : 16, fontFamily: "'Geist Mono', monospace" }}>
+        <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginBottom: 6 }}>
+          No news events{ticker ? ` for ${ticker}` : ""} in the last 30 days.
+        </div>
+        {ticker && (
+          <div style={{ fontSize: 9, color: "var(--muted-foreground)", opacity: 0.6, lineHeight: 1.5 }}>
+            Source: IBKR (Dow Jones, Briefing, FlyOnTheWall). Coverage varies by ticker — Norwegian small/mid-caps may have limited headlines.
+          </div>
+        )}
+      </div>
+    );
   }
+
+  const eventCount = events.length;
 
   return (
     <div style={{ fontFamily: "'Geist Mono', monospace", fontSize: compact ? 10 : 11 }}>
@@ -571,6 +584,12 @@ export default function NewsFeed({
           </div>
         );
       })}
+      {/* Source attribution */}
+      {compact && eventCount > 0 && (
+        <div style={{ padding: "6px 0 2px", fontSize: 8, color: "var(--muted-foreground)", opacity: 0.5, textAlign: "right" }}>
+          {eventCount} article{eventCount !== 1 ? "s" : ""} · IBKR/DJ
+        </div>
+      )}
     </div>
   );
 }
