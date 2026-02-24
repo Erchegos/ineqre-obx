@@ -27,5 +27,5 @@ EXPOSE 8000
 ENV OMP_NUM_THREADS=1
 ENV MKL_NUM_THREADS=1
 
-# Run with 2 workers for concurrent request handling
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--timeout-keep-alive", "120"]
+# Run with 2 workers; use shell form so $PORT is expanded at runtime
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2 --timeout-keep-alive 120
