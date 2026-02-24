@@ -53,6 +53,8 @@ type NewsEvent = {
   structuredFacts: StructuredFacts | null;
   tickers: TickerRef[];
   sectors: SectorRef[];
+  dayReturnPct?: number | null;
+  priceClose?: number | null;
 };
 
 type NewsFeedProps = {
@@ -73,36 +75,23 @@ const SEV_COLOR: Record<number, string> = {
   5: "#ef4444",
 };
 
-const TYPE_COLOR: Record<string, string> = {
-  earnings: "#22c55e",
-  guidance: "#3b82f6",
-  analyst_action: "#a855f7",
-  corporate_action: "#f59e0b",
-  insider_trade: "#ec4899",
-  regulatory: "#06b6d4",
-  macro: "#6366f1",
-  geopolitical: "#ef4444",
-  sector_news: "#14b8a6",
-  other: "#6b7280",
-};
-
-const DIR_SYM: Record<string, { icon: string; color: string }> = {
-  positive: { icon: "▲", color: "#22c55e" },
-  negative: { icon: "▼", color: "#ef4444" },
-  neutral: { icon: "─", color: "#6b7280" },
+const TYPE_LABEL: Record<string, { label: string; color: string }> = {
+  earnings: { label: "Earnings", color: "#22c55e" },
+  guidance: { label: "Guidance", color: "#3b82f6" },
+  analyst_action: { label: "Analyst", color: "#a855f7" },
+  corporate_action: { label: "Corporate", color: "#f59e0b" },
+  insider_trade: { label: "Insider", color: "#ec4899" },
+  regulatory: { label: "Regulatory", color: "#06b6d4" },
+  macro: { label: "Macro", color: "#6366f1" },
+  geopolitical: { label: "Geopolitical", color: "#ef4444" },
+  sector_news: { label: "Sector", color: "#14b8a6" },
 };
 
 /* ─── Helpers ──────────────────────────────────────────────────── */
 
-function timeAgo(dateStr: string): string {
-  const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
-  if (mins < 1) return "NOW";
-  if (mins < 60) return `${mins}m`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
-  const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d`;
-  return new Date(dateStr).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
 /** Format NOK amount (e.g., 2400000 -> "NOK 2.4M") */
@@ -112,12 +101,6 @@ function fmtNOK(v: number | null | undefined): string | null {
   if (v >= 1_000_000) return `NOK ${(v / 1_000_000).toFixed(1)}M`;
   if (v >= 1_000) return `NOK ${(v / 1_000).toFixed(0)}K`;
   return `NOK ${v.toFixed(0)}`;
-}
-
-/** Format share count (e.g., 50000 -> "50,000 shares") */
-function fmtShares(v: number | null | undefined): string | null {
-  if (!v) return null;
-  return `${v.toLocaleString("en-US")} shares`;
 }
 
 /** Build a compact fact line from structured facts */
@@ -130,24 +113,22 @@ function factLine(ev: NewsEvent): string | null {
     if (f.transaction_type) parts.push(f.transaction_type);
     const val = fmtNOK(f.total_value_nok);
     if (val) parts.push(val);
-    if (f.shares_traded) parts.push(fmtShares(f.shares_traded)!);
+    if (f.shares_traded) parts.push(`${f.shares_traded.toLocaleString("en-US")} shares`);
     if (f.person_name) {
       const role = f.person_role ? ` (${f.person_role})` : "";
       parts.push(`${f.person_name}${role}`);
     }
-    if (f.holdings_after) parts.push(`Holdings: ${fmtShares(f.holdings_after)}`);
     return parts.length > 0 ? parts.join(" · ") : null;
   }
 
   if (ev.eventType === "corporate_action") {
     const parts: string[] = [];
     if (f.action_type) parts.push(f.action_type.toUpperCase());
-    if (f.shares_count) parts.push(fmtShares(f.shares_count)!);
+    if (f.shares_count) parts.push(`${f.shares_count.toLocaleString("en-US")} shares`);
     const val = fmtNOK(f.total_value_nok);
     if (val) parts.push(val);
     if (f.dividend_per_share) parts.push(`NOK ${f.dividend_per_share}/share`);
     if (f.ex_date) parts.push(`Ex: ${f.ex_date}`);
-    if (f.program_total) parts.push(`Program: ${f.program_total}`);
     return parts.length > 0 ? parts.join(" · ") : null;
   }
 
@@ -179,7 +160,8 @@ function cleanHeadline(headline: string): string {
   return headline
     .replace(/^Press Release:\s*/i, "")
     .replace(/^\*\s*/, "")
-    .replace(/^[A-Z]{2,}[A-Z\s]*:\s*/i, "")
+    // Remove ticker prefix like "STOREBRAND ASA:" or "DNB BANK ASA:"
+    .replace(/^[A-Z][A-Za-z\s]{2,30}(ASA|AS|NV|Ltd|AB):\s*/i, "")
     .trim();
 }
 
@@ -257,9 +239,14 @@ export default function NewsFeed({
       {events.map((ev) => {
         const isExpanded = expandedId === ev.id;
         const sevColor = SEV_COLOR[ev.severity] || "#6b7280";
-        const typeColor = TYPE_COLOR[ev.eventType] || "#6b7280";
+        const typeInfo = TYPE_LABEL[ev.eventType];
         const headline = cleanHeadline(ev.headline);
         const facts = factLine(ev);
+        const hasSummary = ev.summary && ev.summary.length > 5;
+        const summaryPreview = hasSummary
+          ? (ev.summary!.length > 140 ? ev.summary!.slice(0, 137) + "..." : ev.summary!)
+          : null;
+        const returnPct = ev.dayReturnPct;
 
         return (
           <div
@@ -274,27 +261,55 @@ export default function NewsFeed({
             onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.02)")}
             onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
           >
-            {/* Single-line row */}
+            {/* Main row */}
             <div style={{ display: "flex", alignItems: "flex-start", gap: compact ? 4 : 8 }}>
               {/* Severity bar */}
               <div style={{ width: 2, minHeight: compact ? 14 : 18, background: sevColor, borderRadius: 1, marginTop: 2, flexShrink: 0 }} />
 
-              {/* Time */}
-              <span style={{ fontSize: compact ? 9 : 10, color: "var(--muted-foreground)", minWidth: compact ? 24 : 36, flexShrink: 0, marginTop: 1 }}>
-                {timeAgo(ev.publishedAt)}
+              {/* Date */}
+              <span style={{ fontSize: compact ? 9 : 10, color: "var(--muted-foreground)", minWidth: compact ? 28 : 40, flexShrink: 0, marginTop: 1 }}>
+                {formatDate(ev.publishedAt)}
               </span>
 
               {/* Content */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                {/* Headline — truncated in compact */}
-                <span style={{
-                  color: "var(--foreground)", fontWeight: 500, lineHeight: 1.35,
-                  ...(compact && !isExpanded ? { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const, display: "block" } : {}),
-                }}>
-                  {compact && headline.length > 70 ? headline.slice(0, 67) + "..." : headline}
-                </span>
+                {/* Headline — clickable link if URL exists */}
+                {ev.url ? (
+                  <a
+                    href={ev.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      color: "var(--foreground)", fontWeight: 500, lineHeight: 1.35,
+                      textDecoration: "none", display: "block",
+                      ...(compact && !isExpanded ? { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const } : {}),
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = "var(--foreground)")}
+                  >
+                    {compact && headline.length > 65 ? headline.slice(0, 62) + "..." : headline}
+                  </a>
+                ) : (
+                  <span style={{
+                    color: "var(--foreground)", fontWeight: 500, lineHeight: 1.35,
+                    ...(compact && !isExpanded ? { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const, display: "block" } : {}),
+                  }}>
+                    {compact && headline.length > 65 ? headline.slice(0, 62) + "..." : headline}
+                  </span>
+                )}
 
-                {/* Structured facts line (KEY DATA) */}
+                {/* Summary preview (always visible, below headline) */}
+                {summaryPreview && !compact && (
+                  <div style={{
+                    fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.4,
+                    marginTop: 2, opacity: 0.75,
+                  }}>
+                    {summaryPreview}
+                  </div>
+                )}
+
+                {/* Structured facts line (KEY DATA — insider trades, earnings, etc.) */}
                 {facts && (
                   <div style={{
                     fontSize: compact ? 9 : 10,
@@ -304,7 +319,7 @@ export default function NewsFeed({
                            ev.eventType === "earnings" ? "#22c55e" :
                            ev.eventType === "analyst_action" ? "#a855f7" :
                            "var(--muted-foreground)",
-                    marginTop: 1,
+                    marginTop: 2,
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap" as const,
@@ -313,39 +328,38 @@ export default function NewsFeed({
                   </div>
                 )}
 
-                {/* Inline badges */}
-                <div style={{ display: "flex", gap: 3, marginTop: 2, flexWrap: "wrap", alignItems: "center" }}>
-                  {/* Event type */}
-                  <span style={{
-                    fontSize: 8, fontWeight: 700, padding: "0px 4px", borderRadius: 1,
-                    background: `${typeColor}18`, color: typeColor,
-                    textTransform: "uppercase", letterSpacing: "0.03em",
-                  }}>
-                    {ev.eventType.replace(/_/g, " ")}
-                  </span>
-
-                  {/* Sentiment */}
-                  {ev.sentiment !== null && Math.abs(ev.sentiment) > 0.05 && (
+                {/* Inline metadata — only event type (if not "other") + price move */}
+                <div style={{ display: "flex", gap: 6, marginTop: 3, flexWrap: "wrap", alignItems: "center" }}>
+                  {/* Event type — only show meaningful types */}
+                  {typeInfo && (
                     <span style={{
-                      fontSize: 9, fontWeight: 600,
-                      color: ev.sentiment > 0 ? "#22c55e" : "#ef4444",
+                      fontSize: 8.5, fontWeight: 600, padding: "1px 5px", borderRadius: 2,
+                      background: `${typeInfo.color}15`, color: typeInfo.color,
+                      letterSpacing: "0.02em",
                     }}>
-                      {ev.sentiment > 0 ? "+" : ""}{ev.sentiment.toFixed(2)}
+                      {typeInfo.label}
+                    </span>
+                  )}
+
+                  {/* Stock % move on event date */}
+                  {returnPct != null && (
+                    <span style={{
+                      fontSize: 9.5, fontWeight: 700, fontFamily: "monospace",
+                      color: returnPct > 0 ? "#22c55e" : returnPct < 0 ? "#ef4444" : "var(--muted-foreground)",
+                    }}>
+                      {returnPct > 0 ? "+" : ""}{returnPct.toFixed(2)}%
                     </span>
                   )}
 
                   {/* Ticker pills (only in non-ticker-specific mode) */}
-                  {!ticker && ev.tickers?.slice(0, 2).map((t) => {
-                    const d = DIR_SYM[t.direction] || DIR_SYM.neutral;
-                    return (
-                      <span key={t.ticker} style={{
-                        fontSize: 8, fontWeight: 700, padding: "0px 3px", borderRadius: 1,
-                        background: "rgba(255,255,255,0.06)", color: d.color,
-                      }}>
-                        {d.icon}{t.ticker}
-                      </span>
-                    );
-                  })}
+                  {!ticker && ev.tickers?.slice(0, 3).map((t) => (
+                    <span key={t.ticker} style={{
+                      fontSize: 8.5, fontWeight: 600, padding: "1px 5px", borderRadius: 2,
+                      background: "rgba(255,255,255,0.06)", color: "var(--muted-foreground)",
+                    }}>
+                      {t.ticker}
+                    </span>
+                  ))}
                 </div>
               </div>
             </div>
@@ -358,18 +372,28 @@ export default function NewsFeed({
             }}>
               <div style={{ overflow: "hidden" }}>
               <div style={{
-                marginTop: 6, marginLeft: compact ? 30 : 46,
-                padding: "8px 10px", background: "rgba(255,255,255,0.03)",
-                borderRadius: 3, border: "1px solid var(--border)", fontSize: compact ? 10 : 11,
+                marginTop: 6, marginLeft: compact ? 30 : 50,
+                padding: "10px 12px", background: "rgba(255,255,255,0.03)",
+                borderRadius: 4, border: "1px solid var(--border)", fontSize: compact ? 10 : 11,
               }}>
+                {/* Full summary */}
+                {ev.summary && ev.summary.length > 5 && (
+                  <p style={{ color: "var(--foreground)", lineHeight: 1.55, margin: "0 0 10px 0", fontSize: 11 }}>
+                    {ev.summary}
+                  </p>
+                )}
+
                 {/* Structured facts detail (full display) */}
                 {ev.structuredFacts && Object.values(ev.structuredFacts).some(v => v !== null) && (
                   <div style={{
                     display: "grid",
                     gridTemplateColumns: "auto 1fr",
-                    gap: "2px 12px",
-                    marginBottom: 8,
+                    gap: "3px 14px",
+                    marginBottom: 10,
                     fontSize: 10,
+                    padding: "8px 10px",
+                    background: "rgba(255,255,255,0.02)",
+                    borderRadius: 3,
                   }}>
                     {ev.structuredFacts.person_name && (
                       <>
@@ -499,52 +523,44 @@ export default function NewsFeed({
                   </div>
                 )}
 
-                {ev.summary && (
-                  <p style={{ color: "var(--foreground)", lineHeight: 1.5, marginBottom: 8, margin: "0 0 8px 0" }}>
-                    {ev.summary}
-                  </p>
-                )}
-
-                <div style={{ display: "flex", gap: 12, fontSize: 9, color: "var(--muted-foreground)", flexWrap: "wrap" }}>
-                  <span>SEV <strong style={{ color: sevColor }}>{ev.severity}/5</strong></span>
-                  {ev.confidence !== null && <span>CONF <strong>{(ev.confidence * 100).toFixed(0)}%</strong></span>}
+                {/* Footer metadata */}
+                <div style={{ display: "flex", gap: 10, fontSize: 9, color: "var(--muted-foreground)", flexWrap: "wrap", alignItems: "center" }}>
                   <span>{new Date(ev.publishedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
-                  {ev.providerCode && <span>{ev.providerCode}</span>}
-                  <span>{ev.source}</span>
+                  {ev.source && <span>{ev.source}</span>}
+                  {ev.providerCode && <span style={{ opacity: 0.6 }}>{ev.providerCode}</span>}
+                  {ev.severity >= 3 && <span>SEV <strong style={{ color: sevColor }}>{ev.severity}/5</strong></span>}
+                  {returnPct != null && (
+                    <span>
+                      Day move: <strong style={{ color: returnPct > 0 ? "#22c55e" : returnPct < 0 ? "#ef4444" : "var(--foreground)" }}>
+                        {returnPct > 0 ? "+" : ""}{returnPct.toFixed(2)}%
+                      </strong>
+                      {ev.priceClose != null && <span style={{ opacity: 0.6 }}> (NOK {ev.priceClose.toFixed(2)})</span>}
+                    </span>
+                  )}
+                  {ev.url && (
+                    <a
+                      href={ev.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}
+                      onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+                      onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+                    >
+                      Source
+                    </a>
+                  )}
                 </div>
 
-                {/* Tickers */}
-                {ev.tickers && ev.tickers.length > 0 && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 6 }}>
-                    {ev.tickers.map((t) => {
-                      const d = DIR_SYM[t.direction] || DIR_SYM.neutral;
-                      return (
-                        <span key={t.ticker} style={{
-                          fontSize: 9, fontWeight: 600, padding: "1px 5px", borderRadius: 2,
-                          background: "rgba(255,255,255,0.06)", color: d.color,
-                        }}>
-                          {d.icon} {t.ticker}
-                          {t.relevance !== null && <span style={{ opacity: 0.6, marginLeft: 3 }}>{(t.relevance * 100).toFixed(0)}%</span>}
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Sectors */}
-                {ev.sectors && ev.sectors.length > 0 && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 4 }}>
-                    {ev.sectors.map((s) => (
-                      <span key={s.sector} style={{
-                        fontSize: 9, padding: "1px 5px", borderRadius: 2,
-                        background: "rgba(255,255,255,0.04)", color: "var(--muted-foreground)",
+                {/* Tickers (expanded only, non-ticker mode) */}
+                {!ticker && ev.tickers && ev.tickers.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 }}>
+                    {ev.tickers.map((t) => (
+                      <span key={t.ticker} style={{
+                        fontSize: 9, fontWeight: 600, padding: "2px 6px", borderRadius: 3,
+                        background: "rgba(255,255,255,0.06)", color: "var(--foreground)",
                       }}>
-                        {s.sector}
-                        {s.impact !== null && (
-                          <span style={{ marginLeft: 3, color: s.impact > 0 ? "#22c55e" : "#ef4444", fontWeight: 600 }}>
-                            {s.impact > 0 ? "+" : ""}{s.impact.toFixed(2)}
-                          </span>
-                        )}
+                        {t.ticker}
                       </span>
                     ))}
                   </div>

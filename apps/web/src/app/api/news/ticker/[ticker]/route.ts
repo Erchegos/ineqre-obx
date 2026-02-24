@@ -8,10 +8,12 @@
  *   ?severity_min=1    — minimum severity filter
  *
  * Returns news events for a specific ticker, ordered by recency.
+ * Includes the stock's daily % price move on the event date.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
+import { getPriceTable } from "@/lib/price-data-adapter";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,6 +44,7 @@ export async function GET(
     }
 
     const where = conditions.join(" AND ");
+    const priceTable = await getPriceTable();
 
     const result = await pool.query(
       `
@@ -51,6 +54,13 @@ export async function GET(
         e.provider_code, e.url, e.structured_facts,
         tm.relevance_score::float AS relevance,
         tm.impact_direction,
+        -- Daily price move: join with prices on same date
+        pd.close AS price_close,
+        pd.prev_close,
+        CASE WHEN pd.prev_close > 0
+          THEN ((pd.close - pd.prev_close) / pd.prev_close * 100)::float
+          ELSE NULL
+        END AS day_return_pct,
         COALESCE(
           (SELECT json_agg(json_build_object(
             'ticker', t2.ticker,
@@ -68,6 +78,15 @@ export async function GET(
         ) AS sectors
       FROM news_events e
       JOIN news_ticker_map tm ON tm.news_event_id = e.id
+      LEFT JOIN LATERAL (
+        SELECT p.close, LAG(p.close) OVER (ORDER BY p.date) AS prev_close
+        FROM public.${priceTable} p
+        WHERE upper(p.ticker) = $1
+          AND p.close IS NOT NULL
+          AND p.date BETWEEN (e.published_at::date - INTERVAL '3 days') AND (e.published_at::date + INTERVAL '1 day')
+        ORDER BY p.date DESC
+        LIMIT 1
+      ) pd ON true
       WHERE ${where}
       ORDER BY e.published_at DESC
       LIMIT $${idx}
@@ -92,6 +111,8 @@ export async function GET(
         structuredFacts: r.structured_facts,
         relevance: r.relevance,
         impactDirection: r.impact_direction,
+        dayReturnPct: r.day_return_pct != null ? Number(r.day_return_pct) : null,
+        priceClose: r.price_close != null ? Number(r.price_close) : null,
         tickers: r.all_tickers,
         sectors: r.sectors,
       })),
