@@ -447,6 +447,9 @@ export default function PortfolioPage() {
     }
   };
 
+  // Signal explanation toggle
+  const [showSignalGuide, setShowSignalGuide] = useState(false);
+
   // Sector browser state
   const [showSectorBrowser, setShowSectorBrowser] = useState(false);
   const [expandedSectors, setExpandedSectors] = useState<Set<string>>(new Set());
@@ -1928,14 +1931,36 @@ export default function PortfolioPage() {
               })}
             </div>
 
-            {/* Legend */}
-            <div style={{ display: "flex", gap: 14, marginTop: 8, fontSize: 8, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", flexWrap: "wrap", justifyContent: "center" }}>
-              <span>ML: XGB/LGBM 1m forecast</span>
-              <span>MOM: 1m/6m/11m trend</span>
-              <span>VAL: E/P, B/M, D/Y</span>
-              <span>CLU: OU mean-reversion</span>
-              <span>REG: HMM regime state</span>
-              <span>CNN: 1D-CNN+Transformer</span>
+            {/* Signal Guide */}
+            <div style={{ marginTop: 8 }}>
+              <div
+                onClick={() => setShowSignalGuide(!showSignalGuide)}
+                style={{ display: "flex", gap: 14, fontSize: 8, color: "rgba(255,255,255,0.35)", fontFamily: "monospace", flexWrap: "wrap", justifyContent: "center", cursor: "pointer" }}
+              >
+                <span>ML: XGB/LGBM 1m forecast</span>
+                <span>MOM: 1m/6m/11m trend</span>
+                <span>VAL: E/P, B/M, D/Y</span>
+                <span>CLU: OU mean-reversion</span>
+                <span>REG: HMM regime state</span>
+                <span>CNN: 1D-CNN+Transformer</span>
+                <span style={{ color: "rgba(255,255,255,0.5)" }}>{showSignalGuide ? "▲ HIDE" : "▼ EXPLAIN"}</span>
+              </div>
+              {showSignalGuide && (
+                <div style={{ marginTop: 10, padding: 14, background: "rgba(255,255,255,0.03)", borderRadius: 6, fontSize: 10, lineHeight: 1.7, color: "rgba(255,255,255,0.55)", fontFamily: "monospace" }}>
+                  <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 6, fontSize: 11 }}>ALPHA SIGNAL METHODOLOGY</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 20px" }}>
+                    <div><span style={{ color: "#4CAF50" }}>ML</span> — XGBoost/LightGBM ensemble trained on 19 factors (momentum, volatility, fundamentals). Predicts 1-month forward returns. Signal = prediction × 20 scaled to [-1,1]. Per-ticker.</div>
+                    <div><span style={{ color: "#FF9800" }}>MOM</span> — Momentum composite: 1-month (40%), 6-month (30%), 11-month (30%) price trends. Positive momentum → buy signal. Per-ticker.</div>
+                    <div><span style={{ color: "#F44336" }}>VAL</span> — Valuation score from E/P (earnings yield), B/M (book-to-market), D/Y (dividend yield). Cheap stocks → positive signal. Per-ticker.</div>
+                    <div><span style={{ color: "#2196F3" }}>CLU</span> — Spectral clustering groups correlated stocks, then fits Ornstein-Uhlenbeck mean-reversion models per cluster. Negative z-score = dislocated below fair value → buy. Per-cluster.</div>
+                    <div><span style={{ color: "#9C27B0" }}>REG</span> — Hidden Markov Model detects market regime (Bull/Neutral/Crisis) from cross-asset returns. Bull → +0.8, Neutral → 0.0, Crisis → -0.8. Same for all tickers (market-level signal).</div>
+                    <div><span style={{ color: "#00BCD4" }}>CNN</span> — 1D-CNN + Transformer trained on 60-day return windows. Detects residual patterns in price series. Signal ∈ [-1,1] where positive → expected up-move. Per-ticker.</div>
+                  </div>
+                  <div style={{ marginTop: 8, borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 8 }}>
+                    <span style={{ color: "rgba(255,255,255,0.4)" }}>Weights (normal):</span> ML 25% · CNN 20% · MOM 15% · VAL 15% · CLU 15% · REG 10%. In Crisis regime, REG weight increases to 30%. Unavailable signals are excluded and weights renormalized.
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         );

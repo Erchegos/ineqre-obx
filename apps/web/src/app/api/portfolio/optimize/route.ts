@@ -492,8 +492,8 @@ export async function POST(req: NextRequest) {
       const cnnResponse = await fetch(`${mlServiceUrl3}/signals/cnn`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tickers, lookback_days: 504, epochs: 5, window: 60 }),
-        signal: AbortSignal.timeout(60000), // CNN training takes ~15-30s
+        body: JSON.stringify({ tickers, lookback_days: 504, epochs: 20, window: 60 }),
+        signal: AbortSignal.timeout(90000), // CNN training takes ~30-60s with 20 epochs
       });
       if (cnnResponse.ok) {
         const cnnResult = await cnnResponse.json();
