@@ -1245,7 +1245,7 @@ export default function StockTickerPage() {
                 </Link>
               </div>
               <div style={{ maxHeight: 370, overflowY: "auto", padding: "0 6px", flex: 1 }}>
-                <NewsFeed ticker={ticker} limit={15} compact refreshInterval={120} severityMin={2} />
+                <NewsFeed ticker={ticker} limit={20} compact refreshInterval={120} />
               </div>
             </div>
           </div>
