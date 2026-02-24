@@ -10,6 +10,8 @@ import TimeframeSelector from "@/components/TimeframeSelector";
 import StockFundamentalsPanel from "@/components/StockFundamentalsPanel";
 import CandlestickChart from "@/components/CandlestickChart";
 import { LiquidityBadge } from "@/components/LiquidityBadge";
+import NewsFeed from "@/components/NewsFeed";
+import WhyDidItMove from "@/components/WhyDidItMove";
 
 type Stats = {
   totalReturn: number;
@@ -194,8 +196,12 @@ export default function StockTickerPage() {
   // UI State: Toggle between historical analysis and STD channel
   const [viewMode, setViewMode] = useState<"historical" | "std_channel">("historical");
   const [chartMode, setChartMode] = useState<"price" | "total_return" | "comparison">("comparison");
-  const [showInfo, setShowInfo] = useState<boolean>(false);
   const [isPanelOpen, setIsPanelOpen] = useState<boolean>(false);
+
+  // Inline fundamentals (compact strip next to mode toggle)
+  const [inlineFundamentals, setInlineFundamentals] = useState<{
+    ep: number | null; bm: number | null; dy: number | null; mktcap: number | null;
+  } | null>(null);
 
   const [returnsStartDate, setReturnsStartDate] = useState<string>("");
   const [returnsEndDate, setReturnsEndDate] = useState<string>("");
@@ -204,6 +210,8 @@ export default function StockTickerPage() {
   const [totalRows, setTotalRows] = useState<number>(0);
   const [stockMetaLoading, setStockMetaLoading] = useState<boolean>(true);
   const [hasFactorData, setHasFactorData] = useState<boolean>(false);
+  const [stockName, setStockName] = useState<string>("");
+  const [stockSector, setStockSector] = useState<string>("");
 
   // Filter and sort state for Daily Returns table
   const [returnFilter, setReturnFilter] = useState<"all" | "positive" | "negative" | "large_positive" | "large_negative" | "custom">("all");
@@ -388,6 +396,8 @@ export default function StockTickerPage() {
         if (!cancelled) {
           setTotalRows(stock?.rows || 0);
           setHasFactorData(factorExists);
+          setStockName(stock?.name || "");
+          setStockSector(stock?.sector || "");
         }
       } catch (e) {
         console.warn("Error fetching stock metadata:", e);
@@ -406,6 +416,30 @@ export default function StockTickerPage() {
     return () => {
       cancelled = true;
     };
+  }, [ticker]);
+
+  // Fetch inline fundamentals (compact strip)
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchFundamentals() {
+      if (!ticker) return;
+      try {
+        const res = await fetch(`/api/factors/${encodeURIComponent(ticker)}?type=fundamental&limit=1`);
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!cancelled && json.success && json.data?.length > 0) {
+          const d = json.data[0];
+          setInlineFundamentals({
+            ep: d.ep != null ? Number(d.ep) : null,
+            bm: d.bm != null ? Number(d.bm) : null,
+            dy: d.dy != null ? Number(d.dy) : null,
+            mktcap: d.mktcap != null ? Number(d.mktcap) : null,
+          });
+        }
+      } catch { /* silently skip */ }
+    }
+    fetchFundamentals();
+    return () => { cancelled = true; };
   }, [ticker]);
 
   // Fetch residuals data
@@ -590,11 +624,6 @@ export default function StockTickerPage() {
   const activeStats = useMemo(() => {
     if (!data?.summary) return null;
     return chartMode === "price" ? data.summary.raw : data.summary.adjusted;
-  }, [data, chartMode]);
-
-  const activeDrawdown = useMemo(() => {
-    if (!data?.drawdown) return [];
-    return chartMode === "price" ? data.drawdown.raw : data.drawdown.adjusted;
   }, [data, chartMode]);
 
   const activeReturns = useMemo(() => {
@@ -867,142 +896,141 @@ export default function StockTickerPage() {
     return 'Performance Comparison';
   };
 
+  // Compute last price + daily change for hero bar
+  const priceInfo = useMemo(() => {
+    if (!data?.prices || data.prices.length < 2) return null;
+    const last = data.prices[data.prices.length - 1];
+    const prev = data.prices[data.prices.length - 2];
+    const price = last.adj_close ?? last.close;
+    const prevPrice = prev.adj_close ?? prev.close;
+    const change = price - prevPrice;
+    const changePct = prevPrice !== 0 ? (change / prevPrice) * 100 : 0;
+    return { price, change, changePct, date: last.date };
+  }, [data]);
+
+  // Compute CAGR for hero bar
+  const cagr = useMemo(() => {
+    if (!activeStats || !data?.dateRange?.start || !data?.dateRange?.end) return null;
+    const start = new Date(data.dateRange.start);
+    const end = new Date(data.dateRange.end);
+    const years = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+    if (years < 0.5) return null;
+    return (Math.pow(1 + activeStats.totalReturn / 100, 1 / years) - 1) * 100;
+  }, [activeStats, data]);
+
   return (
-    <main style={{ padding: 24, maxWidth: 1400, margin: "0 auto", minHeight: "100vh", background: "var(--background)", color: "var(--foreground)" }}>
-      {/* Header Section */}
-      <div style={{ marginBottom: 24 }}>
-        {/* Terminal-style Header */}
-      <div
-        style={{
-          padding: "10px 12px",
-          background: "var(--terminal-bg)",
-          border: "1px solid var(--terminal-border)",
-          borderRadius: 2,
-          marginBottom: 16,
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: "monospace", color: "var(--foreground)" }}>
+    <main style={{ padding: "16px 24px", maxWidth: 1400, margin: "0 auto", minHeight: "100vh", background: "var(--background)", color: "var(--foreground)" }}>
+      <style>{`
+        .stock-hero-metrics { display: flex; flex-wrap: wrap; }
+        .stock-chart-news { display: grid; grid-template-columns: 3fr 2fr; gap: 10px; }
+        .stock-metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; }
+        .stock-mode-fundamentals { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
+        .stock-mode-fundamentals .fundamentals-strip { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+        @media (max-width: 900px) {
+          .stock-chart-news { grid-template-columns: 1fr; }
+          .stock-metric-grid { grid-template-columns: repeat(3, 1fr); }
+          .stock-mode-fundamentals .fundamentals-strip { margin-left: 0; width: 100%; }
+        }
+        @media (max-width: 600px) {
+          .stock-metric-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+      `}</style>
+      {/* ═══ BLOOMBERG-STYLE HERO BAR ═══ */}
+      <div style={{
+        background: "rgba(255,255,255,0.02)",
+        border: "1px solid var(--border)",
+        borderRadius: 3,
+        padding: "10px 14px",
+        marginBottom: 12,
+        fontFamily: "'Geist Mono', monospace",
+      }}>
+        {/* Row 1: Ticker + Name + Badge + Nav */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>
               {ticker || "?"}
             </h1>
+            {stockName && (
+              <span style={{ fontSize: 12, color: "var(--muted-foreground)", fontWeight: 400 }}>
+                {stockName}
+              </span>
+            )}
             {ticker && <LiquidityBadge ticker={ticker} />}
+            {stockSector && (
+              <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 2, background: "rgba(255,255,255,0.06)", color: "var(--muted-foreground)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                {stockSector}
+              </span>
+            )}
           </div>
-          <Link
-            href="/stocks"
-            style={{
-              fontSize: 10,
-              color: "var(--accent)",
-              textDecoration: "none",
-              fontFamily: "monospace",
-              fontWeight: 600,
-              padding: "4px 10px",
-              border: "1px solid var(--border)",
-              borderRadius: 2,
-              background: "var(--input-bg)",
-            }}
-          >
-            ← BACK TO ASSET LIST
-          </Link>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <Link href="/" style={{ fontSize: 10, color: "var(--muted-foreground)", textDecoration: "none" }}>← Home</Link>
+            <Link href="/stocks" style={{ fontSize: 10, color: "var(--muted-foreground)", textDecoration: "none" }}>← Stocks</Link>
+            <Link href="/news" style={{ fontSize: 10, color: "var(--muted-foreground)", textDecoration: "none" }}>News</Link>
+          </div>
         </div>
 
-        {/* Navigation Links */}
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <Link
-            href={`/volatility/${ticker}`}
-            style={{
-              padding: "6px 10px",
-              borderRadius: 2,
-              background: "var(--card-bg)",
-              border: "1px solid var(--border)",
-              color: "var(--foreground)",
-              fontSize: 10,
-              fontWeight: 600,
-              textDecoration: "none",
-              fontFamily: "monospace",
+        {/* Row 2: Price + Change + Key Metrics Strip */}
+        <div style={{ display: "flex", alignItems: "baseline", gap: 16, marginBottom: 8, flexWrap: "wrap" }}>
+          {priceInfo ? (
+            <>
+              <span style={{ fontSize: 24, fontWeight: 700 }}>{priceInfo.price.toFixed(2)}</span>
+              <span style={{
+                fontSize: 14, fontWeight: 700,
+                color: priceInfo.change >= 0 ? "#22c55e" : "#ef4444",
+              }}>
+                {priceInfo.change >= 0 ? "▲" : "▼"} {priceInfo.change >= 0 ? "+" : ""}{priceInfo.changePct.toFixed(2)}%
+              </span>
+              <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
+                {priceInfo.change >= 0 ? "+" : ""}{priceInfo.change.toFixed(2)}
+              </span>
+            </>
+          ) : (
+            <span style={{ fontSize: 14, color: "var(--muted-foreground)" }}>Loading...</span>
+          )}
+
+          {activeStats && (
+            <>
+              <span style={{ width: 1, height: 16, background: "var(--border)" }} />
+              {[
+                { label: "VOL", value: fmtPct(activeStats.volatility) },
+                { label: "SHARPE", value: fmtNum(activeStats.sharpeRatio, 2) },
+                { label: "β", value: fmtNum(activeStats.beta, 2) },
+                { label: "DD", value: fmtPct(activeStats.maxDrawdown), color: "#ef4444" },
+                { label: "RET", value: fmtPct(activeStats.totalReturn), color: activeStats.totalReturn >= 0 ? "#22c55e" : "#ef4444" },
+                ...(cagr !== null ? [{ label: "CAGR", value: fmtPct(cagr), color: cagr >= 0 ? "#22c55e" : "#ef4444" }] : []),
+              ].map((m) => (
+                <div key={m.label} style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                  <span style={{ fontSize: 9, color: "var(--muted-foreground)", fontWeight: 700, letterSpacing: "0.04em" }}>{m.label}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: m.color || "var(--foreground)" }}>{m.value}</span>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+
+        {/* Row 3: Navigation Links */}
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+          {[
+            { href: `/volatility/${ticker}`, label: "VOLATILITY" },
+            { href: `/montecarlo/${ticker}`, label: "MONTE CARLO" },
+            ...(!stockMetaLoading && totalRows >= 756 && hasFactorData ? [{ href: `/predictions/${ticker}`, label: "ML PREDICTIONS" }] : []),
+            ...(["EQNR.US", "BORR.US", "FLNG.US", "FRO.US"].includes(ticker) ? [{ href: `/options/${ticker}`, label: "OPTIONS" }] : []),
+            { href: "/std-channel-strategy", label: "STD OPTIMIZER" },
+          ].map((link) => (
+            <Link key={link.href} href={link.href} style={{
+              padding: "4px 8px", borderRadius: 2, background: "rgba(255,255,255,0.04)",
+              border: "1px solid var(--border)", color: "var(--foreground)",
+              fontSize: 9, fontWeight: 600, textDecoration: "none", letterSpacing: "0.03em",
               transition: "all 0.15s",
-            }}
-          >
-            VOLATILITY ANALYSIS
-          </Link>
-          <Link
-            href={`/montecarlo/${ticker}`}
-            style={{
-              padding: "6px 10px",
-              borderRadius: 2,
-              background: "var(--card-bg)",
-              border: "1px solid var(--border)",
-              color: "var(--foreground)",
-              fontSize: 10,
-              fontWeight: 600,
-              textDecoration: "none",
-              fontFamily: "monospace",
-              transition: "all 0.15s",
-            }}
-          >
-            MONTE CARLO SIMULATION
-          </Link>
-          {(!stockMetaLoading && totalRows >= 756 && hasFactorData) && (
-            <Link
-              href={`/predictions/${ticker}`}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 2,
-                background: "var(--card-bg)",
-                border: "1px solid var(--border)",
-                color: "var(--foreground)",
-                fontSize: 10,
-                fontWeight: 600,
-                textDecoration: "none",
-                fontFamily: "monospace",
-                transition: "all 0.15s",
-              }}
-            >
-              ML PREDICTIONS
+            }}>
+              {link.label}
             </Link>
-          )}
-          {["EQNR.US", "BORR.US", "FLNG.US", "FRO.US"].includes(ticker) && (
-          <Link
-            href={`/options/${ticker}`}
-            style={{
-              padding: "6px 10px",
-              borderRadius: 2,
-              background: "var(--card-bg)",
-              border: "1px solid var(--border)",
-              color: "var(--foreground)",
-              fontSize: 10,
-              fontWeight: 600,
-              textDecoration: "none",
-              fontFamily: "monospace",
-              transition: "all 0.15s",
-            }}
-          >
-            OPTIONS ANALYSIS
-          </Link>
-          )}
-          <Link
-            href="/std-channel-strategy"
-            style={{
-              padding: "6px 10px",
-              borderRadius: 2,
-              background: "var(--card-bg)",
-              border: "1px solid var(--border)",
-              color: "var(--foreground)",
-              fontSize: 10,
-              fontWeight: 600,
-              textDecoration: "none",
-              fontFamily: "monospace",
-              transition: "all 0.15s",
-            }}
-          >
-            STD OPTIMIZER (ALL STOCKS)
-          </Link>
+          ))}
         </div>
       </div>
-      </div>
 
-      {/* View Mode Toggle */}
-      <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
+      {/* View Mode Toggle + Inline Fundamentals */}
+      <div className="stock-mode-fundamentals">
         <span style={{ fontSize: 13, color: "var(--muted)", letterSpacing: "0.02em", textTransform: "uppercase" }}>
           Analysis Mode
         </span>
@@ -1060,12 +1088,59 @@ export default function StockTickerPage() {
             </span>
           </button>
         </div>
+
+        {/* Inline Fundamentals Strip */}
+        {inlineFundamentals && (
+          <div className="fundamentals-strip" style={{ fontFamily: "'Geist Mono', monospace" }}>
+            {inlineFundamentals.ep !== null && (
+              <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
+                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", marginRight: 3 }}>E/P</span>
+                <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{(inlineFundamentals.ep * 100).toFixed(1)}%</span>
+              </span>
+            )}
+            {inlineFundamentals.bm !== null && (
+              <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
+                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", marginRight: 3 }}>B/M</span>
+                <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{inlineFundamentals.bm.toFixed(2)}</span>
+              </span>
+            )}
+            {inlineFundamentals.dy !== null && (
+              <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
+                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", marginRight: 3 }}>DY</span>
+                <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{(inlineFundamentals.dy * 100).toFixed(1)}%</span>
+              </span>
+            )}
+            {inlineFundamentals.mktcap !== null && (
+              <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
+                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", marginRight: 3 }}>MCAP</span>
+                <span style={{ fontWeight: 600, color: "var(--foreground)" }}>
+                  {inlineFundamentals.mktcap >= 1e9
+                    ? `${(inlineFundamentals.mktcap / 1e9).toFixed(0)}B`
+                    : `${(inlineFundamentals.mktcap / 1e6).toFixed(0)}M`}
+                </span>
+              </span>
+            )}
+            <button
+              onClick={() => setIsPanelOpen(true)}
+              style={{
+                padding: "2px 8px", borderRadius: 2, border: "1px solid var(--border)",
+                background: "transparent", color: "var(--accent)", fontSize: 9,
+                fontWeight: 700, fontFamily: "monospace", cursor: "pointer",
+                letterSpacing: "0.04em", transition: "border-color 0.15s",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--accent)")}
+              onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
+            >
+              MORE ▸
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Timeframe Selector - Only shown in Historical mode */}
+      {/* Timeframe Selector - compact, only in Historical mode */}
       {viewMode === "historical" && (
-        <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 13, color: "var(--muted)", letterSpacing: "0.02em", textTransform: "uppercase" }}>
+        <div style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 9, color: "var(--muted-foreground)", letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "monospace", fontWeight: 700 }}>
             Timeframe
           </span>
           <TimeframeSelector
@@ -1097,237 +1172,97 @@ export default function StockTickerPage() {
         </div>
       )}
 
-      {/* HISTORICAL ANALYSIS MODE */}
+      {/* ═══ HISTORICAL ANALYSIS ═══ */}
       {!loading && data && activeStats && viewMode === "historical" && (
         <>
-           {/* --- CONTROLS SECTION --- */}
-           <div style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 20,
-            padding: 16,
-            background: "var(--card-bg)",
-            border: "1px solid var(--card-border)",
-            borderRadius: 4,
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-               <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: "var(--foreground)" }}>
-                 Data Mode:
-               </h2>
-               <div style={{ display: "flex", gap: 4, background: "var(--input-bg)", padding: 4, borderRadius: 6 }}>
-                  <button
-                    onClick={() => setChartMode("price")}
-                    style={{
-                      padding: "6px 12px",
-                      borderRadius: 4,
-                      border: "none",
-                      background: chartMode === "price" ? "var(--background)" : "transparent",
-                      color: chartMode === "price" ? "var(--foreground)" : "var(--muted)",
-                      fontSize: 13,
-                      fontWeight: 500,
-                      cursor: "pointer",
-                      boxShadow: chartMode === "price" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
-                      transition: "all 0.1s"
-                    }}
-                  >
-                    Price
-                  </button>
-                  <button
-                    onClick={() => setChartMode("total_return")}
-                    style={{
-                      padding: "6px 12px",
-                      borderRadius: 4,
-                      border: "none",
-                      background: chartMode === "total_return" ? "var(--background)" : "transparent",
-                      color: chartMode === "total_return" ? "var(--accent)" : "var(--muted)",
-                      fontSize: 13,
-                      fontWeight: 500,
-                      cursor: "pointer",
-                      boxShadow: chartMode === "total_return" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
-                      transition: "all 0.1s"
-                    }}
-                  >
-                    Total Return
-                  </button>
-                  <button
-                    onClick={() => setChartMode("comparison")}
-                    style={{
-                      padding: "6px 12px",
-                      borderRadius: 4,
-                      border: "none",
-                      background: chartMode === "comparison" ? "var(--background)" : "transparent",
-                      color: chartMode === "comparison" ? "var(--success)" : "var(--muted)", // Green highlight
-                      fontSize: 13,
-                      fontWeight: 500,
-                      cursor: "pointer",
-                      boxShadow: chartMode === "comparison" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
-                      transition: "all 0.1s"
-                    }}
-                  >
-                    Compare (%)
-                  </button>
-                </div>
-                <button
-                  onClick={() => setShowInfo(!showInfo)}
-                  style={{ background: "none", border: "none", color: showInfo ? "var(--accent)" : "var(--muted)", cursor: "pointer", marginLeft: 8 }}
-                  title="Info"
-                >
-                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <line x1="12" y1="16" x2="12" y2="12"></line>
-                      <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                   </svg>
-                </button>
-            </div>
-            <button
-              onClick={() => setIsPanelOpen(true)}
-              style={{
-                padding: "8px 16px",
-                borderRadius: 4,
-                background: "var(--card-bg)",
-                border: "1px solid var(--card-border)",
-                color: "var(--foreground)",
-                fontSize: 13,
-                fontWeight: 500,
-                cursor: "pointer",
-                transition: "all 0.15s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = "var(--accent)";
-                e.currentTarget.style.background = "var(--hover-bg)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = "var(--card-border)";
-                e.currentTarget.style.background = "var(--card-bg)";
-              }}
-          onMouseDown={(e) => {
-            e.currentTarget.style.transform = "scale(0.95)";
-          }}
-          onMouseUp={(e) => {
-            e.currentTarget.style.transform = "scale(1)";
-          }}
-            >
-              Fundamental Details
-            </button>
-          </div>
-
-           {/* --- INFO BOX --- */}
-           {showInfo && (
-              <div style={{
-                marginBottom: 20,
-                padding: "16px",
-                background: "var(--hover-bg)",
+          {/* Row 1: Metric cards — full width, single row */}
+          <div className="stock-metric-grid" style={{ marginBottom: 10 }}>
+            {[
+              { label: "TOT RET", value: fmtPct(activeStats.totalReturn), color: activeStats.totalReturn >= 0 ? "#22c55e" : "#ef4444" },
+              { label: "CAGR", value: cagr !== null ? fmtPct(cagr) : "—", color: (cagr ?? 0) >= 0 ? "#22c55e" : "#ef4444" },
+              { label: "MAX DD", value: fmtPct(activeStats.maxDrawdown), color: "#ef4444" },
+              { label: "VaR 95%", value: fmtPct(activeStats.var95), color: "var(--foreground)" },
+              { label: "CVaR 95%", value: fmtPct(activeStats.cvar95), color: "var(--foreground)" },
+              { label: "SHARPE", value: fmtNum(activeStats.sharpeRatio, 3), color: "var(--foreground)" },
+            ].map((m) => (
+              <div key={m.label} style={{
+                padding: "6px 8px",
+                background: "rgba(255,255,255,0.02)",
                 border: "1px solid var(--border)",
-                borderRadius: 4,
-                fontSize: 13,
-                lineHeight: 1.5,
-                color: "var(--foreground)",
-                animation: "fadeIn 0.2s ease-in-out",
+                borderRadius: 3,
               }}>
-                <div style={{ fontWeight: 600, marginBottom: 8, color: "var(--accent)" }}>
-                  Mode Explanation:
+                <div style={{ fontSize: 8, fontWeight: 700, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3, fontFamily: "monospace" }}>
+                  {m.label}
                 </div>
-                <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 8 }}>
-                  <li><strong>Price:</strong> Absolute share price in NOK. Ignores dividends.</li>
-                  <li><strong>Total Return:</strong> Absolute theoretical price in NOK if dividends were reinvested.</li>
-                  <li><strong>Compare (%):</strong> Shows the accumulated percentage return of both strategies side-by-side. The gap between the lines represents the value of dividends.</li>
-                </ul>
-              </div>
-            )}
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 28 }}>
-            <MetricCard
-              label="Total Return"
-              value={fmtPct(activeStats.totalReturn)}
-              colorType={activeStats.totalReturn >= 0 ? "success" : "danger"}
-              subtitle={(() => {
-                // Calculate actual time period from date range
-                const startDate = data?.dateRange?.start;
-                const endDate = data?.dateRange?.end;
-                if (!startDate || !endDate) return "";
-
-                const start = new Date(startDate);
-                const end = new Date(endDate);
-                const days = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-                const years = days / 365.25;
-
-                if (years < 1) {
-                  const months = Math.round(years * 12);
-                  return `Over ${months} month${months !== 1 ? 's' : ''}`;
-                }
-
-                // Calculate CAGR (Compound Annual Growth Rate)
-                const cagr = ((Math.pow(1 + activeStats.totalReturn / 100, 1 / years) - 1) * 100);
-                return `${fmtPct(cagr)} CAGR (${years.toFixed(1)}y)`;
-              })()}
-            />
-            <MetricCard
-              label="Volatility (Ann.)"
-              value={fmtPct(activeStats.volatility)}
-              subtitle={(() => {
-                // Convert to daily volatility for context
-                const dailyVol = activeStats.volatility / Math.sqrt(252);
-                return `${fmtPct(dailyVol)} daily · ${(dailyVol * 100).toFixed(2)}% avg daily swing`;
-              })()}
-            />
-            <MetricCard
-              label="Max Drawdown"
-              value={fmtPct(activeStats.maxDrawdown)}
-              colorType="danger"
-              subtitle={(() => {
-                // Find when the max drawdown occurred
-                const drawdownPoint = activeDrawdown.reduce((min, curr) =>
-                  curr.drawdown < min.drawdown ? curr : min,
-                  activeDrawdown[0] || { drawdown: 0, date: "" }
-                );
-                if (!drawdownPoint?.date) return "Peak-to-trough decline";
-                const year = new Date(drawdownPoint.date).getFullYear();
-                return `Lowest point in ${year}`;
-              })()}
-            />
-            <div style={{ padding: 14, borderRadius: 3, border: "1px solid var(--card-border)", background: "var(--card-bg)" }}>
-              <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", marginBottom: 8 }}>
-                Risk Metrics (95%)
-              </div>
-              <div style={{ display: "flex", gap: 16, alignItems: "baseline" }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 9, color: "var(--muted-foreground)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>VaR</div>
-                  <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "monospace", color: "var(--foreground)" }}>
-                    {fmtPct(activeStats.var95)}
-                  </div>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 9, color: "var(--muted-foreground)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>CVaR</div>
-                  <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "monospace", color: "var(--foreground)" }}>
-                    {fmtPct(activeStats.cvar95)}
-                  </div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: m.color, fontFamily: "monospace" }}>
+                  {m.value}
                 </div>
               </div>
-              <div style={{ fontSize: 10, color: "var(--muted-foreground)", marginTop: 8, lineHeight: 1.4 }}>
-                5% chance of losing {fmtPct(Math.abs(activeStats.var95))} or more
-              </div>
-            </div>
-            <MetricCard
-              label="Sharpe Ratio"
-              value={fmtNum(activeStats.sharpeRatio, 3)}
-              subtitle={(() => {
-                // Show return per unit of risk
-                const returnPerRisk = activeStats.sharpeRatio * activeStats.volatility;
-                return `${fmtPct(returnPerRisk)} excess return/year`;
-              })()}
-            />
+            ))}
           </div>
 
-          {/* CHARTS SECTION */}
-          <div style={{ marginBottom: 24, padding: 20, borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)" }}>
-            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: "var(--foreground)" }}>
-               History ({getModeLabel()})
-            </h2>
-            <PriceChart 
-              data={chartData} 
-              height={320} 
-            />
+          {/* Row 2: Chart + News side-by-side */}
+          <div className="stock-chart-news" style={{ marginBottom: 10 }}>
+            {/* Chart panel (left) */}
+            <div style={{ padding: "8px 12px", borderRadius: 3, border: "1px solid var(--border)", background: "rgba(255,255,255,0.02)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <div style={{ display: "flex", gap: 2 }}>
+                  {(["price", "total_return", "comparison"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => setChartMode(mode)}
+                      style={{
+                        padding: "3px 8px", borderRadius: 2, border: "1px solid var(--border)",
+                        background: chartMode === mode ? "var(--accent)" : "transparent",
+                        color: chartMode === mode ? "#fff" : "var(--muted-foreground)",
+                        fontSize: 9, fontWeight: 600, fontFamily: "monospace", cursor: "pointer",
+                        letterSpacing: "0.03em", textTransform: "uppercase",
+                      }}
+                    >
+                      {mode === "price" ? "PRICE" : mode === "total_return" ? "TOTAL RET" : "COMPARE %"}
+                    </button>
+                  ))}
+                </div>
+                <span style={{ fontSize: 9, color: "var(--muted-foreground)", fontFamily: "monospace" }}>
+                  {getModeLabel()}
+                </span>
+              </div>
+              <PriceChart data={chartData} height={340} />
+            </div>
+
+            {/* News panel (right) */}
+            <div style={{ border: "1px solid var(--border)", borderRadius: 3, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+              <div style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "4px 8px", background: "rgba(255,255,255,0.03)",
+                borderBottom: "1px solid var(--border)", flexShrink: 0,
+              }}>
+                <span style={{ fontSize: 9, fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.06em", color: "var(--muted-foreground)" }}>
+                  NEWS
+                </span>
+                <Link href="/news" style={{ fontSize: 9, color: "var(--accent)", textDecoration: "none", fontFamily: "monospace" }}>
+                  ALL →
+                </Link>
+              </div>
+              <div style={{ maxHeight: 370, overflowY: "auto", padding: "0 6px", flex: 1 }}>
+                <NewsFeed ticker={ticker} limit={15} compact refreshInterval={120} severityMin={2} />
+              </div>
+            </div>
+          </div>
+
+          {/* Row 3: Significant Moves — full width */}
+          <div style={{ border: "1px solid var(--border)", borderRadius: 3, overflow: "hidden", marginBottom: 10 }}>
+            <div style={{
+              padding: "4px 8px", background: "rgba(255,255,255,0.03)",
+              borderBottom: "1px solid var(--border)",
+              fontSize: 9, fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.06em",
+              color: "var(--muted-foreground)",
+            }}>
+              SIGNIFICANT MOVES (2σ)
+            </div>
+            <div style={{ maxHeight: 180, overflowY: "auto", padding: "0 6px" }}>
+              <WhyDidItMove ticker={ticker} days={60} sigma={2} />
+            </div>
           </div>
         </>
       )}
@@ -2687,25 +2622,6 @@ export default function StockTickerPage() {
 }
 
 // Subcomponents
-function MetricCard({ label, value, colorType, tooltip, subtitle }: { label: string; value: string; colorType?: "success" | "danger" | "warning"; tooltip?: string; subtitle?: string }) {
-  const getColor = () => {
-    if (colorType === "success") return "var(--success)";
-    if (colorType === "danger") return "var(--danger)";
-    if (colorType === "warning") return "var(--warning)";
-    return "var(--foreground)";
-  };
-  return (
-    <div style={{ padding: 14, borderRadius: 3, border: "1px solid var(--card-border)", background: "var(--card-bg)" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-        <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase" }}>{label}</div>
-        {tooltip && <div style={{ cursor: "help", color: "var(--muted-foreground)" }} title={tooltip}>?</div>}
-      </div>
-      <div style={{ fontSize: 22, fontWeight: 600, color: getColor(), fontFamily: "monospace", marginBottom: subtitle ? 6 : 0 }}>{value}</div>
-      {subtitle && <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.4 }}>{subtitle}</div>}
-    </div>
-  );
-}
-
 function StatItem({ label, value, colorType }: { label: string; value: string; colorType?: "success" | "danger" }) {
   const getColor = () => {
     if (colorType === "success") return "var(--success)";
