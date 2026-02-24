@@ -257,7 +257,7 @@ Schema files in `packages/db/src/schema/`
 | Table | Purpose |
 |-------|---------|
 | `factor_technical` | Momentum (1m/6m/11m/36m), volatility (1m/3m/12m), beta, ivol |
-| `factor_fundamentals` | B/M, E/P, dividend yield, sales/price, market cap |
+| `factor_fundamentals` | B/M, E/P, dividend yield, sales/price, EV/EBITDA, market cap |
 
 ### ML Tables
 | Table | Purpose |
@@ -455,7 +455,7 @@ Signal Sources (6):
   ML (XGB/LGBM):  25% — 1-month return prediction
   CNN:            20% — 1D CNN + Transformer pattern detection
   Momentum:       15% — 1m/6m/11m trend alignment
-  Valuation:      15% — E/P, B/M, D/Y composite
+  Valuation:      15% — Sector-relative z-scores (E/P, B/M, D/Y, EV/EBITDA, S/P)
   Cluster (MR):   15% — OU mean-reversion z-score
   Regime:         10% — 3-state HMM portfolio regime
 
