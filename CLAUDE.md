@@ -135,7 +135,7 @@ All endpoints in `apps/web/src/app/api/`
 ### Portfolio APIs (Password-Protected)
 | Endpoint | Purpose |
 |----------|---------|
-| `POST /api/portfolio/auth` | Password authentication (same creds as research) |
+| `POST /api/portfolio/auth` | Username + password authentication (JWT 8h, profile from `research_access_tokens.description`) |
 | `POST /api/portfolio/optimize` | Mean-variance optimization (5 modes, risk decomposition, efficient frontier) |
 | `GET /api/portfolio/configs` | List saved portfolio configurations |
 | `POST /api/portfolio/configs` | Save new portfolio configuration |
@@ -563,18 +563,27 @@ The options module (`/options/[ticker]`) provides:
 - Supported tickers: EQNR, BORR, FLNG, FRO (US-listed with valid OI/volume)
 - Max pain computed in JS (iterates each strike as hypothetical settlement price)
 - OPTN badge on stocks list only shows for `.US`-suffixed tickers
+- **Synthetic bid/ask**: Options without bid/ask from Yahoo get synthetic quotes:
+  - Mid price = last_price (if available) or Black-Scholes theoretical price
+  - Spread: 5% ATM → 25% deep OTM (moneyness-scaled)
+  - Applied both in fetch script (DB storage) and API route (runtime fallback)
+  - IV solved from last_price via Newton-Raphson when Yahoo returns ~0 IV
+  - Dead options (no price, no OI) are skipped during fetch
 
 ---
 
 ## Portfolio Optimizer Details
 
-Located at `/portfolio`. Password-protected with per-user profiles (each password maps to a profile via `research_access_tokens.description`).
+Located at `/portfolio`. Password-protected with per-user profiles.
 
-### Profile System
-- Each login password maps to a profile name (from `description` column in `research_access_tokens`)
-- JWT token includes `profile` field, displayed in header badge
+### Auth & Profile System
+- Login requires **username + password** (no session persistence — must re-login on every page reload)
+- Username matches `description` column in `research_access_tokens`; password verified against `token_hash` (bcryptjs)
+- JWT token (8h expiry) includes `profile` field, displayed in header badge
+- Auto-logout on 401 (expired token) — any API call returning 401 clears auth state
 - Saved portfolios are scoped by profile — each user only sees their own configs
 - `portfolio_configs.profile` column (VARCHAR 50) stores the profile name
+- Accounts managed via `scripts/create-research-password.ts`
 
 ### Optimization Modes (Long-Only, Sum-to-1)
 | Mode | Objective | Needs Expected Returns |
@@ -592,7 +601,7 @@ Located at `/portfolio`. Password-protected with per-user profiles (each passwor
 
 ### Constraint Enforcement
 - Iterative projection algorithm (50 rounds) in `applyConstraintsAndNormalize()`
-- Box constraints: `[minPos, maxPos]` per position, long-only
+- Box constraints: `[minPos, maxPos]` per position, long-only (default max 20%)
 - Sector exposure cap (default 30%)
 - When capped positions don't sum to 1, deficit redistributed to zero-weight positions
 - **Allocation modes**: "All Included" (minPos=1%, forces every ticker) vs "Allow Zero" (minPos=0, optimizer may exclude)
@@ -611,7 +620,7 @@ The optimize API (`POST /api/portfolio/optimize`) enriches results with:
 - **Combined Signal**: 6-source weighted blend [-1, +1] → Strong Buy / Buy / Hold / Sell / Strong Sell
 - **ML Signal**: XGB/LGBM ensemble 1-month forecast (thresholds: >4%, >1.5%, >-1.5%, >-4%)
 - **Momentum Signal**: Bullish / Neutral / Bearish (from alignment of mom1m/mom6m/mom11m)
-- **Valuation Signal**: Cheap / Fair / Expensive (E/P thresholds: >8%, >4%)
+- **Valuation Signal**: Cheap / Fair / Expensive — sector-relative z-scores (MAD-based) across E/P, B/M, D/Y, EV/EBITDA, S/P vs OSE sector peers. Z-score breakdown shown per card.
 - **Cluster Signal**: OU mean-reversion z-score from spectral clustering
 - **Per-holding beta**: Cov(R_i, R_OBX) / Var(R_OBX)
 - **Research count**: Documents in last 90 days per holding
@@ -648,7 +657,7 @@ The optimize API (`POST /api/portfolio/optimize`) enriches results with:
 - **Weights Strip**: Compact weight display sorted by allocation
 - **Risk Alerts Banner**: Color-coded critical/warning/info alerts
 - **Mode Comparison**: Interactive RadarChart (instant hover response) + table with Hist/ML Return & Sharpe; hover highlights radar, click switches strategy with loading bar
-- **Portfolio Alpha Intelligence**: Combined 6-source signal gauge, signal distribution bar, per-holding signal cards with component breakdown (ML, MOM, VAL, CLU, REG, CNN)
+- **Portfolio Alpha Intelligence**: Combined 6-source signal gauge, signal distribution bar, per-holding signal cards with component breakdown (ML, MOM, VAL, CLU, REG, CNN), VAL peer z-score breakdown per card (E/P, P/B, DY, EV/EBITDA, S/P with raw values)
 - **Efficient Frontier**: Interactive SVG with gradient fills, hover tooltips, mode positions overlay, animated portfolio marker
 - **Weight Distribution**: Horizontal bar chart
 - **Risk Decomposition**: Sortable table with marginal contribution, component VaR, % of total risk

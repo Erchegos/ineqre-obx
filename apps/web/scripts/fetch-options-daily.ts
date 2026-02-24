@@ -63,6 +63,33 @@ function normalCDF(x: number): number {
   return 0.5 * (1.0 + sign * y);
 }
 
+function bsPrice(type: "call" | "put", S: number, K: number, T: number, r: number, sigma: number): number {
+  if (T <= 0 || sigma <= 0) return Math.max(0, type === "call" ? S - K : K - S);
+  const d1 = (Math.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * Math.sqrt(T));
+  const d2 = d1 - sigma * Math.sqrt(T);
+  if (type === "call") return S * normalCDF(d1) - K * Math.exp(-r * T) * normalCDF(d2);
+  return K * Math.exp(-r * T) * normalCDF(-d2) - S * normalCDF(-d1);
+}
+
+function impliedVolFromPrice(
+  type: "call" | "put", marketPrice: number, S: number, K: number, T: number, r: number
+): number {
+  if (marketPrice <= 0 || T <= 0) return 0;
+  let sigma = 0.30;
+  for (let i = 0; i < 50; i++) {
+    const price = bsPrice(type, S, K, T, r, sigma);
+    const diff = price - marketPrice;
+    if (Math.abs(diff) < 0.001) return sigma;
+    // Vega for Newton-Raphson
+    const d1 = (Math.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * Math.sqrt(T));
+    const vega = S * Math.exp(-0.5 * d1 * d1) / Math.sqrt(2 * Math.PI) * Math.sqrt(T);
+    if (vega < 0.001) break;
+    sigma = sigma - diff / vega;
+    sigma = Math.max(0.01, Math.min(sigma, 5.0));
+  }
+  return sigma;
+}
+
 function blackScholesGreeks(
   type: "call" | "put", S: number, K: number, T: number, r: number, sigma: number
 ): { delta: number; gamma: number; theta: number; vega: number } {
@@ -75,10 +102,22 @@ function blackScholesGreeks(
   const delta = type === "call" ? Nd1 : Nd1 - 1;
   const gamma = nd1 / (S * sigma * Math.sqrt(T));
   let theta = (-S * nd1 * sigma / (2 * Math.sqrt(T)) - r * K * Math.exp(-r * T) * (type === "call" ? Nd2 : normalCDF(-d2))) / 365;
-  // Sanity: theta should be small negative; clamp nonsensical values
   if (!isFinite(theta) || Math.abs(theta) > 10) theta = 0;
   const vega = (S * nd1 * Math.sqrt(T)) / 100;
   return { delta, gamma, theta, vega };
+}
+
+/**
+ * Generate synthetic bid/ask around a mid price with realistic spread.
+ * Spread widens for more OTM options (5% ATM → 25% deep OTM).
+ */
+function syntheticBidAsk(mid: number, moneyness: number): { bid: number; ask: number } {
+  const spreadPct = Math.min(0.05 + moneyness * 0.5, 0.25);
+  const halfSpread = Math.max(mid * spreadPct / 2, 0.005);
+  return {
+    bid: Math.max(0.01, parseFloat((mid - halfSpread).toFixed(2))),
+    ask: parseFloat((mid + halfSpread).toFixed(2)),
+  };
 }
 
 // ─── IBKR Client Portal API ─────────────────────────────────────
@@ -170,11 +209,47 @@ async function fetchYahooOptions(
 
     let expiryRows = 0;
 
+    // Collect a fallback IV from ATM options in this expiry
+    const atmCalls = calls.filter((c: any) => (c.impliedVolatility || 0) > 0.05);
+    const atmPuts = puts.filter((p: any) => (p.impliedVolatility || 0) > 0.05);
+    const allWithIV = [...atmCalls, ...atmPuts].sort((a: any, b: any) =>
+      Math.abs(a.strike - underlyingPrice) - Math.abs(b.strike - underlyingPrice));
+    const expiryFallbackIV = allWithIV.length > 0 ? (allWithIV[0] as any).impliedVolatility : 0.30;
+
     for (const opt of calls) {
       const strike = opt.strike;
+      const bid = opt.bid || 0;
+      const ask = opt.ask || 0;
+      const lastPrice = opt.lastPrice || 0;
+
+      // Skip completely dead options (no price data AND no open interest)
+      if (bid === 0 && ask === 0 && lastPrice === 0 && (opt.openInterest || 0) === 0) continue;
+
       allStrikes.add(strike);
-      const iv = opt.impliedVolatility || 0;
-      const greeks = iv > 0 && underlyingPrice > 0
+      const moneyness = Math.abs(strike - underlyingPrice) / underlyingPrice;
+
+      // Fix IV: if Yahoo gives ~0 IV but we have a last price, solve for IV
+      let iv = opt.impliedVolatility || 0;
+      if (iv < 0.05 && lastPrice > 0 && underlyingPrice > 0) {
+        iv = impliedVolFromPrice("call", lastPrice, underlyingPrice, strike, T, r);
+      }
+      if (iv < 0.05) iv = expiryFallbackIV;
+
+      // Synthetic bid/ask when Yahoo returns 0
+      let storeBid = bid;
+      let storeAsk = ask;
+      let storeLast = lastPrice;
+      if (bid === 0 && ask === 0) {
+        const mid = lastPrice > 0 ? lastPrice : bsPrice("call", underlyingPrice, strike, T, r, iv);
+        if (mid >= 0.01) {
+          const syn = syntheticBidAsk(mid, moneyness);
+          storeBid = syn.bid;
+          storeAsk = syn.ask;
+          if (storeLast === 0) storeLast = parseFloat(mid.toFixed(2));
+        }
+      }
+
+      const greeks = iv > 0.01 && underlyingPrice > 0
         ? blackScholesGreeks("call", underlyingPrice, strike, T, r, iv)
         : { delta: 0, gamma: 0, theta: 0, vega: 0 };
 
@@ -188,7 +263,7 @@ async function fetchYahooOptions(
           theta = EXCLUDED.theta, vega = EXCLUDED.vega,
           open_interest = EXCLUDED.open_interest, volume = EXCLUDED.volume,
           underlying_price = EXCLUDED.underlying_price, fetched_at = EXCLUDED.fetched_at`,
-        [dbTicker, expStr, strike, opt.bid || 0, opt.ask || 0, opt.lastPrice || 0,
+        [dbTicker, expStr, strike, storeBid, storeAsk, storeLast,
           iv, greeks.delta, greeks.gamma, greeks.theta, greeks.vega,
           opt.openInterest || 0, opt.volume || 0, underlyingPrice]
       );
@@ -197,9 +272,38 @@ async function fetchYahooOptions(
 
     for (const opt of puts) {
       const strike = opt.strike;
+      const bid = opt.bid || 0;
+      const ask = opt.ask || 0;
+      const lastPrice = opt.lastPrice || 0;
+
+      // Skip completely dead options
+      if (bid === 0 && ask === 0 && lastPrice === 0 && (opt.openInterest || 0) === 0) continue;
+
       allStrikes.add(strike);
-      const iv = opt.impliedVolatility || 0;
-      const greeks = iv > 0 && underlyingPrice > 0
+      const moneyness = Math.abs(strike - underlyingPrice) / underlyingPrice;
+
+      // Fix IV
+      let iv = opt.impliedVolatility || 0;
+      if (iv < 0.05 && lastPrice > 0 && underlyingPrice > 0) {
+        iv = impliedVolFromPrice("put", lastPrice, underlyingPrice, strike, T, r);
+      }
+      if (iv < 0.05) iv = expiryFallbackIV;
+
+      // Synthetic bid/ask
+      let storeBid = bid;
+      let storeAsk = ask;
+      let storeLast = lastPrice;
+      if (bid === 0 && ask === 0) {
+        const mid = lastPrice > 0 ? lastPrice : bsPrice("put", underlyingPrice, strike, T, r, iv);
+        if (mid >= 0.01) {
+          const syn = syntheticBidAsk(mid, moneyness);
+          storeBid = syn.bid;
+          storeAsk = syn.ask;
+          if (storeLast === 0) storeLast = parseFloat(mid.toFixed(2));
+        }
+      }
+
+      const greeks = iv > 0.01 && underlyingPrice > 0
         ? blackScholesGreeks("put", underlyingPrice, strike, T, r, iv)
         : { delta: 0, gamma: 0, theta: 0, vega: 0 };
 
@@ -213,7 +317,7 @@ async function fetchYahooOptions(
           theta = EXCLUDED.theta, vega = EXCLUDED.vega,
           open_interest = EXCLUDED.open_interest, volume = EXCLUDED.volume,
           underlying_price = EXCLUDED.underlying_price, fetched_at = EXCLUDED.fetched_at`,
-        [dbTicker, expStr, strike, opt.bid || 0, opt.ask || 0, opt.lastPrice || 0,
+        [dbTicker, expStr, strike, storeBid, storeAsk, storeLast,
           iv, greeks.delta, greeks.gamma, greeks.theta, greeks.vega,
           opt.openInterest || 0, opt.volume || 0, underlyingPrice]
       );
