@@ -62,29 +62,72 @@ def _momentum_signal(mom1m: float, mom6m: float, mom11m: float) -> float:
     return _normalize_signal(score)
 
 
-def _valuation_signal(ep: float, bm: float, dy: float) -> float:
-    """Convert valuation factors to [-1, 1] signal."""
-    score = 0
-    # E/P: higher = cheaper = positive
-    if ep > 0.08:
-        score += 0.5
-    elif ep > 0.04:
-        score += 0.2
-    elif ep > 0:
-        score -= 0.1
-    else:
-        score -= 0.3
-    # B/M: higher = cheaper
-    if bm > 1.0:
-        score += 0.3
-    elif bm > 0.5:
-        score += 0.1
-    elif bm > 0:
-        score -= 0.1
-    # D/Y: moderate yield = positive
-    if 0.02 < dy < 0.08:
-        score += 0.2
-    return _normalize_signal(score)
+def _valuation_signal(metrics: dict) -> float:
+    """
+    Composite valuation score from up to 5 metrics.
+    Each available metric produces a sub-score; final = average of available sub-scores.
+    """
+    sub_scores: list[float] = []
+
+    ep = metrics.get("ep", 0) or 0
+    if ep != 0:
+        # E/P (earnings yield): higher = cheaper
+        if ep > 0.08:
+            sub_scores.append(1.0)
+        elif ep > 0.04:
+            sub_scores.append(0.3)
+        elif ep > 0:
+            sub_scores.append(-0.2)
+        else:
+            sub_scores.append(-1.0)
+
+    bm = metrics.get("bm", 0) or 0
+    if bm != 0:
+        # B/M (book-to-market): higher = cheaper
+        if bm > 1.0:
+            sub_scores.append(1.0)
+        elif bm > 0.5:
+            sub_scores.append(0.3)
+        elif bm > 0.2:
+            sub_scores.append(-0.2)
+        else:
+            sub_scores.append(-0.5)
+
+    dy = metrics.get("dy", 0) or 0
+    if dy != 0:
+        # D/Y: moderate 2-8% is ideal
+        if 0.02 < dy < 0.08:
+            sub_scores.append(0.5)
+        elif dy > 0:
+            sub_scores.append(0.1)
+        else:
+            sub_scores.append(-0.3)
+
+    ev_ebitda = metrics.get("ev_ebitda", 0) or 0
+    if ev_ebitda > 0:
+        # EV/EBITDA: lower = cheaper
+        if ev_ebitda < 6:
+            sub_scores.append(1.0)
+        elif ev_ebitda < 10:
+            sub_scores.append(0.3)
+        elif ev_ebitda < 15:
+            sub_scores.append(-0.2)
+        else:
+            sub_scores.append(-0.5)
+
+    sp = metrics.get("sp", 0) or 0
+    if sp > 0:
+        # S/P (sales/price): higher = cheaper
+        if sp > 1.0:
+            sub_scores.append(0.5)
+        elif sp > 0.5:
+            sub_scores.append(0.2)
+        else:
+            sub_scores.append(-0.1)
+
+    if not sub_scores:
+        return 0.0
+    return _normalize_signal(sum(sub_scores) / len(sub_scores))
 
 
 def _regime_signal(regime_label: str) -> float:
@@ -147,13 +190,9 @@ def combine_signals(
         components["momentum"] = 0
         weights = {**weights, "momentum": 0}
 
-    # Valuation
+    # Valuation (5-metric composite: E/P, B/M, D/Y, EV/EBITDA, S/P)
     if valuation_factors and any(v is not None and v > 0 for v in valuation_factors.values()):
-        components["valuation"] = _valuation_signal(
-            valuation_factors.get("ep", 0) or 0,
-            valuation_factors.get("bm", 0) or 0,
-            valuation_factors.get("dy", 0) or 0,
-        )
+        components["valuation"] = _valuation_signal(valuation_factors)
     else:
         components["valuation"] = 0
         weights = {**weights, "valuation": 0}

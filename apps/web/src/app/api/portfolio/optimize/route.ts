@@ -202,26 +202,38 @@ export async function POST(req: NextRequest) {
       const factorQuery = `
         SELECT DISTINCT ON (ft.ticker)
           ft.ticker, ft.mom1m, ft.mom6m, ft.mom11m, ft.mom36m, ft.vol1m, ft.vol3m, ft.beta, ft.ivol,
-          ff.bm, ff.ep, ff.dy, ff.mktcap
+          ff.bm, ff.ep, ff.dy, ff.sp, ff.mktcap,
+          fs.ev_ebitda, fs.ebitda_ttm
         FROM factor_technical ft
         LEFT JOIN (
-          SELECT DISTINCT ON (ticker) ticker, bm, ep, dy, mktcap
+          SELECT DISTINCT ON (ticker) ticker, bm, ep, dy, sp, mktcap
           FROM factor_fundamentals
           ORDER BY ticker, date DESC
         ) ff ON ft.ticker = ff.ticker
+        LEFT JOIN (
+          SELECT DISTINCT ON (ticker) ticker, ev_ebitda, ebitda_ttm
+          FROM fundamentals_snapshot
+          ORDER BY ticker, as_of_date DESC
+        ) fs ON ft.ticker = fs.ticker
         WHERE ft.ticker = ANY($1)
         ORDER BY ft.ticker, ft.date DESC
       `;
       const factorResult = await pool.query(factorQuery, [tickers]);
       factorMap = new Map(
-        factorResult.rows.map((r: Record<string, unknown>) => [r.ticker as string, {
-          mom1m: Number(r.mom1m || 0), mom6m: Number(r.mom6m || 0),
-          mom11m: Number(r.mom11m || 0), mom36m: Number(r.mom36m || 0),
-          vol1m: Number(r.vol1m || 0), vol3m: Number(r.vol3m || 0),
-          beta: Number(r.beta || 0), ivol: Number(r.ivol || 0),
-          bm: Number(r.bm || 0), ep: Number(r.ep || 0),
-          dy: Number(r.dy || 0), mktcap: Number(r.mktcap || 0),
-        }])
+        factorResult.rows.map((r: Record<string, unknown>) => {
+          const mktcap = Number(r.mktcap || 0);
+          const ebitdaTtm = Number(r.ebitda_ttm || 0);
+          return [r.ticker as string, {
+            mom1m: Number(r.mom1m || 0), mom6m: Number(r.mom6m || 0),
+            mom11m: Number(r.mom11m || 0), mom36m: Number(r.mom36m || 0),
+            vol1m: Number(r.vol1m || 0), vol3m: Number(r.vol3m || 0),
+            beta: Number(r.beta || 0), ivol: Number(r.ivol || 0),
+            bm: Number(r.bm || 0), ep: Number(r.ep || 0),
+            dy: Number(r.dy || 0), sp: Number(r.sp || 0), mktcap,
+            ev_ebitda: Number(r.ev_ebitda || 0),
+            fcf_yield: mktcap > 0 && ebitdaTtm > 0 ? ebitdaTtm / mktcap : 0,
+          }];
+        })
       );
     } catch { /* factor tables may not exist */ }
 
@@ -527,7 +539,10 @@ export async function POST(req: NextRequest) {
         const factors = factorMap.get(t);
         if (factors) {
           momData[t] = { mom1m: factors.mom1m, mom6m: factors.mom6m, mom11m: factors.mom11m };
-          valData[t] = { ep: factors.ep, bm: factors.bm, dy: factors.dy };
+          valData[t] = {
+            ep: factors.ep, bm: factors.bm, dy: factors.dy,
+            sp: factors.sp, ev_ebitda: factors.ev_ebitda, fcf_yield: factors.fcf_yield,
+          };
         }
       }
       const combineResponse = await fetch(`${mlServiceUrl4}/signals/combine`, {
