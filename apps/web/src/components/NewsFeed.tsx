@@ -63,6 +63,7 @@ type NewsFeedProps = {
   compact?: boolean;
   refreshInterval?: number;
   severityMin?: number;
+  initialData?: NewsEvent[] | null;
 };
 
 /* ─── Constants ────────────────────────────────────────────────── */
@@ -196,9 +197,10 @@ export default function NewsFeed({
   compact = false,
   refreshInterval = 60,
   severityMin = 1,
+  initialData = null,
 }: NewsFeedProps) {
-  const [events, setEvents] = useState<NewsEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [events, setEvents] = useState<NewsEvent[]>(initialData ? dedup(initialData) : []);
+  const [loading, setLoading] = useState(!initialData);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -222,13 +224,25 @@ export default function NewsFeed({
     }
   }, [ticker, limit, severityMin]);
 
+  // If initialData is provided, skip the first fetch (data already loaded)
+  // Only set up the refresh interval for subsequent updates
   useEffect(() => {
-    fetchNews();
+    if (!initialData) {
+      fetchNews();
+    }
     if (refreshInterval > 0) {
       timerRef.current = setInterval(fetchNews, refreshInterval * 1000);
       return () => { if (timerRef.current) clearInterval(timerRef.current); };
     }
-  }, [fetchNews, refreshInterval]);
+  }, [fetchNews, refreshInterval, initialData]);
+
+  // Update events if initialData changes (e.g., ticker switch)
+  useEffect(() => {
+    if (initialData) {
+      setEvents(dedup(initialData));
+      setLoading(false);
+    }
+  }, [initialData]);
 
   if (loading) {
     return <div style={{ padding: 8, fontFamily: "monospace", fontSize: 10, color: "var(--muted-foreground)" }}>Loading...</div>;

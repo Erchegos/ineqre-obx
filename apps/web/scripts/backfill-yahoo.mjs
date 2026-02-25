@@ -296,7 +296,9 @@ async function main() {
   let succeeded = 0;
 
   try {
-    await pool.connect();
+    // Verify DB connection (acquire and immediately release)
+    const client = await pool.connect();
+    client.release();
     console.log('Database connected\n');
 
     const entries = Object.entries(STOCKS);

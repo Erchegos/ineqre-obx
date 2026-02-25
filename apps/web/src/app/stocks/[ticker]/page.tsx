@@ -218,6 +218,7 @@ export default function StockTickerPage() {
   const [stockName, setStockName] = useState<string>("");
   const [stockSector, setStockSector] = useState<string>("");
   const [sectorPeers, setSectorPeers] = useState<Array<{ ticker: string; name: string }>>([]);
+  const [prefetchedNews, setPrefetchedNews] = useState<any[] | null>(null);
 
   // Filter and sort state for Daily Returns table
   const [returnFilter, setReturnFilter] = useState<"all" | "positive" | "negative" | "large_positive" | "large_negative" | "custom">("all");
@@ -369,8 +370,8 @@ export default function StockTickerPage() {
       setStockMetaLoading(true);
 
       try {
-        // Run ALL 3 API calls in PARALLEL for faster load
-        const [factorRes, stocksRes, fundRes] = await Promise.all([
+        // Run ALL 4 API calls in PARALLEL for faster load (including news prefetch)
+        const [factorRes, stocksRes, fundRes, newsRes] = await Promise.all([
           fetch(`/api/factors/tickers`, {
             method: "GET",
             headers: { accept: "application/json" },
@@ -380,6 +381,7 @@ export default function StockTickerPage() {
             headers: { accept: "application/json" },
           }),
           fetch(`/api/factors/${encodeURIComponent(ticker)}?type=fundamental&limit=1`),
+          fetch(`/api/news/ticker/${encodeURIComponent(ticker)}?limit=20`),
         ]);
 
         let factorExists = false;
@@ -402,6 +404,14 @@ export default function StockTickerPage() {
               mktcap: d.mktcap != null ? Number(d.mktcap) : null,
             });
           }
+        }
+
+        // Parse prefetched news
+        if (!cancelled && newsRes.ok) {
+          try {
+            const newsJson = await newsRes.json();
+            setPrefetchedNews(newsJson.events || []);
+          } catch { /* non-fatal */ }
         }
 
         if (!stocksRes.ok) {
@@ -1295,7 +1305,7 @@ export default function StockTickerPage() {
                 </Link>
               </div>
               <div style={{ maxHeight: 370, overflowY: "auto", padding: "0 6px", flex: 1 }}>
-                <NewsFeed ticker={ticker} limit={20} compact refreshInterval={120} />
+                <NewsFeed ticker={ticker} limit={20} compact refreshInterval={120} initialData={prefetchedNews} />
               </div>
             </div>
           </div>
