@@ -72,7 +72,7 @@ export async function GET(
           ft.vol1m, ft.vol3m, ft.vol12m, ft.maxret, ft.beta, ft.ivol,
           ft.dum_jan,
           -- Fundamental factors (forward-filled)
-          ff.bm, ff.nokvol, ff.ep, ff.dy, ff.sp, ff.sg, ff.mktcap,
+          ff.bm, ff.nokvol, ff.ep, ff.dy, ff.sp, ff.sg, ff.mktcap, ff.ev_ebitda,
           ff.is_forward_filled
         FROM factor_technical ft
         LEFT JOIN LATERAL (

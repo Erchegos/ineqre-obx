@@ -205,7 +205,7 @@ export default function StockTickerPage() {
 
   // Inline fundamentals (compact strip next to mode toggle)
   const [inlineFundamentals, setInlineFundamentals] = useState<{
-    ep: number | null; bm: number | null; dy: number | null; mktcap: number | null;
+    ep: number | null; bm: number | null; dy: number | null; ev_ebitda: number | null; sp: number | null; mktcap: number | null;
   } | null>(null);
 
   const [returnsStartDate, setReturnsStartDate] = useState<string>("");
@@ -396,6 +396,8 @@ export default function StockTickerPage() {
               ep: d.ep != null ? Number(d.ep) : null,
               bm: d.bm != null ? Number(d.bm) : null,
               dy: d.dy != null ? Number(d.dy) : null,
+              ev_ebitda: d.ev_ebitda != null ? Number(d.ev_ebitda) : null,
+              sp: d.sp != null ? Number(d.sp) : null,
               mktcap: d.mktcap != null ? Number(d.mktcap) : null,
             });
           }
@@ -1118,7 +1120,7 @@ export default function StockTickerPage() {
           </button>
         </div>
 
-        {/* Inline Fundamentals Strip */}
+        {/* Inline Fundamentals Strip — 5 multiples matching portfolio optimizer VAL */}
         {inlineFundamentals && (
           <div className="fundamentals-strip" style={{ fontFamily: "'Geist Mono', monospace" }}>
             {inlineFundamentals.ep !== null && (
@@ -1137,6 +1139,18 @@ export default function StockTickerPage() {
               <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
                 <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", marginRight: 3 }}>DY</span>
                 <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{(inlineFundamentals.dy * 100).toFixed(1)}%</span>
+              </span>
+            )}
+            {inlineFundamentals.ev_ebitda !== null && inlineFundamentals.ev_ebitda !== 0 && (
+              <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
+                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", marginRight: 3 }}>EV/EB</span>
+                <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{inlineFundamentals.ev_ebitda.toFixed(1)}x</span>
+              </span>
+            )}
+            {inlineFundamentals.sp !== null && inlineFundamentals.sp !== 0 && (
+              <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
+                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", marginRight: 3 }}>S/P</span>
+                <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{inlineFundamentals.sp.toFixed(2)}</span>
               </span>
             )}
             {inlineFundamentals.mktcap !== null && (
