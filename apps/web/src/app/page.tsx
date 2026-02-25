@@ -286,12 +286,13 @@ export default function HomePage() {
               />
               <FeatureCard
                 href="/news"
-                title="News Feed"
-                description="AI-classified news events from Dow Jones and IBKR providers. Severity scoring, sentiment analysis, ticker and sector mapping. Explains significant price moves with correlated news."
+                title="Intelligence Terminal"
+                description="Bloomberg-style command center. Real-time AI-classified news feed with sentiment, Finanstilsynet short positions with sparklines, commodity prices with stock sensitivity betas."
                 tags={[
-                  { label: "AI Classified", color: "var(--success)" },
-                  { label: "Sentiment", color: "var(--accent)" },
-                  { label: "Live", color: "var(--warning)" },
+                  { label: "News", color: "var(--accent)" },
+                  { label: "Shorts", color: "var(--error)" },
+                  { label: "Commodities", color: "var(--warning)" },
+                  { label: "Live", color: "var(--success)" },
                 ]}
                 visible={modulesReveal.visible}
                 delay={6}

@@ -74,6 +74,7 @@ InEqRe_OBX/
 | **Options List** | `/options` | `apps/web/src/app/options/page.tsx` |
 | **Options Analysis** | `/options/[ticker]` | `apps/web/src/app/options/[ticker]/page.tsx` |
 | **Portfolio Optimizer** | `/portfolio` | `apps/web/src/app/portfolio/page.tsx` |
+| **Intelligence Terminal** | `/news` | `apps/web/src/app/news/page.tsx` |
 
 ---
 
@@ -142,6 +143,15 @@ All endpoints in `apps/web/src/app/api/`
 | `GET /api/portfolio/configs/[id]` | Load specific portfolio configuration |
 | `PUT /api/portfolio/configs/[id]` | Update portfolio configuration |
 | `DELETE /api/portfolio/configs/[id]` | Delete portfolio configuration |
+
+### News & Intelligence APIs
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/news` | AI-classified news feed (severity, sentiment, ticker/sector mapping) |
+| `GET /api/shorts` | Latest short positions for all stocks (Finanstilsynet SSR) |
+| `GET /api/shorts/[ticker]` | Per-stock short position history with holder breakdown |
+| `GET /api/commodities` | All commodity prices with stock sensitivity data |
+| `GET /api/commodities/[symbol]` | Per-commodity detail with price history and stock betas |
 
 ### FX APIs
 | Endpoint | Purpose |
@@ -298,15 +308,26 @@ Schema files in `packages/db/src/schema/`
 |-------|---------|
 | `portfolio_configs` | Saved portfolio configurations (tickers, weights, mode, constraints) |
 
+### Intelligence / Alt Data
+| Table | Purpose |
+|-------|---------|
+| `short_positions` | Daily aggregate short interest per stock (Finanstilsynet SSR) |
+| `short_position_holders` | Individual short position holders per stock per day |
+| `commodity_prices` | Daily OHLCV for Brent, WTI, Gas, Aluminium, Gold, Silver |
+| `commodity_stock_sensitivity` | Regression beta, correlation of stocks vs commodities |
+| `newsweb_filings` | Oslo Børs NewsWeb regulatory filings (AI-classified) |
+| `insider_transactions` | Structured insider trade data extracted from filings |
+
 ---
 
 ## Data Pipeline
 
 ### Data Sources
 1. **IBKR Gateway** (port 4002) - Primary real-time data
-2. **Yahoo Finance** - Fallback for prices/fundamentals
+2. **Yahoo Finance** - Fallback for prices/fundamentals + commodity prices (BZ=F, CL=F, NG=F, ALI=F, GC=F, SI=F)
 3. **Norges Bank** - FX rates (NOK/USD, EUR, GBP)
 4. **Gmail IMAP** - Research emails from Pareto/DNB
+5. **Finanstilsynet SSR** - Short selling positions (`https://ssr.finanstilsynet.no/api/v2/instruments`)
 
 ### ML Pipeline (6 steps)
 Located in `apps/web/scripts/ml-daily-pipeline.ts`:
@@ -320,9 +341,17 @@ Located in `apps/web/scripts/ml-daily-pipeline.ts`:
 
 **Run**: `pnpm run ml:pipeline` (from apps/web)
 
+### Intelligence Data Pipeline (daily)
+Run after market close alongside ML pipeline:
+
+1. **Short positions**: `pnpm run shorts:fetch` — Finanstilsynet SSR API (no auth, free JSON)
+2. **Commodity prices**: `pnpm run commodities:fetch` — Yahoo Finance OHLCV + stock sensitivity regression
+3. **News**: `pnpm run news:fetch` — IBKR news headlines with AI classification
+
 ### Automation
 - **GitHub Actions**: ML pipeline daily at 01:00 UTC, Email import every 10 min
 - **Local**: `pnpm run daily-update` (smart IBKR → Yahoo fallback)
+- **Intelligence data**: Run `shorts:fetch` + `commodities:fetch` daily after prices are updated
 
 ---
 
@@ -344,6 +373,8 @@ Located in `apps/web/scripts/ml-daily-pipeline.ts`:
 | `scan-ose-universe.ts` | Discover new OSE tickers |
 | `import-new-tickers.ts` | Import tickers to database |
 | `fetch-options-daily.ts` | Fetch options chains from Yahoo Finance, store in DB |
+| `fetch-ssr-shorts.ts` | Fetch short positions from Finanstilsynet SSR API |
+| `fetch-commodities.ts` | Fetch commodity prices from Yahoo + calculate stock sensitivity |
 
 ### scripts/
 | Script | Purpose |
@@ -393,6 +424,8 @@ pnpm run ml:pipeline      # Full ML pipeline
 pnpm run daily-update     # Smart IBKR→Yahoo + ML
 pnpm run ibkr:scan-universe  # Scan for new tickers
 pnpm run import:new-tickers  # Import new tickers
+pnpm run shorts:fetch     # Fetch Finanstilsynet short positions
+pnpm run commodities:fetch  # Fetch commodity prices + sensitivity
 ```
 
 ---

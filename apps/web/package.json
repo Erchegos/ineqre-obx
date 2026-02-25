@@ -23,7 +23,9 @@
     "daily-update:ibkr": "bash scripts/daily-update.sh --ibkr",
     "ml:volatility": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/compute-volatility-models.ts",
     "news:test": "tsx scripts/test-ibkr-news.ts",
-    "news:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-news-ibkr.ts"
+    "news:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-news-ibkr.ts",
+    "shorts:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-ssr-shorts.ts",
+    "commodities:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-commodities.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

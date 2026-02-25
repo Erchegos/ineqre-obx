@@ -10,12 +10,12 @@
  *   ?limit=50               — max results (default 50, max 200)
  *   ?before=ISO_DATE        — pagination cursor
  *
- * Returns news events with daily stock return for the primary ticker.
+ * Returns news events with ticker/sector maps. Price returns computed in a
+ * separate batch query to avoid slow LATERAL JOINs.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { getPriceTable } from "@/lib/price-data-adapter";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     const before = sp.get("before");
 
     const conditions: string[] = ["e.severity >= $1"];
-    const params: any[] = [severityMin];
+    const params: (string | number)[] = [severityMin];
     let idx = 2;
 
     if (ticker) {
@@ -58,11 +58,11 @@ export async function GET(req: NextRequest) {
       idx++;
     }
 
-    conditions.push(`e.published_at > NOW() - INTERVAL '30 days'`);
+    conditions.push(`e.published_at > NOW() - INTERVAL '90 days'`);
 
     const where = conditions.join(" AND ");
-    const priceTable = await getPriceTable();
 
+    // Step 1: Fetch events with ticker/sector maps (fast — no price JOINs)
     const result = await pool.query(`
       SELECT
         e.id, e.published_at, e.source, e.headline, e.summary,
@@ -82,44 +82,84 @@ export async function GET(req: NextRequest) {
             'impact', sm.impact_score::float
           )) FROM news_sector_map sm WHERE sm.news_event_id = e.id),
           '[]'
-        ) AS sectors,
-        -- Primary ticker (highest relevance) for price lookup
-        primary_tm.ticker AS primary_ticker,
-        pd.close AS price_close,
-        CASE WHEN pd.prev_close > 0
-          THEN ((pd.close - pd.prev_close) / pd.prev_close * 100)::float
-          ELSE NULL
-        END AS day_return_pct
+        ) AS sectors
       FROM news_events e
-      LEFT JOIN LATERAL (
-        SELECT tm.ticker FROM news_ticker_map tm
-        WHERE tm.news_event_id = e.id
-        ORDER BY tm.relevance_score DESC NULLS LAST
-        LIMIT 1
-      ) primary_tm ON true
-      LEFT JOIN LATERAL (
-        SELECT
-          p1.close,
-          (SELECT p2.close FROM public.${priceTable} p2
-           WHERE upper(p2.ticker) = primary_tm.ticker AND p2.close IS NOT NULL
-             AND p2.date < p1.date ORDER BY p2.date DESC LIMIT 1
-          ) AS prev_close
-        FROM public.${priceTable} p1
-        WHERE primary_tm.ticker IS NOT NULL
-          AND upper(p1.ticker) = primary_tm.ticker
-          AND p1.close IS NOT NULL
-          AND p1.date <= (e.published_at::date + INTERVAL '1 day')
-          AND p1.date >= (e.published_at::date - INTERVAL '3 days')
-        ORDER BY p1.date DESC
-        LIMIT 1
-      ) pd ON true
       WHERE ${where}
       ORDER BY e.published_at DESC
       LIMIT $${idx}
     `, [...params, limit]);
 
-    return NextResponse.json({
-      events: result.rows.map(r => ({
+    // Step 2: Batch price lookup for primary tickers
+    // Collect unique (ticker, date) pairs
+    const priceLookups = new Map<string, string>(); // eventId -> ticker
+    const eventDates = new Map<string, string>(); // eventId -> date
+    for (const row of result.rows) {
+      const tickers = row.tickers as { ticker: string; relevance: number }[];
+      if (Array.isArray(tickers) && tickers.length > 0) {
+        priceLookups.set(String(row.id), tickers[0].ticker);
+        eventDates.set(String(row.id), new Date(row.published_at).toISOString().slice(0, 10));
+      }
+    }
+
+    // Build price return map: ticker|date -> dayReturnPct
+    const priceMap = new Map<string, { close: number; returnPct: number | null }>();
+    if (priceLookups.size > 0) {
+      const uniqueTickers = [...new Set(priceLookups.values())];
+      try {
+        const priceResult = await pool.query(`
+          WITH ranked AS (
+            SELECT ticker, date, close,
+              LAG(close) OVER (PARTITION BY upper(ticker) ORDER BY date) AS prev_close
+            FROM prices_daily
+            WHERE upper(ticker) = ANY($1::text[])
+              AND close IS NOT NULL
+              AND date > NOW() - INTERVAL '95 days'
+          )
+          SELECT upper(ticker) as ticker, date::text as date, close::float,
+            CASE WHEN prev_close > 0
+              THEN ((close - prev_close) / prev_close * 100)::float
+              ELSE NULL
+            END AS day_return_pct
+          FROM ranked
+          WHERE prev_close IS NOT NULL
+        `, [uniqueTickers.map(t => t.toUpperCase())]);
+
+        for (const pr of priceResult.rows) {
+          priceMap.set(`${pr.ticker}|${pr.date}`, {
+            close: pr.close,
+            returnPct: pr.day_return_pct,
+          });
+        }
+      } catch {
+        // Price lookup is non-critical
+      }
+    }
+
+    // Step 3: Merge and respond
+    const events = result.rows.map(r => {
+      const eventId = String(r.id);
+      const primaryTicker = priceLookups.get(eventId) || null;
+      const eventDate = eventDates.get(eventId);
+      let dayReturnPct: number | null = null;
+      let priceClose: number | null = null;
+
+      if (primaryTicker && eventDate) {
+        // Try exact date, then -1d, -2d, -3d
+        const key = primaryTicker.toUpperCase();
+        for (let offset = 0; offset <= 3; offset++) {
+          const d = new Date(eventDate);
+          d.setDate(d.getDate() - offset);
+          const dStr = d.toISOString().slice(0, 10);
+          const hit = priceMap.get(`${key}|${dStr}`);
+          if (hit) {
+            priceClose = hit.close;
+            dayReturnPct = hit.returnPct;
+            break;
+          }
+        }
+      }
+
+      return {
         id: Number(r.id),
         publishedAt: r.published_at,
         source: r.source,
@@ -131,15 +171,16 @@ export async function GET(req: NextRequest) {
         confidence: r.confidence,
         providerCode: r.provider_code,
         url: r.url,
-        structuredFacts: r.structured_facts,
+        structuredFacts: r.structured_facts || null,
         tickers: r.tickers,
         sectors: r.sectors,
-        primaryTicker: r.primary_ticker || null,
-        dayReturnPct: r.day_return_pct != null ? Number(r.day_return_pct) : null,
-        priceClose: r.price_close != null ? Number(r.price_close) : null,
-      })),
-      count: result.rowCount,
+        primaryTicker,
+        dayReturnPct: dayReturnPct != null ? Number(dayReturnPct) : null,
+        priceClose: priceClose != null ? Number(priceClose) : null,
+      };
     });
+
+    return NextResponse.json({ events, count: events.length });
   } catch (err) {
     console.error("[NEWS API]", err);
     return NextResponse.json({ error: "Failed to fetch news" }, { status: 500 });

@@ -38,1343 +38,859 @@ type NewsEvent = {
   priceClose: number | null;
 };
 
+type ShortPosition = {
+  ticker: string;
+  isin: string;
+  date: string;
+  shortPct: number;
+  totalShortShares: number | null;
+  activePositions: number;
+  prevShortPct: number | null;
+  changePct: number | null;
+  stockName: string | null;
+  sector: string | null;
+  history: { date: string; short_pct: number }[];
+  holders: { holder: string; pct: number; shares: number | null }[];
+};
+
+type CommodityData = {
+  symbol: string;
+  name: string;
+  currency: string;
+  latest: {
+    date: string;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number | null;
+  };
+  dayReturnPct: number | null;
+  history: { date: string; close: number }[];
+  sensitivities: {
+    ticker: string;
+    stockName: string | null;
+    sector: string | null;
+    beta: number;
+    correlation60d: number | null;
+    correlation252d: number | null;
+    rSquared: number | null;
+  }[];
+};
+
 /* ─── Constants ────────────────────────────────────────────────── */
 
-const SEVERITY_COLORS: Record<number, string> = {
-  1: "#6b7280",
-  2: "#3b82f6",
-  3: "#f59e0b",
-  4: "#f97316",
-  5: "#ef4444",
+const SEV_C: Record<number, string> = {
+  1: "#555", 2: "#3b82f6", 3: "#f59e0b", 4: "#f97316", 5: "#ef4444",
 };
 
-const SEVERITY_LABELS: Record<number, string> = {
-  1: "LOW",
-  2: "MODERATE",
-  3: "ELEVATED",
-  4: "HIGH",
-  5: "CRITICAL",
-};
-
-const EVENT_TYPE_COLORS: Record<string, string> = {
-  earnings: "#22c55e",
-  guidance: "#3b82f6",
-  analyst_action: "#a855f7",
-  corporate_action: "#f59e0b",
-  insider_trade: "#ec4899",
-  regulatory: "#06b6d4",
-  macro: "#6366f1",
-  geopolitical: "#ef4444",
-  sector_news: "#14b8a6",
-  other: "#6b7280",
-};
-
-const DIRECTION_SYMBOLS: Record<string, { icon: string; color: string }> = {
-  positive: { icon: "▲", color: "#22c55e" },
-  negative: { icon: "▼", color: "#ef4444" },
-  neutral: { icon: "─", color: "#6b7280" },
+const TYPE_C: Record<string, string> = {
+  earnings: "#22c55e", guidance: "#3b82f6", analyst_action: "#a855f7",
+  corporate_action: "#f59e0b", insider_trade: "#ec4899", regulatory: "#06b6d4",
+  macro: "#6366f1", geopolitical: "#ef4444", sector_news: "#14b8a6", other: "#555",
 };
 
 const EVENT_TYPES = [
-  "earnings",
-  "guidance",
-  "analyst_action",
-  "corporate_action",
-  "insider_trade",
-  "regulatory",
-  "macro",
-  "geopolitical",
-  "sector_news",
-  "other",
+  "earnings", "guidance", "analyst_action", "corporate_action",
+  "insider_trade", "regulatory", "macro", "geopolitical", "sector_news", "other",
 ];
+
+const DIR_SYM: Record<string, { icon: string; color: string }> = {
+  positive: { icon: "\u25B2", color: "#22c55e" },
+  negative: { icon: "\u25BC", color: "#ef4444" },
+  neutral: { icon: "\u2500", color: "#555" },
+};
 
 /* ─── Helpers ──────────────────────────────────────────────────── */
 
-function timeAgo(dateStr: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diffMs = now - then;
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "NOW";
-  if (mins < 60) return `${mins}m`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d`;
+function timeAgo(d: string): string {
+  const ms = Date.now() - new Date(d).getTime();
+  const m = Math.floor(ms / 60000);
+  if (m < 1) return "NOW";
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  return `${Math.floor(h / 24)}d`;
 }
 
-function formatTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function fmtPct(v: number | null | undefined, d = 2): string {
+  if (v == null) return "\u2014";
+  return `${v >= 0 ? "+" : ""}${v.toFixed(d)}%`;
+}
+
+function fmtNum(v: number | null, compact = false): string {
+  if (v == null) return "\u2014";
+  if (compact && Math.abs(v) >= 1e6) return `${(v / 1e6).toFixed(1)}M`;
+  if (compact && Math.abs(v) >= 1e3) return `${(v / 1e3).toFixed(1)}K`;
+  return v.toLocaleString();
+}
+
+function fmtPrice(v: number | null): string {
+  if (v == null) return "\u2014";
+  return v >= 100 ? v.toFixed(0) : v >= 1 ? v.toFixed(2) : v.toFixed(4);
+}
+
+function sparklineSvg(data: number[], w = 60, h = 16, color = "#3b82f6"): string {
+  if (data.length < 2) return "";
+  const mn = Math.min(...data), mx = Math.max(...data);
+  const range = mx - mn || 1;
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - ((v - mn) / range) * (h - 2) - 1;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
 
 /* ─── Page Component ───────────────────────────────────────────── */
 
-export default function NewsPage() {
+export default function IntelligencePage() {
   const [events, setEvents] = useState<NewsEvent[]>([]);
+  const [shorts, setShorts] = useState<ShortPosition[]>([]);
+  const [commodities, setCommodities] = useState<CommodityData[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   // Filters
   const [tickerFilter, setTickerFilter] = useState("");
-  const [sectorFilter, setSectorFilter] = useState("");
   const [severityMin, setSeverityMin] = useState(1);
   const [eventTypeFilter, setEventTypeFilter] = useState("");
-  const [sortBy, setSortBy] = useState<"time" | "severity" | "sentiment">(
-    "time"
-  );
-
-  // Sector summary
-  const [sectorSummary, setSectorSummary] = useState<
-    { sector: string; count: number; avgSeverity: number; avgSentiment: number }[]
-  >([]);
+  const [sortBy, setSortBy] = useState<"time" | "severity" | "sentiment">("time");
+  const [hideOther, setHideOther] = useState(true);
 
   // Auto-refresh
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
-  const fetchNews = useCallback(async () => {
+
+  const fetchAll = useCallback(async () => {
     try {
       const params = new URLSearchParams();
       if (tickerFilter) params.set("ticker", tickerFilter);
-      if (sectorFilter) params.set("sector", sectorFilter);
       if (severityMin > 1) params.set("severity_min", String(severityMin));
       if (eventTypeFilter) params.set("event_type", eventTypeFilter);
       params.set("limit", "200");
 
-      const res = await fetch(`/api/news?${params}`, { cache: "no-store" });
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data = await res.json();
-      // Deduplicate by normalized headline
-      const seen = new Map<string, NewsEvent>();
-      for (const ev of (data.events || []) as NewsEvent[]) {
-        const key = ev.headline.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-        const existing = seen.get(key);
-        if (!existing || ev.severity > existing.severity) seen.set(key, ev);
+      const [newsRes, shortsRes, commoditiesRes] = await Promise.all([
+        fetch(`/api/news?${params}`, { cache: "no-store" }),
+        fetch("/api/shorts", { cache: "no-store" }),
+        fetch("/api/commodities?days=90", { cache: "no-store" }),
+      ]);
+
+      if (newsRes.ok) {
+        const data = await newsRes.json();
+        // Deduplicate by normalized headline
+        const seen = new Map<string, NewsEvent>();
+        for (const ev of (data.events || []) as NewsEvent[]) {
+          const key = ev.headline.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+          const existing = seen.get(key);
+          if (!existing || ev.severity > existing.severity) seen.set(key, ev);
+        }
+        setEvents(
+          Array.from(seen.values()).sort(
+            (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+          )
+        );
       }
-      setEvents(
-        Array.from(seen.values()).sort(
-          (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
-        )
-      );
+
+      if (shortsRes.ok) {
+        const data = await shortsRes.json();
+        setShorts(data.positions || []);
+      }
+
+      if (commoditiesRes.ok) {
+        const data = await commoditiesRes.json();
+        setCommodities(data.commodities || []);
+      }
+
       setLastRefresh(new Date());
     } catch (err) {
-      console.error("[NewsPage]", err);
+      console.error("[IntelligencePage]", err);
     } finally {
       setLoading(false);
     }
-  }, [tickerFilter, sectorFilter, severityMin, eventTypeFilter]);
+  }, [tickerFilter, severityMin, eventTypeFilter]);
 
   useEffect(() => {
     setLoading(true);
-    fetchNews();
-  }, [fetchNews]);
+    fetchAll();
+  }, [fetchAll]);
 
-  // Auto-refresh every 60s
   useEffect(() => {
-    timerRef.current = setInterval(fetchNews, 60000);
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [fetchNews]);
+    timerRef.current = setInterval(fetchAll, 60000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [fetchAll]);
 
-  // Build sector summary from current events
-  useEffect(() => {
-    const sectorMap = new Map<
-      string,
-      { count: number; totalSev: number; totalSent: number; sentCount: number }
-    >();
-    for (const ev of events) {
-      if (!ev.sectors) continue;
-      for (const s of ev.sectors) {
-        const existing = sectorMap.get(s.sector) || {
-          count: 0,
-          totalSev: 0,
-          totalSent: 0,
-          sentCount: 0,
-        };
-        existing.count++;
-        existing.totalSev += ev.severity;
-        if (ev.sentiment !== null) {
-          existing.totalSent += ev.sentiment;
-          existing.sentCount++;
-        }
-        sectorMap.set(s.sector, existing);
-      }
-    }
-    const summary = Array.from(sectorMap.entries())
-      .map(([sector, d]) => ({
-        sector,
-        count: d.count,
-        avgSeverity: d.totalSev / d.count,
-        avgSentiment: d.sentCount > 0 ? d.totalSent / d.sentCount : 0,
-      }))
-      .sort((a, b) => b.count - a.count);
-    setSectorSummary(summary);
-  }, [events]);
-
-  // Sort events
-  const sortedEvents = [...events].sort((a, b) => {
+  // Filter + sort events
+  const filteredEvents = hideOther && !eventTypeFilter
+    ? events.filter(e => e.eventType !== "other")
+    : events;
+  const sortedEvents = [...filteredEvents].sort((a, b) => {
     if (sortBy === "severity") return b.severity - a.severity;
-    if (sortBy === "sentiment") {
-      const aSent = a.sentiment ?? 0;
-      const bSent = b.sentiment ?? 0;
-      return Math.abs(bSent) - Math.abs(aSent);
-    }
-    return (
-      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
-    );
+    if (sortBy === "sentiment") return Math.abs(b.sentiment ?? 0) - Math.abs(a.sentiment ?? 0);
+    return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
   });
 
+  // Stats (based on visible events)
+  const sev4Count = filteredEvents.filter(e => e.severity === 4).length;
+  const sev5Count = filteredEvents.filter(e => e.severity === 5).length;
+  const sev3Count = filteredEvents.filter(e => e.severity === 3).length;
+  const topShorted = shorts.length > 0 ? shorts[0] : null;
+  const shortMovers = shorts.filter(s => s.changePct != null && Math.abs(s.changePct) > 0.2);
+
   // Severity distribution
-  const severityDist = [1, 2, 3, 4, 5].map((s) => ({
-    level: s,
-    count: events.filter((e) => e.severity === s).length,
+  const sevDist = [1, 2, 3, 4, 5].map(s => ({
+    level: s, count: filteredEvents.filter(e => e.severity === s).length,
   }));
+
+  /* ─── Inline styles ──────────────────────────────────────────── */
+
+  const S = {
+    page: {
+      minHeight: "100vh",
+      background: "#0a0a0a",
+      color: "#e5e5e5",
+      fontFamily: "'Geist Mono', 'SF Mono', 'Consolas', monospace",
+      fontSize: 12,
+    } as React.CSSProperties,
+    container: {
+      maxWidth: 1600,
+      margin: "0 auto",
+      padding: "0 12px",
+    } as React.CSSProperties,
+    header: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: "8px 0",
+      borderBottom: "1px solid #222",
+    } as React.CSSProperties,
+    headerLeft: {
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+    } as React.CSSProperties,
+    title: {
+      fontSize: 13,
+      fontWeight: 700,
+      letterSpacing: "0.08em",
+      color: "#f97316",
+    } as React.CSSProperties,
+    badge: (bg: string) => ({
+      fontSize: 9,
+      fontWeight: 700,
+      padding: "1px 5px",
+      borderRadius: 2,
+      background: bg,
+      color: "#fff",
+      letterSpacing: "0.04em",
+    }) as React.CSSProperties,
+    statCell: {
+      display: "flex",
+      flexDirection: "column" as const,
+      alignItems: "flex-end",
+      fontSize: 10,
+      lineHeight: 1.3,
+    } as React.CSSProperties,
+    // Three-column grid
+    grid: {
+      display: "grid",
+      gridTemplateColumns: "1fr 320px",
+      gap: 0,
+      marginTop: 1,
+    } as React.CSSProperties,
+    filterBar: {
+      display: "flex",
+      flexWrap: "wrap" as const,
+      gap: 6,
+      padding: "6px 8px",
+      background: "#111",
+      borderBottom: "1px solid #222",
+      alignItems: "center",
+    } as React.CSSProperties,
+    filterInput: {
+      width: 72,
+      padding: "3px 6px",
+      background: "#1a1a1a",
+      border: "1px solid #333",
+      borderRadius: 2,
+      color: "#e5e5e5",
+      fontFamily: "inherit",
+      fontSize: 10,
+      outline: "none",
+    } as React.CSSProperties,
+    filterBtn: (active: boolean) => ({
+      padding: "2px 7px",
+      borderRadius: 2,
+      border: `1px solid ${active ? "#f97316" : "#333"}`,
+      background: active ? "#f97316" : "transparent",
+      color: active ? "#000" : "#888",
+      fontFamily: "inherit",
+      fontSize: 9,
+      fontWeight: 700,
+      cursor: "pointer",
+      letterSpacing: "0.04em",
+      transition: "all 0.1s",
+    }) as React.CSSProperties,
+    tableHeader: {
+      display: "grid",
+      gridTemplateColumns: "44px 3px 1fr 72px 54px 54px",
+      padding: "4px 8px",
+      fontSize: 9,
+      fontWeight: 700,
+      color: "#666",
+      textTransform: "uppercase" as const,
+      letterSpacing: "0.06em",
+      background: "#111",
+      borderBottom: "1px solid #222",
+    } as React.CSSProperties,
+    row: {
+      display: "grid",
+      gridTemplateColumns: "44px 3px 1fr 72px 54px 54px",
+      padding: "5px 8px",
+      cursor: "pointer",
+      borderBottom: "1px solid #1a1a1a",
+      alignItems: "start",
+      transition: "background 0.08s",
+    } as React.CSSProperties,
+    rightPanel: {
+      borderLeft: "1px solid #222",
+      background: "#0d0d0d",
+      overflow: "auto" as const,
+      maxHeight: "calc(100vh - 90px)",
+    } as React.CSSProperties,
+    sectionTitle: {
+      fontSize: 9,
+      fontWeight: 700,
+      color: "#666",
+      letterSpacing: "0.08em",
+      textTransform: "uppercase" as const,
+      padding: "8px 10px 4px",
+      borderBottom: "1px solid #1a1a1a",
+    } as React.CSSProperties,
+  };
+
+  /* ─── Render ─────────────────────────────────────────────────── */
 
   return (
     <>
       <style>{`
-        .news-row { transition: background 0.12s; }
-        .news-row:hover { background: rgba(255,255,255,0.025) !important; }
-        .filter-btn {
-          padding: 3px 8px;
-          border-radius: 3px;
-          border: 1px solid var(--border);
-          background: transparent;
-          color: var(--muted-foreground);
-          font-family: monospace;
-          font-size: 10px;
-          cursor: pointer;
-          transition: all 0.15s;
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
-          font-weight: 600;
-        }
-        .filter-btn:hover { border-color: var(--accent); color: var(--accent); }
-        .filter-btn.active {
-          background: var(--accent);
-          color: #fff;
-          border-color: var(--accent);
-        }
-        .sector-row { transition: background 0.12s; cursor: pointer; }
-        .sector-row:hover { background: rgba(255,255,255,0.03) !important; }
-        .news-page-grid { display: grid; grid-template-columns: 1fr 280px; gap: 20px; }
-        @media (max-width: 900px) {
-          .news-page-grid { grid-template-columns: 1fr; }
+        .intel-row:hover { background: #151515 !important; }
+        .short-row:hover { background: #151515 !important; }
+        @media (max-width: 1000px) {
+          .intel-grid { grid-template-columns: 1fr !important; }
+          .intel-right { display: none !important; }
         }
       `}</style>
 
-      <main
-        style={{
-          minHeight: "100vh",
-          background: "var(--background)",
-          color: "var(--foreground)",
-          fontFamily: "'Geist Mono', monospace",
-        }}
-      >
-        <div style={{ maxWidth: 1400, margin: "0 auto", padding: "20px 24px" }}>
-          {/* Header */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 16,
-              borderBottom: "1px solid var(--border)",
-              paddingBottom: 12,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <Link
-                href="/"
-                style={{
-                  fontSize: 11,
-                  color: "var(--muted-foreground)",
-                  textDecoration: "none",
-                }}
-              >
-                ← Home
+      <main style={S.page}>
+        <div style={S.container}>
+          {/* ─── Top Bar ──────────────────────────────────────── */}
+          <div style={S.header}>
+            <div style={S.headerLeft}>
+              <Link href="/" style={{ fontSize: 10, color: "#666", textDecoration: "none" }}>
+                HOME
               </Link>
-              <h1
-                style={{
-                  fontSize: 16,
-                  fontWeight: 700,
-                  letterSpacing: "-0.02em",
-                }}
-              >
-                NEWS FEED
-              </h1>
-              <span
-                style={{
-                  fontSize: 10,
-                  color: "var(--muted-foreground)",
-                  padding: "2px 6px",
-                  background: "rgba(255,255,255,0.04)",
-                  borderRadius: 3,
-                }}
-              >
-                {events.length} events
+              <span style={{ color: "#333" }}>/</span>
+              <span style={S.title}>INTELLIGENCE TERMINAL</span>
+              <span style={{ ...S.badge("#1a1a1a"), color: "#888", border: "1px solid #333" }}>
+                {filteredEvents.length} EVENTS
               </span>
+              {sev5Count > 0 && (
+                <span style={S.badge("#ef4444")}>
+                  {sev5Count} CRITICAL
+                </span>
+              )}
+              {sev4Count > 0 && (
+                <span style={S.badge("#f97316")}>
+                  {sev4Count} HIGH
+                </span>
+              )}
+              {sev3Count > 0 && (
+                <span style={{ ...S.badge("#1a1a1a"), color: "#f59e0b", border: "1px solid #f59e0b44" }}>
+                  {sev3Count} ELEVATED
+                </span>
+              )}
             </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                fontSize: 10,
-                color: "var(--muted-foreground)",
-              }}
-            >
-              <span
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                }}
-              >
-                <span
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: "50%",
-                    background: "#22c55e",
-                    animation: "pulse 2s infinite",
-                  }}
-                />
-                LIVE
-              </span>
-              <span>
-                Updated{" "}
-                {lastRefresh.toLocaleTimeString("en-GB", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              {/* Commodity ticker strip */}
+              <div style={{ display: "flex", gap: 12, fontSize: 10 }}>
+                {commodities.slice(0, 4).map(c => (
+                  <span key={c.symbol} style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                    <span style={{ color: "#888" }}>{c.name.split(" ")[0].toUpperCase()}</span>
+                    <span style={{ color: "#e5e5e5", fontWeight: 600 }}>
+                      {c.currency === "USD" ? "$" : ""}{fmtPrice(c.latest.close)}
+                    </span>
+                    <span style={{
+                      color: (c.dayReturnPct ?? 0) >= 0 ? "#22c55e" : "#ef4444",
+                      fontWeight: 600,
+                    }}>
+                      {fmtPct(c.dayReturnPct, 1)}
+                    </span>
+                  </span>
+                ))}
+              </div>
+              <span style={{ width: 1, height: 12, background: "#333" }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: "#666" }}>
+                <span style={{
+                  width: 5, height: 5, borderRadius: "50%", background: "#22c55e",
+                  boxShadow: "0 0 4px #22c55e",
+                }} />
+                <span>
+                  {lastRefresh.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              </div>
             </div>
           </div>
 
-          <div className="news-page-grid">
-            {/* Left: Main feed */}
+          {/* ─── Main Grid ────────────────────────────────────── */}
+          <div className="intel-grid" style={S.grid}>
+            {/* ─── Left: News Feed ────────────────────────────── */}
             <div>
               {/* Filter bar */}
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 8,
-                  marginBottom: 12,
-                  padding: "10px 12px",
-                  background: "rgba(255,255,255,0.02)",
-                  borderRadius: 4,
-                  border: "1px solid var(--border)",
-                  alignItems: "center",
-                }}
-              >
-                {/* Ticker search */}
+              <div style={S.filterBar}>
                 <input
                   type="text"
                   placeholder="TICKER"
                   value={tickerFilter}
-                  onChange={(e) =>
-                    setTickerFilter(e.target.value.toUpperCase())
-                  }
-                  style={{
-                    width: 80,
-                    padding: "4px 8px",
-                    background: "rgba(255,255,255,0.04)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 3,
-                    color: "var(--foreground)",
-                    fontFamily: "monospace",
-                    fontSize: 11,
-                    outline: "none",
-                  }}
+                  onChange={e => setTickerFilter(e.target.value.toUpperCase())}
+                  style={S.filterInput}
                 />
+                <span style={{ width: 1, height: 14, background: "#333" }} />
 
-                {/* Severity filter */}
-                <div style={{ display: "flex", gap: 2 }}>
-                  {[1, 2, 3, 4, 5].map((s) => (
+                {/* Severity */}
+                <div style={{ display: "flex", gap: 1 }}>
+                  {[1, 2, 3, 4, 5].map(s => (
                     <button
                       key={s}
-                      className={`filter-btn ${severityMin <= s ? "active" : ""}`}
                       style={{
-                        background:
-                          severityMin <= s
-                            ? SEVERITY_COLORS[s]
-                            : "transparent",
-                        borderColor:
-                          severityMin <= s
-                            ? SEVERITY_COLORS[s]
-                            : "var(--border)",
-                        color: severityMin <= s ? "#fff" : "var(--muted-foreground)",
-                        minWidth: 22,
-                        textAlign: "center",
+                        ...S.filterBtn(severityMin <= s),
+                        background: severityMin <= s ? SEV_C[s] : "transparent",
+                        borderColor: severityMin <= s ? SEV_C[s] : "#333",
+                        color: severityMin <= s ? "#fff" : "#666",
+                        minWidth: 18,
+                        padding: "2px 4px",
                       }}
                       onClick={() => setSeverityMin(s)}
-                      title={`Min severity: ${s}`}
                     >
                       {s}
                     </button>
                   ))}
                 </div>
-
-                {/* Divider */}
-                <span
-                  style={{
-                    width: 1,
-                    height: 16,
-                    background: "var(--border)",
-                  }}
-                />
+                <span style={{ width: 1, height: 14, background: "#333" }} />
 
                 {/* Sort */}
-                <div style={{ display: "flex", gap: 2 }}>
-                  {(
-                    [
-                      ["time", "TIME"],
-                      ["severity", "SEV"],
-                      ["sentiment", "SENT"],
-                    ] as const
-                  ).map(([key, label]) => (
-                    <button
-                      key={key}
-                      className={`filter-btn ${sortBy === key ? "active" : ""}`}
-                      onClick={() => setSortBy(key)}
-                    >
-                      {label}
+                <div style={{ display: "flex", gap: 1 }}>
+                  {([["time", "TIME"], ["severity", "SEV"], ["sentiment", "SENT"]] as const).map(([k, l]) => (
+                    <button key={k} style={S.filterBtn(sortBy === k)} onClick={() => setSortBy(k)}>
+                      {l}
                     </button>
                   ))}
                 </div>
+                <span style={{ width: 1, height: 14, background: "#333" }} />
 
-                {/* Divider */}
-                <span
-                  style={{
-                    width: 1,
-                    height: 16,
-                    background: "var(--border)",
-                  }}
-                />
-
-                {/* Event type filter */}
+                {/* Event type */}
                 <select
                   value={eventTypeFilter}
-                  onChange={(e) => setEventTypeFilter(e.target.value)}
+                  onChange={e => {
+                    setEventTypeFilter(e.target.value);
+                    if (e.target.value === "other") setHideOther(false);
+                  }}
                   style={{
-                    padding: "4px 6px",
-                    background: "rgba(255,255,255,0.04)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 3,
-                    color: "var(--foreground)",
-                    fontFamily: "monospace",
-                    fontSize: 10,
-                    outline: "none",
+                    ...S.filterInput,
+                    width: "auto",
                     cursor: "pointer",
                   }}
                 >
                   <option value="">ALL TYPES</option>
-                  {EVENT_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {t.replace(/_/g, " ").toUpperCase()}
-                    </option>
+                  {EVENT_TYPES.map(t => (
+                    <option key={t} value={t}>{t.replace(/_/g, " ").toUpperCase()}</option>
                   ))}
                 </select>
 
-                {/* Sector filter */}
-                {sectorSummary.length > 0 && (
-                  <select
-                    value={sectorFilter}
-                    onChange={(e) => setSectorFilter(e.target.value)}
-                    style={{
-                      padding: "4px 6px",
-                      background: "rgba(255,255,255,0.04)",
-                      border: "1px solid var(--border)",
-                      borderRadius: 3,
-                      color: "var(--foreground)",
-                      fontFamily: "monospace",
-                      fontSize: 10,
-                      outline: "none",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <option value="">ALL SECTORS</option>
-                    {sectorSummary.map((s) => (
-                      <option key={s.sector} value={s.sector}>
-                        {s.sector.toUpperCase()} ({s.count})
-                      </option>
-                    ))}
-                  </select>
-                )}
+                {/* Hide/show "other" toggle */}
+                <button
+                  style={{
+                    ...S.filterBtn(!hideOther),
+                    ...(hideOther ? { color: "#555", borderColor: "#333" } : {}),
+                  }}
+                  onClick={() => setHideOther(h => !h)}
+                  title={hideOther ? "Click to include 'other' events" : "Click to hide 'other' events"}
+                >
+                  {hideOther ? "+OTHER" : "-OTHER"}
+                </button>
 
-                {/* Clear */}
-                {(tickerFilter ||
-                  sectorFilter ||
-                  severityMin > 1 ||
-                  eventTypeFilter) && (
+                {(tickerFilter || severityMin > 1 || eventTypeFilter || !hideOther) && (
                   <button
-                    className="filter-btn"
-                    onClick={() => {
-                      setTickerFilter("");
-                      setSectorFilter("");
-                      setSeverityMin(1);
-                      setEventTypeFilter("");
-                    }}
-                    style={{ color: "#ef4444", borderColor: "#ef4444" }}
+                    style={{ ...S.filterBtn(false), color: "#ef4444", borderColor: "#ef4444" }}
+                    onClick={() => { setTickerFilter(""); setSeverityMin(1); setEventTypeFilter(""); setHideOther(true); }}
                   >
                     CLEAR
                   </button>
                 )}
               </div>
 
-              {/* Severity distribution bar */}
-              <div
-                style={{
-                  display: "flex",
-                  height: 4,
-                  borderRadius: 2,
-                  overflow: "hidden",
-                  marginBottom: 12,
-                  background: "rgba(255,255,255,0.04)",
-                }}
-              >
-                {severityDist.map((d) => (
+              {/* Severity bar */}
+              <div style={{ display: "flex", height: 2, background: "#111" }}>
+                {sevDist.map(d => (
                   <div
                     key={d.level}
                     style={{
                       width: `${events.length > 0 ? (d.count / events.length) * 100 : 0}%`,
-                      background: SEVERITY_COLORS[d.level],
-                      transition: "width 0.3s",
+                      background: SEV_C[d.level],
                     }}
-                    title={`Severity ${d.level}: ${d.count} events`}
                   />
                 ))}
               </div>
 
-              {/* Event list */}
-              {loading ? (
-                <div
-                  style={{
-                    padding: 40,
-                    textAlign: "center",
-                    color: "var(--muted-foreground)",
-                    fontSize: 12,
-                  }}
-                >
-                  Loading news feed...
-                </div>
-              ) : sortedEvents.length === 0 ? (
-                <div
-                  style={{
-                    padding: 40,
-                    textAlign: "center",
-                    color: "var(--muted-foreground)",
-                    fontSize: 12,
-                  }}
-                >
-                  No events match your filters.
-                </div>
-              ) : (
-                <div
-                  style={{
-                    border: "1px solid var(--border)",
-                    borderRadius: 4,
-                    overflow: "hidden",
-                  }}
-                >
-                  {/* Table header */}
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "52px 3px 1fr 80px 60px 60px",
-                      padding: "6px 10px",
-                      fontSize: 9,
-                      fontWeight: 700,
-                      color: "var(--muted-foreground)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                      background: "rgba(255,255,255,0.03)",
-                      borderBottom: "1px solid var(--border)",
-                    }}
-                  >
-                    <span>TIME</span>
-                    <span />
-                    <span>HEADLINE</span>
-                    <span style={{ textAlign: "center" }}>TYPE</span>
-                    <span style={{ textAlign: "right" }}>SENT</span>
-                    <span style={{ textAlign: "right" }}>RETURN</span>
-                  </div>
+              {/* News table */}
+              <div style={S.tableHeader}>
+                <span>TIME</span>
+                <span />
+                <span>HEADLINE</span>
+                <span style={{ textAlign: "center" }}>TYPE</span>
+                <span style={{ textAlign: "right" }}>SENT</span>
+                <span style={{ textAlign: "right" }}>RTN</span>
+              </div>
 
-                  {sortedEvents.map((ev) => {
-                    const isExpanded = expandedId === ev.id;
-                    const sevColor = SEVERITY_COLORS[ev.severity] || "#6b7280";
-                    const typeColor =
-                      EVENT_TYPE_COLORS[ev.eventType] ||
-                      EVENT_TYPE_COLORS.other;
+              <div style={{ maxHeight: "calc(100vh - 140px)", overflow: "auto" }}>
+                {loading ? (
+                  <div style={{ padding: 40, textAlign: "center", color: "#666", fontSize: 11 }}>
+                    Loading...
+                  </div>
+                ) : sortedEvents.length === 0 ? (
+                  <div style={{ padding: 40, textAlign: "center", color: "#666", fontSize: 11 }}>
+                    No events match filters
+                  </div>
+                ) : (
+                  sortedEvents.map(ev => {
+                    const isExp = expandedId === ev.id;
+                    const sevColor = SEV_C[ev.severity] || "#555";
+                    const typeColor = TYPE_C[ev.eventType] || TYPE_C.other;
+
+                    // Determine if this event has expandable content
+                    const hasSummary = !!(ev.summary && ev.summary !== ev.headline);
+                    const hasFacts = !!(ev.structuredFacts && Object.values(ev.structuredFacts).some(v => v !== null));
+                    const hasUrl = !!ev.url;
+                    const hasExpandable = hasSummary || hasFacts || hasUrl;
 
                     return (
                       <div key={ev.id}>
                         <div
-                          className="news-row"
-                          onClick={() =>
-                            setExpandedId(isExpanded ? null : ev.id)
-                          }
+                          className="intel-row"
+                          onClick={() => hasExpandable ? setExpandedId(isExp ? null : ev.id) : undefined}
                           style={{
-                            display: "grid",
-                            gridTemplateColumns: "52px 3px 1fr 80px 60px 60px",
-                            padding: "8px 10px",
-                            cursor: "pointer",
-                            borderBottom: "1px solid rgba(255,255,255,0.04)",
-                            alignItems: "start",
+                            ...S.row,
+                            cursor: hasExpandable ? "pointer" : "default",
                           }}
                         >
-                          {/* Time */}
-                          <span
-                            style={{
-                              fontSize: 10,
-                              color: "var(--muted-foreground)",
-                              paddingTop: 2,
-                            }}
-                          >
+                          <span style={{ fontSize: 10, color: "#666", paddingTop: 1 }}>
                             {timeAgo(ev.publishedAt)}
                           </span>
-
-                          {/* Severity bar */}
-                          <div
-                            style={{
-                              width: 3,
-                              minHeight: 18,
-                              background: sevColor,
-                              borderRadius: 1,
-                              marginTop: 2,
-                            }}
-                          />
-
-                          {/* Headline + meta */}
-                          <div style={{ paddingLeft: 8 }}>
-                            <div
-                              style={{
-                                color: "var(--foreground)",
-                                fontWeight: 500,
-                                lineHeight: 1.4,
-                                fontSize: 12,
-                              }}
-                            >
+                          <div style={{
+                            width: 3, minHeight: 16, background: sevColor, borderRadius: 1, marginTop: 1,
+                          }} />
+                          <div style={{ paddingLeft: 6 }}>
+                            <div style={{
+                              color: "#e5e5e5", fontWeight: 500, lineHeight: 1.35, fontSize: 11,
+                              ...(ev.severity >= 4 ? { color: "#fff" } : {}),
+                            }}>
                               {ev.headline}
+                              {hasExpandable && (
+                                <span style={{ fontSize: 8, color: "#444", marginLeft: 6 }}>
+                                  {isExp ? "\u25B4" : "\u25BE"}
+                                </span>
+                              )}
                             </div>
-                            <div
-                              style={{
-                                display: "flex",
-                                gap: 4,
-                                marginTop: 3,
-                                flexWrap: "wrap",
-                              }}
-                            >
-                              {ev.tickers?.slice(0, 4).map((t) => {
-                                const dir =
-                                  DIRECTION_SYMBOLS[t.direction] ||
-                                  DIRECTION_SYMBOLS.neutral;
+                            <div style={{ display: "flex", gap: 4, marginTop: 2, flexWrap: "wrap", alignItems: "center" }}>
+                              {ev.tickers?.slice(0, 3).map(t => {
+                                const dir = DIR_SYM[t.direction] || DIR_SYM.neutral;
                                 return (
                                   <Link
                                     key={t.ticker}
                                     href={`/stocks/${t.ticker}`}
-                                    onClick={(e) => e.stopPropagation()}
+                                    onClick={e => e.stopPropagation()}
                                     style={{
-                                      fontSize: 9,
-                                      fontWeight: 700,
-                                      padding: "1px 4px",
-                                      borderRadius: 2,
-                                      background: "rgba(255,255,255,0.06)",
-                                      color: dir.color,
-                                      textDecoration: "none",
+                                      fontSize: 9, fontWeight: 700, padding: "0px 3px",
+                                      borderRadius: 1, background: "#1a1a1a",
+                                      color: dir.color, textDecoration: "none",
                                     }}
                                   >
                                     {dir.icon} {t.ticker}
                                   </Link>
                                 );
                               })}
-                              <span
-                                style={{
-                                  fontSize: 9,
-                                  color: "var(--muted-foreground)",
-                                  opacity: 0.5,
-                                }}
-                              >
-                                {ev.source}
+                              <span style={{ fontSize: 8, color: "#444" }}>
+                                {ev.source?.replace("ibkr_", "").toUpperCase()}
+                              </span>
+                              <span style={{ fontSize: 8, color: "#333" }}>
+                                {new Date(ev.publishedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
                               </span>
                             </div>
                           </div>
-
-                          {/* Event type */}
-                          <div style={{ textAlign: "center", paddingTop: 2 }}>
-                            <span
-                              style={{
-                                fontSize: 8,
-                                fontWeight: 700,
-                                letterSpacing: "0.04em",
-                                padding: "2px 5px",
-                                borderRadius: 2,
-                                background: `${typeColor}18`,
-                                color: typeColor,
-                                textTransform: "uppercase",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {ev.eventType.replace(/_/g, " ")}
+                          <div style={{ textAlign: "center", paddingTop: 1 }}>
+                            <span style={{
+                              fontSize: 8, fontWeight: 700, padding: "1px 4px",
+                              borderRadius: 1, background: `${typeColor}15`,
+                              color: typeColor, letterSpacing: "0.03em",
+                            }}>
+                              {ev.eventType.replace(/_/g, " ").toUpperCase()}
                             </span>
                           </div>
-
-                          {/* Sentiment */}
-                          <div
-                            style={{
-                              textAlign: "right",
-                              paddingTop: 2,
-                              fontSize: 11,
-                              fontWeight: 600,
-                              color:
-                                ev.sentiment !== null
-                                  ? ev.sentiment > 0.1
-                                    ? "#22c55e"
-                                    : ev.sentiment < -0.1
-                                    ? "#ef4444"
-                                    : "#6b7280"
-                                  : "var(--muted-foreground)",
-                            }}
-                          >
-                            {ev.sentiment !== null
-                              ? `${ev.sentiment > 0 ? "+" : ""}${ev.sentiment.toFixed(2)}`
-                              : "—"}
+                          <div style={{
+                            textAlign: "right", paddingTop: 1, fontSize: 10, fontWeight: 600,
+                            color: ev.sentiment != null
+                              ? ev.sentiment > 0.1 ? "#22c55e" : ev.sentiment < -0.1 ? "#ef4444" : "#555"
+                              : "#444",
+                          }}>
+                            {ev.sentiment != null ? `${ev.sentiment > 0 ? "+" : ""}${ev.sentiment.toFixed(2)}` : ""}
                           </div>
-
-                          {/* Day Return */}
-                          <div
-                            style={{
-                              textAlign: "right",
-                              paddingTop: 2,
-                              fontSize: 11,
-                              fontWeight: 600,
-                              color:
-                                ev.dayReturnPct !== null
-                                  ? ev.dayReturnPct > 0.3
-                                    ? "#22c55e"
-                                    : ev.dayReturnPct < -0.3
-                                    ? "#ef4444"
-                                    : "#6b7280"
-                                  : "var(--muted-foreground)",
-                            }}
-                          >
-                            {ev.dayReturnPct !== null
-                              ? `${ev.dayReturnPct > 0 ? "+" : ""}${ev.dayReturnPct.toFixed(1)}%`
-                              : "—"}
+                          <div style={{
+                            textAlign: "right", paddingTop: 1, fontSize: 10, fontWeight: 600,
+                            color: ev.dayReturnPct != null
+                              ? ev.dayReturnPct > 0.3 ? "#22c55e" : ev.dayReturnPct < -0.3 ? "#ef4444" : "#555"
+                              : "#444",
+                          }}>
+                            {ev.dayReturnPct != null ? fmtPct(ev.dayReturnPct, 1) : ""}
                           </div>
                         </div>
 
-                        {/* Expanded details */}
-                        {isExpanded && (
-                          <div
-                            style={{
-                              padding: "12px 16px 12px 75px",
-                              background: "rgba(255,255,255,0.02)",
-                              borderBottom: "1px solid var(--border)",
-                            }}
-                          >
-                            {/* Structured Facts */}
-                            {ev.structuredFacts && Object.values(ev.structuredFacts).some(v => v !== null) && (
+                        {/* Expanded detail — only when there's real content */}
+                        {isExp && hasExpandable && (
+                          <div style={{
+                            padding: "10px 12px 10px 60px",
+                            background: "#111",
+                            borderBottom: "1px solid #222",
+                            fontSize: 11,
+                          }}>
+                            {hasFacts && ev.structuredFacts && (
                               <div style={{
-                                display: "grid",
-                                gridTemplateColumns: "auto 1fr",
-                                gap: "3px 16px",
-                                marginBottom: 12,
-                                fontSize: 11,
-                                padding: "8px 12px",
-                                background: "rgba(255,255,255,0.03)",
-                                borderRadius: 4,
-                                border: "1px solid var(--border)",
+                                display: "grid", gridTemplateColumns: "auto 1fr",
+                                gap: "2px 12px", marginBottom: 8, padding: "6px 10px",
+                                background: "#1a1a1a", borderRadius: 2, border: "1px solid #222",
+                                fontSize: 10,
                               }}>
                                 {ev.structuredFacts.person_name && (
                                   <>
-                                    <span style={{ color: "var(--muted-foreground)", fontSize: 10 }}>Person</span>
-                                    <span style={{ fontWeight: 600 }}>
-                                      {ev.structuredFacts.person_name as string}
-                                      {ev.structuredFacts.person_role && (
-                                        <span style={{ color: "var(--muted-foreground)", fontWeight: 400 }}> ({ev.structuredFacts.person_role as string})</span>
-                                      )}
-                                    </span>
+                                    <span style={{ color: "#666" }}>Person</span>
+                                    <span>{String(ev.structuredFacts.person_name)}{ev.structuredFacts.person_role ? ` (${ev.structuredFacts.person_role})` : ""}</span>
                                   </>
                                 )}
                                 {ev.structuredFacts.transaction_type && (
                                   <>
-                                    <span style={{ color: "var(--muted-foreground)", fontSize: 10 }}>Type</span>
-                                    <span style={{ fontWeight: 700, color: ev.structuredFacts.transaction_type === "BUY" ? "#22c55e" : "#ef4444" }}>
-                                      {ev.structuredFacts.transaction_type as string}
-                                    </span>
-                                  </>
-                                )}
-                                {ev.structuredFacts.shares_traded && (
-                                  <>
-                                    <span style={{ color: "var(--muted-foreground)", fontSize: 10 }}>Shares</span>
-                                    <span style={{ fontWeight: 600 }}>{(ev.structuredFacts.shares_traded as number).toLocaleString("en-US")}</span>
-                                  </>
-                                )}
-                                {ev.structuredFacts.total_value_nok && (
-                                  <>
-                                    <span style={{ color: "var(--muted-foreground)", fontSize: 10 }}>Value</span>
-                                    <span style={{ fontWeight: 600 }}>
-                                      {(ev.structuredFacts.total_value_nok as number) >= 1e6
-                                        ? `NOK ${((ev.structuredFacts.total_value_nok as number) / 1e6).toFixed(1)}M`
-                                        : `NOK ${(ev.structuredFacts.total_value_nok as number).toLocaleString("en-US")}`}
-                                    </span>
-                                  </>
-                                )}
-                                {ev.structuredFacts.holdings_after && (
-                                  <>
-                                    <span style={{ color: "var(--muted-foreground)", fontSize: 10 }}>Holdings</span>
-                                    <span style={{ fontWeight: 600 }}>{(ev.structuredFacts.holdings_after as number).toLocaleString("en-US")} shares</span>
-                                  </>
-                                )}
-                                {ev.structuredFacts.action_type && (
-                                  <>
-                                    <span style={{ color: "var(--muted-foreground)", fontSize: 10 }}>Action</span>
-                                    <span style={{ fontWeight: 700 }}>{(ev.structuredFacts.action_type as string).toUpperCase()}</span>
-                                  </>
-                                )}
-                                {ev.structuredFacts.shares_count && (
-                                  <>
-                                    <span style={{ color: "var(--muted-foreground)", fontSize: 10 }}>Shares</span>
-                                    <span style={{ fontWeight: 600 }}>{(ev.structuredFacts.shares_count as number).toLocaleString("en-US")}</span>
-                                  </>
-                                )}
-                                {ev.structuredFacts.dividend_per_share && (
-                                  <>
-                                    <span style={{ color: "var(--muted-foreground)", fontSize: 10 }}>Dividend</span>
-                                    <span style={{ fontWeight: 600 }}>NOK {ev.structuredFacts.dividend_per_share}/share</span>
-                                  </>
-                                )}
-                                {ev.structuredFacts.ex_date && (
-                                  <>
-                                    <span style={{ color: "var(--muted-foreground)", fontSize: 10 }}>Ex-date</span>
-                                    <span style={{ fontWeight: 600 }}>{ev.structuredFacts.ex_date as string}</span>
-                                  </>
-                                )}
-                                {ev.structuredFacts.program_total && (
-                                  <>
-                                    <span style={{ color: "var(--muted-foreground)", fontSize: 10 }}>Program</span>
-                                    <span style={{ fontWeight: 600 }}>{ev.structuredFacts.program_total as string}</span>
-                                  </>
-                                )}
-                                {ev.structuredFacts.broker && (
-                                  <>
-                                    <span style={{ color: "var(--muted-foreground)", fontSize: 10 }}>Broker</span>
-                                    <span style={{ fontWeight: 600 }}>{ev.structuredFacts.broker as string}</span>
-                                  </>
-                                )}
-                                {ev.structuredFacts.rating && (
-                                  <>
-                                    <span style={{ color: "var(--muted-foreground)", fontSize: 10 }}>Rating</span>
-                                    <span style={{ fontWeight: 700 }}>{(ev.structuredFacts.rating as string).toUpperCase()}</span>
-                                  </>
-                                )}
-                                {ev.structuredFacts.target_price && (
-                                  <>
-                                    <span style={{ color: "var(--muted-foreground)", fontSize: 10 }}>Target</span>
-                                    <span style={{ fontWeight: 600 }}>NOK {ev.structuredFacts.target_price as number}</span>
-                                  </>
-                                )}
-                                {ev.structuredFacts.beat_miss && (
-                                  <>
-                                    <span style={{ color: "var(--muted-foreground)", fontSize: 10 }}>Result</span>
+                                    <span style={{ color: "#666" }}>Type</span>
                                     <span style={{
                                       fontWeight: 700,
-                                      color: ev.structuredFacts.beat_miss === "beat" ? "#22c55e" : ev.structuredFacts.beat_miss === "miss" ? "#ef4444" : "var(--foreground)",
-                                    }}>
-                                      {(ev.structuredFacts.beat_miss as string).toUpperCase()}
-                                    </span>
+                                      color: String(ev.structuredFacts.transaction_type).toLowerCase() === "buy" ? "#22c55e" : "#ef4444",
+                                    }}>{String(ev.structuredFacts.transaction_type).toUpperCase()}</span>
                                   </>
                                 )}
-                                {ev.structuredFacts.key_quote && (
+                                {ev.structuredFacts.shares && (
                                   <>
-                                    <span style={{ color: "var(--muted-foreground)", fontSize: 10 }}>Quote</span>
-                                    <span style={{ fontStyle: "italic", color: "var(--muted-foreground)" }}>"{ev.structuredFacts.key_quote as string}"</span>
+                                    <span style={{ color: "#666" }}>Shares</span>
+                                    <span>{fmtNum(Number(ev.structuredFacts.shares), true)}</span>
+                                  </>
+                                )}
+                                {ev.structuredFacts.price_per_share && (
+                                  <>
+                                    <span style={{ color: "#666" }}>Price</span>
+                                    <span>NOK {Number(ev.structuredFacts.price_per_share).toFixed(2)}</span>
+                                  </>
+                                )}
+                                {ev.structuredFacts.total_value && (
+                                  <>
+                                    <span style={{ color: "#666" }}>Value</span>
+                                    <span>NOK {fmtNum(Number(ev.structuredFacts.total_value), true)}</span>
                                   </>
                                 )}
                               </div>
                             )}
 
-                            {ev.summary && (
-                              <p
-                                style={{
-                                  color: "var(--foreground)",
-                                  lineHeight: 1.6,
-                                  marginBottom: 12,
-                                  fontSize: 12,
-                                  maxWidth: 700,
-                                }}
-                              >
+                            {hasSummary && (
+                              <p style={{ color: "#bbb", margin: "0 0 8px", lineHeight: 1.5, fontSize: 11 }}>
                                 {ev.summary}
                               </p>
                             )}
 
-                            <div
-                              style={{
-                                display: "grid",
-                                gridTemplateColumns:
-                                  "repeat(auto-fit, minmax(130px, 1fr))",
-                                gap: 10,
-                                fontSize: 10,
-                                marginBottom: 10,
-                              }}
-                            >
-                              <div>
-                                <span
-                                  style={{
-                                    color: "var(--muted-foreground)",
-                                    fontSize: 9,
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.05em",
-                                  }}
-                                >
-                                  Severity
+                            <div style={{ display: "flex", gap: 16, fontSize: 10, color: "#555", flexWrap: "wrap" }}>
+                              {ev.tickers && ev.tickers.length > 0 && (
+                                <span>
+                                  Tickers: {ev.tickers.map(t => t.ticker).join(", ")}
                                 </span>
-                                <br />
-                                <span
-                                  style={{
-                                    fontWeight: 700,
-                                    color: sevColor,
-                                  }}
-                                >
-                                  {ev.severity}/5 — {SEVERITY_LABELS[ev.severity]}
+                              )}
+                              {ev.sectors && ev.sectors.length > 0 && (
+                                <span>
+                                  Sectors: {ev.sectors.map(s => s.sector).join(", ")}
                                 </span>
-                              </div>
-                              <div>
-                                <span
-                                  style={{
-                                    color: "var(--muted-foreground)",
-                                    fontSize: 9,
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.05em",
-                                  }}
-                                >
-                                  Confidence
-                                </span>
-                                <br />
-                                <span style={{ fontWeight: 600 }}>
-                                  {ev.confidence !== null
-                                    ? `${(ev.confidence * 100).toFixed(0)}%`
-                                    : "N/A"}
-                                </span>
-                              </div>
-                              <div>
-                                <span
-                                  style={{
-                                    color: "var(--muted-foreground)",
-                                    fontSize: 9,
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.05em",
-                                  }}
-                                >
-                                  Published
-                                </span>
-                                <br />
-                                <span style={{ fontWeight: 600 }}>
-                                  {formatTime(ev.publishedAt)}
-                                </span>
-                              </div>
-                              {ev.providerCode && (
-                                <div>
-                                  <span
-                                    style={{
-                                      color: "var(--muted-foreground)",
-                                      fontSize: 9,
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.05em",
-                                    }}
-                                  >
-                                    Provider
-                                  </span>
-                                  <br />
-                                  <span style={{ fontWeight: 600 }}>
-                                    {ev.providerCode}
-                                  </span>
-                                </div>
+                              )}
+                              {hasUrl && (
+                                <a href={ev.url!} target="_blank" rel="noopener noreferrer"
+                                  style={{ color: "#3b82f6", textDecoration: "none" }}
+                                  onClick={e => e.stopPropagation()}>
+                                  Source {"\u2197"}
+                                </a>
                               )}
                             </div>
-
-                            {/* Tickers */}
-                            {ev.tickers && ev.tickers.length > 0 && (
-                              <div style={{ marginBottom: 8 }}>
-                                <span
-                                  style={{
-                                    fontSize: 9,
-                                    color: "var(--muted-foreground)",
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.06em",
-                                  }}
-                                >
-                                  Affected Tickers
-                                </span>
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    flexWrap: "wrap",
-                                    gap: 4,
-                                    marginTop: 4,
-                                  }}
-                                >
-                                  {ev.tickers.map((t) => {
-                                    const dir =
-                                      DIRECTION_SYMBOLS[t.direction] ||
-                                      DIRECTION_SYMBOLS.neutral;
-                                    return (
-                                      <Link
-                                        key={t.ticker}
-                                        href={`/stocks/${t.ticker}`}
-                                        style={{
-                                          fontSize: 10,
-                                          fontWeight: 600,
-                                          padding: "2px 6px",
-                                          borderRadius: 2,
-                                          background:
-                                            "rgba(255,255,255,0.06)",
-                                          color: dir.color,
-                                          textDecoration: "none",
-                                        }}
-                                      >
-                                        {dir.icon} {t.ticker}
-                                        {t.relevance !== null && (
-                                          <span
-                                            style={{
-                                              opacity: 0.6,
-                                              marginLeft: 4,
-                                            }}
-                                          >
-                                            {(t.relevance * 100).toFixed(0)}%
-                                          </span>
-                                        )}
-                                      </Link>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Sectors */}
-                            {ev.sectors && ev.sectors.length > 0 && (
-                              <div style={{ marginBottom: 8 }}>
-                                <span
-                                  style={{
-                                    fontSize: 9,
-                                    color: "var(--muted-foreground)",
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.06em",
-                                  }}
-                                >
-                                  Sector Impact
-                                </span>
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    flexWrap: "wrap",
-                                    gap: 4,
-                                    marginTop: 4,
-                                  }}
-                                >
-                                  {ev.sectors.map((s) => (
-                                    <span
-                                      key={s.sector}
-                                      style={{
-                                        fontSize: 10,
-                                        padding: "2px 6px",
-                                        borderRadius: 2,
-                                        background:
-                                          "rgba(255,255,255,0.04)",
-                                        color: "var(--muted-foreground)",
-                                      }}
-                                    >
-                                      {s.sector}
-                                      {s.impact !== null && (
-                                        <span
-                                          style={{
-                                            marginLeft: 4,
-                                            color:
-                                              s.impact > 0
-                                                ? "#22c55e"
-                                                : "#ef4444",
-                                            fontWeight: 600,
-                                          }}
-                                        >
-                                          {s.impact > 0 ? "+" : ""}
-                                          {s.impact.toFixed(2)}
-                                        </span>
-                                      )}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {ev.url && (
-                              <a
-                                href={ev.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{
-                                  fontSize: 10,
-                                  color: "var(--accent)",
-                                  textDecoration: "none",
-                                }}
-                              >
-                                View source →
-                              </a>
-                            )}
                           </div>
                         )}
                       </div>
                     );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Right sidebar */}
-            <div>
-              {/* Sector Overview */}
-              <div
-                style={{
-                  border: "1px solid var(--border)",
-                  borderRadius: 4,
-                  marginBottom: 16,
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    padding: "8px 12px",
-                    fontSize: 9,
-                    fontWeight: 700,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                    color: "var(--muted-foreground)",
-                    background: "rgba(255,255,255,0.03)",
-                    borderBottom: "1px solid var(--border)",
-                  }}
-                >
-                  SECTOR OVERVIEW
-                </div>
-                {sectorSummary.length === 0 ? (
-                  <div
-                    style={{
-                      padding: 12,
-                      fontSize: 11,
-                      color: "var(--muted-foreground)",
-                    }}
-                  >
-                    No sector data
-                  </div>
-                ) : (
-                  sectorSummary.map((s) => (
-                    <div
-                      key={s.sector}
-                      className="sector-row"
-                      onClick={() =>
-                        setSectorFilter(
-                          sectorFilter === s.sector ? "" : s.sector
-                        )
-                      }
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr 32px 44px",
-                        padding: "6px 12px",
-                        fontSize: 11,
-                        borderBottom: "1px solid rgba(255,255,255,0.04)",
-                        background:
-                          sectorFilter === s.sector
-                            ? "rgba(59,130,246,0.08)"
-                            : "transparent",
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontWeight: 600,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {s.sector}
-                      </span>
-                      <span
-                        style={{
-                          textAlign: "center",
-                          color: "var(--muted-foreground)",
-                          fontSize: 10,
-                        }}
-                      >
-                        {s.count}
-                      </span>
-                      <span
-                        style={{
-                          textAlign: "right",
-                          fontWeight: 600,
-                          color:
-                            s.avgSentiment > 0.05
-                              ? "#22c55e"
-                              : s.avgSentiment < -0.05
-                              ? "#ef4444"
-                              : "#6b7280",
-                          fontSize: 10,
-                        }}
-                      >
-                        {s.avgSentiment > 0 ? "+" : ""}
-                        {s.avgSentiment.toFixed(2)}
-                      </span>
-                    </div>
-                  ))
+                  })
                 )}
               </div>
+            </div>
 
-              {/* Severity breakdown */}
-              <div
-                style={{
-                  border: "1px solid var(--border)",
-                  borderRadius: 4,
-                  marginBottom: 16,
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    padding: "8px 12px",
-                    fontSize: 9,
-                    fontWeight: 700,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                    color: "var(--muted-foreground)",
-                    background: "rgba(255,255,255,0.03)",
-                    borderBottom: "1px solid var(--border)",
-                  }}
-                >
-                  SEVERITY DISTRIBUTION
-                </div>
-                <div style={{ padding: "8px 12px" }}>
-                  {severityDist.map((d) => (
-                    <div
-                      key={d.level}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        marginBottom: 6,
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: 16,
-                          fontSize: 10,
-                          fontWeight: 700,
-                          color: SEVERITY_COLORS[d.level],
-                        }}
-                      >
-                        {d.level}
-                      </span>
-                      <div
-                        style={{
-                          flex: 1,
-                          height: 6,
-                          background: "rgba(255,255,255,0.04)",
-                          borderRadius: 3,
-                          overflow: "hidden",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: `${events.length > 0 ? (d.count / events.length) * 100 : 0}%`,
-                            height: "100%",
-                            background: SEVERITY_COLORS[d.level],
-                            borderRadius: 3,
-                            transition: "width 0.3s",
-                          }}
-                        />
+            {/* ─── Right Panel: Commodities then Shorts stacked ── */}
+            <div className="intel-right" style={S.rightPanel}>
+              {/* ─── Commodities Section ──────────────────────── */}
+              <div style={{ fontSize: 9, fontWeight: 700, color: "#f97316", letterSpacing: "0.08em", padding: "6px 10px", borderBottom: "1px solid #222", background: "#111" }}>
+                COMMODITIES
+              </div>
+              {commodities.map(c => {
+                const retColor = (c.dayReturnPct ?? 0) >= 0 ? "#22c55e" : "#ef4444";
+                const histData = c.history?.map(h => h.close) || [];
+                const sparkColor = histData.length > 1
+                  ? histData[histData.length - 1] >= histData[0] ? "#22c55e" : "#ef4444"
+                  : "#555";
+
+                return (
+                  <div key={c.symbol} style={{ borderBottom: "1px solid #1a1a1a" }}>
+                    <div style={{
+                      display: "grid", gridTemplateColumns: "1fr auto auto",
+                      padding: "6px 10px 3px", alignItems: "center", gap: 8,
+                    }}>
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "#e5e5e5" }}>
+                          {c.name}
+                        </div>
+                        <div style={{ fontSize: 8, color: "#555" }}>{c.symbol}</div>
                       </div>
-                      <span
-                        style={{
-                          fontSize: 10,
-                          color: "var(--muted-foreground)",
-                          minWidth: 20,
-                          textAlign: "right",
-                        }}
-                      >
-                        {d.count}
-                      </span>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#e5e5e5" }}>
+                          {c.currency === "USD" ? "$" : ""}{fmtPrice(c.latest.close)}
+                        </div>
+                        <div style={{ fontSize: 10, fontWeight: 600, color: retColor }}>
+                          {fmtPct(c.dayReturnPct, 1)}
+                        </div>
+                      </div>
+                      <div dangerouslySetInnerHTML={{ __html: sparklineSvg(histData.slice(-30), 48, 18, sparkColor) }} />
                     </div>
-                  ))}
+                    {c.sensitivities.length > 0 && (
+                      <div style={{ padding: "1px 10px 6px", display: "flex", gap: 4, flexWrap: "wrap" }}>
+                        {c.sensitivities.slice(0, 4).map(s => (
+                          <Link
+                            key={s.ticker}
+                            href={`/stocks/${s.ticker}`}
+                            style={{
+                              fontSize: 9, padding: "2px 6px", borderRadius: 2,
+                              background: "transparent",
+                              border: `1px solid ${s.beta > 0 ? "#22c55e33" : "#ef444433"}`,
+                              color: "#999", textDecoration: "none", fontWeight: 500,
+                              display: "inline-flex", gap: 3, alignItems: "center",
+                            }}
+                          >
+                            <span style={{ color: "#ccc", fontWeight: 700 }}>{s.ticker}</span>
+                            <span style={{ color: s.beta > 0 ? "#22c55e" : "#ef4444" }}>
+                              {s.beta > 0 ? "+" : ""}{s.beta.toFixed(2)}
+                            </span>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* ─── Short Interest Section ───────────────────── */}
+              <div style={{ fontSize: 9, fontWeight: 700, color: "#f97316", letterSpacing: "0.08em", padding: "6px 10px", borderBottom: "1px solid #222", background: "#111", marginTop: 0 }}>
+                SHORT INTEREST
+              </div>
+              <div style={{
+                display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
+                padding: "6px 10px", borderBottom: "1px solid #1a1a1a", fontSize: 10,
+              }}>
+                <div>
+                  <div style={{ color: "#666", fontSize: 8, letterSpacing: "0.06em" }}>TRACKED</div>
+                  <div style={{ fontWeight: 700, color: "#e5e5e5" }}>{shorts.length}</div>
+                </div>
+                <div>
+                  <div style={{ color: "#666", fontSize: 8, letterSpacing: "0.06em" }}>TOP</div>
+                  <div style={{ fontWeight: 700, color: "#f97316" }}>
+                    {topShorted ? `${topShorted.ticker} ${topShorted.shortPct.toFixed(1)}%` : "\u2014"}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ color: "#666", fontSize: 8, letterSpacing: "0.06em" }}>MOVERS</div>
+                  <div style={{ fontWeight: 700, color: shortMovers.length > 0 ? "#ef4444" : "#666" }}>
+                    {shortMovers.length}
+                  </div>
                 </div>
               </div>
 
-              {/* Event type breakdown */}
-              <div
-                style={{
-                  border: "1px solid var(--border)",
-                  borderRadius: 4,
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    padding: "8px 12px",
-                    fontSize: 9,
-                    fontWeight: 700,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                    color: "var(--muted-foreground)",
-                    background: "rgba(255,255,255,0.03)",
-                    borderBottom: "1px solid var(--border)",
-                  }}
-                >
-                  EVENT TYPES
-                </div>
-                <div style={{ padding: "6px 12px" }}>
-                  {EVENT_TYPES.map((t) => {
-                    const count = events.filter(
-                      (e) => e.eventType === t
-                    ).length;
-                    if (count === 0) return null;
-                    const color = EVENT_TYPE_COLORS[t] || "#6b7280";
+              <div style={{
+                display: "grid", gridTemplateColumns: "60px 50px 40px 1fr 24px",
+                padding: "4px 10px", fontSize: 8, fontWeight: 700, color: "#555",
+                letterSpacing: "0.06em", borderBottom: "1px solid #1a1a1a",
+              }}>
+                <span>TICKER</span>
+                <span style={{ textAlign: "right" }}>SI%</span>
+                <span style={{ textAlign: "right" }}>{"\u0394"}</span>
+                <span style={{ textAlign: "center" }}>90D</span>
+                <span style={{ textAlign: "right" }}>N</span>
+              </div>
+
+              <div>
+                {shorts.length === 0 ? (
+                  <div style={{ padding: 20, textAlign: "center", color: "#555", fontSize: 10 }}>
+                    No short position data
+                  </div>
+                ) : (
+                  shorts.map(s => {
+                    const changePct = s.changePct;
+                    const changeColor = changePct == null ? "#555"
+                      : changePct > 0.2 ? "#ef4444"
+                      : changePct < -0.2 ? "#22c55e"
+                      : "#555";
+                    const siColor = s.shortPct >= 5 ? "#ef4444"
+                      : s.shortPct >= 3 ? "#f97316"
+                      : s.shortPct >= 1 ? "#f59e0b"
+                      : "#888";
+
+                    const histData = s.history?.map(h => h.short_pct) || [];
+                    const sparkColor = histData.length > 1
+                      ? histData[histData.length - 1] > histData[0] ? "#ef4444" : "#22c55e"
+                      : "#555";
+
                     return (
-                      <div
-                        key={t}
-                        onClick={() =>
-                          setEventTypeFilter(
-                            eventTypeFilter === t ? "" : t
-                          )
-                        }
-                        className="sector-row"
+                      <Link
+                        key={s.ticker}
+                        href={`/stocks/${s.ticker}`}
+                        className="short-row"
                         style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          padding: "4px 0",
-                          fontSize: 10,
-                          background:
-                            eventTypeFilter === t
-                              ? "rgba(59,130,246,0.08)"
-                              : "transparent",
-                          borderRadius: 2,
-                          paddingLeft: 4,
-                          paddingRight: 4,
+                          display: "grid", gridTemplateColumns: "60px 50px 40px 1fr 24px",
+                          padding: "5px 10px", textDecoration: "none", color: "inherit",
+                          borderBottom: "1px solid #111", alignItems: "center",
                         }}
                       >
-                        <span style={{ color, fontWeight: 600 }}>
-                          {t.replace(/_/g, " ").toUpperCase()}
+                        <span style={{ fontSize: 10, fontWeight: 700, color: "#e5e5e5" }}>
+                          {s.ticker}
                         </span>
-                        <span style={{ color: "var(--muted-foreground)" }}>
-                          {count}
+                        <span style={{ textAlign: "right", fontSize: 10, fontWeight: 700, color: siColor }}>
+                          {s.shortPct.toFixed(2)}%
                         </span>
-                      </div>
+                        <span style={{ textAlign: "right", fontSize: 9, fontWeight: 600, color: changeColor }}>
+                          {changePct != null ? fmtPct(changePct, 1) : "\u2014"}
+                        </span>
+                        <div style={{ textAlign: "center" }}
+                          dangerouslySetInnerHTML={{ __html: sparklineSvg(histData, 50, 14, sparkColor) }}
+                        />
+                        <span style={{ textAlign: "right", fontSize: 9, color: "#666" }}>
+                          {s.activePositions}
+                        </span>
+                      </Link>
                     );
-                  })}
-                </div>
+                  })
+                )}
               </div>
             </div>
           </div>
