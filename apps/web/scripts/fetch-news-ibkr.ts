@@ -297,10 +297,10 @@ async function main() {
     const endDt = formatDate(now);
     console.log(`Fetching news from ${startDt} to ${endDt}\n`);
 
-    // 4. Load existing article_ids for dedup
+    // 4. Load ALL existing article_ids for dedup (IBKR returns articles
+    //    far beyond the requested date range when totalResults is high)
     const { rows: existing } = await pool.query(
-      `SELECT article_id FROM news_events WHERE article_id IS NOT NULL AND published_at >= $1`,
-      [start.toISOString()]
+      `SELECT article_id FROM news_events WHERE article_id IS NOT NULL`
     );
     const existingIds = new Set(existing.map((r: any) => r.article_id));
     console.log(`${existingIds.size} existing articles in DB for dedup\n`);
