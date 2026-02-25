@@ -156,7 +156,7 @@ export default function VolatilityPage() {
       setError(null);
       try {
         const url = `/api/volatility/${encodeURIComponent(ticker)}?limit=${limit}&adjusted=${isAdjusted}`;
-        const res = await fetch(url, { method: "GET", headers: { accept: "application/json" }, cache: "no-store" });
+        const res = await fetch(url, { method: "GET", headers: { accept: "application/json" } });
         if (!res.ok) {
           const text = await res.text();
           if (!cancelled) { setError(`Volatility API failed: ${text}`); setData(null); }
@@ -167,7 +167,7 @@ export default function VolatilityPage() {
         let marketJson: VolatilityData | null = null;
         try {
           const marketRes = await fetch(`/api/volatility/OBX?limit=${limit}&adjusted=${isAdjusted}`, {
-            method: "GET", headers: { accept: "application/json" }, cache: "no-store",
+            method: "GET", headers: { accept: "application/json" },
           });
           if (marketRes.ok) marketJson = (await marketRes.json()) as VolatilityData;
         } catch (e) {
@@ -191,7 +191,7 @@ export default function VolatilityPage() {
       setMlLoading(true);
       try {
         const res = await fetch(`/api/volatility/ml/${encodeURIComponent(ticker)}?limit=${limit}`, {
-          method: "GET", headers: { accept: "application/json" }, cache: "no-store",
+          method: "GET", headers: { accept: "application/json" },
         });
         if (res.ok && !cancelled) {
           const json = await res.json();

@@ -116,7 +116,6 @@ export default function PredictionsPage() {
         const tickersRes = await fetch("/api/factors/tickers", {
           method: "GET",
           headers: { accept: "application/json" },
-          cache: "no-store",
         });
 
         if (tickersRes.ok) {

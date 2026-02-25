@@ -373,7 +373,7 @@ export default function PortfolioPage() {
     let cancelled = false;
     async function load() {
       try {
-        const res = await fetch("/api/stocks?assetTypes=equity", { cache: "no-store" });
+        const res = await fetch("/api/stocks?assetTypes=equity");
         if (res.ok) {
           const data = await res.json();
           if (!cancelled) {
@@ -404,7 +404,6 @@ export default function PortfolioPage() {
     try {
       const res = await fetch("/api/portfolio/configs", {
         headers: { Authorization: `Bearer ${token}` },
-        cache: "no-store",
       });
       if (res.status === 401) { setToken(null); setProfileName(""); return; }
       if (res.ok) {

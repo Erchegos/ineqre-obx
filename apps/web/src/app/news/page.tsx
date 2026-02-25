@@ -174,9 +174,9 @@ export default function IntelligencePage() {
       params.set("limit", "200");
 
       const [newsRes, shortsRes, commoditiesRes] = await Promise.all([
-        fetch(`/api/news?${params}`, { cache: "no-store" }),
-        fetch("/api/shorts", { cache: "no-store" }),
-        fetch("/api/commodities?days=90", { cache: "no-store" }),
+        fetch(`/api/news?${params}`),
+        fetch("/api/shorts"),
+        fetch("/api/commodities?days=90"),
       ]);
 
       if (newsRes.ok) {

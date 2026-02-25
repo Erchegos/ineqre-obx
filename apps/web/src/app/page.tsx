@@ -54,7 +54,7 @@ export default function HomePage() {
 
     async function fetchStats() {
       try {
-        const res = await fetch("/api/stats", { method: "GET", cache: "no-store" });
+        const res = await fetch("/api/stats", { method: "GET" });
         if (res.ok) setStats(await res.json());
       } catch (e) {
         console.error("Failed to fetch stats:", e);

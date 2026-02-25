@@ -54,7 +54,6 @@ export default function StocksPage() {
       const res = await fetch(`/api/stocks?assetTypes=${typesParam}`, {
         method: "GET",
         headers: { accept: "application/json" },
-        cache: "no-store",
       });
 
       if (!res.ok) {
@@ -104,18 +103,15 @@ export default function StocksPage() {
           fetch("/api/factors/tickers", {
             method: "GET",
             headers: { accept: "application/json" },
-            cache: "no-store",
-          }),
+              }),
           fetch("/api/optimizer-config/tickers", {
             method: "GET",
             headers: { accept: "application/json" },
-            cache: "no-store",
-          }),
+              }),
           fetch("/api/options", {
             method: "GET",
             headers: { accept: "application/json" },
-            cache: "no-store",
-          }),
+              }),
         ]);
 
         if (factorRes.ok) {
