@@ -48,16 +48,31 @@ export async function GET(req: NextRequest) {
       ORDER BY cp.symbol, cp.date DESC
     `, [TRACKED_SYMBOLS]);
 
-    // Fetch latest EUR/NOK rate for salmon conversion
+    // Fetch live EUR/NOK rate from Norges Bank for salmon conversion
     let nokPerEur: number | null = null;
     try {
-      const fxRes = await pool.query(
-        `SELECT spot_rate::float FROM fx_spot_rates
-         WHERE currency_pair = 'NOKEUR'
-         ORDER BY date DESC LIMIT 1`
+      const nbRes = await fetch(
+        "https://data.norges-bank.no/api/data/EXR/B.EUR.NOK.SP?format=sdmx-json&lastNObservations=1",
+        { next: { revalidate: 3600 } } // cache for 1 hour
       );
-      nokPerEur = fxRes.rows[0]?.spot_rate ?? null;
+      if (nbRes.ok) {
+        const nbData = await nbRes.json();
+        const obs = nbData?.data?.dataSets?.[0]?.series?.["0:0:0:0"]?.observations;
+        const val = obs ? Object.values(obs)[0] : null;
+        nokPerEur = (val as number[])?.[0] ?? null;
+      }
     } catch { /* non-critical */ }
+    // Fallback to DB if Norges Bank fails
+    if (!nokPerEur) {
+      try {
+        const fxRes = await pool.query(
+          `SELECT spot_rate::float FROM fx_spot_rates
+           WHERE currency_pair = 'NOKEUR'
+           ORDER BY date DESC LIMIT 1`
+        );
+        nokPerEur = fxRes.rows[0]?.spot_rate ?? null;
+      } catch { /* non-critical */ }
+    }
 
     // Build response with history + sensitivity per commodity
     const commodities = await Promise.all(
