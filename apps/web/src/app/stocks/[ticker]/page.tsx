@@ -1123,16 +1123,16 @@ export default function StockTickerPage() {
         {/* Inline Fundamentals Strip — 5 multiples matching portfolio optimizer VAL */}
         {inlineFundamentals && (
           <div className="fundamentals-strip" style={{ fontFamily: "'Geist Mono', monospace" }}>
-            {inlineFundamentals.ep !== null && (
+            {inlineFundamentals.ep !== null && inlineFundamentals.ep > 0 && (
               <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
-                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", marginRight: 3 }}>E/P</span>
-                <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{(inlineFundamentals.ep * 100).toFixed(1)}%</span>
+                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", marginRight: 3 }}>P/E</span>
+                <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{(1 / inlineFundamentals.ep).toFixed(1)}x</span>
               </span>
             )}
-            {inlineFundamentals.bm !== null && (
+            {inlineFundamentals.bm !== null && inlineFundamentals.bm > 0 && (
               <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
-                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", marginRight: 3 }}>B/M</span>
-                <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{inlineFundamentals.bm.toFixed(2)}</span>
+                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", marginRight: 3 }}>P/B</span>
+                <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{(1 / inlineFundamentals.bm).toFixed(2)}</span>
               </span>
             )}
             {inlineFundamentals.dy !== null && (
@@ -1147,10 +1147,10 @@ export default function StockTickerPage() {
                 <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{inlineFundamentals.ev_ebitda.toFixed(1)}x</span>
               </span>
             )}
-            {inlineFundamentals.sp !== null && inlineFundamentals.sp !== 0 && (
+            {inlineFundamentals.sp !== null && inlineFundamentals.sp > 0 && (
               <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
-                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", marginRight: 3 }}>S/P</span>
-                <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{inlineFundamentals.sp.toFixed(2)}</span>
+                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", marginRight: 3 }}>P/S</span>
+                <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{(1 / inlineFundamentals.sp).toFixed(2)}x</span>
               </span>
             )}
             {inlineFundamentals.mktcap !== null && (
