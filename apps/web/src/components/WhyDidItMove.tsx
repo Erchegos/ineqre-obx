@@ -418,18 +418,21 @@ export default function WhyDidItMove({
 
             {/* ── Animated expanded detail panel ── */}
             <Collapsible open={isExpanded}>
-              <div style={{ marginTop: 10, marginLeft: 44, paddingBottom: 4 }}>
+              <div style={{ marginTop: 14, paddingBottom: 8 }}>
                 {/* News events */}
                 {move.newsEvents.length > 0 && (
                   <div
                     style={{
-                      padding: "12px 16px",
+                      padding: "16px 20px",
                       background: "rgba(255,255,255,0.03)",
-                      borderRadius: 6,
+                      borderRadius: 8,
                       border: "1px solid var(--border)",
-                      marginBottom: 8,
+                      marginBottom: 10,
                     }}
                   >
+                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted-foreground)", marginBottom: 12 }}>
+                      Correlated News & Filings
+                    </div>
                     {move.newsEvents.map((ne, neIdx) => {
                       const typeColor =
                         EVENT_TYPE_COLORS[ne.eventType] || "#6b7280";
@@ -438,7 +441,7 @@ export default function WhyDidItMove({
                         <div
                           key={`${ne.source}-${ne.id}`}
                           style={{
-                            padding: "8px 0",
+                            padding: "12px 0",
                             borderBottom: isLast
                               ? "none"
                               : "1px solid rgba(255,255,255,0.06)",
@@ -448,8 +451,8 @@ export default function WhyDidItMove({
                             style={{
                               color: "var(--foreground)",
                               lineHeight: 1.5,
-                              marginBottom: 4,
-                              fontSize: 12,
+                              marginBottom: 6,
+                              fontSize: 13,
                               fontWeight: 500,
                             }}
                           >
@@ -475,16 +478,16 @@ export default function WhyDidItMove({
                           <div
                             style={{
                               display: "flex",
-                              gap: 6,
+                              gap: 8,
                               alignItems: "center",
-                              fontSize: 9,
+                              fontSize: 10,
                               flexWrap: "wrap",
                             }}
                           >
                             <span
                               style={{
-                                padding: "1px 5px",
-                                borderRadius: 2,
+                                padding: "2px 6px",
+                                borderRadius: 3,
                                 background: `${typeColor}15`,
                                 color: typeColor,
                                 fontWeight: 600,
@@ -496,8 +499,8 @@ export default function WhyDidItMove({
                             {ne.source === "newsweb" && (
                               <span
                                 style={{
-                                  padding: "1px 5px",
-                                  borderRadius: 2,
+                                  padding: "2px 6px",
+                                  borderRadius: 3,
                                   background: "#06b6d415",
                                   color: "#06b6d4",
                                   fontWeight: 600,
@@ -543,9 +546,9 @@ export default function WhyDidItMove({
                             <p
                               style={{
                                 color: "var(--muted-foreground)",
-                                fontSize: 11,
-                                lineHeight: 1.6,
-                                marginTop: 6,
+                                fontSize: 12,
+                                lineHeight: 1.7,
+                                marginTop: 8,
                                 marginBottom: 0,
                               }}
                             >
@@ -562,21 +565,21 @@ export default function WhyDidItMove({
                 {move.insiderTransactions.length > 0 && (
                   <div
                     style={{
-                      padding: "12px 16px",
+                      padding: "16px 20px",
                       background: "rgba(236,72,153,0.04)",
-                      borderRadius: 6,
+                      borderRadius: 8,
                       border: "1px solid rgba(236,72,153,0.15)",
-                      marginBottom: 8,
+                      marginBottom: 10,
                     }}
                   >
                     <div
                       style={{
-                        fontSize: 9,
+                        fontSize: 10,
                         fontWeight: 700,
                         textTransform: "uppercase",
                         letterSpacing: "0.06em",
                         color: "#ec4899",
-                        marginBottom: 8,
+                        marginBottom: 10,
                       }}
                     >
                       Insider Transactions
@@ -589,12 +592,12 @@ export default function WhyDidItMove({
                         <div
                           key={i}
                           style={{
-                            padding: "6px 0",
+                            padding: "8px 0",
                             borderBottom:
                               i === move.insiderTransactions.length - 1
                                 ? "none"
-                                : "1px solid rgba(255,255,255,0.04)",
-                            fontSize: 11,
+                                : "1px solid rgba(255,255,255,0.06)",
+                            fontSize: 12,
                           }}
                         >
                           <div
@@ -609,7 +612,7 @@ export default function WhyDidItMove({
                                 style={{
                                   fontWeight: 700,
                                   color: isBuy ? "#22c55e" : "#ef4444",
-                                  marginRight: 6,
+                                  marginRight: 8,
                                 }}
                               >
                                 {it.transactionType}
@@ -621,8 +624,8 @@ export default function WhyDidItMove({
                                 <span
                                   style={{
                                     color: "var(--muted-foreground)",
-                                    marginLeft: 4,
-                                    fontSize: 9,
+                                    marginLeft: 6,
+                                    fontSize: 10,
                                   }}
                                 >
                                   ({it.personRole})
@@ -647,9 +650,11 @@ export default function WhyDidItMove({
                               target="_blank"
                               rel="noopener noreferrer"
                               style={{
-                                fontSize: 9,
+                                fontSize: 10,
                                 color: "#06b6d4",
                                 textDecoration: "none",
+                                marginTop: 4,
+                                display: "inline-block",
                               }}
                               onClick={(e) => e.stopPropagation()}
                             >
@@ -662,107 +667,107 @@ export default function WhyDidItMove({
                   </div>
                 )}
 
-                {/* Short position change */}
-                {move.shortContext?.significant && (
-                  <div
-                    style={{
-                      padding: "10px 16px",
-                      background: "rgba(239,68,68,0.04)",
-                      borderRadius: 6,
-                      border: "1px solid rgba(239,68,68,0.15)",
-                      marginBottom: 8,
-                      fontSize: 11,
-                    }}
-                  >
+                {/* Context row: Market + Commodity + Short side-by-side */}
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  {/* Short position change */}
+                  {move.shortContext?.significant && (
                     <div
                       style={{
-                        fontSize: 9,
-                        fontWeight: 700,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.06em",
-                        color: "#ef4444",
-                        marginBottom: 6,
+                        padding: "12px 20px",
+                        background: "rgba(239,68,68,0.04)",
+                        borderRadius: 8,
+                        border: "1px solid rgba(239,68,68,0.15)",
+                        fontSize: 12,
+                        flex: "1 1 auto",
                       }}
                     >
-                      Short Position Change
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: 16,
-                        alignItems: "center",
-                      }}
-                    >
-                      <span>
-                        <span
-                          style={{ color: "var(--muted-foreground)" }}
-                        >
-                          SI:{" "}
+                      <div
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                          color: "#ef4444",
+                          marginBottom: 8,
+                        }}
+                      >
+                        Short Position Change
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 16,
+                          alignItems: "center",
+                        }}
+                      >
+                        <span>
+                          <span style={{ color: "var(--muted-foreground)" }}>
+                            SI:{" "}
+                          </span>
+                          <span
+                            style={{
+                              fontWeight: 700,
+                              color: "var(--foreground)",
+                            }}
+                          >
+                            {move.shortContext.shortPct.toFixed(2)}%
+                          </span>
                         </span>
                         <span
                           style={{
                             fontWeight: 700,
-                            color: "var(--foreground)",
+                            color:
+                              move.shortContext.changePct > 0
+                                ? "#ef4444"
+                                : "#22c55e",
                           }}
                         >
-                          {move.shortContext.shortPct.toFixed(2)}%
+                          {move.shortContext.changePct > 0 ? "+" : ""}
+                          {move.shortContext.changePct.toFixed(2)}pp
                         </span>
-                      </span>
-                      <span
-                        style={{
-                          fontWeight: 700,
-                          color:
-                            move.shortContext.changePct > 0
-                              ? "#ef4444"
-                              : "#22c55e",
-                        }}
-                      >
-                        {move.shortContext.changePct > 0 ? "+" : ""}
-                        {move.shortContext.changePct.toFixed(2)}pp
-                      </span>
-                      <span
-                        style={{
-                          color: "var(--muted-foreground)",
-                          fontSize: 10,
-                        }}
-                      >
-                        {move.shortContext.activePositions} holder
-                        {move.shortContext.activePositions !== 1 ? "s" : ""}
-                      </span>
+                        <span
+                          style={{
+                            color: "var(--muted-foreground)",
+                            fontSize: 11,
+                          }}
+                        >
+                          {move.shortContext.activePositions} holder
+                          {move.shortContext.activePositions !== 1 ? "s" : ""}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Market context */}
-                {move.marketContext && (
-                  <div
-                    style={{
-                      padding: "8px 16px",
-                      background: "rgba(99,102,241,0.04)",
-                      borderRadius: 6,
-                      border: "1px solid rgba(99,102,241,0.12)",
-                      marginBottom: 8,
-                      fontSize: 11,
-                      display: "flex",
-                      gap: 12,
-                      alignItems: "center",
-                    }}
-                  >
-                    <span
+                  {/* Market context */}
+                  {move.marketContext && (
+                    <div
                       style={{
-                        fontSize: 9,
-                        fontWeight: 700,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.06em",
-                        color: "#6366f1",
+                        padding: "12px 20px",
+                        background: "rgba(99,102,241,0.04)",
+                        borderRadius: 8,
+                        border: "1px solid rgba(99,102,241,0.12)",
+                        fontSize: 12,
+                        display: "flex",
+                        gap: 14,
+                        alignItems: "center",
+                        flex: "1 1 auto",
                       }}
                     >
-                      OBX
-                    </span>
-                    <span>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                          color: "#6366f1",
+                        }}
+                      >
+                        OBX
+                      </span>
                       <span
                         style={{
                           fontWeight: 700,
+                          fontSize: 13,
                           color:
                             move.marketContext.obxReturn >= 0
                               ? "#22c55e"
@@ -772,71 +777,71 @@ export default function WhyDidItMove({
                         {move.marketContext.obxReturn >= 0 ? "+" : ""}
                         {(move.marketContext.obxReturn * 100).toFixed(2)}%
                       </span>
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 9,
-                        color: "var(--muted-foreground)",
-                      }}
-                    >
-                      {move.marketContext.isSystematic
-                        ? "Systematic move — market-wide"
-                        : "Idiosyncratic — stock-specific"}
-                    </span>
-                  </div>
-                )}
-
-                {/* Commodity context */}
-                {move.commodityContext.length > 0 && (
-                  <div
-                    style={{
-                      padding: "8px 16px",
-                      background: "rgba(245,158,11,0.04)",
-                      borderRadius: 6,
-                      border: "1px solid rgba(245,158,11,0.12)",
-                      marginBottom: 8,
-                      fontSize: 11,
-                      display: "flex",
-                      gap: 12,
-                      alignItems: "center",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: 9,
-                        fontWeight: 700,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.06em",
-                        color: "#f59e0b",
-                      }}
-                    >
-                      Commodities
-                    </span>
-                    {move.commodityContext.map((c) => (
-                      <span key={c.symbol}>
-                        <span
-                          style={{
-                            color: "var(--muted-foreground)",
-                            marginRight: 4,
-                          }}
-                        >
-                          {COMMODITY_LABELS[c.symbol] || c.symbol}
-                        </span>
-                        <span
-                          style={{
-                            fontWeight: 700,
-                            color:
-                              c.returnPct >= 0 ? "#22c55e" : "#ef4444",
-                          }}
-                        >
-                          {c.returnPct >= 0 ? "+" : ""}
-                          {c.returnPct.toFixed(1)}%
-                        </span>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: "var(--muted-foreground)",
+                        }}
+                      >
+                        {move.marketContext.isSystematic
+                          ? "Systematic — market-wide"
+                          : "Idiosyncratic — stock-specific"}
                       </span>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                  )}
+
+                  {/* Commodity context */}
+                  {move.commodityContext.length > 0 && (
+                    <div
+                      style={{
+                        padding: "12px 20px",
+                        background: "rgba(245,158,11,0.04)",
+                        borderRadius: 8,
+                        border: "1px solid rgba(245,158,11,0.12)",
+                        fontSize: 12,
+                        display: "flex",
+                        gap: 14,
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        flex: "1 1 auto",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                          color: "#f59e0b",
+                        }}
+                      >
+                        Commodities
+                      </span>
+                      {move.commodityContext.map((c) => (
+                        <span key={c.symbol}>
+                          <span
+                            style={{
+                              color: "var(--muted-foreground)",
+                              marginRight: 4,
+                            }}
+                          >
+                            {COMMODITY_LABELS[c.symbol] || c.symbol}
+                          </span>
+                          <span
+                            style={{
+                              fontWeight: 700,
+                              color:
+                                c.returnPct >= 0 ? "#22c55e" : "#ef4444",
+                            }}
+                          >
+                            {c.returnPct >= 0 ? "+" : ""}
+                            {c.returnPct.toFixed(1)}%
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 {/* Fully unexplained */}
                 {!move.explained &&
@@ -844,12 +849,13 @@ export default function WhyDidItMove({
                   move.commodityContext.length === 0 && (
                     <div
                       style={{
-                        padding: "10px 16px",
+                        padding: "14px 20px",
                         background: "rgba(245,158,11,0.06)",
-                        borderRadius: 6,
+                        borderRadius: 8,
                         border: "1px solid rgba(245,158,11,0.15)",
-                        fontSize: 11,
+                        fontSize: 12,
                         color: "#f59e0b",
+                        marginTop: 10,
                       }}
                     >
                       No correlated events found. This move may be technical
