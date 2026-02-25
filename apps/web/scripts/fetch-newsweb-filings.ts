@@ -8,6 +8,9 @@
  *   POST https://api3.oslo.oslobors.no/v1/newsreader/list?fromDate=...&toDate=...
  *   GET  https://api3.oslo.oslobors.no/v1/newsreader/message?messageId=...
  *
+ * The list API caps at ~600 results per call, so for large date ranges we
+ * chunk into 7-day windows to ensure full coverage.
+ *
  * Usage:
  *   npx tsx scripts/fetch-newsweb-filings.ts                  # Last 3 days
  *   npx tsx scripts/fetch-newsweb-filings.ts --days=56        # Backfill ~2 months
@@ -27,41 +30,47 @@ dotenv.config({ path: path.resolve(__dirname, "../.env.local") });
 
 const API_BASE = "https://api3.oslo.oslobors.no/v1/newsreader";
 
+/** Max days per API call to avoid hitting the ~600 result cap */
+const CHUNK_DAYS = 7;
+
 /** Category ID → our schema category mapping */
 const CATEGORY_MAP: Record<number, string> = {
-  1102: "insider_trade",        // MANDATORY NOTIFICATION OF TRADE PRIMARY INSIDERS
-  1005: "insider_trade",        // INSIDE INFORMATION (often insider-related)
-  1001: "earnings",             // ANNUAL FINANCIAL AND AUDIT REPORTS
-  1002: "earnings",             // HALF YEARLY FINANCIAL REPORTS
-  1007: "buyback",              // ACQUISITION OR DISPOSAL OF ISSUER'S OWN SHARES
-  1101: "dividend",             // EX DATE
+  1102: "insider_trade",          // MANDATORY NOTIFICATION OF TRADE PRIMARY INSIDERS
+  1005: "insider_trade",          // INSIDE INFORMATION
+  1001: "earnings",               // ANNUAL FINANCIAL AND AUDIT REPORTS
+  1002: "earnings",               // HALF YEARLY FINANCIAL REPORTS
+  1007: "buyback",                // ACQUISITION OR DISPOSAL OF ISSUER'S OWN SHARES
+  1101: "dividend",               // EX DATE
   1006: "mandatory_notification", // MAJOR SHAREHOLDING NOTIFICATIONS
   1008: "mandatory_notification", // TOTAL NUMBER OF VOTING RIGHTS AND CAPITAL
   1009: "mandatory_notification", // CHANGES IN RIGHTS ATTACHING TO SHARES
   1103: "mandatory_notification", // PROSPECTUS / ADMISSION DOCUMENT
-  1104: "other",                // NON-REGULATORY PRESS RELEASES
-  1105: "other",                // ADJUSTMENT OF INTEREST RATE
-  1010: "other",                // ADDITIONAL REGULATED INFORMATION
-  1003: "other",                // PAYMENTS TO GOVERNMENTS
-  1004: "other",                // HOME MEMBER STATE
-  1201: "other",                // LISTING / ADMISSION
-  1202: "other",                // TRADING HALTS
-  1301: "regulatory",           // ANNOUNCEMENT FROM FSA
+  1104: "other",                  // NON-REGULATORY PRESS RELEASES
+  1010: "other",                  // ADDITIONAL REGULATED INFORMATION
+  1003: "other",                  // PAYMENTS TO GOVERNMENTS
+  1004: "other",                  // HOME MEMBER STATE
+  1201: "other",                  // LISTING / ADMISSION
+  1202: "other",                  // TRADING HALTS
+  1301: "regulatory",             // ANNOUNCEMENT FROM FSA
+  1105: "other",                  // ADJUSTMENT OF INTEREST RATE
 };
 
-/** Categories we actually want to store (skip noise like interest rate adjustments) */
-const RELEVANT_CATEGORY_IDS = new Set([
-  1102, // Insider trades
-  1005, // Inside information
-  1001, // Annual reports
-  1002, // Half yearly reports
-  1007, // Buybacks
-  1101, // Ex dates / dividends
-  1006, // Major shareholdings
-  1104, // Non-regulatory press releases
-  1008, // Voting rights changes
-  1009, // Rights changes
-  1301, // FSA announcements
+/**
+ * Categories we store. Only skip exchange-level noise (trading halts,
+ * closing prices, matching halts, announcements from other participants).
+ */
+const SKIP_CATEGORY_IDS = new Set([
+  1202, // TRADING HALTS
+  1203, // MATCHING HALT
+  1204, // SPECIAL OBSERVATION
+  1205, // CLOSING PRICES DERIVATIVES
+  1206, // DERIVATIVE NOTICES
+  1207, // ANNOUNCEMENT FROM OSLO BØRS
+  1208, // ANNOUNCEMENT FROM OTHER PARTICIPANTS
+  1302, // ANNOUNCEMENT FROM NORGES BANK
+  1003, // PAYMENTS TO GOVERNMENTS
+  1004, // HOME MEMBER STATE
+  1105, // ADJUSTMENT OF INTEREST RATE (bond coupon resets — noise)
 ]);
 
 /** Severity by category */
@@ -135,6 +144,57 @@ async function fetchFilingList(
   return json?.data?.messages || [];
 }
 
+/**
+ * Fetch filings in chunked windows to avoid hitting the API's ~600 result cap.
+ * For <=7 days we do a single call; for longer ranges we chunk into 7-day windows.
+ */
+async function fetchFilingListChunked(
+  from: Date,
+  to: Date,
+  issuerSign?: string
+): Promise<NewsWebMessage[]> {
+  const totalDays = Math.ceil(
+    (to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  if (totalDays <= CHUNK_DAYS) {
+    return fetchFilingList(formatDate(from), formatDate(to), issuerSign);
+  }
+
+  // Chunk into CHUNK_DAYS windows
+  const allMessages: NewsWebMessage[] = [];
+  const seen = new Set<number>();
+  let chunkStart = new Date(from);
+
+  while (chunkStart < to) {
+    const chunkEnd = new Date(chunkStart);
+    chunkEnd.setDate(chunkEnd.getDate() + CHUNK_DAYS);
+    if (chunkEnd > to) chunkEnd.setTime(to.getTime());
+
+    const fromStr = formatDate(chunkStart);
+    const toStr = formatDate(chunkEnd);
+    console.log(`  Fetching chunk ${fromStr} → ${toStr}...`);
+
+    const msgs = await fetchFilingList(fromStr, toStr, issuerSign);
+    let newCount = 0;
+    for (const m of msgs) {
+      if (!seen.has(m.messageId)) {
+        seen.add(m.messageId);
+        allMessages.push(m);
+        newCount++;
+      }
+    }
+    console.log(`    ${msgs.length} messages (${newCount} new)`);
+
+    // Move to next chunk
+    chunkStart = new Date(chunkEnd);
+    // Small delay between API calls
+    if (chunkStart < to) await sleep(200);
+  }
+
+  return allMessages;
+}
+
 async function fetchMessageBody(messageId: number): Promise<string | null> {
   try {
     const res = await fetch(
@@ -172,10 +232,7 @@ async function main() {
     const fromDate = new Date();
     fromDate.setDate(fromDate.getDate() - days);
 
-    const fromStr = formatDate(fromDate);
-    const toStr = formatDate(toDate);
-
-    console.log(`Fetching filings from ${fromStr} to ${toStr}...`);
+    console.log(`Fetching filings from ${formatDate(fromDate)} to ${formatDate(toDate)}...`);
 
     // Get known tickers from DB
     const tickerRes = await pool.query(
@@ -186,18 +243,18 @@ async function main() {
     );
     console.log(`Known active tickers: ${knownTickers.size}\n`);
 
-    // Fetch all filings in date range
-    const messages = await fetchFilingList(
-      fromStr,
-      toStr,
+    // Fetch all filings in date range (chunked for large ranges)
+    const messages = await fetchFilingListChunked(
+      fromDate,
+      toDate,
       filterTicker || undefined
     );
-    console.log(`Total messages from API: ${messages.length}`);
+    console.log(`\nTotal messages from API: ${messages.length}`);
 
-    // Filter to relevant categories and known tickers
+    // Filter: skip exchange-level noise, keep only our tracked tickers
     const relevant = messages.filter((m) => {
       const catId = m.category[0]?.id;
-      if (!catId || !RELEVANT_CATEGORY_IDS.has(catId)) return false;
+      if (!catId || SKIP_CATEGORY_IDS.has(catId)) return false;
       // Filter to our tracked tickers
       const ticker = m.issuerSign?.toUpperCase();
       if (!ticker || !knownTickers.has(ticker)) return false;
@@ -237,8 +294,8 @@ async function main() {
       let body: string | null = null;
       if (!skipBody) {
         body = await fetchMessageBody(msg.messageId);
-        // Rate limit: 100ms between detail requests
-        if (i < relevant.length - 1) await sleep(100);
+        // Rate limit: 50ms between detail requests
+        if (i < relevant.length - 1) await sleep(50);
       }
 
       if (dryRun) {
