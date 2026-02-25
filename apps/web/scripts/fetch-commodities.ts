@@ -142,33 +142,20 @@ async function fetchSalmonSSB(
 ): Promise<number> {
   console.log("Fetching Salmon prices from SSB (Statistics Norway)...");
 
-  // Build list of recent week codes (e.g., "2026U08", "2026U07")
-  const weekCodes: string[] = [];
-  const now = new Date();
-  for (let w = 0; w < weeksBack; w++) {
-    const d = new Date(now.getTime() - w * 7 * 86400000);
-    const year = d.getFullYear();
-    // ISO week number
-    const jan1 = new Date(year, 0, 1);
-    const dayOfYear = Math.ceil((d.getTime() - jan1.getTime()) / 86400000);
-    const weekNum = Math.ceil((dayOfYear + jan1.getDay()) / 7);
-    const wStr = String(weekNum).padStart(2, "0");
-    weekCodes.push(`${year}U${wStr}`);
-  }
-
+  // Use SSB "top" filter to get most recent N weeks
   const body = {
     query: [
       {
-        code: "Varugruppe",
+        code: "VareGrupper2",
         selection: { filter: "item", values: ["01"] }, // Fresh salmon
       },
       {
         code: "ContentsCode",
-        selection: { filter: "item", values: ["KiloprisNOK"] },
+        selection: { filter: "item", values: ["Kilopris"] },
       },
       {
         code: "Tid",
-        selection: { filter: "item", values: weekCodes },
+        selection: { filter: "top", values: [String(weeksBack)] },
       },
     ],
     response: { format: "json-stat2" },
@@ -181,7 +168,9 @@ async function fetchSalmonSSB(
   });
 
   if (!resp.ok) {
+    const errBody = await resp.text().catch(() => "");
     console.error(`  SSB API error: ${resp.status} ${resp.statusText}`);
+    if (errBody) console.error(`  Response: ${errBody.slice(0, 500)}`);
     return 0;
   }
 
@@ -384,7 +373,7 @@ async function main() {
         [comm.symbol]
       );
 
-      if (commPrices.length < 60) {
+      if (commPrices.length < 30) {
         console.log(
           `  Skipping ${comm.symbol}: only ${commPrices.length} data points`
         );
