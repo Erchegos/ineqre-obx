@@ -18,10 +18,10 @@ export const dynamic = "force-dynamic";
 const COMMODITY_NAMES: Record<string, string> = {
   "BZ=F": "Brent Crude Oil",
   "CL=F": "WTI Crude Oil",
-  "NG=F": "Natural Gas",
   "ALI=F": "Aluminium",
   "GC=F": "Gold",
   "SI=F": "Silver",
+  "SALMON": "Salmon",
 };
 
 export async function GET(req: NextRequest) {
@@ -43,6 +43,17 @@ export async function GET(req: NextRequest) {
       FROM commodity_prices cp
       ORDER BY cp.symbol, cp.date DESC
     `);
+
+    // Fetch latest EUR/NOK rate for salmon conversion
+    let nokPerEur: number | null = null;
+    try {
+      const fxRes = await pool.query(
+        `SELECT spot_rate::float FROM fx_spot_rates
+         WHERE currency_pair = 'NOKEUR'
+         ORDER BY date DESC LIMIT 1`
+      );
+      nokPerEur = fxRes.rows[0]?.spot_rate ?? null;
+    } catch { /* non-critical */ }
 
     // Build response with history + sensitivity per commodity
     const commodities = await Promise.all(
@@ -86,6 +97,12 @@ export async function GET(req: NextRequest) {
           [latest.symbol]
         );
 
+        // For salmon (NOK): also compute EUR equivalent
+        const isSalmon = latest.symbol === "SALMON";
+        const eurClose = isSalmon && nokPerEur && nokPerEur > 0
+          ? latest.close / nokPerEur
+          : null;
+
         return {
           symbol: latest.symbol,
           name: COMMODITY_NAMES[latest.symbol] || latest.symbol,
@@ -99,6 +116,7 @@ export async function GET(req: NextRequest) {
             volume: latest.volume ? Number(latest.volume) : null,
           },
           dayReturnPct: dayReturn,
+          ...(isSalmon && eurClose != null ? { eurClose, nokPerEur } : {}),
           history: histResult.rows.map((r) => ({
             date: r.date,
             close: r.close,

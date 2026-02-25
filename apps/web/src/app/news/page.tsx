@@ -66,6 +66,8 @@ type CommodityData = {
     volume: number | null;
   };
   dayReturnPct: number | null;
+  eurClose?: number;
+  nokPerEur?: number;
   history: { date: string; close: number }[];
   sensitivities: {
     ticker: string;
@@ -415,20 +417,35 @@ export default function IntelligencePage() {
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
               {/* Commodity ticker strip */}
               <div style={{ display: "flex", gap: 12, fontSize: 10 }}>
-                {commodities.slice(0, 4).map(c => (
-                  <span key={c.symbol} style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                    <span style={{ color: "#888" }}>{c.name.split(" ")[0].toUpperCase()}</span>
-                    <span style={{ color: "#e5e5e5", fontWeight: 600 }}>
-                      {c.currency === "USD" ? "$" : ""}{fmtPrice(c.latest.close)}
+                {commodities.slice(0, 5).map(c => {
+                  const isSalmon = c.symbol === "SALMON";
+                  const currSym = c.currency === "USD" ? "$" : c.currency === "NOK" ? "" : "";
+                  return (
+                    <span key={c.symbol} style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                      <span style={{ color: "#888" }}>{c.name.split(" ")[0].toUpperCase()}</span>
+                      {isSalmon ? (
+                        <>
+                          <span style={{ color: "#e5e5e5", fontWeight: 600 }}>
+                            {"\u20AC"}{c.eurClose ? c.eurClose.toFixed(2) : "–"}
+                          </span>
+                          <span style={{ color: "#999", fontWeight: 500 }}>
+                            NOK{fmtPrice(c.latest.close)}
+                          </span>
+                        </>
+                      ) : (
+                        <span style={{ color: "#e5e5e5", fontWeight: 600 }}>
+                          {currSym}{fmtPrice(c.latest.close)}
+                        </span>
+                      )}
+                      <span style={{
+                        color: (c.dayReturnPct ?? 0) >= 0 ? "#22c55e" : "#ef4444",
+                        fontWeight: 600,
+                      }}>
+                        {fmtPct(c.dayReturnPct, 1)}
+                      </span>
                     </span>
-                    <span style={{
-                      color: (c.dayReturnPct ?? 0) >= 0 ? "#22c55e" : "#ef4444",
-                      fontWeight: 600,
-                    }}>
-                      {fmtPct(c.dayReturnPct, 1)}
-                    </span>
-                  </span>
-                ))}
+                  );
+                })}
               </div>
               <span style={{ width: 1, height: 12, background: "#333" }} />
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: "#666" }}>
@@ -752,6 +769,7 @@ export default function IntelligencePage() {
                 const sparkColor = histData.length > 1
                   ? histData[histData.length - 1] >= histData[0] ? "#22c55e" : "#ef4444"
                   : "#555";
+                const isSalmon = c.symbol === "SALMON";
 
                 return (
                   <div key={c.symbol} style={{ borderBottom: "1px solid #1a1a1a" }}>
@@ -763,15 +781,33 @@ export default function IntelligencePage() {
                         <div style={{ fontSize: 10, fontWeight: 700, color: "#e5e5e5" }}>
                           {c.name}
                         </div>
-                        <div style={{ fontSize: 8, color: "#555" }}>{c.symbol}</div>
+                        <div style={{ fontSize: 8, color: "#555" }}>
+                          {isSalmon ? "NOK/kg · weekly" : c.symbol}
+                        </div>
                       </div>
                       <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: "#e5e5e5" }}>
-                          {c.currency === "USD" ? "$" : ""}{fmtPrice(c.latest.close)}
-                        </div>
-                        <div style={{ fontSize: 10, fontWeight: 600, color: retColor }}>
-                          {fmtPct(c.dayReturnPct, 1)}
-                        </div>
+                        {isSalmon ? (
+                          <>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#e5e5e5" }}>
+                              {"\u20AC"}{c.eurClose ? c.eurClose.toFixed(2) : "–"}
+                              <span style={{ color: "#888", fontWeight: 500, fontSize: 9 }}>
+                                {" "}NOK{fmtPrice(c.latest.close)}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: 10, fontWeight: 600, color: retColor }}>
+                              {fmtPct(c.dayReturnPct, 1)}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#e5e5e5" }}>
+                              {c.currency === "USD" ? "$" : ""}{fmtPrice(c.latest.close)}
+                            </div>
+                            <div style={{ fontSize: 10, fontWeight: 600, color: retColor }}>
+                              {fmtPct(c.dayReturnPct, 1)}
+                            </div>
+                          </>
+                        )}
                       </div>
                       <div dangerouslySetInnerHTML={{ __html: sparklineSvg(histData.slice(-30), 48, 18, sparkColor) }} />
                     </div>

@@ -7,7 +7,7 @@
  * Commodities tracked:
  *   BZ=F   Brent Crude Oil   → EQNR, AKRBP, DNO, SUBC, VAR, DOFG
  *   CL=F   WTI Crude Oil     → reference
- *   NG=F   Natural Gas       → energy sector
+ *   SALMON Salmon (SSB)      → MOWI, SALM, LSG, GSF, BAKKA, AUSS
  *   ALI=F  Aluminium LME     → NHY
  *   GC=F   Gold              → reference/hedge
  *   SI=F   Silver            → reference
@@ -62,13 +62,6 @@ const COMMODITIES: CommodityDef[] = [
     name: "WTI Crude Oil",
     currency: "USD",
     relatedTickers: ["EQNR", "AKRBP", "DNO"],
-  },
-  {
-    symbol: "NG=F",
-    yahooSymbol: "NG=F",
-    name: "Natural Gas",
-    currency: "USD",
-    relatedTickers: ["EQNR", "AKRBP", "VAR"],
   },
   {
     symbol: "ALI=F",
@@ -137,6 +130,109 @@ async function fetchYahooChart(
   }
 
   return rows;
+}
+
+// ── Salmon from SSB (Statistics Norway) ──
+// Table 03024: Weekly salmon export prices (NOK/kg)
+const SALMON_RELATED_TICKERS = ["MOWI", "SALM", "LSG", "GSF", "BAKKA", "AUSS"];
+
+async function fetchSalmonSSB(
+  existingKeys: Set<string>,
+  weeksBack: number = 52
+): Promise<number> {
+  console.log("Fetching Salmon prices from SSB (Statistics Norway)...");
+
+  // Build list of recent week codes (e.g., "2026U08", "2026U07")
+  const weekCodes: string[] = [];
+  const now = new Date();
+  for (let w = 0; w < weeksBack; w++) {
+    const d = new Date(now.getTime() - w * 7 * 86400000);
+    const year = d.getFullYear();
+    // ISO week number
+    const jan1 = new Date(year, 0, 1);
+    const dayOfYear = Math.ceil((d.getTime() - jan1.getTime()) / 86400000);
+    const weekNum = Math.ceil((dayOfYear + jan1.getDay()) / 7);
+    const wStr = String(weekNum).padStart(2, "0");
+    weekCodes.push(`${year}U${wStr}`);
+  }
+
+  const body = {
+    query: [
+      {
+        code: "Varugruppe",
+        selection: { filter: "item", values: ["01"] }, // Fresh salmon
+      },
+      {
+        code: "ContentsCode",
+        selection: { filter: "item", values: ["KiloprisNOK"] },
+      },
+      {
+        code: "Tid",
+        selection: { filter: "item", values: weekCodes },
+      },
+    ],
+    response: { format: "json-stat2" },
+  };
+
+  const resp = await fetch("https://data.ssb.no/api/v0/en/table/03024", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!resp.ok) {
+    console.error(`  SSB API error: ${resp.status} ${resp.statusText}`);
+    return 0;
+  }
+
+  const data = await resp.json();
+  const timeLabels: string[] = Object.keys(data.dimension?.Tid?.category?.label || {});
+  const values: (number | null)[] = data.value || [];
+
+  if (timeLabels.length === 0) {
+    console.error("  No salmon data from SSB");
+    return 0;
+  }
+
+  console.log(`  ${timeLabels.length} weekly data points from SSB`);
+
+  let inserted = 0;
+  for (let i = 0; i < timeLabels.length; i++) {
+    const weekCode = timeLabels[i]; // e.g., "2026U08"
+    const price = values[i];
+    if (price == null || price <= 0) continue;
+
+    // Convert week code to a Friday date (end of trading week)
+    const match = weekCode.match(/^(\d{4})U(\d{2})$/);
+    if (!match) continue;
+    const year = parseInt(match[1]);
+    const week = parseInt(match[2]);
+    // ISO week: week 1 contains Jan 4
+    const jan4 = new Date(year, 0, 4);
+    const dayOfWeek = jan4.getDay() || 7; // 1=Mon..7=Sun
+    const weekStart = new Date(jan4.getTime() + (1 - dayOfWeek) * 86400000);
+    const friday = new Date(weekStart.getTime() + ((week - 1) * 7 + 4) * 86400000);
+    const dateStr = friday.toISOString().slice(0, 10);
+
+    const key = `SALMON|${dateStr}`;
+    if (existingKeys.has(key)) continue;
+
+    if (DRY_RUN) {
+      console.log(`  [DRY] SALMON ${dateStr} (${weekCode}): NOK ${price.toFixed(2)}/kg`);
+    } else {
+      await pool.query(
+        `INSERT INTO commodity_prices (symbol, date, open, high, low, close, volume, currency, source)
+         VALUES ($1, $2, $3, $3, $3, $3, NULL, 'NOK', 'ssb')
+         ON CONFLICT (symbol, date) DO UPDATE SET close = EXCLUDED.close`,
+        ["SALMON", dateStr, price]
+      );
+      existingKeys.add(key);
+      inserted++;
+    }
+  }
+
+  console.log(`  ${inserted} new salmon price rows inserted\n`);
+  return inserted;
 }
 
 // ── Sensitivity calculation ──
@@ -257,6 +353,10 @@ async function main() {
     await new Promise((r) => setTimeout(r, 500));
   }
 
+  // ── Salmon from SSB ──
+  const salmonInserted = await fetchSalmonSSB(existingKeys, Math.ceil(DAYS_BACK / 7));
+  totalInserted += salmonInserted;
+
   console.log(`Total commodity prices inserted: ${totalInserted}\n`);
 
   // ── Commodity-Stock Sensitivity ──
@@ -268,7 +368,13 @@ async function main() {
     const today = new Date().toISOString().slice(0, 10);
     let sensitivityCount = 0;
 
-    for (const comm of COMMODITIES) {
+    // Include salmon alongside Yahoo commodities for sensitivity
+    const allCommodities = [
+      ...COMMODITIES,
+      { symbol: "SALMON", relatedTickers: SALMON_RELATED_TICKERS },
+    ];
+
+    for (const comm of allCommodities) {
       if (comm.relatedTickers.length === 0) continue;
 
       // Load commodity returns (252 days)
