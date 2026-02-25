@@ -25,7 +25,9 @@
     "news:test": "tsx scripts/test-ibkr-news.ts",
     "news:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-news-ibkr.ts",
     "shorts:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-ssr-shorts.ts",
-    "commodities:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-commodities.ts"
+    "commodities:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-commodities.ts",
+    "yahoo:backfill": "node scripts/backfill-yahoo.mjs",
+    "fundamentals:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-yahoo-fundamentals.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

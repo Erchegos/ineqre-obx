@@ -1,0 +1,69 @@
+name: Commodity Price Pipeline
+
+on:
+  schedule:
+    # 22:30 UTC — after US markets close (16:00 ET → 21:00 UTC)
+    # Gives 90 min buffer for settlement prices
+    - cron: '30 22 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Days of history to fetch'
+        type: string
+        default: '30'
+      skip_sensitivity:
+        description: 'Skip commodity-stock sensitivity calculation'
+        type: boolean
+        default: false
+
+jobs:
+  commodities:
+    name: Commodity Prices + Stock Sensitivity
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Create env file
+        working-directory: apps/web
+        run: |
+          echo 'DATABASE_URL="${{ secrets.DATABASE_URL }}"' > .env.local
+
+      - name: Fetch commodity prices
+        working-directory: apps/web
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: |
+          DAYS="${{ github.event.inputs.days || '30' }}"
+          EXTRA_FLAGS=""
+          if [ "${{ github.event.inputs.skip_sensitivity }}" = "true" ]; then
+            EXTRA_FLAGS="--skip-sensitivity"
+          fi
+          npx tsx scripts/fetch-commodities.ts --days=$DAYS $EXTRA_FLAGS
+
+      - name: Pipeline Summary
+        if: always()
+        run: |
+          echo "## Commodity Price Pipeline" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commodities**: Brent, WTI, NatGas, Aluminium, Gold, Silver, Salmon" >> $GITHUB_STEP_SUMMARY
+          echo "- **Days fetched**: ${{ github.event.inputs.days || '30' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Sensitivity**: ${{ github.event.inputs.skip_sensitivity == 'true' && 'Skipped' || 'Calculated' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time**: $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY

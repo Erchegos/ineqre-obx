@@ -1,0 +1,106 @@
+name: Daily Data Pipeline
+
+on:
+  schedule:
+    # 16:00 UTC = 17:00 CET (winter) / 18:00 CEST (summer)
+    # Oslo Børs closes at 16:30 CET, SSR updates ~15:30 CET
+    # This gives ~30 min buffer after market close
+    - cron: '0 16 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      skip_prices:
+        description: 'Skip Yahoo price backfill'
+        type: boolean
+        default: false
+      skip_shorts:
+        description: 'Skip SSR shorts fetch'
+        type: boolean
+        default: false
+      skip_fundamentals:
+        description: 'Skip Yahoo fundamentals fetch'
+        type: boolean
+        default: false
+      skip_ml:
+        description: 'Skip ML pipeline'
+        type: boolean
+        default: false
+
+jobs:
+  daily-data:
+    name: Yahoo Prices → Shorts → Fundamentals → ML
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Create env file
+        working-directory: apps/web
+        run: |
+          echo 'DATABASE_URL="${{ secrets.DATABASE_URL }}"' > .env.local
+
+      # ─── Step 1: Yahoo Price Backfill ───────────────────────────────
+      - name: "Step 1: Yahoo price backfill"
+        if: ${{ github.event.inputs.skip_prices != 'true' }}
+        working-directory: apps/web
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: node scripts/backfill-yahoo.mjs
+
+      # ─── Step 2: SSR Short Positions ────────────────────────────────
+      - name: "Step 2: Finanstilsynet short positions"
+        if: ${{ github.event.inputs.skip_shorts != 'true' }}
+        working-directory: apps/web
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: npx tsx scripts/fetch-ssr-shorts.ts
+
+      # ─── Step 3: Yahoo Fundamentals ─────────────────────────────────
+      - name: "Step 3: Yahoo fundamentals"
+        if: ${{ github.event.inputs.skip_fundamentals != 'true' }}
+        working-directory: apps/web
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: npx tsx scripts/fetch-yahoo-fundamentals.ts
+
+      # ─── Step 4: ML Pipeline ────────────────────────────────────────
+      - name: "Step 4: ML pipeline (factors → predictions)"
+        if: ${{ github.event.inputs.skip_ml != 'true' }}
+        working-directory: apps/web
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: npx tsx scripts/ml-daily-pipeline.ts
+
+      # ─── Summary ───────────────────────────────────────────────────
+      - name: Pipeline Summary
+        if: always()
+        run: |
+          echo "## Daily Data Pipeline" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Step | Task | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 1 | Yahoo Price Backfill | ${{ steps.step1.outcome || '✅' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 2 | SSR Short Positions | ${{ steps.step2.outcome || '✅' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 3 | Yahoo Fundamentals | ${{ steps.step3.outcome || '✅' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 4 | ML Pipeline | ${{ steps.step4.outcome || '✅' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time**: $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
