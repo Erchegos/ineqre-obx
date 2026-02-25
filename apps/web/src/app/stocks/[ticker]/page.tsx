@@ -1309,7 +1309,7 @@ export default function StockTickerPage() {
             }}>
               SIGNIFICANT MOVES (2σ)
             </div>
-            <div style={{ maxHeight: 180, overflowY: "auto", padding: "0 6px" }}>
+            <div style={{ maxHeight: 500, overflowY: "auto", padding: "4px 10px 10px" }}>
               <WhyDidItMove ticker={ticker} days={60} sigma={2} />
             </div>
           </div>
