@@ -45,6 +45,7 @@ export default function MonteCarloPage() {
   // Custom parameters (null = use historical)
   const [customDrift, setCustomDrift] = useState<number | null>(null);
   const [customVolatility, setCustomVolatility] = useState<number | null>(null);
+  const [showInfo, setShowInfo] = useState(false);
 
   // Fetch stock data
   useEffect(() => {
@@ -171,7 +172,7 @@ export default function MonteCarloPage() {
   return (
     <main style={{ padding: 24, maxWidth: 1400, margin: "0 auto" }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
         <h1 style={{ fontSize: 32, fontWeight: 600, margin: 0, letterSpacing: "-0.02em", color: "var(--foreground)" }}>
           {ticker || "?"} - Monte Carlo Simulation
         </h1>
@@ -200,27 +201,53 @@ export default function MonteCarloPage() {
         >
           {ticker} Analysis
         </Link>
+        <button
+          onClick={() => setShowInfo(!showInfo)}
+          title="About this simulation"
+          style={{
+            padding: "6px 12px",
+            borderRadius: 4,
+            border: "1px solid var(--border)",
+            background: showInfo ? "var(--hover-bg)" : "transparent",
+            color: "var(--muted-foreground)",
+            fontSize: 12,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontFamily: "monospace",
+          }}
+        >
+          <span style={{ fontSize: 14 }}>i</span> Info
+        </button>
       </div>
 
-      {/* Description */}
-      <div style={{
-        marginBottom: 24,
-        padding: 16,
-        background: "var(--hover-bg)",
-        border: "1px solid var(--border)",
-        borderRadius: 8,
-        fontSize: 13,
-        color: "var(--muted-foreground)",
-        lineHeight: 1.6,
-      }}>
-        <p style={{ margin: 0, marginBottom: 8 }}>
-          <strong>Monte Carlo Price Simulation</strong> - Visualize potential future price paths for {ticker} using historical volatility and returns.
-        </p>
-        <p style={{ margin: 0 }}>
-          Each path represents one possible future scenario. The simulation uses <strong>Geometric Brownian Motion (GBM)</strong> with
-          parameters calculated from the stock's historical performance. Extreme outlier paths are filtered for realistic results.
-        </p>
-      </div>
+      {/* Collapsible Info Panel */}
+      {showInfo && (
+        <div style={{
+          marginBottom: 16,
+          padding: 16,
+          background: "var(--hover-bg)",
+          border: "1px solid var(--border)",
+          borderRadius: 8,
+          fontSize: 13,
+          color: "var(--muted-foreground)",
+          lineHeight: 1.6,
+        }}>
+          <p style={{ margin: 0, marginBottom: 8 }}>
+            <strong>Monte Carlo Price Simulation</strong> - Visualize potential future price paths for {ticker} using historical volatility and returns.
+            Each path represents one possible future scenario using <strong>Geometric Brownian Motion (GBM)</strong>.
+            Extreme outlier paths are filtered for realistic results.
+          </p>
+          <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }}>
+            <li><strong>Paths:</strong> Each line is one possible future price trajectory.</li>
+            <li><strong>Magenta path:</strong> Highlighted path for easier tracking.</li>
+            <li><strong>Right axis:</strong> %-return from current price.</li>
+            <li><strong>Distribution:</strong> Range of final prices. Green bars = empirical, magenta = theoretical.</li>
+            <li><strong>Percentiles:</strong> 5th-95th show 90% confidence interval.</li>
+          </ul>
+        </div>
+      )}
 
       {loading && (
         <div style={{ padding: 20, borderRadius: 4, border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--muted)", fontSize: 14 }}>
@@ -439,29 +466,6 @@ export default function MonteCarloPage() {
             />
           </div>
 
-          {/* Interpretation Guide */}
-          <div style={{
-            marginTop: 24,
-            padding: 16,
-            background: "var(--hover-bg)",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            fontSize: 13,
-            color: "var(--muted-foreground)",
-            lineHeight: 1.6,
-          }}>
-            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: "var(--foreground)" }}>
-              How to Interpret This Simulation
-            </h3>
-            <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6 }}>
-              <li><strong>Paths:</strong> Each line shows one possible future price trajectory based on historical patterns.</li>
-              <li><strong>Magenta path:</strong> One randomly highlighted path for easier tracking.</li>
-              <li><strong>Distribution:</strong> Shows the range of possible final prices. Bell curve shape indicates normal distribution.</li>
-              <li><strong>Green area:</strong> Empirical distribution from simulation results.</li>
-              <li><strong>Magenta curve:</strong> Theoretical normal distribution predicted by GBM model.</li>
-              <li><strong>Percentiles:</strong> 5th and 95th percentiles show the range where 90% of outcomes fall.</li>
-            </ul>
-          </div>
         </>
       )}
     </main>

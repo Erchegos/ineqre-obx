@@ -249,6 +249,7 @@ export default function MonteCarloChart({
                 />
 
                 <YAxis
+                  yAxisId="left"
                   stroke="var(--muted)"
                   fontSize={11}
                   label={{
@@ -258,6 +259,24 @@ export default function MonteCarloChart({
                     style: { fill: "var(--foreground)", fontSize: 12 },
                   }}
                   domain={['auto', 'auto']}
+                />
+
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  stroke="var(--muted)"
+                  fontSize={10}
+                  tickFormatter={(val: number) => {
+                    const pct = ((val - startPrice) / startPrice) * 100;
+                    return `${pct >= 0 ? "+" : ""}${pct.toFixed(0)}%`;
+                  }}
+                  domain={['auto', 'auto']}
+                  label={{
+                    value: "Return %",
+                    angle: 90,
+                    position: "insideRight",
+                    style: { fill: "var(--muted)", fontSize: 11 },
+                  }}
                 />
 
                 <Tooltip
@@ -292,6 +311,7 @@ export default function MonteCarloChart({
 
                 {/* Reference line at starting price */}
                 <ReferenceLine
+                  yAxisId="left"
                   y={startPrice}
                   stroke="#666"
                   strokeDasharray="3 3"
@@ -301,6 +321,7 @@ export default function MonteCarloChart({
                 {/* Highlight one path in magenta */}
                 {paths.length > 0 && (
                   <Line
+                    yAxisId="left"
                     dataKey="path0"
                     stroke="#d946ef"
                     strokeWidth={2}
@@ -313,6 +334,7 @@ export default function MonteCarloChart({
                 {paths.slice(1).map((_, idx) => (
                   <Line
                     key={idx}
+                    yAxisId="left"
                     dataKey={`path${idx + 1}`}
                     stroke="rgba(20, 184, 166, 0.4)"
                     strokeWidth={0.8}
