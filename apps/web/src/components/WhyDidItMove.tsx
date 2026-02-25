@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /* ─── Types ────────────────────────────────────────────────────── */
 
@@ -127,6 +127,38 @@ const fmtNok = (n: number) => {
   return n.toFixed(0);
 };
 
+/* ─── Animated collapsible wrapper ─────────────────────────────── */
+
+function Collapsible({
+  open,
+  children,
+}: {
+  open: boolean;
+  children: React.ReactNode;
+}) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState(0);
+
+  useEffect(() => {
+    if (contentRef.current) {
+      setHeight(contentRef.current.scrollHeight);
+    }
+  }, [open, children]);
+
+  return (
+    <div
+      style={{
+        maxHeight: open ? height : 0,
+        opacity: open ? 1 : 0,
+        overflow: "hidden",
+        transition: "max-height 350ms cubic-bezier(0.4,0,0.2,1), opacity 250ms ease",
+      }}
+    >
+      <div ref={contentRef}>{children}</div>
+    </div>
+  );
+}
+
 /* ─── Component ────────────────────────────────────────────────── */
 
 export default function WhyDidItMove({
@@ -244,7 +276,7 @@ export default function WhyDidItMove({
             key={`${move.date}-${idx}`}
             style={{
               borderBottom: "1px solid var(--border)",
-              padding: "10px 0",
+              padding: "12px 0",
               cursor: "pointer",
             }}
             onClick={() => setExpandedIdx(isExpanded ? null : idx)}
@@ -257,6 +289,21 @@ export default function WhyDidItMove({
                 gap: 12,
               }}
             >
+              {/* Chevron */}
+              <span
+                style={{
+                  fontSize: 10,
+                  color: "var(--muted-foreground)",
+                  transition: "transform 250ms ease",
+                  transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
+                  width: 12,
+                  textAlign: "center",
+                  flexShrink: 0,
+                }}
+              >
+                ▶
+              </span>
+
               {/* Direction arrow */}
               <span
                 style={{
@@ -265,6 +312,7 @@ export default function WhyDidItMove({
                   color: isUp ? "#22c55e" : "#ef4444",
                   width: 20,
                   textAlign: "center",
+                  flexShrink: 0,
                 }}
               >
                 {isUp ? "▲" : "▼"}
@@ -368,38 +416,41 @@ export default function WhyDidItMove({
               </div>
             </div>
 
-            {/* ── Expanded detail panel ── */}
-            {isExpanded && (
-              <div style={{ marginTop: 8, marginLeft: 32 }}>
+            {/* ── Animated expanded detail panel ── */}
+            <Collapsible open={isExpanded}>
+              <div style={{ marginTop: 10, marginLeft: 44, paddingBottom: 4 }}>
                 {/* News events */}
                 {move.newsEvents.length > 0 && (
                   <div
                     style={{
-                      padding: "8px 12px",
+                      padding: "12px 16px",
                       background: "rgba(255,255,255,0.03)",
-                      borderRadius: 4,
+                      borderRadius: 6,
                       border: "1px solid var(--border)",
-                      marginBottom: 6,
+                      marginBottom: 8,
                     }}
                   >
-                    {move.newsEvents.map((ne) => {
+                    {move.newsEvents.map((ne, neIdx) => {
                       const typeColor =
                         EVENT_TYPE_COLORS[ne.eventType] || "#6b7280";
+                      const isLast = neIdx === move.newsEvents.length - 1;
                       return (
                         <div
                           key={`${ne.source}-${ne.id}`}
                           style={{
-                            padding: "6px 0",
-                            borderBottom:
-                              "1px solid rgba(255,255,255,0.04)",
+                            padding: "8px 0",
+                            borderBottom: isLast
+                              ? "none"
+                              : "1px solid rgba(255,255,255,0.06)",
                           }}
                         >
                           <div
                             style={{
                               color: "var(--foreground)",
-                              lineHeight: 1.4,
-                              marginBottom: 3,
-                              fontSize: 11,
+                              lineHeight: 1.5,
+                              marginBottom: 4,
+                              fontSize: 12,
+                              fontWeight: 500,
                             }}
                           >
                             {ne.url ? (
@@ -410,7 +461,8 @@ export default function WhyDidItMove({
                                 style={{
                                   color: "var(--foreground)",
                                   textDecoration: "none",
-                                  borderBottom: "1px dotted var(--muted-foreground)",
+                                  borderBottom:
+                                    "1px dotted var(--muted-foreground)",
                                 }}
                                 onClick={(e) => e.stopPropagation()}
                               >
@@ -426,11 +478,12 @@ export default function WhyDidItMove({
                               gap: 6,
                               alignItems: "center",
                               fontSize: 9,
+                              flexWrap: "wrap",
                             }}
                           >
                             <span
                               style={{
-                                padding: "1px 4px",
+                                padding: "1px 5px",
                                 borderRadius: 2,
                                 background: `${typeColor}15`,
                                 color: typeColor,
@@ -443,7 +496,7 @@ export default function WhyDidItMove({
                             {ne.source === "newsweb" && (
                               <span
                                 style={{
-                                  padding: "1px 4px",
+                                  padding: "1px 5px",
                                   borderRadius: 2,
                                   background: "#06b6d415",
                                   color: "#06b6d4",
@@ -490,9 +543,10 @@ export default function WhyDidItMove({
                             <p
                               style={{
                                 color: "var(--muted-foreground)",
-                                fontSize: 10,
-                                lineHeight: 1.5,
-                                marginTop: 4,
+                                fontSize: 11,
+                                lineHeight: 1.6,
+                                marginTop: 6,
+                                marginBottom: 0,
                               }}
                             >
                               {ne.summary}
@@ -508,11 +562,11 @@ export default function WhyDidItMove({
                 {move.insiderTransactions.length > 0 && (
                   <div
                     style={{
-                      padding: "8px 12px",
+                      padding: "12px 16px",
                       background: "rgba(236,72,153,0.04)",
-                      borderRadius: 4,
+                      borderRadius: 6,
                       border: "1px solid rgba(236,72,153,0.15)",
-                      marginBottom: 6,
+                      marginBottom: 8,
                     }}
                   >
                     <div
@@ -522,7 +576,7 @@ export default function WhyDidItMove({
                         textTransform: "uppercase",
                         letterSpacing: "0.06em",
                         color: "#ec4899",
-                        marginBottom: 6,
+                        marginBottom: 8,
                       }}
                     >
                       Insider Transactions
@@ -535,9 +589,11 @@ export default function WhyDidItMove({
                         <div
                           key={i}
                           style={{
-                            padding: "4px 0",
+                            padding: "6px 0",
                             borderBottom:
-                              "1px solid rgba(255,255,255,0.04)",
+                              i === move.insiderTransactions.length - 1
+                                ? "none"
+                                : "1px solid rgba(255,255,255,0.04)",
                             fontSize: 11,
                           }}
                         >
@@ -552,26 +608,19 @@ export default function WhyDidItMove({
                               <span
                                 style={{
                                   fontWeight: 700,
-                                  color: isBuy
-                                    ? "#22c55e"
-                                    : "#ef4444",
+                                  color: isBuy ? "#22c55e" : "#ef4444",
                                   marginRight: 6,
                                 }}
                               >
                                 {it.transactionType}
                               </span>
-                              <span
-                                style={{
-                                  color: "var(--foreground)",
-                                }}
-                              >
+                              <span style={{ color: "var(--foreground)" }}>
                                 {it.personName}
                               </span>
                               {it.personRole && (
                                 <span
                                   style={{
-                                    color:
-                                      "var(--muted-foreground)",
+                                    color: "var(--muted-foreground)",
                                     marginLeft: 4,
                                     fontSize: 9,
                                   }}
@@ -617,11 +666,11 @@ export default function WhyDidItMove({
                 {move.shortContext?.significant && (
                   <div
                     style={{
-                      padding: "8px 12px",
+                      padding: "10px 16px",
                       background: "rgba(239,68,68,0.04)",
-                      borderRadius: 4,
+                      borderRadius: 6,
                       border: "1px solid rgba(239,68,68,0.15)",
-                      marginBottom: 6,
+                      marginBottom: 8,
                       fontSize: 11,
                     }}
                   >
@@ -632,7 +681,7 @@ export default function WhyDidItMove({
                         textTransform: "uppercase",
                         letterSpacing: "0.06em",
                         color: "#ef4444",
-                        marginBottom: 4,
+                        marginBottom: 6,
                       }}
                     >
                       Short Position Change
@@ -678,9 +727,7 @@ export default function WhyDidItMove({
                         }}
                       >
                         {move.shortContext.activePositions} holder
-                        {move.shortContext.activePositions !== 1
-                          ? "s"
-                          : ""}
+                        {move.shortContext.activePositions !== 1 ? "s" : ""}
                       </span>
                     </div>
                   </div>
@@ -690,11 +737,11 @@ export default function WhyDidItMove({
                 {move.marketContext && (
                   <div
                     style={{
-                      padding: "6px 12px",
+                      padding: "8px 16px",
                       background: "rgba(99,102,241,0.04)",
-                      borderRadius: 4,
+                      borderRadius: 6,
                       border: "1px solid rgba(99,102,241,0.12)",
-                      marginBottom: 6,
+                      marginBottom: 8,
                       fontSize: 11,
                       display: "flex",
                       gap: 12,
@@ -726,26 +773,16 @@ export default function WhyDidItMove({
                         {(move.marketContext.obxReturn * 100).toFixed(2)}%
                       </span>
                     </span>
-                    {move.marketContext.isSystematic && (
-                      <span
-                        style={{
-                          fontSize: 9,
-                          color: "var(--muted-foreground)",
-                        }}
-                      >
-                        Systematic move — market-wide
-                      </span>
-                    )}
-                    {!move.marketContext.isSystematic && (
-                      <span
-                        style={{
-                          fontSize: 9,
-                          color: "var(--muted-foreground)",
-                        }}
-                      >
-                        Idiosyncratic — stock-specific
-                      </span>
-                    )}
+                    <span
+                      style={{
+                        fontSize: 9,
+                        color: "var(--muted-foreground)",
+                      }}
+                    >
+                      {move.marketContext.isSystematic
+                        ? "Systematic move — market-wide"
+                        : "Idiosyncratic — stock-specific"}
+                    </span>
                   </div>
                 )}
 
@@ -753,11 +790,11 @@ export default function WhyDidItMove({
                 {move.commodityContext.length > 0 && (
                   <div
                     style={{
-                      padding: "6px 12px",
+                      padding: "8px 16px",
                       background: "rgba(245,158,11,0.04)",
-                      borderRadius: 4,
+                      borderRadius: 6,
                       border: "1px solid rgba(245,158,11,0.12)",
-                      marginBottom: 6,
+                      marginBottom: 8,
                       fontSize: 11,
                       display: "flex",
                       gap: 12,
@@ -807,21 +844,21 @@ export default function WhyDidItMove({
                   move.commodityContext.length === 0 && (
                     <div
                       style={{
-                        padding: "8px 12px",
+                        padding: "10px 16px",
                         background: "rgba(245,158,11,0.06)",
-                        borderRadius: 4,
+                        borderRadius: 6,
                         border: "1px solid rgba(245,158,11,0.15)",
                         fontSize: 11,
                         color: "#f59e0b",
                       }}
                     >
-                      No correlated events found. This move may be
-                      technical (mean-reversion candidate) or driven by
-                      information not yet in the system.
+                      No correlated events found. This move may be technical
+                      (mean-reversion candidate) or driven by information not
+                      yet in the system.
                     </div>
                   )}
               </div>
-            )}
+            </Collapsible>
           </div>
         );
       })}
