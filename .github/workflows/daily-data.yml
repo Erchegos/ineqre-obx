@@ -24,10 +24,14 @@ on:
         description: 'Skip ML pipeline'
         type: boolean
         default: false
+      skip_newsweb:
+        description: 'Skip NewsWeb filings fetch'
+        type: boolean
+        default: false
 
 jobs:
   daily-data:
-    name: Yahoo Prices → Shorts → Fundamentals → ML
+    name: Yahoo Prices → Shorts → Fundamentals → ML → NewsWeb
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -88,6 +92,15 @@ jobs:
           NODE_TLS_REJECT_UNAUTHORIZED: '0'
         run: npx tsx scripts/ml-daily-pipeline.ts
 
+      # ─── Step 5: NewsWeb Filings ──────────────────────────────────
+      - name: "Step 5: NewsWeb regulatory filings"
+        if: ${{ github.event.inputs.skip_newsweb != 'true' }}
+        working-directory: apps/web
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: npx tsx scripts/fetch-newsweb-filings.ts --days=3
+
       # ─── Summary ───────────────────────────────────────────────────
       - name: Pipeline Summary
         if: always()
@@ -100,6 +113,7 @@ jobs:
           echo "| 2 | SSR Short Positions | ${{ steps.step2.outcome || '✅' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| 3 | Yahoo Fundamentals | ${{ steps.step3.outcome || '✅' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| 4 | ML Pipeline | ${{ steps.step4.outcome || '✅' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 5 | NewsWeb Filings | ${{ steps.step5.outcome || '✅' }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Time**: $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY

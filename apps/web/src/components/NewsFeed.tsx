@@ -85,6 +85,10 @@ const TYPE_LABEL: Record<string, { label: string; color: string }> = {
   macro: { label: "Macro", color: "#6366f1" },
   geopolitical: { label: "Geopolitical", color: "#ef4444" },
   sector_news: { label: "Sector", color: "#14b8a6" },
+  mandatory_notification: { label: "Filing", color: "#06b6d4" },
+  buyback: { label: "Buyback", color: "#f59e0b" },
+  dividend: { label: "Dividend", color: "#22c55e" },
+  management_change: { label: "Mgmt", color: "#8b5cf6" },
 };
 
 /* ─── Helpers ──────────────────────────────────────────────────── */
@@ -234,11 +238,11 @@ export default function NewsFeed({
     return (
       <div style={{ padding: compact ? 8 : 16, fontFamily: "'Geist Mono', monospace" }}>
         <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginBottom: 6 }}>
-          No news events{ticker ? ` for ${ticker}` : ""} in the last 30 days.
+          No news events{ticker ? ` for ${ticker}` : ""} in the last 90 days.
         </div>
         {ticker && (
           <div style={{ fontSize: 9, color: "var(--muted-foreground)", opacity: 0.6, lineHeight: 1.5 }}>
-            Source: IBKR (Dow Jones, Briefing, FlyOnTheWall). Coverage varies by ticker — Norwegian small/mid-caps may have limited headlines.
+            Sources: IBKR (Dow Jones, Briefing, FlyOnTheWall) + Oslo Bors NewsWeb (regulatory filings). Coverage varies by ticker.
           </div>
         )}
       </div>
@@ -351,6 +355,16 @@ export default function NewsFeed({
                       letterSpacing: "0.02em",
                     }}>
                       {typeInfo.label}
+                    </span>
+                  )}
+
+                  {/* NewsWeb source badge */}
+                  {ev.source === "newsweb" && (
+                    <span style={{
+                      fontSize: 8, fontWeight: 600, padding: "1px 4px", borderRadius: 2,
+                      background: "#06b6d415", color: "#06b6d4",
+                    }}>
+                      NW
                     </span>
                   )}
 
@@ -587,7 +601,7 @@ export default function NewsFeed({
       {/* Source attribution */}
       {compact && eventCount > 0 && (
         <div style={{ padding: "6px 0 2px", fontSize: 8, color: "var(--muted-foreground)", opacity: 0.5, textAlign: "right" }}>
-          {eventCount} article{eventCount !== 1 ? "s" : ""} · IBKR/DJ
+          {eventCount} article{eventCount !== 1 ? "s" : ""} · IBKR · NW
         </div>
       )}
     </div>

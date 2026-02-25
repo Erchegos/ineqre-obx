@@ -148,6 +148,7 @@ All endpoints in `apps/web/src/app/api/`
 | Endpoint | Purpose |
 |----------|---------|
 | `GET /api/news` | AI-classified news feed (severity, sentiment, ticker/sector mapping) |
+| `GET /api/news/ticker/[ticker]` | Per-ticker news: merges IBKR news + NewsWeb filings, sorted by date |
 | `GET /api/shorts` | Latest short positions for all stocks (Finanstilsynet SSR) |
 | `GET /api/shorts/[ticker]` | Per-stock short position history with holder breakdown |
 | `GET /api/commodities` | All commodity prices with stock sensitivity data |
@@ -347,11 +348,12 @@ Run after market close alongside ML pipeline:
 1. **Short positions**: `pnpm run shorts:fetch` — Finanstilsynet SSR API (no auth, free JSON)
 2. **Commodity prices**: `pnpm run commodities:fetch` — Yahoo Finance OHLCV + stock sensitivity regression
 3. **News**: `pnpm run news:fetch` — IBKR news headlines with AI classification
+4. **NewsWeb filings**: `pnpm run newsweb:fetch` — Oslo Børs regulatory filings (insider trades, earnings, buybacks, dividends)
 
 ### Automation
 - **GitHub Actions**: ML pipeline daily at 01:00 UTC, Email import every 10 min
 - **Local**: `pnpm run daily-update` (smart IBKR → Yahoo fallback)
-- **Intelligence data**: Run `shorts:fetch` + `commodities:fetch` daily after prices are updated
+- **Intelligence data**: Run `shorts:fetch` + `commodities:fetch` + `newsweb:fetch` daily after prices are updated
 
 ---
 
@@ -375,6 +377,7 @@ Run after market close alongside ML pipeline:
 | `fetch-options-daily.ts` | Fetch options chains from Yahoo Finance, store in DB |
 | `fetch-ssr-shorts.ts` | Fetch short positions from Finanstilsynet SSR API |
 | `fetch-commodities.ts` | Fetch commodity prices from Yahoo + calculate stock sensitivity |
+| `fetch-newsweb-filings.ts` | Fetch regulatory filings from Oslo Børs NewsWeb API into `newsweb_filings` |
 
 ### scripts/
 | Script | Purpose |
@@ -424,8 +427,9 @@ pnpm run ml:pipeline      # Full ML pipeline
 pnpm run daily-update     # Smart IBKR→Yahoo + ML
 pnpm run ibkr:scan-universe  # Scan for new tickers
 pnpm run import:new-tickers  # Import new tickers
-pnpm run shorts:fetch     # Fetch Finanstilsynet short positions
+pnpm run shorts:fetch       # Fetch Finanstilsynet short positions
 pnpm run commodities:fetch  # Fetch commodity prices + sensitivity
+pnpm run newsweb:fetch      # Fetch Oslo Børs NewsWeb filings
 ```
 
 ---

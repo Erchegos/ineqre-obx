@@ -27,7 +27,8 @@
     "shorts:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-ssr-shorts.ts",
     "commodities:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-commodities.ts",
     "yahoo:backfill": "node scripts/backfill-yahoo.mjs",
-    "fundamentals:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-yahoo-fundamentals.ts"
+    "fundamentals:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-yahoo-fundamentals.ts",
+    "newsweb:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-newsweb-filings.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
