@@ -33,6 +33,9 @@ type NewsEvent = {
   structuredFacts: StructuredFacts | null;
   tickers: TickerRef[];
   sectors: SectorRef[];
+  primaryTicker: string | null;
+  dayReturnPct: number | null;
+  priceClose: number | null;
 };
 
 /* ─── Constants ────────────────────────────────────────────────── */
@@ -586,7 +589,7 @@ export default function NewsPage() {
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "52px 3px 1fr 80px 60px",
+                      gridTemplateColumns: "52px 3px 1fr 80px 60px 60px",
                       padding: "6px 10px",
                       fontSize: 9,
                       fontWeight: 700,
@@ -602,6 +605,7 @@ export default function NewsPage() {
                     <span>HEADLINE</span>
                     <span style={{ textAlign: "center" }}>TYPE</span>
                     <span style={{ textAlign: "right" }}>SENT</span>
+                    <span style={{ textAlign: "right" }}>RETURN</span>
                   </div>
 
                   {sortedEvents.map((ev) => {
@@ -620,7 +624,7 @@ export default function NewsPage() {
                           }
                           style={{
                             display: "grid",
-                            gridTemplateColumns: "52px 3px 1fr 80px 60px",
+                            gridTemplateColumns: "52px 3px 1fr 80px 60px 60px",
                             padding: "8px 10px",
                             cursor: "pointer",
                             borderBottom: "1px solid rgba(255,255,255,0.04)",
@@ -742,6 +746,28 @@ export default function NewsPage() {
                           >
                             {ev.sentiment !== null
                               ? `${ev.sentiment > 0 ? "+" : ""}${ev.sentiment.toFixed(2)}`
+                              : "—"}
+                          </div>
+
+                          {/* Day Return */}
+                          <div
+                            style={{
+                              textAlign: "right",
+                              paddingTop: 2,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color:
+                                ev.dayReturnPct !== null
+                                  ? ev.dayReturnPct > 0.3
+                                    ? "#22c55e"
+                                    : ev.dayReturnPct < -0.3
+                                    ? "#ef4444"
+                                    : "#6b7280"
+                                  : "var(--muted-foreground)",
+                            }}
+                          >
+                            {ev.dayReturnPct !== null
+                              ? `${ev.dayReturnPct > 0 ? "+" : ""}${ev.dayReturnPct.toFixed(1)}%`
                               : "—"}
                           </div>
                         </div>

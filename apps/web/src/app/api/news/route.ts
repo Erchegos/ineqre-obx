@@ -9,10 +9,13 @@
  *   ?event_type=earnings    — filter by event type
  *   ?limit=50               — max results (default 50, max 200)
  *   ?before=ISO_DATE        — pagination cursor
+ *
+ * Returns news events with daily stock return for the primary ticker.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
+import { getPriceTable } from "@/lib/price-data-adapter";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,6 +61,7 @@ export async function GET(req: NextRequest) {
     conditions.push(`e.published_at > NOW() - INTERVAL '30 days'`);
 
     const where = conditions.join(" AND ");
+    const priceTable = await getPriceTable();
 
     const result = await pool.query(`
       SELECT
@@ -69,7 +73,7 @@ export async function GET(req: NextRequest) {
             'ticker', tm.ticker,
             'relevance', tm.relevance_score::float,
             'direction', tm.impact_direction
-          )) FROM news_ticker_map tm WHERE tm.news_event_id = e.id),
+          ) ORDER BY tm.relevance_score DESC NULLS LAST) FROM news_ticker_map tm WHERE tm.news_event_id = e.id),
           '[]'
         ) AS tickers,
         COALESCE(
@@ -78,8 +82,37 @@ export async function GET(req: NextRequest) {
             'impact', sm.impact_score::float
           )) FROM news_sector_map sm WHERE sm.news_event_id = e.id),
           '[]'
-        ) AS sectors
+        ) AS sectors,
+        -- Primary ticker (highest relevance) for price lookup
+        primary_tm.ticker AS primary_ticker,
+        pd.close AS price_close,
+        CASE WHEN pd.prev_close > 0
+          THEN ((pd.close - pd.prev_close) / pd.prev_close * 100)::float
+          ELSE NULL
+        END AS day_return_pct
       FROM news_events e
+      LEFT JOIN LATERAL (
+        SELECT tm.ticker FROM news_ticker_map tm
+        WHERE tm.news_event_id = e.id
+        ORDER BY tm.relevance_score DESC NULLS LAST
+        LIMIT 1
+      ) primary_tm ON true
+      LEFT JOIN LATERAL (
+        SELECT
+          p1.close,
+          (SELECT p2.close FROM public.${priceTable} p2
+           WHERE upper(p2.ticker) = primary_tm.ticker AND p2.close IS NOT NULL
+             AND p2.date < p1.date ORDER BY p2.date DESC LIMIT 1
+          ) AS prev_close
+        FROM public.${priceTable} p1
+        WHERE primary_tm.ticker IS NOT NULL
+          AND upper(p1.ticker) = primary_tm.ticker
+          AND p1.close IS NOT NULL
+          AND p1.date <= (e.published_at::date + INTERVAL '1 day')
+          AND p1.date >= (e.published_at::date - INTERVAL '3 days')
+        ORDER BY p1.date DESC
+        LIMIT 1
+      ) pd ON true
       WHERE ${where}
       ORDER BY e.published_at DESC
       LIMIT $${idx}
@@ -101,6 +134,9 @@ export async function GET(req: NextRequest) {
         structuredFacts: r.structured_facts,
         tickers: r.tickers,
         sectors: r.sectors,
+        primaryTicker: r.primary_ticker || null,
+        dayReturnPct: r.day_return_pct != null ? Number(r.day_return_pct) : null,
+        priceClose: r.price_close != null ? Number(r.price_close) : null,
       })),
       count: result.rowCount,
     });
