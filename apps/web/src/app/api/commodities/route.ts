@@ -29,6 +29,9 @@ export async function GET(req: NextRequest) {
     const sp = req.nextUrl.searchParams;
     const days = parseInt(sp.get("days") || "90");
 
+    // Only return commodities we actively track
+    const TRACKED_SYMBOLS = Object.keys(COMMODITY_NAMES);
+
     // Latest price per commodity
     const latestResult = await pool.query(`
       SELECT DISTINCT ON (cp.symbol)
@@ -41,8 +44,9 @@ export async function GET(req: NextRequest) {
         cp.volume::bigint AS volume,
         cp.currency
       FROM commodity_prices cp
+      WHERE cp.symbol = ANY($1::text[])
       ORDER BY cp.symbol, cp.date DESC
-    `);
+    `, [TRACKED_SYMBOLS]);
 
     // Fetch latest EUR/NOK rate for salmon conversion
     let nokPerEur: number | null = null;
