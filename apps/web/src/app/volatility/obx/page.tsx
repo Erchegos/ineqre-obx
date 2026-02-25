@@ -52,7 +52,6 @@ export default function OBXVolatilityDashboard() {
         const res = await fetch(`/api/volatility/obx?limit=${limit}`, {
           method: "GET",
           headers: { accept: "application/json" },
-          cache: "no-store",
         });
         if (!res.ok) {
           const text = await res.text();

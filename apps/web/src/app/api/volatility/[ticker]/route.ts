@@ -422,7 +422,9 @@ export async function GET(
       },
     };
     
-    return NextResponse.json(responseData);
+    return NextResponse.json(responseData, {
+      headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" },
+    });
   } catch (e: any) {
     console.error('[Volatility API] Error:', e);
     return NextResponse.json(

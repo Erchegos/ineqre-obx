@@ -84,7 +84,9 @@ export async function GET(req: NextRequest) {
       rows: Number(row.rows),
     }));
 
-    return secureJsonResponse(stocks);
+    return secureJsonResponse(stocks, {
+      headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" },
+    });
   } catch (e: unknown) {
     // Don't expose internal database error details to clients
     return safeErrorResponse(e, 'Failed to fetch stocks data');

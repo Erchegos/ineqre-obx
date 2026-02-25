@@ -211,7 +211,7 @@ export default function NewsFeed({
       const url = ticker
         ? `/api/news/ticker/${ticker}?${params}`
         : `/api/news?${params}`;
-      const res = await fetch(url, { cache: "no-store" });
+      const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
       setEvents(dedup(data.events || []));

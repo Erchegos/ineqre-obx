@@ -46,11 +46,16 @@ export async function GET() {
 
     const tickers = result.rows.map((row) => row.ticker);
 
-    return NextResponse.json({
-      success: true,
-      count: tickers.length,
-      tickers,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        count: tickers.length,
+        tickers,
+      },
+      {
+        headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" },
+      }
+    );
   } catch (error: any) {
     console.error("Error fetching factor tickers:", error);
     return NextResponse.json(

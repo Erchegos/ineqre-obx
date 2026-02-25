@@ -312,7 +312,6 @@ export default function StockTickerPage() {
         const res = await fetch(url, {
           method: "GET",
           headers: { accept: "application/json" },
-          cache: "no-store",
         });
 
         if (!res.ok) {
@@ -353,7 +352,7 @@ export default function StockTickerPage() {
     };
   }, [ticker, limit, customDateRange]);
 
-  // Fetch stock metadata and check if factor data exists
+  // Fetch stock metadata, factor eligibility, AND fundamentals in parallel
   useEffect(() => {
     let cancelled = false;
 
@@ -368,24 +367,37 @@ export default function StockTickerPage() {
       setStockMetaLoading(true);
 
       try {
-        // Run both API calls in PARALLEL for faster load
-        const [factorRes, stocksRes] = await Promise.all([
+        // Run ALL 3 API calls in PARALLEL for faster load
+        const [factorRes, stocksRes, fundRes] = await Promise.all([
           fetch(`/api/factors/tickers`, {
             method: "GET",
             headers: { accept: "application/json" },
-            cache: "no-store",
           }),
           fetch(`/api/stocks`, {
             method: "GET",
             headers: { accept: "application/json" },
-            cache: "no-store",
           }),
+          fetch(`/api/factors/${encodeURIComponent(ticker)}?type=fundamental&limit=1`),
         ]);
 
         let factorExists = false;
         if (factorRes.ok) {
           const factorData = await factorRes.json();
           factorExists = factorData.success && factorData.tickers?.includes(ticker);
+        }
+
+        // Parse fundamentals
+        if (!cancelled && fundRes.ok) {
+          const fundJson = await fundRes.json();
+          if (fundJson.success && fundJson.data?.length > 0) {
+            const d = fundJson.data[0];
+            setInlineFundamentals({
+              ep: d.ep != null ? Number(d.ep) : null,
+              bm: d.bm != null ? Number(d.bm) : null,
+              dy: d.dy != null ? Number(d.dy) : null,
+              mktcap: d.mktcap != null ? Number(d.mktcap) : null,
+            });
+          }
         }
 
         if (!stocksRes.ok) {
@@ -423,30 +435,6 @@ export default function StockTickerPage() {
     };
   }, [ticker]);
 
-  // Fetch inline fundamentals (compact strip)
-  useEffect(() => {
-    let cancelled = false;
-    async function fetchFundamentals() {
-      if (!ticker) return;
-      try {
-        const res = await fetch(`/api/factors/${encodeURIComponent(ticker)}?type=fundamental&limit=1`);
-        if (!res.ok) return;
-        const json = await res.json();
-        if (!cancelled && json.success && json.data?.length > 0) {
-          const d = json.data[0];
-          setInlineFundamentals({
-            ep: d.ep != null ? Number(d.ep) : null,
-            bm: d.bm != null ? Number(d.bm) : null,
-            dy: d.dy != null ? Number(d.dy) : null,
-            mktcap: d.mktcap != null ? Number(d.mktcap) : null,
-          });
-        }
-      } catch { /* silently skip */ }
-    }
-    fetchFundamentals();
-    return () => { cancelled = true; };
-  }, [ticker]);
-
   // Fetch residuals data
   useEffect(() => {
     let cancelled = false;
@@ -468,7 +456,6 @@ export default function StockTickerPage() {
         const res = await fetch(url, {
           method: "GET",
           headers: { accept: "application/json" },
-          cache: "no-store",
         });
 
         if (!res.ok) {
@@ -531,7 +518,6 @@ export default function StockTickerPage() {
         const res = await fetch(url, {
           method: "GET",
           headers: { accept: "application/json" },
-          cache: "no-store",
         });
 
         if (!res.ok) {
@@ -588,7 +574,6 @@ export default function StockTickerPage() {
       const res = await fetch(`/api/std-channel-optimize/${encodeURIComponent(ticker)}?${params.toString()}`, {
         method: "GET",
         headers: { accept: "application/json" },
-        cache: "no-store",
       });
 
       if (!res.ok) {

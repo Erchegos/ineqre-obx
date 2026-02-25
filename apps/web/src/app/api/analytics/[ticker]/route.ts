@@ -282,41 +282,44 @@ export async function GET(
       return: r
     }));
 
-    return NextResponse.json({
-      ticker: ticker.toUpperCase(),
-      count: prices.length,
-      // Return BOTH sets of summaries
-      summary: {
-        adjusted: adjStats.metrics,
-        raw: rawStats.metrics
+    return NextResponse.json(
+      {
+        ticker: ticker.toUpperCase(),
+        count: prices.length,
+        summary: {
+          adjusted: adjStats.metrics,
+          raw: rawStats.metrics
+        },
+        returns: {
+          adjusted: formatReturns(adjStats.returns, adjDates),
+          raw: formatReturns(rawStats.returns, dates)
+        },
+        drawdown: {
+          adjusted: adjStats.drawdown,
+          raw: rawStats.drawdown
+        },
+        prices: prices.map(p => ({
+          date: p.date,
+          close: p.close,
+          adj_close: p.adj_close > 0 ? p.adj_close : p.close
+        })),
+        dateRange: {
+          start: dates[0],
+          end: dates[dates.length - 1],
+          adjustedStart: adjDates[0],
+          fullStart: fullDateRange?.start,
+          fullEnd: fullDateRange?.end,
+        },
+        betaInfo: {
+          rawDataPoints: rawBetaDataPoints,
+          adjDataPoints: adjBetaDataPoints,
+          benchmark: "OBX",
+        },
       },
-      // Return BOTH sets of series (adjusted may have different date range)
-      returns: {
-        adjusted: formatReturns(adjStats.returns, adjDates),
-        raw: formatReturns(rawStats.returns, dates)
-      },
-      drawdown: {
-        adjusted: adjStats.drawdown,
-        raw: rawStats.drawdown
-      },
-      prices: prices.map(p => ({
-        date: p.date,
-        close: p.close,
-        adj_close: p.adj_close > 0 ? p.adj_close : p.close // Fallback for display
-      })),
-      dateRange: {
-        start: dates[0],
-        end: dates[dates.length - 1],
-        adjustedStart: adjDates[0], // When valid adj_close data begins
-        fullStart: fullDateRange?.start, // Earliest data in database
-        fullEnd: fullDateRange?.end, // Latest data in database
-      },
-      betaInfo: {
-        rawDataPoints: rawBetaDataPoints,
-        adjDataPoints: adjBetaDataPoints,
-        benchmark: "OBX",
-      },
-    });
+      {
+        headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" },
+      }
+    );
 
   } catch (e: any) {
     console.error("[Analytics API] Error:", e);

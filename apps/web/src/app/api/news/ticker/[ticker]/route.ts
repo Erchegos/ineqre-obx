@@ -50,60 +50,7 @@ export async function GET(
 
     const ibkrWhere = ibkrConditions.join(" AND ");
 
-    const ibkrResult = await pool.query(
-      `
-      SELECT
-        e.id, e.published_at, e.source, e.headline, e.summary,
-        e.event_type, e.severity, e.sentiment::float, e.confidence::float,
-        e.provider_code, e.url, e.structured_facts,
-        tm.relevance_score::float AS relevance,
-        tm.impact_direction,
-        pd.close AS price_close,
-        pd.prev_close,
-        CASE WHEN pd.prev_close > 0
-          THEN ((pd.close - pd.prev_close) / pd.prev_close * 100)::float
-          ELSE NULL
-        END AS day_return_pct,
-        COALESCE(
-          (SELECT json_agg(json_build_object(
-            'ticker', t2.ticker,
-            'relevance', t2.relevance_score::float,
-            'direction', t2.impact_direction
-          )) FROM news_ticker_map t2 WHERE t2.news_event_id = e.id),
-          '[]'
-        ) AS all_tickers,
-        COALESCE(
-          (SELECT json_agg(json_build_object(
-            'sector', sm.sector,
-            'impact', sm.impact_score::float
-          )) FROM news_sector_map sm WHERE sm.news_event_id = e.id),
-          '[]'
-        ) AS sectors
-      FROM news_events e
-      JOIN news_ticker_map tm ON tm.news_event_id = e.id
-      LEFT JOIN LATERAL (
-        SELECT
-          p1.close,
-          (SELECT p2.close FROM public.${priceTable} p2
-           WHERE upper(p2.ticker) = $1 AND p2.close IS NOT NULL
-             AND p2.date < p1.date ORDER BY p2.date DESC LIMIT 1
-          ) AS prev_close
-        FROM public.${priceTable} p1
-        WHERE upper(p1.ticker) = $1
-          AND p1.close IS NOT NULL
-          AND p1.date <= (e.published_at::date + INTERVAL '1 day')
-          AND p1.date >= (e.published_at::date - INTERVAL '3 days')
-        ORDER BY p1.date DESC
-        LIMIT 1
-      ) pd ON true
-      WHERE ${ibkrWhere}
-      ORDER BY e.published_at DESC
-      LIMIT $${idx}
-    `,
-      [...ibkrParams, limit]
-    );
-
-    // ── Query 2: NewsWeb filings ─────────────────────────────
+    // ── Build NewsWeb query params ────────────────────────────
     const nwConditions: string[] = [
       "upper(nf.ticker) = $1",
       "COALESCE(nf.severity, 3) >= $2",
@@ -120,50 +67,105 @@ export async function GET(
 
     const nwWhere = nwConditions.join(" AND ");
 
-    const nwResult = await pool.query(
-      `
-      SELECT
-        nf.id,
-        nf.published_at,
-        'newsweb' AS source,
-        nf.headline,
-        nf.body AS summary,
-        nf.category AS event_type,
-        COALESCE(nf.severity, 3) AS severity,
-        nf.sentiment::float,
-        nf.confidence::float,
-        NULL AS provider_code,
-        nf.url,
-        nf.structured_facts,
-        nf.issuer_name,
-        pd.close AS price_close,
-        pd.prev_close,
-        CASE WHEN pd.prev_close > 0
-          THEN ((pd.close - pd.prev_close) / pd.prev_close * 100)::float
-          ELSE NULL
-        END AS day_return_pct
-      FROM newsweb_filings nf
-      LEFT JOIN LATERAL (
+    // ── Run BOTH queries in parallel ───────────────────────
+    const [ibkrResult, nwResult] = await Promise.all([
+      pool.query(
+        `
         SELECT
-          p1.close,
-          (SELECT p2.close FROM public.${priceTable} p2
-           WHERE upper(p2.ticker) = $1 AND p2.close IS NOT NULL
-             AND p2.date < p1.date ORDER BY p2.date DESC LIMIT 1
-          ) AS prev_close
-        FROM public.${priceTable} p1
-        WHERE upper(p1.ticker) = $1
-          AND p1.close IS NOT NULL
-          AND p1.date <= (nf.published_at::date + INTERVAL '1 day')
-          AND p1.date >= (nf.published_at::date - INTERVAL '3 days')
-        ORDER BY p1.date DESC
-        LIMIT 1
-      ) pd ON true
-      WHERE ${nwWhere}
-      ORDER BY nf.published_at DESC
-      LIMIT $${nwIdx}
-    `,
-      [...nwParams, limit]
-    );
+          e.id, e.published_at, e.source, e.headline, e.summary,
+          e.event_type, e.severity, e.sentiment::float, e.confidence::float,
+          e.provider_code, e.url, e.structured_facts,
+          tm.relevance_score::float AS relevance,
+          tm.impact_direction,
+          pd.close AS price_close,
+          pd.prev_close,
+          CASE WHEN pd.prev_close > 0
+            THEN ((pd.close - pd.prev_close) / pd.prev_close * 100)::float
+            ELSE NULL
+          END AS day_return_pct,
+          COALESCE(
+            (SELECT json_agg(json_build_object(
+              'ticker', t2.ticker,
+              'relevance', t2.relevance_score::float,
+              'direction', t2.impact_direction
+            )) FROM news_ticker_map t2 WHERE t2.news_event_id = e.id),
+            '[]'
+          ) AS all_tickers,
+          COALESCE(
+            (SELECT json_agg(json_build_object(
+              'sector', sm.sector,
+              'impact', sm.impact_score::float
+            )) FROM news_sector_map sm WHERE sm.news_event_id = e.id),
+            '[]'
+          ) AS sectors
+        FROM news_events e
+        JOIN news_ticker_map tm ON tm.news_event_id = e.id
+        LEFT JOIN LATERAL (
+          SELECT
+            p1.close,
+            (SELECT p2.close FROM public.${priceTable} p2
+             WHERE upper(p2.ticker) = $1 AND p2.close IS NOT NULL
+               AND p2.date < p1.date ORDER BY p2.date DESC LIMIT 1
+            ) AS prev_close
+          FROM public.${priceTable} p1
+          WHERE upper(p1.ticker) = $1
+            AND p1.close IS NOT NULL
+            AND p1.date <= (e.published_at::date + INTERVAL '1 day')
+            AND p1.date >= (e.published_at::date - INTERVAL '3 days')
+          ORDER BY p1.date DESC
+          LIMIT 1
+        ) pd ON true
+        WHERE ${ibkrWhere}
+        ORDER BY e.published_at DESC
+        LIMIT $${idx}
+      `,
+        [...ibkrParams, limit]
+      ),
+      pool.query(
+        `
+        SELECT
+          nf.id,
+          nf.published_at,
+          'newsweb' AS source,
+          nf.headline,
+          LEFT(nf.body, 500) AS summary,
+          nf.category AS event_type,
+          COALESCE(nf.severity, 3) AS severity,
+          nf.sentiment::float,
+          nf.confidence::float,
+          NULL AS provider_code,
+          nf.url,
+          nf.structured_facts,
+          nf.issuer_name,
+          pd.close AS price_close,
+          pd.prev_close,
+          CASE WHEN pd.prev_close > 0
+            THEN ((pd.close - pd.prev_close) / pd.prev_close * 100)::float
+            ELSE NULL
+          END AS day_return_pct
+        FROM newsweb_filings nf
+        LEFT JOIN LATERAL (
+          SELECT
+            p1.close,
+            (SELECT p2.close FROM public.${priceTable} p2
+             WHERE upper(p2.ticker) = $1 AND p2.close IS NOT NULL
+               AND p2.date < p1.date ORDER BY p2.date DESC LIMIT 1
+            ) AS prev_close
+          FROM public.${priceTable} p1
+          WHERE upper(p1.ticker) = $1
+            AND p1.close IS NOT NULL
+            AND p1.date <= (nf.published_at::date + INTERVAL '1 day')
+            AND p1.date >= (nf.published_at::date - INTERVAL '3 days')
+          ORDER BY p1.date DESC
+          LIMIT 1
+        ) pd ON true
+        WHERE ${nwWhere}
+        ORDER BY nf.published_at DESC
+        LIMIT $${nwIdx}
+      `,
+        [...nwParams, limit]
+      ),
+    ]);
 
     // ── Merge + sort by publishedAt DESC ─────────────────────
     const ibkrEvents = ibkrResult.rows.map((r) => ({
@@ -192,7 +194,7 @@ export async function GET(
       publishedAt: r.published_at,
       source: "newsweb" as string,
       headline: r.headline,
-      summary: r.summary ? (r.summary.length > 500 ? r.summary.slice(0, 497) + "..." : r.summary) : null,
+      summary: r.summary || null,
       eventType: r.event_type,
       severity: r.severity,
       sentiment: r.sentiment,
@@ -212,11 +214,18 @@ export async function GET(
       .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
       .slice(0, limit);
 
-    return NextResponse.json({
-      ticker: tickerUpper,
-      events: allEvents,
-      count: allEvents.length,
-    });
+    return NextResponse.json(
+      {
+        ticker: tickerUpper,
+        events: allEvents,
+        count: allEvents.length,
+      },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+        },
+      }
+    );
   } catch (err) {
     console.error("[NEWS TICKER API]", err);
     return NextResponse.json(

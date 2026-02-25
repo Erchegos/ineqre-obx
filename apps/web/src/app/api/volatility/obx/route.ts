@@ -60,7 +60,7 @@ async function fetchOseEquities(): Promise<string[]> {
   return result.rows.map((r: { ticker: string }) => r.ticker).filter((t: string) => t !== "OBX");
 }
 
-// --- Fetch price bars for a ticker ---
+// --- Fetch price bars for a single ticker ---
 async function fetchBars(ticker: string, limit: number): Promise<PriceBar[]> {
   const tableName = await getPriceTable();
   const q = `
@@ -80,6 +80,49 @@ async function fetchBars(ticker: string, limit: number): Promise<PriceBar[]> {
       close: Number(r.adj_close || r.close),
     }))
     .reverse();
+}
+
+// --- Bulk fetch price bars for ALL tickers in one query ---
+async function fetchAllConstituentBars(
+  tickers: string[],
+  limit: number
+): Promise<Map<string, PriceBar[]>> {
+  if (tickers.length === 0) return new Map();
+  const tableName = await getPriceTable();
+
+  // Use window function to get latest N bars per ticker in a single query
+  const q = `
+    SELECT ticker_upper, date, open, high, low, close FROM (
+      SELECT
+        upper(p.ticker) AS ticker_upper,
+        p.date::date AS date,
+        p.open, p.high, p.low,
+        COALESCE(p.adj_close, p.close) AS close,
+        ROW_NUMBER() OVER (PARTITION BY upper(p.ticker) ORDER BY p.date DESC) AS rn
+      FROM ${tableName} p
+      WHERE upper(p.ticker) = ANY($1)
+        AND p.close IS NOT NULL AND p.close > 0
+    ) sub
+    WHERE rn <= $2
+    ORDER BY ticker_upper, date ASC
+  `;
+
+  const result = await pool.query(q, [tickers, limit]);
+
+  const barsByTicker = new Map<string, PriceBar[]>();
+  for (const r of result.rows) {
+    const t = r.ticker_upper;
+    if (!barsByTicker.has(t)) barsByTicker.set(t, []);
+    barsByTicker.get(t)!.push({
+      date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date),
+      open: Number(r.open),
+      high: Number(r.high),
+      low: Number(r.low),
+      close: Number(r.close),
+    });
+  }
+
+  return barsByTicker;
 }
 
 // --- Compute quick vol snapshot for a constituent ---
@@ -286,37 +329,33 @@ export async function GET(request: Request) {
     // Vol cone
     const volCone = computeVolCone(obxBars);
 
-    // 3. Fetch constituent bars in parallel (batch of 10)
-    const batchSize = 10;
+    // 3. Fetch ALL constituent bars in a single bulk query
+    const allBarsByTicker = await fetchAllConstituentBars(tickers, limit);
     const constituentSnapshots: any[] = [];
-    // Date-aligned return maps: ticker -> Map<date, logReturn>
     const constituentReturnByDate = new Map<string, Map<string, number>>();
 
     // OBX ordered dates for correlation grid (skip first bar — no return for it)
     const obxDates = obxBars.slice(1).map((b) => b.date);
     const obxDateSet = new Set(obxDates);
 
-    for (let i = 0; i < tickers.length; i += batchSize) {
-      const batch = tickers.slice(i, i + batchSize);
-      const batchResults = await Promise.all(batch.map((t) => fetchBars(t, limit)));
+    for (const ticker of tickers) {
+      const bars = allBarsByTicker.get(ticker);
+      if (!bars || bars.length < 30) continue;
 
-      for (let j = 0; j < batch.length; j++) {
-        const bars = batchResults[j];
-        const snapshot = computeConstituentSnapshot(bars, batch[j]);
-        if (snapshot) {
-          constituentSnapshots.push(snapshot);
+      const snapshot = computeConstituentSnapshot(bars, ticker);
+      if (snapshot) {
+        constituentSnapshots.push(snapshot);
 
-          // Build date-keyed return map for correlation
-          const returnMap = new Map<string, number>();
-          for (let k = 1; k < bars.length; k++) {
-            const d = bars[k].date;
-            if (obxDateSet.has(d)) {
-              returnMap.set(d, Math.log(bars[k].close / bars[k - 1].close));
-            }
+        // Build date-keyed return map for correlation
+        const returnMap = new Map<string, number>();
+        for (let k = 1; k < bars.length; k++) {
+          const d = bars[k].date;
+          if (obxDateSet.has(d)) {
+            returnMap.set(d, Math.log(bars[k].close / bars[k - 1].close));
           }
-          if (returnMap.size > 60) {
-            constituentReturnByDate.set(batch[j], returnMap);
-          }
+        }
+        if (returnMap.size > 60) {
+          constituentReturnByDate.set(ticker, returnMap);
         }
       }
     }
@@ -400,6 +439,10 @@ export async function GET(request: Request) {
         regimeDistribution: regimeCounts,
         highVolCount: constituentSnapshots.filter((s) => ["Crisis", "Extreme High"].includes(s.regime)).length,
         lowVolCount: constituentSnapshots.filter((s) => ["Low & Stable", "Low & Contracting"].includes(s.regime)).length,
+      },
+    }, {
+      headers: {
+        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
       },
     });
   } catch (e: any) {
