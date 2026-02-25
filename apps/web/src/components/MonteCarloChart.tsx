@@ -232,7 +232,7 @@ export default function MonteCarloChart({
             <ResponsiveContainer width="100%" height={height}>
               <LineChart
                 data={animatedPathsData}
-                margin={{ top: 10, right: 10, left: 10, bottom: 30 }}
+                margin={{ top: 10, right: 50, left: 10, bottom: 30 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" opacity={0.3} />
 
@@ -265,18 +265,22 @@ export default function MonteCarloChart({
                   yAxisId="right"
                   orientation="right"
                   stroke="var(--muted)"
-                  fontSize={10}
+                  fontSize={11}
                   tickFormatter={(val: number) => {
                     const pct = ((val - startPrice) / startPrice) * 100;
                     return `${pct >= 0 ? "+" : ""}${pct.toFixed(0)}%`;
                   }}
                   domain={['auto', 'auto']}
-                  label={{
-                    value: "Return %",
-                    angle: 90,
-                    position: "insideRight",
-                    style: { fill: "var(--muted)", fontSize: 11 },
-                  }}
+                />
+
+                {/* Hidden line to bind data to right axis so ticks render */}
+                <Line
+                  yAxisId="right"
+                  dataKey="path0"
+                  stroke="transparent"
+                  strokeWidth={0}
+                  dot={false}
+                  isAnimationActive={false}
                 />
 
                 <Tooltip
