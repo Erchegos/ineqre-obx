@@ -131,10 +131,23 @@ export async function GET(
       : [];
 
     // ── 3. Batch fetch ALL correlated data in parallel ────────────
+    // Wrap each query so one failure doesn't crash everything
+    const safeQuery = async (
+      query: string,
+      params: unknown[]
+    ): Promise<{ rows: any[] }> => {
+      try {
+        return await pool.query(query, params);
+      } catch (err) {
+        console.warn("[EXPLAIN] Query failed (non-fatal):", (err as Error).message?.slice(0, 120));
+        return { rows: [] };
+      }
+    };
+
     const [ibkrNews, nwFilings, insiderTx, shortChanges, obxReturns, commodityMoves] =
       await Promise.all([
         // 3a. IBKR news events (wide range, filter per-move later)
-        pool.query(
+        safeQuery(
           `
           SELECT
             e.id, e.published_at, e.headline, e.summary,
@@ -153,7 +166,7 @@ export async function GET(
         ),
 
         // 3b. NewsWeb filings (wider ±48h window for regulatory)
-        pool.query(
+        safeQuery(
           `
           SELECT
             nf.id,
@@ -175,7 +188,7 @@ export async function GET(
         ),
 
         // 3c. Insider transactions (±3 days)
-        pool.query(
+        safeQuery(
           `
           SELECT
             it.id,
@@ -200,7 +213,7 @@ export async function GET(
         ),
 
         // 3d. Short position changes
-        pool.query(
+        safeQuery(
           `
           SELECT
             sp.date,
@@ -217,15 +230,25 @@ export async function GET(
           [upperTicker, minDate, maxDate]
         ),
 
-        // 3e. OBX index returns on move dates
-        pool.query(
+        // 3e. OBX index returns (computed from prices_daily)
+        safeQuery(
           `
+          WITH obx AS (
+            SELECT
+              date,
+              COALESCE(adj_close, close) AS px,
+              LAG(COALESCE(adj_close, close)) OVER (ORDER BY date) AS prev_px
+            FROM ${priceTable}
+            WHERE upper(ticker) = 'OBX'
+              AND close IS NOT NULL AND close > 0
+              AND date BETWEEN ($1::date - INTERVAL '5 days') AND $2::date
+            ORDER BY date
+          )
           SELECT
             date,
-            ret_1d::float AS obx_return
-          FROM obx_features
-          WHERE ticker = 'OBX'
-            AND date BETWEEN $1::date AND $2::date
+            CASE WHEN prev_px > 0 THEN (px - prev_px) / prev_px ELSE NULL END AS obx_return
+          FROM obx
+          WHERE prev_px IS NOT NULL
           ORDER BY date DESC
         `,
           [minDate, maxDate]
@@ -233,7 +256,7 @@ export async function GET(
 
         // 3f. Commodity price moves (if sector is relevant)
         commoditySymbols.length > 0
-          ? pool.query(
+          ? safeQuery(
               `
               SELECT
                 cp.symbol,
@@ -253,7 +276,9 @@ export async function GET(
     // ── 4. Index data for fast lookups ────────────────────────────
     const obxByDate = new Map<string, number>();
     for (const r of obxReturns.rows) {
-      obxByDate.set(dateKey(r.date), r.obx_return);
+      if (r.obx_return != null) {
+        obxByDate.set(dateKey(r.date), parseFloat(r.obx_return));
+      }
     }
 
     const shortByDate = new Map<string, (typeof shortChanges.rows)[0]>();
