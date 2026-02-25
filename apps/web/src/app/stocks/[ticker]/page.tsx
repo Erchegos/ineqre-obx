@@ -262,6 +262,7 @@ export default function StockTickerPage() {
   const [showOptimizer, setShowOptimizer] = useState<boolean>(false);
   const [optimizerProgress, setOptimizerProgress] = useState<number>(0);
   const [showOptimizerParams, setShowOptimizerParams] = useState<boolean>(false);
+  const [showWindowSettings, setShowWindowSettings] = useState<boolean>(false);
   const [showTrades, setShowTrades] = useState<boolean>(false);
 
   // Optimizer parameter state - use Sets for checkbox selections
@@ -1334,70 +1335,7 @@ export default function StockTickerPage() {
 
           {!stdChannelLoading && !stdChannelError && stdChannelData && (
             <>
-              {/* Window Optimization Info */}
-              <div style={{
-                padding: 16,
-                borderRadius: 4,
-                border: "1px solid var(--card-border)",
-                background: "var(--card-bg)",
-                marginBottom: 20,
-              }}>
-                <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: "var(--foreground)" }}>
-                  Window Optimization
-                </h3>
-                <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12, lineHeight: 1.6 }}>
-                  The optimal window size is automatically selected by maximizing the R² (coefficient of determination) across different lookback periods.
-                  This ensures the best linear fit for the regression channel. You can override this by setting a fixed window size or adjusting the search range.
-                </p>
-
-                <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
-                  {/* Window Controls */}
-                  <div style={{ flex: 1, display: "flex", gap: 16, flexWrap: "wrap" }}>
-                    <div style={{ flex: "0 1 120px" }}>
-                      <label style={{ display: "block", fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Fixed Window</label>
-                      <input type="number" value={fixedWindow ?? ""} onChange={(e) => setFixedWindow(e.target.value === "" ? null : parseInt(e.target.value))} placeholder="Auto" min="50" max="3000" style={{ width: "100%", padding: "7px 10px", borderRadius: 4, border: "1px solid var(--input-border)", background: "var(--input-bg)", color: "var(--foreground)", fontSize: 13 }} />
-                    </div>
-
-                    <div style={{ flex: "0 1 120px" }}>
-                      <label style={{ display: "block", fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Min Window</label>
-                      <input type="number" value={minWindow} onChange={(e) => setMinWindow(parseInt(e.target.value) || 255)} min="50" max="2000" disabled={fixedWindow !== null} style={{ width: "100%", padding: "7px 10px", borderRadius: 4, border: "1px solid var(--input-border)", background: fixedWindow ? "var(--hover-bg)" : "var(--input-bg)", color: fixedWindow ? "var(--muted)" : "var(--foreground)", fontSize: 13 }} />
-                    </div>
-
-                    <div style={{ flex: "0 1 120px" }}>
-                      <label style={{ display: "block", fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Max Window</label>
-                      <input type="number" value={maxWindow} onChange={(e) => setMaxWindow(parseInt(e.target.value) || 1530)} min="20" max="3000" disabled={fixedWindow !== null} style={{ width: "100%", padding: "7px 10px", borderRadius: 4, border: "1px solid var(--input-border)", background: fixedWindow ? "var(--hover-bg)" : "var(--input-bg)", color: fixedWindow ? "var(--muted)" : "var(--foreground)", fontSize: 13 }} />
-                    </div>
-
-                    <div style={{ flex: "0 1 100px" }}>
-                      <label style={{ display: "block", fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Step Size</label>
-                      <input type="number" value={step} onChange={(e) => setStep(parseInt(e.target.value) || 20)} min="1" max="100" disabled={fixedWindow !== null} style={{ width: "100%", padding: "7px 10px", borderRadius: 4, border: "1px solid var(--input-border)", background: fixedWindow ? "var(--hover-bg)" : "var(--input-bg)", color: fixedWindow ? "var(--muted)" : "var(--foreground)", fontSize: 13 }} />
-                    </div>
-                  </div>
-
-                  {/* Deviation Bands Controls */}
-                  <div style={{ flex: "0 0 auto", minWidth: "220px", paddingLeft: 24, borderLeft: "1px solid var(--border)" }}>
-                    <h4 style={{ fontSize: 12, fontWeight: 600, marginBottom: 12, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                      Deviation Bands
-                    </h4>
-
-                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                      <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, cursor: "pointer", userSelect: "none", color: "var(--foreground)" }}>
-                        <input type="checkbox" checked={showDeviation1} onChange={(e) => setShowDeviation1(e.target.checked)} style={{ width: 16, height: 16, cursor: "pointer" }} />
-                        <span style={{ flex: 1 }}>±1σ Deviation</span>
-                        <input type="number" value={k1} onChange={(e) => setK1(parseFloat(e.target.value) || 1.0)} min="0.1" max="5" step="0.1" disabled={!showDeviation1} style={{ width: "60px", padding: "5px 8px", borderRadius: 4, border: "1px solid var(--input-border)", background: showDeviation1 ? "var(--input-bg)" : "var(--hover-bg)", color: showDeviation1 ? "var(--foreground)" : "var(--muted)", fontSize: 13 }} />
-                      </label>
-
-                      <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, cursor: "pointer", userSelect: "none", color: "var(--foreground)" }}>
-                        <input type="checkbox" checked={showDeviation2} onChange={(e) => setShowDeviation2(e.target.checked)} style={{ width: 16, height: 16, cursor: "pointer" }} />
-                        <span style={{ flex: 1 }}>±2σ Deviation</span>
-                        <input type="number" value={k2} onChange={(e) => setK2(parseFloat(e.target.value) || 2.0)} min="0.1" max="5" step="0.1" disabled={!showDeviation2} style={{ width: "60px", padding: "5px 8px", borderRadius: 4, border: "1px solid var(--input-border)", background: showDeviation2 ? "var(--input-bg)" : "var(--hover-bg)", color: showDeviation2 ? "var(--foreground)" : "var(--muted)", fontSize: 13 }} />
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Channel Statistics */}
+              {/* Channel Statistics (with collapsible Window Settings) */}
               <div style={{
                 padding: 20,
                 borderRadius: 4,
@@ -1405,9 +1343,30 @@ export default function StockTickerPage() {
                 background: "var(--card-bg)",
                 marginBottom: 20,
               }}>
-                <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: "var(--foreground)" }}>
-                  Channel Statistics
-                </h2>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--foreground)", margin: 0 }}>
+                    Channel Statistics
+                  </h2>
+                  <button
+                    onClick={() => setShowWindowSettings(!showWindowSettings)}
+                    style={{
+                      padding: "5px 12px",
+                      borderRadius: 4,
+                      border: "1px solid var(--border)",
+                      background: showWindowSettings ? "var(--hover-bg)" : "transparent",
+                      color: "var(--muted-foreground)",
+                      fontSize: 11,
+                      cursor: "pointer",
+                      fontFamily: "monospace",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <span style={{ transition: "transform 200ms ease", transform: showWindowSettings ? "rotate(90deg)" : "rotate(0deg)", fontSize: 9 }}>▶</span>
+                    Window Settings
+                  </button>
+                </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16 }}>
                   <div>
                     <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Data Points</div>
@@ -1462,9 +1421,155 @@ export default function StockTickerPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Collapsible Window Settings */}
+                {showWindowSettings && (
+                  <div style={{
+                    marginTop: 16,
+                    padding: 16,
+                    background: "var(--hover-bg)",
+                    borderRadius: 6,
+                    border: "1px solid var(--border)",
+                  }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 14 }}>
+                      <div>
+                        <label style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4, display: "block" }}>
+                          Fixed Window
+                        </label>
+                        <input
+                          type="number"
+                          value={fixedWindow ?? ""}
+                          onChange={(e) => setFixedWindow(e.target.value ? parseInt(e.target.value) : null)}
+                          placeholder="Auto"
+                          style={{
+                            width: "100%",
+                            padding: "6px 8px",
+                            borderRadius: 4,
+                            border: "1px solid var(--input-border)",
+                            background: "var(--input-bg)",
+                            color: "var(--foreground)",
+                            fontSize: 12,
+                            fontFamily: "monospace",
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4, display: "block" }}>
+                          Min Window
+                        </label>
+                        <input
+                          type="number"
+                          value={minWindow}
+                          onChange={(e) => setMinWindow(parseInt(e.target.value) || 50)}
+                          style={{
+                            width: "100%",
+                            padding: "6px 8px",
+                            borderRadius: 4,
+                            border: "1px solid var(--input-border)",
+                            background: "var(--input-bg)",
+                            color: "var(--foreground)",
+                            fontSize: 12,
+                            fontFamily: "monospace",
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4, display: "block" }}>
+                          Max Window
+                        </label>
+                        <input
+                          type="number"
+                          value={maxWindow}
+                          onChange={(e) => setMaxWindow(parseInt(e.target.value) || 500)}
+                          style={{
+                            width: "100%",
+                            padding: "6px 8px",
+                            borderRadius: 4,
+                            border: "1px solid var(--input-border)",
+                            background: "var(--input-bg)",
+                            color: "var(--foreground)",
+                            fontSize: 12,
+                            fontFamily: "monospace",
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4, display: "block" }}>
+                          Step Size
+                        </label>
+                        <input
+                          type="number"
+                          value={step}
+                          onChange={(e) => setStep(parseInt(e.target.value) || 10)}
+                          style={{
+                            width: "100%",
+                            padding: "6px 8px",
+                            borderRadius: 4,
+                            border: "1px solid var(--input-border)",
+                            background: "var(--input-bg)",
+                            color: "var(--foreground)",
+                            fontSize: 12,
+                            fontFamily: "monospace",
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Deviation Bands */}
+                    <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+                      <span style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Bands:</span>
+                      <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "var(--foreground)" }}>
+                        <input
+                          type="checkbox"
+                          checked={showDeviation1}
+                          onChange={(e) => setShowDeviation1(e.target.checked)}
+                          style={{ accentColor: "var(--accent)" }}
+                        />
+                        ±1σ
+                      </label>
+                      <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "var(--foreground)" }}>
+                        <input
+                          type="checkbox"
+                          checked={showDeviation2}
+                          onChange={(e) => setShowDeviation2(e.target.checked)}
+                          style={{ accentColor: "var(--accent)" }}
+                        />
+                        ±2σ
+                      </label>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* STD Channel Backtest Optimizer */}
+              {/* Chart */}
+              {stdChartData.length > 0 && (
+                <div style={{
+                  padding: 20,
+                  borderRadius: 4,
+                  border: "1px solid var(--card-border)",
+                  background: "var(--card-bg)",
+                  marginBottom: 20,
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--foreground)" }}>
+                      {ticker} - Price Chart with STD Channels
+                    </h2>
+                    <div style={{ fontSize: 12, color: "var(--muted)", fontFamily: "monospace" }}>
+                      Showing {stdChartData.length} bars | Window: {stdChannelData.metadata.windowSize} | k1={k1}, k2={k2}
+                    </div>
+                  </div>
+                  <CandlestickChart
+                    data={stdChartData}
+                    height={600}
+                    showStdChannel={true}
+                    showDeviation1={showDeviation1}
+                    showDeviation2={showDeviation2}
+                    stdChannelColor="#2962ff"
+                  />
+                </div>
+              )}
+
+              {/* Mean Reversion Backtest */}
               <div style={{
                 padding: 20,
                 borderRadius: 4,
@@ -1976,34 +2081,6 @@ export default function StockTickerPage() {
                   </div>
                 )}
               </div>
-
-              {/* Chart */}
-              {stdChartData.length > 0 && (
-                <div style={{
-                  padding: 20,
-                  borderRadius: 4,
-                  border: "1px solid var(--card-border)",
-                  background: "var(--card-bg)",
-                  marginBottom: 20,
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                    <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--foreground)" }}>
-                      {ticker} - Price Chart with STD Channels
-                    </h2>
-                    <div style={{ fontSize: 12, color: "var(--muted)", fontFamily: "monospace" }}>
-                      Showing {stdChartData.length} bars | Window: {stdChannelData.metadata.windowSize} | k1={k1}, k2={k2}
-                    </div>
-                  </div>
-                  <CandlestickChart
-                    data={stdChartData}
-                    height={600}
-                    showStdChannel={true}
-                    showDeviation1={showDeviation1}
-                    showDeviation2={showDeviation2}
-                    stdChannelColor="#2962ff"
-                  />
-                </div>
-              )}
 
               {/* Position Analysis */}
               {meanReversalInfo && (
