@@ -217,6 +217,7 @@ export default function StockTickerPage() {
   const [hasFactorData, setHasFactorData] = useState<boolean>(false);
   const [stockName, setStockName] = useState<string>("");
   const [stockSector, setStockSector] = useState<string>("");
+  const [sectorPeers, setSectorPeers] = useState<Array<{ ticker: string; name: string }>>([]);
 
   // Filter and sort state for Daily Returns table
   const [returnFilter, setReturnFilter] = useState<"all" | "positive" | "negative" | "large_positive" | "large_negative" | "custom">("all");
@@ -415,6 +416,19 @@ export default function StockTickerPage() {
           setHasFactorData(factorExists);
           setStockName(stock?.name || "");
           setStockSector(stock?.sector || "");
+
+          // Build sector peer list (same sector, exclude self and non-equities)
+          if (stock?.sector) {
+            const peers = stocks
+              .filter((s: any) =>
+                s.sector === stock.sector &&
+                s.ticker !== ticker &&
+                (s.asset_type === "equity" || !s.asset_type)
+              )
+              .map((s: any) => ({ ticker: s.ticker, name: s.name }))
+              .slice(0, 12);
+            setSectorPeers(peers);
+          }
         }
       } catch (e) {
         console.warn("Error fetching stock metadata:", e);
@@ -952,10 +966,32 @@ export default function StockTickerPage() {
               </span>
             )}
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
             <Link href="/" style={{ fontSize: 10, color: "var(--muted-foreground)", textDecoration: "none" }}>← Home</Link>
-            <Link href="/stocks" style={{ fontSize: 10, color: "var(--muted-foreground)", textDecoration: "none" }}>← Stocks</Link>
+            <Link href="/stocks" style={{ fontSize: 10, color: "var(--muted-foreground)", textDecoration: "none" }}>→ Stocks</Link>
             <Link href="/news" style={{ fontSize: 10, color: "var(--muted-foreground)", textDecoration: "none" }}>News</Link>
+            {sectorPeers.length > 0 && (
+              <>
+                <span style={{ color: "var(--border)", fontSize: 10 }}>|</span>
+                <span style={{ fontSize: 9, color: "var(--muted-foreground)", opacity: 0.6, textTransform: "uppercase", letterSpacing: "0.05em" }}>PEERS</span>
+                {sectorPeers.map((p) => (
+                  <Link
+                    key={p.ticker}
+                    href={`/stocks/${p.ticker}`}
+                    style={{
+                      fontSize: 10,
+                      color: "var(--accent)",
+                      textDecoration: "none",
+                      fontWeight: 600,
+                      fontFamily: "'Geist Mono', monospace",
+                    }}
+                    title={p.name}
+                  >
+                    {p.ticker}
+                  </Link>
+                ))}
+              </>
+            )}
           </div>
         </div>
 
