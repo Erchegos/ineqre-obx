@@ -579,15 +579,19 @@ export default function PortfolioPage() {
     }
   };
 
-  // Auto-run default portfolio on first load
+  // Auto-load pre-cached default portfolio on first visit
   const hasAutoRun = useRef(false);
   useEffect(() => {
     if (hasAutoRun.current) return;
-    if (selectedTickers.length >= 2) {
-      hasAutoRun.current = true;
-      runOptimization();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    hasAutoRun.current = true;
+    setLoading(true);
+    fetch("/api/portfolio/default")
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && !data.error) setResult(data);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   // Save config
