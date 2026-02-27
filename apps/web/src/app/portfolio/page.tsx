@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import {
   XAxis, YAxis, CartesianGrid, Tooltip,
@@ -335,11 +335,17 @@ export default function PortfolioPage() {
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
 
+  // Default portfolio — diversified OSE blue chips with strong ML signals
+  const DEFAULT_TICKERS = [
+    "EQNR", "DNB", "STB", "MOWI", "NHY",
+    "YAR", "ATEA", "SUBC", "ORK", "FRO",
+  ];
+
   // Construction state
   const [availableStocks, setAvailableStocks] = useState<StockOption[]>([]);
-  const [selectedTickers, setSelectedTickers] = useState<string[]>([]);
+  const [selectedTickers, setSelectedTickers] = useState<string[]>(DEFAULT_TICKERS);
   const [tickerInput, setTickerInput] = useState("");
-  const [mode, setMode] = useState("min_variance");
+  const [mode, setMode] = useState("max_sharpe");
   const [portfolioValueNOK, setPortfolioValueNOK] = useState(10_000_000);
   const [lookbackDays, setLookbackDays] = useState(504);
   const [covMethod, setCovMethod] = useState("shrinkage");
@@ -572,6 +578,17 @@ export default function PortfolioPage() {
       setLoading(false);
     }
   };
+
+  // Auto-run default portfolio on first load
+  const hasAutoRun = useRef(false);
+  useEffect(() => {
+    if (hasAutoRun.current) return;
+    if (selectedTickers.length >= 2) {
+      hasAutoRun.current = true;
+      runOptimization();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Save config
   const saveConfig = async () => {
