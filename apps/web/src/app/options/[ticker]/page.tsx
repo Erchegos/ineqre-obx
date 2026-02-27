@@ -173,11 +173,20 @@ export default function OptionsPage() {
   // ─── Derived Data ─────────────────────────────────────────────
   const ivSkewData = useMemo(() => {
     if (!data) return [];
-    const IV_MIN = 5;   // Minimum realistic IV (5%)
-    const IV_MAX = 150;  // Cap outliers at 150%
+    const IV_MIN = 5;
+    const IV_MAX = 120;
+    const spot = data.underlyingPrice || 0;
 
-    // Extract valid IV points, filtering out unrealistic values
+    // Step 1: Extract valid IV, filter unrealistic values
     const raw = data.chain
+      .filter(r => {
+        // For cleaner curves, limit strike range to ±50% from spot
+        if (spot > 0) {
+          const moneyness = Math.abs(r.strike - spot) / spot;
+          if (moneyness > 0.5) return false;
+        }
+        return true;
+      })
       .map(r => {
         const civ = r.call?.iv ? r.call.iv * 100 : null;
         const piv = r.put?.iv ? r.put.iv * 100 : null;
@@ -189,24 +198,45 @@ export default function OptionsPage() {
       })
       .filter(r => r.callIV !== null || r.putIV !== null);
 
-    // Smooth: 3-point weighted moving average to reduce noise
     if (raw.length < 3) return raw;
-    const smoothed = raw.map((point, i) => {
-      const prevCall = i > 0 ? raw[i - 1].callIV : null;
-      const nextCall = i < raw.length - 1 ? raw[i + 1].callIV : null;
-      const prevPut = i > 0 ? raw[i - 1].putIV : null;
-      const nextPut = i < raw.length - 1 ? raw[i + 1].putIV : null;
-      let sCall = point.callIV;
-      let sPut = point.putIV;
-      if (sCall !== null && prevCall !== null && nextCall !== null) {
-        sCall = prevCall * 0.25 + sCall * 0.5 + nextCall * 0.25;
+
+    // Step 2: Remove outliers — if a point jumps >1.8x vs average of neighbors, null it
+    type IVPoint = { strike: number; callIV: number | null; putIV: number | null };
+    const cleaned: IVPoint[] = raw.map((point, i) => {
+      let cIV = point.callIV;
+      let pIV = point.putIV;
+      if (i > 0 && i < raw.length - 1) {
+        const pc = raw[i - 1].callIV; const nc = raw[i + 1].callIV;
+        if (cIV !== null && pc !== null && nc !== null) {
+          const avg = (pc + nc) / 2;
+          if (cIV > avg * 1.8 || cIV < avg * 0.55) cIV = null;
+        }
+        const pp = raw[i - 1].putIV; const np = raw[i + 1].putIV;
+        if (pIV !== null && pp !== null && np !== null) {
+          const avg = (pp + np) / 2;
+          if (pIV > avg * 1.8 || pIV < avg * 0.55) pIV = null;
+        }
       }
-      if (sPut !== null && prevPut !== null && nextPut !== null) {
-        sPut = prevPut * 0.25 + sPut * 0.5 + nextPut * 0.25;
-      }
-      return { strike: point.strike, callIV: sCall, putIV: sPut };
-    });
-    return smoothed;
+      return { strike: point.strike, callIV: cIV, putIV: pIV };
+    }).filter(r => r.callIV !== null || r.putIV !== null);
+
+    // Step 3: Two-pass weighted moving average (0.2 / 0.6 / 0.2)
+    const smooth = (pts: IVPoint[]): IVPoint[] =>
+      pts.map((point, i) => {
+        let sCall = point.callIV;
+        let sPut = point.putIV;
+        if (i > 0 && i < pts.length - 1) {
+          const pc = pts[i - 1].callIV; const nc = pts[i + 1].callIV;
+          if (sCall !== null && pc !== null && nc !== null)
+            sCall = pc * 0.2 + sCall * 0.6 + nc * 0.2;
+          const pp = pts[i - 1].putIV; const np = pts[i + 1].putIV;
+          if (sPut !== null && pp !== null && np !== null)
+            sPut = pp * 0.2 + sPut * 0.6 + np * 0.2;
+        }
+        return { strike: point.strike, callIV: sCall, putIV: sPut };
+      });
+
+    return smooth(smooth(cleaned));
   }, [data]);
 
   const volumeData = useMemo(() => {
