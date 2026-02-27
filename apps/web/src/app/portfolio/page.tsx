@@ -335,10 +335,10 @@ export default function PortfolioPage() {
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
 
-  // Default portfolio — diversified OSE blue chips with strong ML signals
+  // Default portfolio — finance-heavy OSE portfolio with top ML signals
   const DEFAULT_TICKERS = [
-    "EQNR", "DNB", "STB", "MOWI", "NHY",
-    "YAR", "ATEA", "SUBC", "ORK", "FRO",
+    "STB", "DNB", "ABG", "NONG", "PROT", "MING",
+    "ATEA", "YAR", "FRO", "WWI", "AKER", "ORK",
   ];
 
   // Construction state
