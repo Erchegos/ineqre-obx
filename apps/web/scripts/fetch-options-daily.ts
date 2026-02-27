@@ -258,11 +258,18 @@ async function fetchYahooOptions(
           (ticker, expiry, strike, option_right, bid, ask, last_price, iv, delta, gamma, theta, vega, open_interest, volume, underlying_price, fetched_at)
         VALUES ($1, $2, $3, 'call', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, now())
         ON CONFLICT (ticker, expiry, strike, option_right) DO UPDATE SET
-          bid = EXCLUDED.bid, ask = EXCLUDED.ask, last_price = EXCLUDED.last_price,
-          iv = EXCLUDED.iv, delta = EXCLUDED.delta, gamma = EXCLUDED.gamma,
-          theta = EXCLUDED.theta, vega = EXCLUDED.vega,
-          open_interest = EXCLUDED.open_interest, volume = EXCLUDED.volume,
-          underlying_price = EXCLUDED.underlying_price, fetched_at = EXCLUDED.fetched_at`,
+          bid = CASE WHEN EXCLUDED.bid > 0 THEN EXCLUDED.bid ELSE options_chain.bid END,
+          ask = CASE WHEN EXCLUDED.ask > 0 THEN EXCLUDED.ask ELSE options_chain.ask END,
+          last_price = CASE WHEN EXCLUDED.last_price > 0 THEN EXCLUDED.last_price ELSE options_chain.last_price END,
+          iv = CASE WHEN EXCLUDED.iv > 0.01 THEN EXCLUDED.iv ELSE options_chain.iv END,
+          delta = CASE WHEN EXCLUDED.iv > 0.01 THEN EXCLUDED.delta ELSE options_chain.delta END,
+          gamma = CASE WHEN EXCLUDED.iv > 0.01 THEN EXCLUDED.gamma ELSE options_chain.gamma END,
+          theta = CASE WHEN EXCLUDED.iv > 0.01 THEN EXCLUDED.theta ELSE options_chain.theta END,
+          vega = CASE WHEN EXCLUDED.iv > 0.01 THEN EXCLUDED.vega ELSE options_chain.vega END,
+          open_interest = CASE WHEN EXCLUDED.open_interest > 0 THEN EXCLUDED.open_interest ELSE options_chain.open_interest END,
+          volume = CASE WHEN EXCLUDED.volume > 0 THEN EXCLUDED.volume ELSE options_chain.volume END,
+          underlying_price = EXCLUDED.underlying_price,
+          fetched_at = EXCLUDED.fetched_at`,
         [dbTicker, expStr, strike, storeBid, storeAsk, storeLast,
           iv, greeks.delta, greeks.gamma, greeks.theta, greeks.vega,
           opt.openInterest || 0, opt.volume || 0, underlyingPrice]
@@ -312,11 +319,18 @@ async function fetchYahooOptions(
           (ticker, expiry, strike, option_right, bid, ask, last_price, iv, delta, gamma, theta, vega, open_interest, volume, underlying_price, fetched_at)
         VALUES ($1, $2, $3, 'put', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, now())
         ON CONFLICT (ticker, expiry, strike, option_right) DO UPDATE SET
-          bid = EXCLUDED.bid, ask = EXCLUDED.ask, last_price = EXCLUDED.last_price,
-          iv = EXCLUDED.iv, delta = EXCLUDED.delta, gamma = EXCLUDED.gamma,
-          theta = EXCLUDED.theta, vega = EXCLUDED.vega,
-          open_interest = EXCLUDED.open_interest, volume = EXCLUDED.volume,
-          underlying_price = EXCLUDED.underlying_price, fetched_at = EXCLUDED.fetched_at`,
+          bid = CASE WHEN EXCLUDED.bid > 0 THEN EXCLUDED.bid ELSE options_chain.bid END,
+          ask = CASE WHEN EXCLUDED.ask > 0 THEN EXCLUDED.ask ELSE options_chain.ask END,
+          last_price = CASE WHEN EXCLUDED.last_price > 0 THEN EXCLUDED.last_price ELSE options_chain.last_price END,
+          iv = CASE WHEN EXCLUDED.iv > 0.01 THEN EXCLUDED.iv ELSE options_chain.iv END,
+          delta = CASE WHEN EXCLUDED.iv > 0.01 THEN EXCLUDED.delta ELSE options_chain.delta END,
+          gamma = CASE WHEN EXCLUDED.iv > 0.01 THEN EXCLUDED.gamma ELSE options_chain.gamma END,
+          theta = CASE WHEN EXCLUDED.iv > 0.01 THEN EXCLUDED.theta ELSE options_chain.theta END,
+          vega = CASE WHEN EXCLUDED.iv > 0.01 THEN EXCLUDED.vega ELSE options_chain.vega END,
+          open_interest = CASE WHEN EXCLUDED.open_interest > 0 THEN EXCLUDED.open_interest ELSE options_chain.open_interest END,
+          volume = CASE WHEN EXCLUDED.volume > 0 THEN EXCLUDED.volume ELSE options_chain.volume END,
+          underlying_price = EXCLUDED.underlying_price,
+          fetched_at = EXCLUDED.fetched_at`,
         [dbTicker, expStr, strike, storeBid, storeAsk, storeLast,
           iv, greeks.delta, greeks.gamma, greeks.theta, greeks.vega,
           opt.openInterest || 0, opt.volume || 0, underlyingPrice]

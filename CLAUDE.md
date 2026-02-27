@@ -606,6 +606,11 @@ The options module (`/options/[ticker]`) provides:
   - Applied both in fetch script (DB storage) and API route (runtime fallback)
   - IV solved from last_price via Newton-Raphson when Yahoo returns ~0 IV
   - Dead options (no price, no OI) are skipped during fetch
+- **Protective UPSERT**: Fetch script never overwrites good data with empty data:
+  - bid/ask/last_price: only updated when new value > 0
+  - IV/Greeks: only updated when new IV > 1%
+  - OI/volume: only updated when new value > 0 (preserves historical OI from previous fetches)
+  - underlying_price/fetched_at: always updated (always valid)
 
 ---
 
