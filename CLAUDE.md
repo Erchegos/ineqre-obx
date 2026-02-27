@@ -133,16 +133,16 @@ All endpoints in `apps/web/src/app/api/`
 | `POST /api/research/auth` | Password authentication |
 | `POST /api/research/generate-summaries` | AI summary generation |
 
-### Portfolio APIs (Password-Protected)
+### Portfolio APIs
 | Endpoint | Purpose |
 |----------|---------|
-| `POST /api/portfolio/auth` | Username + password authentication (JWT 8h, profile from `research_access_tokens.description`) |
-| `POST /api/portfolio/optimize` | Mean-variance optimization (5 modes, risk decomposition, efficient frontier) |
-| `GET /api/portfolio/configs` | List saved portfolio configurations |
-| `POST /api/portfolio/configs` | Save new portfolio configuration |
-| `GET /api/portfolio/configs/[id]` | Load specific portfolio configuration |
-| `PUT /api/portfolio/configs/[id]` | Update portfolio configuration |
-| `DELETE /api/portfolio/configs/[id]` | Delete portfolio configuration |
+| `POST /api/portfolio/optimize` | Mean-variance optimization — **public, no auth required** |
+| `POST /api/portfolio/auth` | Optional login for save/load (JWT 8h) |
+| `GET /api/portfolio/configs` | List saved portfolios (auth required) |
+| `POST /api/portfolio/configs` | Save portfolio (auth required) |
+| `GET /api/portfolio/configs/[id]` | Load specific portfolio (auth required) |
+| `PUT /api/portfolio/configs/[id]` | Update portfolio (auth required) |
+| `DELETE /api/portfolio/configs/[id]` | Delete portfolio (auth required) |
 
 ### News & Intelligence APIs
 | Endpoint | Purpose |
@@ -621,7 +621,7 @@ The options module (`/options/[ticker]`) provides:
 
 ## Portfolio Optimizer Details
 
-Located at `/portfolio`. Password-protected with per-user profiles.
+Located at `/portfolio`. Open access — anyone can optimize. Optional sign-in to save/load named portfolios.
 
 ### Auth & Profile System
 - Login requires **username + password** (no session persistence — must re-login on every page reload)

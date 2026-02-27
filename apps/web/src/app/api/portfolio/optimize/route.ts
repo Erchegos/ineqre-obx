@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
 import { getPriceTable } from '@/lib/price-data-adapter';
-import { requireAuth } from '@/lib/security';
 import {
   optimizePortfolio,
   OptimizationMode,
@@ -24,9 +23,6 @@ const ALL_MODES: OptimizationMode[] = [
 ];
 
 export async function POST(req: NextRequest) {
-  const authError = requireAuth(req);
-  if (authError) return authError;
-
   try {
     const body = await req.json();
     const {

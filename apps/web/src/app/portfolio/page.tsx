@@ -365,11 +365,11 @@ export default function PortfolioPage() {
   const [hoveredMode, setHoveredMode] = useState<string | null>(null);
   const [hoveredAsset, setHoveredAsset] = useState<string | null>(null);
 
-  // No session restore — always require fresh login
+  // Login modal state
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
-  // Fetch available stocks when authenticated
+  // Fetch available stocks immediately (no auth required)
   useEffect(() => {
-    if (!token) return;
     let cancelled = false;
     async function load() {
       try {
@@ -396,7 +396,7 @@ export default function PortfolioPage() {
     }
     load();
     return () => { cancelled = true; };
-  }, [token]);
+  }, []);
 
   // Fetch saved configs when authenticated
   const loadConfigs = useCallback(async () => {
@@ -431,6 +431,7 @@ export default function PortfolioPage() {
         const data = await res.json();
         setToken(data.token);
         setProfileName(data.profile || "");
+        setShowLoginModal(false);
       } else {
         setAuthError("Invalid username or password");
       }
@@ -539,7 +540,6 @@ export default function PortfolioPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           tickers: selectedTickers,
@@ -559,7 +559,6 @@ export default function PortfolioPage() {
       });
 
       if (!res.ok) {
-        if (handleAuthError(res)) return;
         const errData = await res.json().catch(() => ({ error: "Request failed" }));
         setError(errData.error || `Error ${res.status}`);
         return;
@@ -649,89 +648,39 @@ export default function PortfolioPage() {
   }, [result, holdingSortKey, holdingSortAsc]);
 
   // ============================================================================
-  // Login Screen
+  // Login Modal (optional, for save/load functionality)
   // ============================================================================
 
-  if (!token) {
-    const inputStyle = {
-      width: "100%",
-      padding: "10px 12px",
-      background: "#0d1117",
-      border: "1px solid #30363d",
-      borderRadius: 4,
-      color: "#fff",
-      fontSize: 13,
-      fontFamily: "monospace",
-      marginBottom: 12,
-      boxSizing: "border-box" as const,
-    };
-    return (
-      <main style={{ padding: 24, maxWidth: 380, margin: "100px auto" }}>
-        <form
-          style={{ ...cardStyle, padding: 28 }}
-          onSubmit={e => { e.preventDefault(); handleLogin(); }}
-        >
-          <div style={{ textAlign: "center", marginBottom: 24 }}>
-            <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "monospace", letterSpacing: "-0.02em" }}>
-              Portfolio Optimizer
-            </div>
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", marginTop: 4 }}>
-              Sign in to access your portfolio
-            </div>
+  const loginModal = showLoginModal && !token ? (
+    <div
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}
+      onClick={() => setShowLoginModal(false)}
+    >
+      <form
+        style={{ ...cardStyle, padding: 28, width: 340 }}
+        onSubmit={e => { e.preventDefault(); handleLogin(); }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, fontFamily: "monospace" }}>Sign In</div>
+          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", marginTop: 4 }}>
+            Sign in to save & load portfolios
           </div>
-          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", marginBottom: 4, letterSpacing: "0.05em" }}>
-            USERNAME
-          </div>
-          <input
-            type="text"
-            value={username}
-            onChange={e => setUsername(e.target.value)}
-            placeholder="Enter username"
-            autoFocus
-            autoComplete="username"
-            style={inputStyle}
-          />
-          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", marginBottom: 4, letterSpacing: "0.05em" }}>
-            PASSWORD
-          </div>
-          <input
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            placeholder="Enter password"
-            autoComplete="current-password"
-            style={inputStyle}
-          />
-          <button
-            type="submit"
-            disabled={authLoading || !password || !username}
-            style={{
-              width: "100%",
-              padding: "11px 0",
-              marginTop: 4,
-              background: authLoading ? "#30363d" : "#3b82f6",
-              color: "#fff",
-              border: "none",
-              borderRadius: 4,
-              fontSize: 13,
-              fontWeight: 600,
-              fontFamily: "monospace",
-              cursor: authLoading ? "wait" : "pointer",
-              opacity: (authLoading || !password || !username) ? 0.5 : 1,
-              transition: "opacity 0.15s",
-            }}
-          >
-            {authLoading ? "Signing in..." : "Sign In"}
-          </button>
-          {authError && (
-            <div style={{ color: "#ef4444", fontSize: 11, marginTop: 10, fontFamily: "monospace", textAlign: "center" }}>
-              {authError}
-            </div>
-          )}
-        </form>
-      </main>
-    );
-  }
+        </div>
+        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", marginBottom: 4, letterSpacing: "0.05em" }}>USERNAME</div>
+        <input type="text" value={username} onChange={e => setUsername(e.target.value)} placeholder="Enter username" autoFocus autoComplete="username"
+          style={{ width: "100%", padding: "10px 12px", background: "#0d1117", border: "1px solid #30363d", borderRadius: 4, color: "#fff", fontSize: 13, fontFamily: "monospace", marginBottom: 12, boxSizing: "border-box" as const }} />
+        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", marginBottom: 4, letterSpacing: "0.05em" }}>PASSWORD</div>
+        <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter password" autoComplete="current-password"
+          style={{ width: "100%", padding: "10px 12px", background: "#0d1117", border: "1px solid #30363d", borderRadius: 4, color: "#fff", fontSize: 13, fontFamily: "monospace", marginBottom: 12, boxSizing: "border-box" as const }} />
+        <button type="submit" disabled={authLoading || !password || !username}
+          style={{ width: "100%", padding: "11px 0", marginTop: 4, background: authLoading ? "#30363d" : "#3b82f6", color: "#fff", border: "none", borderRadius: 4, fontSize: 13, fontWeight: 600, fontFamily: "monospace", cursor: authLoading ? "wait" : "pointer", opacity: (authLoading || !password || !username) ? 0.5 : 1 }}>
+          {authLoading ? "Signing in..." : "Sign In"}
+        </button>
+        {authError && <div style={{ color: "#ef4444", fontSize: 11, marginTop: 10, fontFamily: "monospace", textAlign: "center" }}>{authError}</div>}
+      </form>
+    </div>
+  ) : null;
 
   // ============================================================================
   // Main Dashboard
@@ -751,6 +700,8 @@ export default function PortfolioPage() {
         </>
       )}
 
+      {loginModal}
+
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
@@ -766,12 +717,21 @@ export default function PortfolioPage() {
             </span>
           )}
         </div>
-        <button
-          onClick={() => { setToken(null); setProfileName(""); setUsername(""); setPassword(""); }}
-          style={{ ...btnStyle(false), fontSize: 10 }}
-        >
-          Logout
-        </button>
+        {token ? (
+          <button
+            onClick={() => { setToken(null); setProfileName(""); setUsername(""); setPassword(""); setConfigs([]); }}
+            style={{ ...btnStyle(false), fontSize: 10 }}
+          >
+            Sign Out
+          </button>
+        ) : (
+          <button
+            onClick={() => setShowLoginModal(true)}
+            style={{ ...btnStyle(false), fontSize: 10, borderColor: "rgba(59,130,246,0.4)", color: "#3b82f6" }}
+          >
+            Sign In
+          </button>
+        )}
       </div>
 
       {/* === SAVED PORTFOLIOS BAR === */}
@@ -1341,47 +1301,62 @@ export default function PortfolioPage() {
 
               {/* Save / Load Buttons */}
               <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                {showSaveForm ? (
-                  <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                    <input
-                      value={saveName}
-                      onChange={e => setSaveName(e.target.value)}
-                      placeholder="Portfolio name..."
-                      autoFocus
-                      onKeyDown={e => { if (e.key === "Enter" && saveName) saveConfig(); if (e.key === "Escape") setShowSaveForm(false); }}
-                      style={{
-                        padding: "6px 10px", background: "#0d1117", width: 180,
-                        border: "1px solid #3b82f6", borderRadius: 5,
-                        color: "#fff", fontSize: 11, fontFamily: "monospace",
-                        outline: "none",
-                      }}
-                    />
+                {token ? (
+                  showSaveForm ? (
+                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                      <input
+                        value={saveName}
+                        onChange={e => setSaveName(e.target.value)}
+                        placeholder="Portfolio name..."
+                        autoFocus
+                        onKeyDown={e => { if (e.key === "Enter" && saveName) saveConfig(); if (e.key === "Escape") setShowSaveForm(false); }}
+                        style={{
+                          padding: "6px 10px", background: "#0d1117", width: 180,
+                          border: "1px solid #3b82f6", borderRadius: 5,
+                          color: "#fff", fontSize: 11, fontFamily: "monospace",
+                          outline: "none",
+                        }}
+                      />
+                      <button
+                        onClick={saveConfig}
+                        disabled={!saveName}
+                        style={{
+                          ...btnStyle(true), padding: "6px 14px", borderRadius: 5,
+                          opacity: saveName ? 1 : 0.4,
+                        }}
+                      >
+                        Save
+                      </button>
+                      <button onClick={() => setShowSaveForm(false)} style={{ ...btnStyle(false), padding: "6px 8px", borderRadius: 5 }}>
+                        ×
+                      </button>
+                    </div>
+                  ) : (
                     <button
-                      onClick={saveConfig}
-                      disabled={!saveName}
+                      onClick={() => setShowSaveForm(true)}
                       style={{
-                        ...btnStyle(true), padding: "6px 14px", borderRadius: 5,
-                        opacity: saveName ? 1 : 0.4,
+                        padding: "6px 14px", borderRadius: 5, fontSize: 10, fontWeight: 600,
+                        fontFamily: "monospace", cursor: "pointer",
+                        background: "none", border: "1px solid #30363d", color: "rgba(255,255,255,0.6)",
                       }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = "#3b82f6"; e.currentTarget.style.color = "#3b82f6"; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = "#30363d"; e.currentTarget.style.color = "rgba(255,255,255,0.6)"; }}
                     >
-                      Save
+                      Save Portfolio
                     </button>
-                    <button onClick={() => setShowSaveForm(false)} style={{ ...btnStyle(false), padding: "6px 8px", borderRadius: 5 }}>
-                      ×
-                    </button>
-                  </div>
+                  )
                 ) : (
                   <button
-                    onClick={() => setShowSaveForm(true)}
+                    onClick={() => setShowLoginModal(true)}
                     style={{
                       padding: "6px 14px", borderRadius: 5, fontSize: 10, fontWeight: 600,
                       fontFamily: "monospace", cursor: "pointer",
-                      background: "none", border: "1px solid #30363d", color: "rgba(255,255,255,0.6)",
+                      background: "none", border: "1px solid rgba(59,130,246,0.3)", color: "rgba(59,130,246,0.6)",
                     }}
                     onMouseEnter={e => { e.currentTarget.style.borderColor = "#3b82f6"; e.currentTarget.style.color = "#3b82f6"; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = "#30363d"; e.currentTarget.style.color = "rgba(255,255,255,0.6)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(59,130,246,0.3)"; e.currentTarget.style.color = "rgba(59,130,246,0.6)"; }}
                   >
-                    Save Portfolio
+                    Sign in to save
                   </button>
                 )}
               </div>
