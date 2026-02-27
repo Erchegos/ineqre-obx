@@ -192,15 +192,17 @@ export default function OptionsPage() {
     // Smooth: 3-point weighted moving average to reduce noise
     if (raw.length < 3) return raw;
     const smoothed = raw.map((point, i) => {
-      const prev = raw[i - 1];
-      const next = raw[i + 1];
+      const prevCall = i > 0 ? raw[i - 1].callIV : null;
+      const nextCall = i < raw.length - 1 ? raw[i + 1].callIV : null;
+      const prevPut = i > 0 ? raw[i - 1].putIV : null;
+      const nextPut = i < raw.length - 1 ? raw[i + 1].putIV : null;
       let sCall = point.callIV;
       let sPut = point.putIV;
-      if (sCall !== null && prev?.callIV !== null && next?.callIV !== null) {
-        sCall = prev.callIV * 0.25 + sCall * 0.5 + next.callIV * 0.25;
+      if (sCall !== null && prevCall !== null && nextCall !== null) {
+        sCall = prevCall * 0.25 + sCall * 0.5 + nextCall * 0.25;
       }
-      if (sPut !== null && prev?.putIV !== null && next?.putIV !== null) {
-        sPut = prev.putIV * 0.25 + sPut * 0.5 + next.putIV * 0.25;
+      if (sPut !== null && prevPut !== null && nextPut !== null) {
+        sPut = prevPut * 0.25 + sPut * 0.5 + nextPut * 0.25;
       }
       return { strike: point.strike, callIV: sCall, putIV: sPut };
     });
