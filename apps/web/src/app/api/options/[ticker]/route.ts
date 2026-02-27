@@ -334,16 +334,18 @@ function impliedVolFromMid(
   if (price < intrinsic * 0.9) return 0; // Price below intrinsic — bad data
 
   let sigma = 0.30;
+  let converged = false;
   for (let i = 0; i < 50; i++) {
     const p = bsPrice(type, S, K, T, r, sigma);
     const diff = p - price;
-    if (Math.abs(diff) < 0.001) return sigma;
+    if (Math.abs(diff) < 0.001) { converged = true; break; }
     const d1 = (Math.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * Math.sqrt(T));
     const vega = S * Math.exp(-0.5 * d1 * d1) / Math.sqrt(2 * Math.PI) * Math.sqrt(T);
     if (vega < 0.001) break;
     sigma = Math.max(0.01, Math.min(sigma - diff / vega, 5.0));
   }
-  // Only return if converged to a reasonable range
+  // Only return if actually converged to a reasonable range
+  if (!converged) return 0;
   return (sigma >= 0.05 && sigma <= 3.0) ? sigma : 0;
 }
 
