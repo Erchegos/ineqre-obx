@@ -598,7 +598,7 @@ The options module (`/options/[ticker]`) provides:
 ### Data
 - Ticker mapping: `.US` suffix stripped for API calls (e.g., `EQNR.US` → `EQNR` in DB)
 - Data from `options_chain` and `options_meta` tables (populated by `fetch-options-daily.ts`)
-- Supported tickers: EQNR, BORR, FLNG, FRO (US-listed with valid OI/volume)
+- Supported tickers: EQNR, FLNG, FRO (US-listed with valid OI/volume)
 - Max pain computed in JS (iterates each strike as hypothetical settlement price)
 - OPTN badge on stocks list only shows for `.US`-suffixed tickers
 - **Synthetic bid/ask**: Options without bid/ask from Yahoo get synthetic quotes:

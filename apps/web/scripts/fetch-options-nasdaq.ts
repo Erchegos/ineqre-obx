@@ -18,7 +18,7 @@ config({ path: resolve(__dirname, "../.env.local") });
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) throw new Error("DATABASE_URL required");
 
-const OPTIONS_TICKERS = ["EQNR", "BORR", "FLNG", "FRO"];
+const OPTIONS_TICKERS = ["EQNR", "FLNG", "FRO"];
 
 function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 

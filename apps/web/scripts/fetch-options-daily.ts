@@ -34,9 +34,6 @@ const OPTIONS_TICKERS: Record<string, { yahoo: string; ibkr?: { conid: number; e
     yahoo: "EQNR",          // Equinor ASA ADR (NYSE)
     ibkr: { conid: 38831, exchange: "NYSE" },
   },
-  BORR: {
-    yahoo: "BORR",           // Borr Drilling (NYSE)
-  },
   FLNG: {
     yahoo: "FLNG",           // Flex LNG (NYSE)
   },
