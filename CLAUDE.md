@@ -375,6 +375,7 @@ Run after market close alongside ML pipeline:
 | `scan-ose-universe.ts` | Discover new OSE tickers |
 | `import-new-tickers.ts` | Import tickers to database |
 | `fetch-options-daily.ts` | Fetch options chains from Yahoo Finance, store in DB |
+| `fetch-options-nasdaq.ts` | Fetch options OI/bid/ask from Nasdaq API (supplements Yahoo) |
 | `fetch-ssr-shorts.ts` | Fetch short positions from Finanstilsynet SSR API |
 | `fetch-commodities.ts` | Fetch commodity prices from Yahoo + calculate stock sensitivity |
 | `fetch-newsweb-filings.ts` | Fetch regulatory filings from Oslo Børs NewsWeb API into `newsweb_filings` |
@@ -606,11 +607,15 @@ The options module (`/options/[ticker]`) provides:
   - Applied both in fetch script (DB storage) and API route (runtime fallback)
   - IV solved from last_price via Newton-Raphson when Yahoo returns ~0 IV
   - Dead options (no price, no OI) are skipped during fetch
-- **Protective UPSERT**: Fetch script never overwrites good data with empty data:
+- **Protective UPSERT**: Fetch scripts never overwrite good data with empty data:
   - bid/ask/last_price: only updated when new value > 0
   - IV/Greeks: only updated when new IV > 1%
   - OI/volume: only updated when new value > 0 (preserves historical OI from previous fetches)
   - underlying_price/fetched_at: always updated (always valid)
+- **Dual data sources**: Yahoo Finance (`fetch-options-daily.ts`) + Nasdaq API (`fetch-options-nasdaq.ts`)
+  - Yahoo: primary source for IV, chain structure, expirations
+  - Nasdaq: supplements with real bid/ask, OI, and volume (no auth required)
+  - Both use protective UPSERT — run in any order, best data wins
 
 ---
 
