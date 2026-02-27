@@ -579,19 +579,15 @@ export default function PortfolioPage() {
     }
   };
 
-  // Auto-load pre-cached default portfolio on first visit
+  // Auto-run optimizer on first load with default portfolio
   const hasAutoRun = useRef(false);
   useEffect(() => {
     if (hasAutoRun.current) return;
-    hasAutoRun.current = true;
-    setLoading(true);
-    fetch("/api/portfolio/default")
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data && !data.error) setResult(data);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    if (selectedTickers.length >= 2) {
+      hasAutoRun.current = true;
+      runOptimization();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Save config
@@ -711,11 +707,11 @@ export default function PortfolioPage() {
 
   return (
     <main style={{ padding: "20px 24px", maxWidth: 1400, margin: "0 auto" }}>
-      {/* Loading bar for strategy switching */}
-      {loading && result && (
+      {/* Loading bar — always visible when optimizing */}
+      {loading && (
         <>
           <style dangerouslySetInnerHTML={{ __html: "@keyframes loadSlide{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}" }} />
-          <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: 2, zIndex: 100, background: "#0d1117", overflow: "hidden" }}>
+          <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: 3, zIndex: 100, background: "#0d1117", overflow: "hidden" }}>
             <div style={{ height: "100%", width: "40%", background: "linear-gradient(90deg, transparent, #3b82f6, #10b981, transparent)", animation: "loadSlide 1.2s ease-in-out infinite" }} />
           </div>
         </>
@@ -1433,12 +1429,45 @@ export default function PortfolioPage() {
                 fontSize: 11, fontWeight: 800, fontFamily: "monospace",
               }}>3</span>
               <span style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", fontFamily: "monospace" }}>
-                {selectedTickers.length < 2
-                  ? "Select at least 2 assets to begin optimization"
-                  : "Click OPTIMIZE to compute optimal weights, risk metrics, and ML signals"
+                {loading
+                  ? "Optimizing portfolio..."
+                  : selectedTickers.length < 2
+                    ? "Select at least 2 assets to begin optimization"
+                    : "Click OPTIMIZE to compute optimal weights, risk metrics, and ML signals"
                 }
               </span>
             </div>
+            {/* Loading skeleton for initial optimization */}
+            {loading && !result && (
+              <div style={{ marginTop: 16 }}>
+                <style dangerouslySetInnerHTML={{ __html: "@keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}" }} />
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10, marginBottom: 16 }}>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} style={{
+                      height: 64, borderRadius: 6,
+                      background: "linear-gradient(90deg, #161b22 25%, #21262d 50%, #161b22 75%)",
+                      backgroundSize: "800px 64px",
+                      animation: `shimmer 1.5s ease-in-out infinite`,
+                      animationDelay: `${i * 0.1}s`,
+                    }} />
+                  ))}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} style={{
+                      height: 120, borderRadius: 6,
+                      background: "linear-gradient(90deg, #161b22 25%, #21262d 50%, #161b22 75%)",
+                      backgroundSize: "800px 120px",
+                      animation: `shimmer 1.5s ease-in-out infinite`,
+                      animationDelay: `${i * 0.15}s`,
+                    }} />
+                  ))}
+                </div>
+                <div style={{ textAlign: "center", marginTop: 20, fontSize: 11, color: "rgba(255,255,255,0.3)", fontFamily: "monospace" }}>
+                  Running 5 optimization modes, ML signals, regime analysis...
+                </div>
+              </div>
+            )}
           </div>
         )}
 
