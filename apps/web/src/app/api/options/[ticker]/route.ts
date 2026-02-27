@@ -111,6 +111,10 @@ export async function GET(
     // Uses Black-Scholes theoretical price with a spread that widens for OTM options
     fillSyntheticBidAsk(chainRows, underlyingPrice, expiry);
 
+    // Recalculate IV from mid(bid,ask) for more consistent skew curves
+    // Stored IV is often from stale lastPrice; mid of current bid/ask is more reliable
+    recalcIVFromMid(chainRows, underlyingPrice, expiry);
+
     // Build OI distribution
     const oiDistribution = chainRows.map(row => ({
       strike: row.strike,
@@ -316,6 +320,63 @@ function fillSyntheticBidAsk(
       }
       // Mark as synthetic so frontend can style differently
       side.synthetic = true;
+    }
+  }
+}
+
+// ─── IV Solver (Newton-Raphson) ─────────────────────────────────
+function impliedVolFromMid(
+  type: "call" | "put", price: number, S: number, K: number, T: number, r: number
+): number {
+  if (price <= 0 || T <= 0 || S <= 0 || K <= 0) return 0;
+  // Intrinsic value check
+  const intrinsic = type === "call" ? Math.max(0, S - K) : Math.max(0, K - S);
+  if (price < intrinsic * 0.9) return 0; // Price below intrinsic — bad data
+
+  let sigma = 0.30;
+  for (let i = 0; i < 50; i++) {
+    const p = bsPrice(type, S, K, T, r, sigma);
+    const diff = p - price;
+    if (Math.abs(diff) < 0.001) return sigma;
+    const d1 = (Math.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * Math.sqrt(T));
+    const vega = S * Math.exp(-0.5 * d1 * d1) / Math.sqrt(2 * Math.PI) * Math.sqrt(T);
+    if (vega < 0.001) break;
+    sigma = Math.max(0.01, Math.min(sigma - diff / vega, 5.0));
+  }
+  // Only return if converged to a reasonable range
+  return (sigma >= 0.05 && sigma <= 3.0) ? sigma : 0;
+}
+
+/**
+ * Recalculate IV from mid(bid,ask) for all options in the chain.
+ * Stored IV is often derived from stale lastPrice; mid of current bid/ask
+ * reflects live market conditions and produces smoother, more reliable skew curves.
+ */
+function recalcIVFromMid(
+  chainRows: Array<{ strike: number; call: Record<string, unknown> | null; put: Record<string, unknown> | null }>,
+  underlyingPrice: number,
+  expiry: string
+) {
+  if (underlyingPrice <= 0) return;
+  const T = Math.max(daysToExpiry(expiry), 1) / 365;
+  const r = 0.04;
+
+  for (const row of chainRows) {
+    for (const [side, type] of [[row.call, "call"], [row.put, "put"]] as const) {
+      if (!side) continue;
+      const bid = side.bid as number;
+      const ask = side.ask as number;
+
+      // Only recalculate if we have real (non-synthetic) bid and ask
+      if (bid <= 0 || ask <= 0 || side.synthetic) continue;
+
+      const mid = (bid + ask) / 2;
+      if (mid <= 0) continue;
+
+      const newIV = impliedVolFromMid(type, mid, underlyingPrice, row.strike, T, r);
+      if (newIV >= 0.05 && newIV <= 2.0) {
+        side.iv = newIV;
+      }
     }
   }
 }
