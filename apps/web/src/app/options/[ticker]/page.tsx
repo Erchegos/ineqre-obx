@@ -173,13 +173,38 @@ export default function OptionsPage() {
   // ─── Derived Data ─────────────────────────────────────────────
   const ivSkewData = useMemo(() => {
     if (!data) return [];
-    return data.chain
-      .filter(r => r.call?.iv || r.put?.iv)
-      .map(r => ({
-        strike: r.strike,
-        callIV: r.call?.iv ? r.call.iv * 100 : null,
-        putIV: r.put?.iv ? r.put.iv * 100 : null,
-      }));
+    const IV_MIN = 5;   // Minimum realistic IV (5%)
+    const IV_MAX = 150;  // Cap outliers at 150%
+
+    // Extract valid IV points, filtering out unrealistic values
+    const raw = data.chain
+      .map(r => {
+        const civ = r.call?.iv ? r.call.iv * 100 : null;
+        const piv = r.put?.iv ? r.put.iv * 100 : null;
+        return {
+          strike: r.strike,
+          callIV: civ !== null && civ >= IV_MIN && civ <= IV_MAX ? civ : null,
+          putIV: piv !== null && piv >= IV_MIN && piv <= IV_MAX ? piv : null,
+        };
+      })
+      .filter(r => r.callIV !== null || r.putIV !== null);
+
+    // Smooth: 3-point weighted moving average to reduce noise
+    if (raw.length < 3) return raw;
+    const smoothed = raw.map((point, i) => {
+      const prev = raw[i - 1];
+      const next = raw[i + 1];
+      let sCall = point.callIV;
+      let sPut = point.putIV;
+      if (sCall !== null && prev?.callIV !== null && next?.callIV !== null) {
+        sCall = prev.callIV * 0.25 + sCall * 0.5 + next.callIV * 0.25;
+      }
+      if (sPut !== null && prev?.putIV !== null && next?.putIV !== null) {
+        sPut = prev.putIV * 0.25 + sPut * 0.5 + next.putIV * 0.25;
+      }
+      return { strike: point.strike, callIV: sCall, putIV: sPut };
+    });
+    return smoothed;
   }, [data]);
 
   const volumeData = useMemo(() => {
@@ -635,8 +660,8 @@ export default function OptionsPage() {
                 <YAxis tick={{ fontSize: 9, fill: "#555", fontFamily: "monospace" }} tickFormatter={(v: number) => `${v.toFixed(0)}%`} domain={["auto", "auto"]} />
                 <Tooltip contentStyle={ttStyle} formatter={(value: number | undefined) => [`${(value ?? 0).toFixed(1)}%`, ""]} labelFormatter={(label) => `Strike: ${label}`} />
                 <ReferenceLine x={underlyingPrice} stroke="#3b82f6" strokeDasharray="3 3" label={{ value: "ATM", fill: "#3b82f6", fontSize: 8, fontFamily: "monospace" }} />
-                <Line type="monotone" dataKey="callIV" stroke="#22c55e" strokeWidth={1.5} dot={{ r: 2.5, fill: "#22c55e" }} name="Call IV" connectNulls />
-                <Line type="monotone" dataKey="putIV" stroke="#ef4444" strokeWidth={1.5} dot={{ r: 2.5, fill: "#ef4444" }} name="Put IV" connectNulls />
+                <Line type="natural" dataKey="callIV" stroke="#22c55e" strokeWidth={2} dot={{ r: 2, fill: "#22c55e" }} name="Call IV" connectNulls />
+                <Line type="natural" dataKey="putIV" stroke="#ef4444" strokeWidth={2} dot={{ r: 2, fill: "#ef4444" }} name="Put IV" connectNulls />
                 <Legend wrapperStyle={{ fontSize: 10, fontFamily: "monospace" }} />
               </LineChart>
             </ResponsiveContainer>
