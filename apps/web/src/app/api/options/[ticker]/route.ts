@@ -351,6 +351,10 @@ function impliedVolFromMid(
  * Recalculate IV from mid(bid,ask) for all options in the chain.
  * Stored IV is often derived from stale lastPrice; mid of current bid/ask
  * reflects live market conditions and produces smoother, more reliable skew curves.
+ *
+ * For deep ITM options where the solver fails (price ≈ intrinsic, vega ≈ 0),
+ * we use put-call parity to infer IV from the opposite side, or interpolate
+ * from neighboring strikes.
  */
 function recalcIVFromMid(
   chainRows: Array<{ strike: number; call: Record<string, unknown> | null; put: Record<string, unknown> | null }>,
@@ -361,13 +365,12 @@ function recalcIVFromMid(
   const T = Math.max(daysToExpiry(expiry), 1) / 365;
   const r = 0.04;
 
+  // Pass 1: Solve IV from mid where possible
   for (const row of chainRows) {
     for (const [side, type] of [[row.call, "call"], [row.put, "put"]] as const) {
       if (!side) continue;
       const bid = side.bid as number;
       const ask = side.ask as number;
-
-      // Only recalculate if we have real (non-synthetic) bid and ask
       if (bid <= 0 || ask <= 0 || side.synthetic) continue;
 
       const mid = (bid + ask) / 2;
@@ -376,7 +379,75 @@ function recalcIVFromMid(
       const newIV = impliedVolFromMid(type, mid, underlyingPrice, row.strike, T, r);
       if (newIV >= 0.05 && newIV <= 2.0) {
         side.iv = newIV;
+        side._ivSolved = true; // Mark as freshly solved
       }
     }
+  }
+
+  // Pass 2: For unsolved options, use the opposite side's IV at the same strike
+  // (put-call parity implies same IV for same strike/expiry)
+  for (const row of chainRows) {
+    const call = row.call;
+    const put = row.put;
+    if (call && put) {
+      const callSolved = call._ivSolved as boolean;
+      const putSolved = put._ivSolved as boolean;
+      if (callSolved && !putSolved) {
+        put.iv = call.iv;
+      } else if (putSolved && !callSolved) {
+        call.iv = put.iv;
+      }
+    }
+  }
+
+  // Pass 3: Interpolate remaining gaps from neighboring strikes
+  // Collect valid IV values per side, then fill gaps via linear interpolation
+  for (const sideKey of ["call", "put"] as const) {
+    // Build array of {index, strike, iv, valid}
+    const points: Array<{ idx: number; strike: number; iv: number; valid: boolean }> = [];
+    for (let i = 0; i < chainRows.length; i++) {
+      const side = chainRows[i][sideKey];
+      if (!side) continue;
+      const iv = side.iv as number;
+      const valid = iv >= 0.05 && iv <= 2.0;
+      points.push({ idx: i, strike: chainRows[i].strike, iv: valid ? iv : 0, valid });
+    }
+
+    // Fill gaps by linear interpolation between nearest valid neighbors
+    for (let p = 0; p < points.length; p++) {
+      if (points[p].valid) continue;
+
+      // Find nearest valid left and right
+      let left: { strike: number; iv: number } | null = null;
+      let right: { strike: number; iv: number } | null = null;
+      for (let l = p - 1; l >= 0; l--) {
+        if (points[l].valid) { left = points[l]; break; }
+      }
+      for (let r = p + 1; r < points.length; r++) {
+        if (points[r].valid) { right = points[r]; break; }
+      }
+
+      let interpIV = 0;
+      if (left && right) {
+        // Linear interpolation
+        const ratio = (points[p].strike - left.strike) / (right.strike - left.strike);
+        interpIV = left.iv + ratio * (right.iv - left.iv);
+      } else if (left) {
+        interpIV = left.iv; // Extrapolate flat from left
+      } else if (right) {
+        interpIV = right.iv; // Extrapolate flat from right
+      }
+
+      if (interpIV >= 0.05 && interpIV <= 2.0) {
+        const side = chainRows[points[p].idx][sideKey];
+        if (side) side.iv = interpIV;
+      }
+    }
+  }
+
+  // Cleanup temporary markers
+  for (const row of chainRows) {
+    if (row.call) delete row.call._ivSolved;
+    if (row.put) delete row.put._ivSolved;
   }
 }
