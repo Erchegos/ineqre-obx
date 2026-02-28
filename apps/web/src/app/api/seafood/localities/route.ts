@@ -42,12 +42,25 @@ export async function GET() {
       LEFT JOIN seafood_production_areas spa
         ON spa.area_number = sl.production_area_number
       LEFT JOIN LATERAL (
-        SELECT avg_adult_female_lice, avg_mobile_lice, avg_stationary_lice,
-               sea_temperature, has_cleaning, has_mechanical_removal,
-               has_medicinal_treatment, year, week
-        FROM seafood_lice_reports
-        WHERE locality_id = sl.locality_id
-        ORDER BY year DESC, week DESC
+        -- Prefer the latest report WITH actual lice data;
+        -- fallow sites report NULL lice, which makes dots gray.
+        -- Fall back to absolute latest if no report has lice data.
+        (SELECT avg_adult_female_lice, avg_mobile_lice, avg_stationary_lice,
+                sea_temperature, has_cleaning, has_mechanical_removal,
+                has_medicinal_treatment, year, week
+         FROM seafood_lice_reports
+         WHERE locality_id = sl.locality_id
+           AND avg_adult_female_lice IS NOT NULL
+         ORDER BY year DESC, week DESC
+         LIMIT 1)
+        UNION ALL
+        (SELECT avg_adult_female_lice, avg_mobile_lice, avg_stationary_lice,
+                sea_temperature, has_cleaning, has_mechanical_removal,
+                has_medicinal_treatment, year, week
+         FROM seafood_lice_reports
+         WHERE locality_id = sl.locality_id
+         ORDER BY year DESC, week DESC
+         LIMIT 1)
         LIMIT 1
       ) lr ON true
       WHERE sl.lat IS NOT NULL AND sl.lng IS NOT NULL
