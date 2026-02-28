@@ -33,7 +33,12 @@ type ProductionArea = {
 
 type Locality = {
   localityId: number; name: string; companyName: string | null; ticker: string | null;
-  lat: number; lng: number; latestLice: number | null; productionArea: number;
+  municipality: string | null; productionArea: number; areaName: string | null;
+  areaTrafficLight: string | null; lat: number; lng: number; hasBiomass: boolean;
+  isActive: boolean; latestLice: number | null; latestMobile: number | null;
+  latestStationary: number | null; latestTemp: number | null;
+  hasCleaning: boolean; hasMechanicalRemoval: boolean; hasMedicinalTreatment: boolean;
+  liceWeek: string | null;
 };
 
 type Company = {
@@ -90,6 +95,7 @@ export default function SeafoodPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"overview" | "map" | "areas">("overview");
+  const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
 
   useEffect(() => {
     const sf = async (url: string) => {
@@ -238,8 +244,10 @@ export default function SeafoodPage() {
                       <div style={{ textAlign: "center" }}>AREAS</div>
                       <div style={{ textAlign: "right" }}>RISK</div>
                     </div>
-                    {sortedCompanies.map(co => (
-                      <div key={co.ticker} className="sf-row" style={{ display: "grid", gridTemplateColumns: "3px 1fr 64px 52px 52px 52px 56px 50px 56px 44px", padding: "5px 8px", borderBottom: "1px solid #1a1a1a", alignItems: "center", cursor: "pointer", transition: "background 0.08s" }}>
+                    {sortedCompanies.map(co => {
+                      const isActive = selectedTicker === co.ticker;
+                      return (
+                      <div key={co.ticker} className="sf-row" onClick={() => setSelectedTicker(isActive ? null : co.ticker)} style={{ display: "grid", gridTemplateColumns: "3px 1fr 64px 52px 52px 52px 56px 50px 56px 44px", padding: "5px 8px", borderBottom: "1px solid #1a1a1a", alignItems: "center", cursor: "pointer", transition: "background 0.08s", background: isActive ? "#1a1a2a" : undefined, outline: isActive ? "1px solid #333" : undefined }}>
                         <div style={{ width: 3, minHeight: 16, background: getRiskColor(co.riskScore), borderRadius: 1 }} />
                         <div>
                           <Link href={`/stocks/${co.ticker}`} style={{ color: "#58a6ff", textDecoration: "none", fontWeight: 600 }}>{co.ticker}</Link>
@@ -258,14 +266,15 @@ export default function SeafoodPage() {
                         </div>
                         <div style={{ textAlign: "right", color: getRiskColor(co.riskScore), fontWeight: 700, fontSize: 13 }}>{co.riskScore?.toFixed(0) ?? "\u2014"}</div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   {/* Map */}
                   <div style={{ borderBottom: "1px solid #222" }}>
                     <div style={S.section}>COASTAL MAP</div>
                     <div style={{ height: 460 }}>
-                      <ProductionAreaMap areas={areas} localities={localities} />
+                      <ProductionAreaMap areas={areas} localities={localities} selectedTicker={selectedTicker} onTickerSelect={setSelectedTicker} />
                     </div>
                   </div>
 
@@ -332,7 +341,7 @@ export default function SeafoodPage() {
                 <div style={{ padding: 0 }}>
                   <div style={S.section}>PRODUCTION AREAS & LOCALITIES ({localities.length} sites)</div>
                   <div style={{ height: "calc(100vh - 130px)" }}>
-                    <ProductionAreaMap areas={areas} localities={localities} />
+                    <ProductionAreaMap areas={areas} localities={localities} selectedTicker={selectedTicker} onTickerSelect={setSelectedTicker} />
                   </div>
                 </div>
               )}
@@ -428,11 +437,13 @@ export default function SeafoodPage() {
               </div>
 
               {/* Company Risk Scores */}
-              <div style={S.section}>RISK SCORES</div>
+              <div style={S.section}>RISK SCORES <span style={{ fontWeight: 400, color: "#555" }}>(click to filter map)</span></div>
               <div style={{ padding: "4px 0" }}>
-                {sortedCompanies.map(co => (
-                  <div key={co.ticker} style={{ display: "grid", gridTemplateColumns: "48px 1fr 36px", padding: "3px 10px", fontSize: 10, borderBottom: "1px solid #111" }}>
-                    <Link href={`/stocks/${co.ticker}`} style={{ color: "#58a6ff", textDecoration: "none", fontWeight: 600 }}>{co.ticker}</Link>
+                {sortedCompanies.map(co => {
+                  const isActive = selectedTicker === co.ticker;
+                  return (
+                  <div key={co.ticker} onClick={() => setSelectedTicker(isActive ? null : co.ticker)} style={{ display: "grid", gridTemplateColumns: "48px 1fr 36px", padding: "3px 10px", fontSize: 10, borderBottom: "1px solid #111", cursor: "pointer", background: isActive ? "#1a1a2a" : undefined }}>
+                    <span style={{ color: "#58a6ff", fontWeight: 600 }}>{co.ticker}</span>
                     <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                       <div style={{ flex: 1, height: 3, background: "#1a1a1a", borderRadius: 1 }}>
                         <div style={{ width: `${Math.min(100, co.riskScore ?? 0)}%`, height: 3, background: getRiskColor(co.riskScore), borderRadius: 1 }} />
@@ -440,7 +451,8 @@ export default function SeafoodPage() {
                     </div>
                     <span style={{ textAlign: "right", color: getRiskColor(co.riskScore), fontWeight: 700 }}>{co.riskScore?.toFixed(0) ?? "\u2014"}</span>
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Data Sources */}

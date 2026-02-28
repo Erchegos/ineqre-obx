@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from "react-leaflet";
 
-type ProductionArea = {
+export type ProductionArea = {
   areaNumber: number;
   name: string;
   trafficLight: string;
@@ -15,20 +15,33 @@ type ProductionArea = {
   notes: string | null;
 };
 
-type Locality = {
+export type Locality = {
   localityId: number;
   name: string;
   companyName: string | null;
   ticker: string | null;
+  municipality: string | null;
+  productionArea: number;
+  areaName: string | null;
+  areaTrafficLight: string | null;
   lat: number;
   lng: number;
+  hasBiomass: boolean;
+  isActive: boolean;
   latestLice: number | null;
-  productionArea: number;
+  latestMobile: number | null;
+  latestStationary: number | null;
+  latestTemp: number | null;
+  hasCleaning: boolean;
+  hasMechanicalRemoval: boolean;
+  hasMedicinalTreatment: boolean;
+  liceWeek: string | null;
 };
 
 type Props = {
   areas: ProductionArea[];
   localities: Locality[];
+  selectedTicker: string | null;
 };
 
 const TRAFFIC_COLORS: Record<string, string> = {
@@ -44,11 +57,9 @@ function getLiceColor(lice: number | null): string {
   return "#ef4444";
 }
 
-// Custom dark map style override
 function MapStyler() {
   const map = useMap();
   useEffect(() => {
-    // Apply dark filter to tile layer
     const container = map.getContainer();
     const tilePane = container.querySelector(".leaflet-tile-pane") as HTMLElement;
     if (tilePane) {
@@ -58,7 +69,21 @@ function MapStyler() {
   return null;
 }
 
-export default function ProductionAreaMapInner({ areas, localities }: Props) {
+const MONO = "'Geist Mono','SF Mono','Consolas',monospace";
+
+export default function ProductionAreaMapInner({ areas, localities, selectedTicker }: Props) {
+  // Separate highlighted vs dimmed localities
+  const { highlighted, dimmed } = useMemo(() => {
+    if (!selectedTicker) return { highlighted: localities, dimmed: [] as Locality[] };
+    const h: Locality[] = [];
+    const d: Locality[] = [];
+    for (const loc of localities) {
+      if (loc.ticker === selectedTicker) h.push(loc);
+      else d.push(loc);
+    }
+    return { highlighted: h, dimmed: d };
+  }, [localities, selectedTicker]);
+
   return (
     <div style={{ height: "100%", overflow: "hidden", border: "none" }}>
       <MapContainer
@@ -88,8 +113,8 @@ export default function ProductionAreaMapInner({ areas, localities }: Props) {
             }}
           >
             <Popup>
-              <div style={{ fontSize: 13, minWidth: 180 }}>
-                <div style={{ fontWeight: 700, marginBottom: 4 }}>
+              <div style={{ fontSize: 12, minWidth: 200, fontFamily: MONO, color: "#222" }}>
+                <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 13 }}>
                   Area {area.areaNumber}: {area.name}
                 </div>
                 <div>
@@ -113,38 +138,119 @@ export default function ProductionAreaMapInner({ areas, localities }: Props) {
           </CircleMarker>
         ))}
 
-        {/* Locality markers (smaller) */}
-        {localities.map((loc) => (
+        {/* Dimmed locality markers (non-selected company) */}
+        {dimmed.map((loc) => (
           <CircleMarker
             key={`loc-${loc.localityId}`}
             center={[loc.lat, loc.lng]}
-            radius={4}
+            radius={3}
             pathOptions={{
-              fillColor: getLiceColor(loc.latestLice),
-              fillOpacity: 0.8,
-              color: getLiceColor(loc.latestLice),
-              weight: 1,
+              fillColor: "#333",
+              fillOpacity: 0.3,
+              color: "#333",
+              weight: 0,
             }}
           >
-            <Popup>
-              <div style={{ fontSize: 12, minWidth: 160 }}>
-                <div style={{ fontWeight: 600 }}>{loc.name}</div>
-                {loc.companyName && <div>{loc.companyName}</div>}
-                {loc.ticker && <div>Ticker: {loc.ticker}</div>}
-                {loc.latestLice != null && (
-                  <div>
-                    Lice:{" "}
-                    <span style={{ color: getLiceColor(loc.latestLice), fontWeight: 600 }}>
-                      {loc.latestLice.toFixed(3)}
-                    </span>
-                  </div>
-                )}
-                <div>Area: {loc.productionArea}</div>
-              </div>
-            </Popup>
+            <Popup>{renderPopup(loc)}</Popup>
           </CircleMarker>
         ))}
+
+        {/* Highlighted locality markers */}
+        {highlighted.map((loc) => {
+          const isSelected = !!selectedTicker;
+          const liceColor = getLiceColor(loc.latestLice);
+          return (
+            <CircleMarker
+              key={`loc-${loc.localityId}`}
+              center={[loc.lat, loc.lng]}
+              radius={isSelected ? 6 : 4}
+              pathOptions={{
+                fillColor: liceColor,
+                fillOpacity: isSelected ? 0.95 : 0.8,
+                color: isSelected ? "#fff" : liceColor,
+                weight: isSelected ? 1.5 : 1,
+              }}
+            >
+              <Popup>{renderPopup(loc)}</Popup>
+            </CircleMarker>
+          );
+        })}
       </MapContainer>
+    </div>
+  );
+}
+
+function renderPopup(loc: Locality) {
+  const liceColor = getLiceColor(loc.latestLice);
+  const treatments: string[] = [];
+  if (loc.hasCleaning) treatments.push("Cleaner fish");
+  if (loc.hasMechanicalRemoval) treatments.push("Mechanical");
+  if (loc.hasMedicinalTreatment) treatments.push("Medicinal");
+
+  return (
+    <div style={{ fontSize: 11, minWidth: 220, fontFamily: MONO, color: "#222", lineHeight: 1.5 }}>
+      <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2 }}>{loc.name}</div>
+      <div style={{ fontSize: 10, color: "#888", marginBottom: 6 }}>ID: {loc.localityId}</div>
+
+      {loc.companyName && (
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <span style={{ color: "#666" }}>Company</span>
+          <span style={{ fontWeight: 600 }}>
+            {loc.companyName}
+            {loc.ticker && <span style={{ color: "#2563eb", marginLeft: 4 }}>[{loc.ticker}]</span>}
+          </span>
+        </div>
+      )}
+
+      {loc.municipality && (
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <span style={{ color: "#666" }}>Municipality</span>
+          <span>{loc.municipality}</span>
+        </div>
+      )}
+
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <span style={{ color: "#666" }}>Production Area</span>
+        <span>{loc.areaName ? `${loc.productionArea} — ${loc.areaName}` : `Area ${loc.productionArea}`}</span>
+      </div>
+
+      <div style={{ borderTop: "1px solid #ddd", marginTop: 6, paddingTop: 6 }}>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <span style={{ color: "#666" }}>Adult Female Lice</span>
+          <span style={{ color: liceColor, fontWeight: 700, fontSize: 13 }}>
+            {loc.latestLice != null ? loc.latestLice.toFixed(2) : "—"}
+          </span>
+        </div>
+        {loc.latestMobile != null && (
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span style={{ color: "#666" }}>Mobile Lice</span>
+            <span>{loc.latestMobile.toFixed(2)}</span>
+          </div>
+        )}
+        {loc.latestStationary != null && (
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span style={{ color: "#666" }}>Stationary Lice</span>
+            <span>{loc.latestStationary.toFixed(2)}</span>
+          </div>
+        )}
+        {loc.latestTemp != null && (
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span style={{ color: "#666" }}>Sea Temp</span>
+            <span>{loc.latestTemp.toFixed(1)} °C</span>
+          </div>
+        )}
+      </div>
+
+      {treatments.length > 0 && (
+        <div style={{ borderTop: "1px solid #ddd", marginTop: 4, paddingTop: 4 }}>
+          <span style={{ color: "#666" }}>Treatment: </span>
+          <span style={{ color: "#c2410c", fontWeight: 600 }}>{treatments.join(", ")}</span>
+        </div>
+      )}
+
+      {loc.liceWeek && (
+        <div style={{ fontSize: 10, color: "#999", marginTop: 4 }}>Report: {loc.liceWeek}</div>
+      )}
     </div>
   );
 }
