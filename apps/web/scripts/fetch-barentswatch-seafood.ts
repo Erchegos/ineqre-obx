@@ -31,7 +31,7 @@ const CLIENT_ID = process.env.BARENTSWATCH_CLIENT_ID || "";
 const CLIENT_SECRET = process.env.BARENTSWATCH_CLIENT_SECRET || "";
 
 const WEEKS_BACK = parseInt(
-  process.argv.find((a) => a.startsWith("--weeks="))?.split("=")[1] ?? "4"
+  process.argv.find((a) => a.startsWith("--weeks="))?.split("=")[1] ?? "52"
 );
 const DRY_RUN = process.argv.includes("--dry-run");
 const SKIP_LICE = process.argv.includes("--skip-lice");
@@ -40,21 +40,31 @@ const SINGLE_LOCALITY = process.argv
   .find((a) => a.startsWith("--locality="))
   ?.split("=")[1];
 
-// Company name → ticker mapping
+// Company name → ticker mapping (includes subsidiaries and brand names)
 const COMPANY_TICKER_MAP: Record<string, string> = {
   "mowi": "MOWI",
   "marine harvest": "MOWI",
+  "mowi norway": "MOWI",
   "salmar": "SALM",
+  "salmar nord": "SALM",
+  "salmar farming": "SALM",
+  "salmar aker ocean": "SALM",
+  "nova sea": "SALM",         // SalMar subsidiary
+  "arctic fish": "SALM",      // SalMar subsidiary
   "lerøy": "LSG",
   "leroy": "LSG",
   "lerøy seafood": "LSG",
+  "lerøy aurora": "LSG",
+  "lerøy midt": "LSG",
+  "sjøtroll": "LSG",          // Lerøy subsidiary
   "grieg seafood": "GSF",
   "grieg": "GSF",
+  "grieg aqua": "GSF",
   "bakkafrost": "BAKKA",
+  "scottish salmon": "BAKKA",  // Bakkafrost subsidiary
   "austevoll": "AUSS",
   "austevoll seafood": "AUSS",
-  "nova sea": "SALM", // SalMar subsidiary
-  "arctic fish": "SALM",
+  "br. birkeland": "AUSS",    // Austevoll subsidiary
 };
 
 function mapCompanyToTicker(companyName: string): string | null {
@@ -171,14 +181,14 @@ async function fetchLocalities(): Promise<number> {
       [
         loc.localityNo,
         loc.name || `Locality ${loc.localityNo}`,
-        loc.aquaCultureRegister?.ownerOrganizationName || null,
+        loc.aquaCultureRegister?.ownerOrganizationName ?? null,
         ticker,
-        loc.municipality?.name || null,
-        loc.municipality?.municipalityNumber || null,
-        loc.productionAreaId || null,
-        loc.latitude || null,
-        loc.longitude || null,
-        loc.hasBiomass || false,
+        loc.municipality?.name ?? null,
+        loc.municipality?.municipalityNumber ?? null,
+        loc.productionAreaId ?? null,
+        loc.latitude ?? null,
+        loc.longitude ?? null,
+        loc.hasBiomass ?? false,
         loc.isActive !== false,
       ]
     );
@@ -251,20 +261,20 @@ async function fetchLiceData(weeksBack: number): Promise<number> {
           year,
           week,
           report.avgAdultFemaleLice ?? null,
-          null, // mobile lice not in this endpoint
-          null, // stationary lice not in this endpoint
-          null, // sea temp not in this endpoint
+          report.avgMobileLice ?? null,
+          report.avgStationaryLice ?? null,
+          report.seaTemperature ?? null,
           report.hasCleanerfishDeployed || false,
           report.hasMechanicalRemoval || false,
           report.hasSubstanceTreatments || false,
         ]
       );
 
-      // Also update locality with lat/lng/disease from lice data
-      if (report.lat && report.lon) {
+      // Update locality with lat/lng from lice data (overwrite to get best coordinates)
+      if (report.lat != null && report.lon != null) {
         await pool.query(
           `UPDATE seafood_localities
-           SET lat = COALESCE(lat, $1), lng = COALESCE(lng, $2),
+           SET lat = $1, lng = $2,
                has_biomass = COALESCE($3, has_biomass),
                is_active = true,
                updated_at = NOW()
