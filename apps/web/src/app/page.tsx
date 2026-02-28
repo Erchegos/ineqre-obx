@@ -297,6 +297,19 @@ export default function HomePage() {
                 visible={modulesReveal.visible}
                 delay={6}
               />
+              <FeatureCard
+                href="/seafood"
+                title="Seafood Intelligence"
+                description="Norwegian aquaculture dashboard. Salmon spot prices, sea lice monitoring, production area traffic lights, disease outbreaks, and company biological risk exposure matrix."
+                tags={[
+                  { label: "Salmon", color: "var(--warning)" },
+                  { label: "Lice", color: "var(--error)" },
+                  { label: "Map", color: "var(--info)" },
+                  { label: "Risk", color: "var(--accent)" },
+                ]}
+                visible={modulesReveal.visible}
+                delay={7}
+              />
             </div>
           </section>
 
