@@ -148,51 +148,59 @@ async function fetchLocalities(): Promise<number> {
 
   console.log(`  ${data.length} localities from API`);
 
+  // Prepare all rows
+  const rows = data.map((loc: any) => ({
+    localityNo: loc.localityNo,
+    name: loc.name || `Locality ${loc.localityNo}`,
+    companyName: loc.aquaCultureRegister?.ownerOrganizationName ?? null,
+    ticker: loc.name ? mapCompanyToTicker(loc.aquaCultureRegister?.ownerOrganizationName || "") : null,
+    municipality: loc.municipality?.name ?? null,
+    municipalityNo: loc.municipality?.municipalityNumber ?? null,
+    areaNo: loc.productionAreaId ?? null,
+    lat: loc.latitude ?? null,
+    lng: loc.longitude ?? null,
+    hasBiomass: loc.hasBiomass ?? false,
+    isActive: loc.isActive !== false,
+  }));
+
+  if (DRY_RUN) {
+    for (const r of rows) console.log(`  [DRY] ${r.localityNo}: ${r.name} (${r.companyName || "?"})`);
+    console.log(`  ${rows.length} localities (dry run)\n`);
+    return rows.length;
+  }
+
+  // Batch insert in chunks of 50 (11 params each = 550 params per batch)
+  const BATCH = 50;
   let inserted = 0;
-  for (const loc of data) {
-    const ticker = loc.name
-      ? mapCompanyToTicker(loc.aquaCultureRegister?.ownerOrganizationName || "")
-      : null;
-
-    if (DRY_RUN) {
-      console.log(
-        `  [DRY] Locality ${loc.localityNo}: ${loc.name} (${loc.aquaCultureRegister?.ownerOrganizationName || "?"})`
-      );
-      inserted++;
-      continue;
+  for (let i = 0; i < rows.length; i += BATCH) {
+    const batch = rows.slice(i, i + BATCH);
+    const vals = batch.map((_: any, idx: number) => {
+      const o = idx * 11;
+      return `($${o+1}, $${o+2}, $${o+3}, $${o+4}, $${o+5}, $${o+6}, $${o+7}, $${o+8}, $${o+9}, $${o+10}, $${o+11}, NOW())`;
+    }).join(",");
+    const params: any[] = [];
+    for (const r of batch) {
+      params.push(r.localityNo, r.name, r.companyName, r.ticker, r.municipality, r.municipalityNo, r.areaNo, r.lat, r.lng, r.hasBiomass, r.isActive);
     }
-
     await pool.query(
       `INSERT INTO seafood_localities
         (locality_id, name, company_name, ticker, municipality_name, municipality_number,
          production_area_number, lat, lng, has_biomass, is_active, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+       VALUES ${vals}
        ON CONFLICT (locality_id) DO UPDATE SET
          name = EXCLUDED.name,
          company_name = EXCLUDED.company_name,
          ticker = COALESCE(EXCLUDED.ticker, seafood_localities.ticker),
          municipality_name = EXCLUDED.municipality_name,
-         production_area_number = EXCLUDED.production_area_number,
-         lat = EXCLUDED.lat,
-         lng = EXCLUDED.lng,
+         production_area_number = COALESCE(EXCLUDED.production_area_number, seafood_localities.production_area_number),
+         lat = COALESCE(EXCLUDED.lat, seafood_localities.lat),
+         lng = COALESCE(EXCLUDED.lng, seafood_localities.lng),
          has_biomass = EXCLUDED.has_biomass,
          is_active = EXCLUDED.is_active,
          updated_at = NOW()`,
-      [
-        loc.localityNo,
-        loc.name || `Locality ${loc.localityNo}`,
-        loc.aquaCultureRegister?.ownerOrganizationName ?? null,
-        ticker,
-        loc.municipality?.name ?? null,
-        loc.municipality?.municipalityNumber ?? null,
-        loc.productionAreaId ?? null,
-        loc.latitude ?? null,
-        loc.longitude ?? null,
-        loc.hasBiomass ?? false,
-        loc.isActive !== false,
-      ]
+      params
     );
-    inserted++;
+    inserted += batch.length;
   }
 
   console.log(`  ${inserted} localities upserted\n`);
@@ -230,63 +238,92 @@ async function fetchLiceData(weeksBack: number): Promise<number> {
       continue;
     }
 
-    let weekInserted = 0;
-    for (const report of data) {
-      if (!report.localityNo) continue;
-      if (SINGLE_LOCALITY && String(report.localityNo) !== SINGLE_LOCALITY) continue;
-      // Skip fallow / non-reporting sites
-      if (report.isFallow && report.avgAdultFemaleLice == null) continue;
+    // Filter valid reports
+    const reports = data.filter((r: any) => {
+      if (!r.localityNo) return false;
+      if (SINGLE_LOCALITY && String(r.localityNo) !== SINGLE_LOCALITY) return false;
+      return true;
+    });
 
-      if (DRY_RUN) {
-        weekInserted++;
-        continue;
+    if (DRY_RUN) {
+      console.log(`    ${reports.length} reports (dry run)`);
+      totalInserted += reports.length;
+      continue;
+    }
+
+    // Batch coordinate updates (all localities with lat/lon)
+    const withCoords = reports.filter((r: any) => r.lat != null && r.lon != null);
+    if (withCoords.length > 0) {
+      const BATCH = 200;
+      for (let i = 0; i < withCoords.length; i += BATCH) {
+        const batch = withCoords.slice(i, i + BATCH);
+        const vals = batch.map((_: any, idx: number) => {
+          const o = idx * 5;
+          return `($${o+1}::int, $${o+2}::float, $${o+3}::float, $${o+4}::bool, $${o+5}::int)`;
+        }).join(",");
+        const params: any[] = [];
+        for (const r of batch) {
+          params.push(r.localityNo, r.lat, r.lon, r.hasSalmonoids || false, r.productionAreaId ?? null);
+        }
+        await pool.query(
+          `UPDATE seafood_localities sl SET
+             lat = v.lat, lng = v.lng,
+             has_biomass = COALESCE(v.bio, sl.has_biomass),
+             production_area_number = COALESCE(v.area, sl.production_area_number),
+             is_active = true, updated_at = NOW()
+           FROM (VALUES ${vals}) AS v(lid, lat, lng, bio, area)
+           WHERE sl.locality_id = v.lid`,
+          params
+        );
       }
+    }
 
+    // Batch lice report inserts (chunks of 100 to stay within param limits)
+    const BATCH = 100;
+    let weekInserted = 0;
+    for (let i = 0; i < reports.length; i += BATCH) {
+      const batch = reports.slice(i, i + BATCH);
+      const vals = batch.map((_: any, idx: number) => {
+        const o = idx * 12;
+        return `($${o+1}, $${o+2}, $${o+3}, $${o+4}, $${o+5}, $${o+6}, $${o+7}, $${o+8}, $${o+9}, $${o+10}, $${o+11}, $${o+12})`;
+      }).join(",");
+      const params: any[] = [];
+      for (const r of batch) {
+        params.push(
+          r.localityNo, year, week,
+          r.avgAdultFemaleLice ?? null,
+          r.avgMobileLice ?? null,
+          r.avgStationaryLice ?? null,
+          r.seaTemperature ?? null,
+          r.hasCleanerfishDeployed || false,
+          r.hasMechanicalRemoval || false,
+          r.hasSubstanceTreatments || false,
+          r.hasPd || false,
+          r.hasIla || false,
+        );
+      }
       await pool.query(
         `INSERT INTO seafood_lice_reports
           (locality_id, year, week, avg_adult_female_lice, avg_mobile_lice,
            avg_stationary_lice, sea_temperature, has_cleaning,
-           has_mechanical_removal, has_medicinal_treatment)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+           has_mechanical_removal, has_medicinal_treatment, has_pd, has_ila)
+         VALUES ${vals}
          ON CONFLICT (locality_id, year, week) DO UPDATE SET
-           avg_adult_female_lice = EXCLUDED.avg_adult_female_lice,
-           avg_mobile_lice = EXCLUDED.avg_mobile_lice,
-           avg_stationary_lice = EXCLUDED.avg_stationary_lice,
-           sea_temperature = EXCLUDED.sea_temperature,
+           avg_adult_female_lice = COALESCE(EXCLUDED.avg_adult_female_lice, seafood_lice_reports.avg_adult_female_lice),
+           avg_mobile_lice = COALESCE(EXCLUDED.avg_mobile_lice, seafood_lice_reports.avg_mobile_lice),
+           avg_stationary_lice = COALESCE(EXCLUDED.avg_stationary_lice, seafood_lice_reports.avg_stationary_lice),
+           sea_temperature = COALESCE(EXCLUDED.sea_temperature, seafood_lice_reports.sea_temperature),
            has_cleaning = EXCLUDED.has_cleaning,
            has_mechanical_removal = EXCLUDED.has_mechanical_removal,
-           has_medicinal_treatment = EXCLUDED.has_medicinal_treatment`,
-        [
-          report.localityNo,
-          year,
-          week,
-          report.avgAdultFemaleLice ?? null,
-          report.avgMobileLice ?? null,
-          report.avgStationaryLice ?? null,
-          report.seaTemperature ?? null,
-          report.hasCleanerfishDeployed || false,
-          report.hasMechanicalRemoval || false,
-          report.hasSubstanceTreatments || false,
-        ]
+           has_medicinal_treatment = EXCLUDED.has_medicinal_treatment,
+           has_pd = EXCLUDED.has_pd,
+           has_ila = EXCLUDED.has_ila`,
+        params
       );
-
-      // Update locality with lat/lng from lice data (overwrite to get best coordinates)
-      if (report.lat != null && report.lon != null) {
-        await pool.query(
-          `UPDATE seafood_localities
-           SET lat = $1, lng = $2,
-               has_biomass = COALESCE($3, has_biomass),
-               is_active = true,
-               updated_at = NOW()
-           WHERE locality_id = $4`,
-          [report.lat, report.lon, report.hasSalmonoids || false, report.localityNo]
-        );
-      }
-
-      weekInserted++;
+      weekInserted += batch.length;
     }
 
-    console.log(`    ${weekInserted} reports (${data.length} total from API)`);
+    console.log(`    ${weekInserted} reports, ${withCoords.length} coords (${data.length} total from API)`);
     totalInserted += weekInserted;
 
     // Rate limit
