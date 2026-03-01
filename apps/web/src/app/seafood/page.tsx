@@ -51,8 +51,8 @@ type Company = {
 type DiseaseOutbreak = {
   localityId: number; localityName: string; ticker: string | null; companyName: string | null;
   area: number | null; areaName: string | null; lat: number | null; lng: number | null;
-  disease: string; weeksFlagged: number; firstDetected: string; lastDetected: string;
-  isActive: boolean;
+  disease: string; weeksFlagged: number; firstDetected: string | null; lastDetected: string;
+  isActive: boolean; predatesWindow: boolean;
 };
 
 /* ─── Helpers ──────────────────────────────────────────────────── */
@@ -293,7 +293,7 @@ export default function SeafoodPage() {
                           <div>TYPE</div>
                           <div>COMPANY</div>
                           <div>AREA</div>
-                          <div style={{ textAlign: "right" }}>DETECTED</div>
+                          <div style={{ textAlign: "right" }}>DURATION</div>
                           <div style={{ textAlign: "center" }}>STATUS</div>
                         </div>
                         {diseases.slice(0, 50).map((d, i) => (
@@ -303,7 +303,6 @@ export default function SeafoodPage() {
                             onClick={() => {
                               if (d.lat && d.lng) {
                                 setFocusLocation({ lat: d.lat, lng: d.lng, name: d.localityName });
-                                // Scroll map into view
                                 const mapEl = document.getElementById("seafood-map");
                                 if (mapEl) mapEl.scrollIntoView({ behavior: "smooth", block: "center" });
                               }
@@ -315,7 +314,12 @@ export default function SeafoodPage() {
                             <div><span style={{ ...S.badge(d.disease === "ILA" ? "#ef4444" : "#f97316"), fontSize: 8 }}>{d.disease}</span></div>
                             <div>{d.ticker ? <Link href={`/stocks/${d.ticker}`} style={{ color: "#58a6ff", textDecoration: "none", fontSize: 10 }} onClick={e => e.stopPropagation()}>{d.ticker}</Link> : <span style={{ color: "#555" }}>{"\u2014"}</span>}</div>
                             <div style={{ fontSize: 10, color: "#aaa" }}>{d.areaName ? `${d.area} — ${d.areaName}` : d.area ?? "\u2014"}</div>
-                            <div style={{ textAlign: "right", fontSize: 10, color: "#888" }}>{d.firstDetected}</div>
+                            <div style={{ textAlign: "right", fontSize: 10, color: "#888" }}>
+                              {d.predatesWindow
+                                ? <span title="Disease predates our data window">&gt;{d.weeksFlagged}w</span>
+                                : <span title={`First detected ${d.firstDetected}`}>{d.weeksFlagged}w <span style={{ color: "#555" }}>from {d.firstDetected}</span></span>
+                              }
+                            </div>
                             <div style={{ textAlign: "center" }}>
                               <span style={{ ...S.badge(d.isActive ? "#ef4444" : "#22c55e"), fontSize: 8 }}>{d.isActive ? "ACTIVE" : "CLEARED"}</span>
                             </div>

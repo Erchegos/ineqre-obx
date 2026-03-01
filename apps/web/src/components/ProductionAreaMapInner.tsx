@@ -75,8 +75,22 @@ function MapStyler() {
 function FlyToLocation({ focusLocation }: { focusLocation: FocusLocation }) {
   const map = useMap();
   useEffect(() => {
-    if (focusLocation) {
-      map.flyTo([focusLocation.lat, focusLocation.lng], 11, { duration: 1.5 });
+    if (!focusLocation) return;
+    const target: [number, number] = [focusLocation.lat, focusLocation.lng];
+    const currentZoom = map.getZoom();
+    const currentCenter = map.getCenter();
+
+    // Calculate rough distance to decide animation strategy
+    const dLat = Math.abs(currentCenter.lat - target[0]);
+    const dLng = Math.abs(currentCenter.lng - target[1]);
+    const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+
+    if (dist < 0.5 && currentZoom >= 9) {
+      // Small move — smooth pan + gentle zoom
+      map.flyTo(target, 11, { duration: 1.0, easeLinearity: 0.15 });
+    } else {
+      // Larger move — fly with smooth easing
+      map.flyTo(target, 11, { duration: 2.0, easeLinearity: 0.1 });
     }
   }, [map, focusLocation]);
   return null;

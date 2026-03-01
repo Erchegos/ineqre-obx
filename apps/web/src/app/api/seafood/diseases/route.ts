@@ -7,8 +7,8 @@
  *
  * Note: BarentsWatch disease flags are cumulative — once set on a locality,
  * they remain true until the site is officially cleared by Mattilsynet.
- * We determine "active" by checking the latest week's flag, and show
- * the earliest detection date in our data window.
+ * If a flag has been set for ALL weeks in our data window, the outbreak
+ * predates our data — we mark it as such instead of showing a misleading date.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -19,15 +19,21 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    // Get the latest 2 weeks in the dataset to determine "active" vs "cleared"
-    const latestWeekRes = await pool.query(`
-      SELECT year, week FROM seafood_lice_reports
-      ORDER BY year DESC, week DESC LIMIT 1
+    // Get the latest week and total distinct weeks in our data
+    const metaRes = await pool.query(`
+      SELECT
+        max(year) FILTER (WHERE (year*100+week) = (SELECT max(year*100+week) FROM seafood_lice_reports)) AS latest_year,
+        max(week) FILTER (WHERE (year*100+week) = (SELECT max(year*100+week) FROM seafood_lice_reports)) AS latest_week,
+        min(year*100+week) AS earliest_yearweek,
+        count(DISTINCT year*100+week)::int AS total_weeks
+      FROM seafood_lice_reports
     `);
-    const latestYear = latestWeekRes.rows[0]?.year;
-    const latestWeek = latestWeekRes.rows[0]?.week;
+    const latestYear = metaRes.rows[0]?.latest_year;
+    const latestWeek = metaRes.rows[0]?.latest_week;
+    const earliestYW = metaRes.rows[0]?.earliest_yearweek;
+    const totalWeeks = metaRes.rows[0]?.total_weeks ?? 0;
 
-    // Find all localities with PD or ILA, with first/last detection and locality coords
+    // Find all localities with PD or ILA
     const result = await pool.query(`
       WITH disease_flags AS (
         SELECT
@@ -76,28 +82,32 @@ export async function GET(req: NextRequest) {
         sl.name
     `, [latestYear, latestWeek]);
 
-    // Helper to convert yearweek int (202510) to "2025-W10" string
     const fmtYW = (yw: number) => {
       const y = Math.floor(yw / 100);
       const w = yw % 100;
       return `${y}-W${String(w).padStart(2, "0")}`;
     };
 
-    const outbreaks = result.rows.map(r => ({
-      localityId: r.locality_id,
-      localityName: r.locality_name,
-      ticker: r.ticker,
-      companyName: r.company_name,
-      area: r.area,
-      areaName: r.area_name,
-      lat: r.lat ? parseFloat(r.lat) : null,
-      lng: r.lng ? parseFloat(r.lng) : null,
-      disease: r.disease,
-      weeksFlagged: r.weeks_flagged,
-      firstDetected: fmtYW(r.first_yearweek),
-      lastDetected: fmtYW(r.last_yearweek),
-      isActive: r.in_latest_week,
-    }));
+    const outbreaks = result.rows.map(r => {
+      // If flagged for ALL weeks, the outbreak predates our data window
+      const predatesWindow = r.weeks_flagged >= totalWeeks;
+      return {
+        localityId: r.locality_id,
+        localityName: r.locality_name,
+        ticker: r.ticker,
+        companyName: r.company_name,
+        area: r.area,
+        areaName: r.area_name,
+        lat: r.lat ? parseFloat(r.lat) : null,
+        lng: r.lng ? parseFloat(r.lng) : null,
+        disease: r.disease,
+        weeksFlagged: r.weeks_flagged,
+        firstDetected: predatesWindow ? null : fmtYW(r.first_yearweek),
+        lastDetected: fmtYW(r.last_yearweek),
+        isActive: r.in_latest_week,
+        predatesWindow,
+      };
+    });
 
     return NextResponse.json({
       outbreaks,
@@ -110,6 +120,10 @@ export async function GET(req: NextRequest) {
           total: outbreaks.filter(r => r.disease === "ILA").length,
           active: outbreaks.filter(r => r.disease === "ILA" && r.isActive).length,
         },
+      },
+      dataWindow: {
+        earliest: earliestYW ? fmtYW(earliestYW) : null,
+        totalWeeks,
       },
       latestWeek: latestYear && latestWeek ? `${latestYear}-W${String(latestWeek).padStart(2, "0")}` : null,
     });
