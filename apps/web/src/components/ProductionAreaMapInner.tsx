@@ -78,19 +78,24 @@ function FlyToLocation({ focusLocation }: { focusLocation: FocusLocation }) {
     if (!focusLocation) return;
     const target: [number, number] = [focusLocation.lat, focusLocation.lng];
     const currentZoom = map.getZoom();
-    const currentCenter = map.getCenter();
+    const zoomDiff = 11 - currentZoom;
+    const container = map.getContainer();
 
-    // Calculate rough distance to decide animation strategy
-    const dLat = Math.abs(currentCenter.lat - target[0]);
-    const dLng = Math.abs(currentCenter.lng - target[1]);
-    const dist = Math.sqrt(dLat * dLat + dLng * dLng);
-
-    if (dist < 0.5 && currentZoom >= 9) {
-      // Small move — smooth pan + gentle zoom
-      map.flyTo(target, 11, { duration: 1.0, easeLinearity: 0.15 });
+    if (zoomDiff > 3) {
+      // Large zoom jump — fade out, teleport, fade in (avoids ugly tile pixelation)
+      container.style.transition = "opacity 0.3s ease-out";
+      container.style.opacity = "0";
+      setTimeout(() => {
+        map.setView(target, 11, { animate: false });
+        // Wait a tick for tiles to start loading, then fade in
+        setTimeout(() => {
+          container.style.transition = "opacity 0.5s ease-in";
+          container.style.opacity = "1";
+        }, 100);
+      }, 300);
     } else {
-      // Larger move — fly with smooth easing
-      map.flyTo(target, 11, { duration: 2.0, easeLinearity: 0.1 });
+      // Already zoomed in — smooth fly
+      map.flyTo(target, 11, { duration: 1.0, easeLinearity: 0.15 });
     }
   }, [map, focusLocation]);
   return null;
