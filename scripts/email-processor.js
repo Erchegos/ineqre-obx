@@ -146,6 +146,67 @@ function cleanText(text) {
 }
 
 /**
+ * Strip email junk from extracted text: disclaimers, analyst info, MIME data, base64
+ */
+function stripEmailJunk(text) {
+  if (!text) return '';
+
+  // Cut at common disclaimer/footer markers (take content BEFORE them)
+  const cutMarkers = [
+    /\bThis message is confidential\b/i,
+    /\bPlease refer to the specific research discla/i,
+    /\bdisclaimer available on our website\b/i,
+    /\bThis material is considered by Pareto Securities\b/i,
+    /\bFor further information regarding the information we collect\b/i,
+    /\bIf you no longer wish to receive such reports\b/i,
+    /\bPlease note that conversations with Pareto Securities\b/i,
+    /\bInternet based solutions Norway:\s*Please contact/i,
+    /\bGlobal Privacy Notice\b/i,
+    /------=_NextPart_/,
+    /Content-Type:\s*image\//i,
+    /Content-Transfer-Encoding:\s*base64/i,
+  ];
+
+  for (const marker of cutMarkers) {
+    const idx = text.search(marker);
+    if (idx > 100) {  // Only cut if we have substantial content before the marker
+      text = text.substring(0, idx);
+    }
+  }
+
+  // Remove analyst contact info blocks
+  text = text.replace(/Analyst\(s\):.*$/is, '');
+  text = text.replace(/\+\d{2}\s*\d{1,3}\s*\d{2}\s*\d{2}\s*\d{2,4}/g, ''); // phone numbers
+  text = text.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, ''); // emails
+
+  // Remove "Click to open report" and similar CTAs
+  text = text.replace(/Click to open report/gi, '');
+  text = text.replace(/CLICK HERE FOR THE FULL REPORT/gi, '');
+
+  // Remove any remaining base64 data (long strings of alphanumeric+/= chars)
+  text = text.replace(/[A-Za-z0-9+/=]{50,}/g, '');
+
+  // Remove MIME headers that leaked through
+  text = text.replace(/Content-Type:.*$/gim, '');
+  text = text.replace(/Content-Transfer-Encoding:.*$/gim, '');
+  text = text.replace(/Content-ID:.*$/gim, '');
+  text = text.replace(/Content-Disposition:.*$/gim, '');
+  text = text.replace(/filename="[^"]*"/gi, '');
+
+  // Remove "Source: Pareto Securities" footer
+  text = text.replace(/Source:\s*Pareto Securities.*/is, '');
+
+  // Clean up whitespace after all the removals
+  text = text
+    .replace(/\n\s*\n\s*\n+/g, '\n\n')
+    .replace(/\s\s+/g, ' ')
+    .replace(/\n\s+/g, '\n')
+    .trim();
+
+  return text;
+}
+
+/**
  * Clean and format Xtrainvestor content using Claude API
  */
 async function cleanXtrainvestorContent(rawContent) {
@@ -434,11 +495,33 @@ async function processEmail(message, imap) {
           }
         }
 
-        // Find actual HTML content - look for <!DOCTYPE or <html or <table (Pareto emails)
+        // Extract just the first HTML MIME part (before any image/attachment boundaries)
         let htmlContent = rawEmail;
-        const htmlStart = rawEmail.search(/(?:<!DOCTYPE|<html|<table[^>]*cellspacing)/i);
-        if (htmlStart > 0) {
-          htmlContent = rawEmail.substring(htmlStart);
+
+        // Try to find the MIME boundary and extract only the first text/html part
+        const boundaryMatch = rawEmail.match(/boundary="?([^"\s\r\n]+)"?/i);
+        if (boundaryMatch) {
+          const boundary = boundaryMatch[1];
+          const parts = rawEmail.split(new RegExp('--' + boundary.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+          // Find the first HTML part
+          for (const part of parts) {
+            if (/content-type:\s*text\/html/i.test(part)) {
+              // Extract content after the headers (blank line separates headers from body)
+              const headerEnd = part.search(/\r?\n\r?\n/);
+              if (headerEnd > 0) {
+                htmlContent = part.substring(headerEnd + 2);
+              }
+              break;
+            }
+          }
+        }
+
+        // If no MIME extraction, find actual HTML content
+        if (htmlContent === rawEmail) {
+          const htmlStart = rawEmail.search(/(?:<!DOCTYPE|<html|<table[^>]*cellspacing)/i);
+          if (htmlStart > 0) {
+            htmlContent = rawEmail.substring(htmlStart);
+          }
         }
 
         // Try to extract body tags if they exist
@@ -488,6 +571,9 @@ async function processEmail(message, imap) {
 
         // Clean up encoding artifacts
         text = cleanText(text);
+
+        // Strip junk: disclaimers, analyst info, MIME headers, base64 data
+        text = stripEmailJunk(text);
 
         // Keep full body text — DB column is TEXT (unlimited).
         // Only truncate if extremely long to avoid memory issues.
