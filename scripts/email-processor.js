@@ -369,13 +369,21 @@ async function processEmail(message, imap) {
     // Check if already processed (using Message-ID)
     const messageId = envelope.messageId;
     const existing = await pool.query(
-      'SELECT id FROM research_documents WHERE email_message_id = $1',
+      'SELECT id, length(body_text) AS body_len FROM research_documents WHERE email_message_id = $1',
       [messageId]
     );
 
+    const isReimport = process.argv.includes('--reimport-truncated');
     if (existing.rows.length > 0) {
-      console.log(`Skipping already processed email: ${messageId}`);
-      return;
+      const bodyLen = existing.rows[0].body_len || 0;
+      // If --reimport-truncated flag set and body was truncated (~1850-2100 chars), re-process
+      if (isReimport && bodyLen >= 1800 && bodyLen <= 2100) {
+        console.log(`Re-importing truncated doc (${bodyLen} chars): ${messageId}`);
+        // Will continue processing and UPDATE instead of INSERT below
+      } else {
+        console.log(`Skipping already processed email: ${messageId}`);
+        return;
+      }
     }
 
     // Extract metadata
@@ -525,12 +533,16 @@ async function processEmail(message, imap) {
       }
     }
 
-    // Insert document record
+    // Insert or update document record (upsert on email_message_id)
     const docResult = await pool.query(
       `INSERT INTO research_documents (
         ticker, email_message_id, source, sender_email,
         subject, body_text, ai_summary, received_date
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      ON CONFLICT (email_message_id) DO UPDATE SET
+        body_text = EXCLUDED.body_text,
+        ai_summary = EXCLUDED.ai_summary,
+        updated_at = NOW()
       RETURNING id`,
       [ticker, messageId, source, sender, subject, bodyText, aiSummary, receivedDate]
     );
@@ -707,9 +719,10 @@ async function main() {
     // Select inbox
     await imap.mailboxOpen('INBOX');
 
-    // Search last 3 days to avoid hitting the batch limit with old emails
+    // Search window: 3 days normally, 90 days for --reimport-truncated
     const sinceDate = new Date();
-    sinceDate.setDate(sinceDate.getDate() - 3);
+    const reimportMode = process.argv.includes('--reimport-truncated');
+    sinceDate.setDate(sinceDate.getDate() - (reimportMode ? 90 : 3));
     console.log(`Searching for research emails since ${sinceDate.toISOString().split('T')[0]}...`);
     let processed = 0;
     let totalCount = 0;
