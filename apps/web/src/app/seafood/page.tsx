@@ -49,9 +49,10 @@ type Company = {
 };
 
 type DiseaseOutbreak = {
-  localityId: number; localityName: string; ticker: string | null; area: number | null;
-  areaName: string | null; disease: string; weeksActive: number;
-  latestWeek: string; isActive: boolean;
+  localityId: number; localityName: string; ticker: string | null; companyName: string | null;
+  area: number | null; areaName: string | null; lat: number | null; lng: number | null;
+  disease: string; weeksFlagged: number; firstDetected: string; lastDetected: string;
+  isActive: boolean;
 };
 
 /* ─── Helpers ──────────────────────────────────────────────────── */
@@ -96,6 +97,7 @@ export default function SeafoodPage() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"overview" | "map" | "areas">("overview");
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
+  const [focusLocation, setFocusLocation] = useState<{ lat: number; lng: number; name: string } | null>(null);
 
   useEffect(() => {
     const sf = async (url: string) => {
@@ -271,10 +273,10 @@ export default function SeafoodPage() {
                   </div>
 
                   {/* Map */}
-                  <div style={{ borderBottom: "1px solid #222" }}>
+                  <div id="seafood-map" style={{ borderBottom: "1px solid #222" }}>
                     <div style={S.section}>COASTAL MAP</div>
                     <div style={{ height: 460 }}>
-                      <ProductionAreaMap areas={areas} localities={localities} selectedTicker={selectedTicker} onTickerSelect={setSelectedTicker} />
+                      <ProductionAreaMap areas={areas} localities={localities} selectedTicker={selectedTicker} onTickerSelect={setSelectedTicker} focusLocation={focusLocation} />
                     </div>
                   </div>
 
@@ -285,25 +287,37 @@ export default function SeafoodPage() {
                       <div style={{ padding: "16px 10px", color: "#555", fontSize: 11 }}>No active disease outbreaks detected in current reporting period.</div>
                     ) : (
                       <>
-                        <div style={{ display: "grid", gridTemplateColumns: "3px 1fr 100px 60px 60px 60px 52px", padding: "4px 8px", fontSize: 9, fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.06em", background: "#111", borderBottom: "1px solid #222" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "3px 1fr 50px 60px 140px 80px 52px", padding: "4px 8px", fontSize: 9, fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.06em", background: "#111", borderBottom: "1px solid #222" }}>
                           <div />
                           <div>LOCALITY</div>
-                          <div>DISEASE</div>
+                          <div>TYPE</div>
                           <div>COMPANY</div>
-                          <div style={{ textAlign: "right" }}>AREA</div>
-                          <div style={{ textAlign: "right" }}>WEEKS</div>
+                          <div>AREA</div>
+                          <div style={{ textAlign: "right" }}>DETECTED</div>
                           <div style={{ textAlign: "center" }}>STATUS</div>
                         </div>
-                        {diseases.slice(0, 30).map((d, i) => (
-                          <div key={i} className="sf-row" style={{ display: "grid", gridTemplateColumns: "3px 1fr 100px 60px 60px 60px 52px", padding: "5px 8px", borderBottom: "1px solid #1a1a1a", alignItems: "center", transition: "background 0.08s" }}>
+                        {diseases.slice(0, 50).map((d, i) => (
+                          <div
+                            key={i}
+                            className="sf-row"
+                            onClick={() => {
+                              if (d.lat && d.lng) {
+                                setFocusLocation({ lat: d.lat, lng: d.lng, name: d.localityName });
+                                // Scroll map into view
+                                const mapEl = document.getElementById("seafood-map");
+                                if (mapEl) mapEl.scrollIntoView({ behavior: "smooth", block: "center" });
+                              }
+                            }}
+                            style={{ display: "grid", gridTemplateColumns: "3px 1fr 50px 60px 140px 80px 52px", padding: "5px 8px", borderBottom: "1px solid #1a1a1a", alignItems: "center", transition: "background 0.08s", cursor: d.lat ? "pointer" : "default" }}
+                          >
                             <div style={{ width: 3, minHeight: 14, background: d.disease === "ILA" ? "#ef4444" : "#f97316", borderRadius: 1 }} />
                             <div style={{ fontSize: 11 }}>{d.localityName}</div>
                             <div><span style={{ ...S.badge(d.disease === "ILA" ? "#ef4444" : "#f97316"), fontSize: 8 }}>{d.disease}</span></div>
-                            <div>{d.ticker ? <Link href={`/stocks/${d.ticker}`} style={{ color: "#58a6ff", textDecoration: "none", fontSize: 10 }}>{d.ticker}</Link> : <span style={{ color: "#555" }}>{"\u2014"}</span>}</div>
-                            <div style={{ textAlign: "right", color: "#888" }}>{d.area ?? "\u2014"}</div>
-                            <div style={{ textAlign: "right", fontWeight: 600 }}>{d.weeksActive}</div>
+                            <div>{d.ticker ? <Link href={`/stocks/${d.ticker}`} style={{ color: "#58a6ff", textDecoration: "none", fontSize: 10 }} onClick={e => e.stopPropagation()}>{d.ticker}</Link> : <span style={{ color: "#555" }}>{"\u2014"}</span>}</div>
+                            <div style={{ fontSize: 10, color: "#aaa" }}>{d.areaName ? `${d.area} — ${d.areaName}` : d.area ?? "\u2014"}</div>
+                            <div style={{ textAlign: "right", fontSize: 10, color: "#888" }}>{d.firstDetected}</div>
                             <div style={{ textAlign: "center" }}>
-                              <span style={{ ...S.badge(d.isActive ? "#ef4444" : "#333"), fontSize: 8 }}>{d.isActive ? "ACTIVE" : "RESOLVED"}</span>
+                              <span style={{ ...S.badge(d.isActive ? "#ef4444" : "#22c55e"), fontSize: 8 }}>{d.isActive ? "ACTIVE" : "CLEARED"}</span>
                             </div>
                           </div>
                         ))}
@@ -341,7 +355,7 @@ export default function SeafoodPage() {
                 <div style={{ padding: 0 }}>
                   <div style={S.section}>PRODUCTION AREAS & LOCALITIES ({localities.length} sites)</div>
                   <div style={{ height: "calc(100vh - 130px)" }}>
-                    <ProductionAreaMap areas={areas} localities={localities} selectedTicker={selectedTicker} onTickerSelect={setSelectedTicker} />
+                    <ProductionAreaMap areas={areas} localities={localities} selectedTicker={selectedTicker} onTickerSelect={setSelectedTicker} focusLocation={focusLocation} />
                   </div>
                 </div>
               )}

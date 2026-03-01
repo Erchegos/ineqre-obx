@@ -15,11 +15,14 @@ type ProductionArea = {
   notes: string | null;
 };
 
+type FocusLocation = { lat: number; lng: number; name: string } | null;
+
 type Props = {
   areas: ProductionArea[];
   localities: Locality[];
   selectedTicker: string | null;
   onTickerSelect: (ticker: string | null) => void;
+  focusLocation?: FocusLocation;
 };
 
 const TRAFFIC_COLORS: Record<string, string> = {
@@ -55,7 +58,7 @@ const MapInner = dynamic(() => import("./ProductionAreaMapInner"), {
   ),
 });
 
-export default function ProductionAreaMap({ areas, localities, selectedTicker, onTickerSelect }: Props) {
+export default function ProductionAreaMap({ areas, localities, selectedTicker, onTickerSelect, focusLocation }: Props) {
   // Collect unique tickers from localities
   const tickers: string[] = [];
   const tickerCounts: Record<string, number> = {};
@@ -136,7 +139,7 @@ export default function ProductionAreaMap({ areas, localities, selectedTicker, o
       </div>
 
       <div style={{ flex: 1, minHeight: 0 }}>
-        <MapInner areas={areas} localities={localities} selectedTicker={selectedTicker} />
+        <MapInner areas={areas} localities={localities} selectedTicker={selectedTicker} focusLocation={focusLocation} />
       </div>
     </div>
   );

@@ -455,7 +455,27 @@ async function main() {
     await fetchLiceData(WEEKS_BACK);
   }
 
-  // 3. Aggregate company metrics
+  // 3. Assign production areas to localities without one (based on nearest center coord)
+  const areaResult = await pool.query(`
+    UPDATE seafood_localities sl
+    SET production_area_number = nearest.area_number
+    FROM (
+      SELECT DISTINCT ON (sl2.locality_id)
+        sl2.locality_id, spa.area_number
+      FROM seafood_localities sl2
+      CROSS JOIN seafood_production_areas spa
+      WHERE sl2.lat IS NOT NULL AND sl2.lng IS NOT NULL
+        AND sl2.production_area_number IS NULL
+      ORDER BY sl2.locality_id,
+        sqrt(pow(sl2.lat - spa.center_lat, 2) + pow(sl2.lng - spa.center_lng, 2))
+    ) nearest
+    WHERE sl.locality_id = nearest.locality_id
+  `);
+  if (areaResult.rowCount && areaResult.rowCount > 0) {
+    console.log(`Assigned production areas to ${areaResult.rowCount} localities\n`);
+  }
+
+  // 4. Aggregate company metrics
   await aggregateCompanyMetrics();
 
   console.log("Done.");

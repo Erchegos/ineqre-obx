@@ -38,10 +38,13 @@ export type Locality = {
   liceWeek: string | null;
 };
 
+type FocusLocation = { lat: number; lng: number; name: string } | null;
+
 type Props = {
   areas: ProductionArea[];
   localities: Locality[];
   selectedTicker: string | null;
+  focusLocation?: FocusLocation;
 };
 
 const TRAFFIC_COLORS: Record<string, string> = {
@@ -69,9 +72,19 @@ function MapStyler() {
   return null;
 }
 
+function FlyToLocation({ focusLocation }: { focusLocation: FocusLocation }) {
+  const map = useMap();
+  useEffect(() => {
+    if (focusLocation) {
+      map.flyTo([focusLocation.lat, focusLocation.lng], 11, { duration: 1.5 });
+    }
+  }, [map, focusLocation]);
+  return null;
+}
+
 const MONO = "'Geist Mono','SF Mono','Consolas',monospace";
 
-export default function ProductionAreaMapInner({ areas, localities, selectedTicker }: Props) {
+export default function ProductionAreaMapInner({ areas, localities, selectedTicker, focusLocation }: Props) {
   // Separate highlighted vs dimmed localities
   const { highlighted, dimmed } = useMemo(() => {
     if (!selectedTicker) return { highlighted: localities, dimmed: [] as Locality[] };
@@ -98,6 +111,7 @@ export default function ProductionAreaMapInner({ areas, localities, selectedTick
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <MapStyler />
+        <FlyToLocation focusLocation={focusLocation ?? null} />
 
         {/* Production area center markers */}
         {areas.map((area) => (
