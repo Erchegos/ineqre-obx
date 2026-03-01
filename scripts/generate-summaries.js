@@ -28,22 +28,45 @@ const anthropic = new Anthropic({
  */
 async function generateSummary(subject, bodyText) {
   try {
+    // Clean body text before sending
+    let cleanedText = bodyText
+      .split(/This message is confidential/i)[0]
+      .split(/Source:\s*Pareto Securities/i)[0]
+      .split(/Analyst\(s\):/i)[0]
+      .split(/Please refer to the specific research discla/i)[0]
+      .split(/\n*Full Report:/i)[0]
+      .trim();
+
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 500,
+      max_tokens: 2048,
       messages: [{
         role: 'user',
-        content: `Summarize this financial research report in 2-3 concise bullet points focusing on:
-- Key financial metrics and numbers
-- Main business developments or events
-- Price targets, ratings, or recommendations
+        content: `Summarize this equity research report. Output ONLY the summary — no disclaimers, legal text, or boilerplate.
 
-Report title: ${subject}
+Format:
+**Rating:** [Buy/Hold/Sell] | **Target Price:** [price in currency] | **Share Price:** [current price]
 
-Report content:
-${bodyText.substring(0, 2000)}
+**Thesis:** [1-2 sentences on the core investment case]
 
-Provide ONLY the bullet points, no introduction or conclusion. Use • for bullets.`
+**Key Points:**
+- [Most important takeaway with specific numbers]
+- [Second key point — earnings, margins, guidance, etc.]
+- [Third key point — catalysts, risks, or sector dynamics]
+- [Additional points if material — max 6 bullets total]
+
+**Estimates:** [Key estimate changes if any — EPS, revenue, EBITDA revisions]
+
+Rules:
+- Include company name and ticker prominently
+- Keep all numbers, percentages, and financial metrics
+- Be thorough — capture ALL material information from the report
+- No legal disclaimers, confidentiality notices, or analyst disclosures
+
+Report: ${subject}
+
+Content:
+${cleanedText.substring(0, 30000)}`
       }]
     });
 
@@ -79,7 +102,7 @@ async function main() {
         AND (ai_summary IS NULL OR ai_summary = '')
         AND received_date >= CURRENT_DATE - INTERVAL '30 days'
       ORDER BY received_date DESC
-      LIMIT 50
+      LIMIT 100
     `);
 
     console.log(`Found ${result.rows.length} documents to summarize\n`);

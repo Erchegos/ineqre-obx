@@ -244,7 +244,7 @@ Rules:
 Newsletter: ${subject}
 
 Content:
-${cleanedText.substring(0, 15000)}`;
+${cleanedText.substring(0, 30000)}`;
   } else if (isSectorUpdate) {
     prompt = `Summarize this market/sector update. Output ONLY the summary — no disclaimers, legal text, or boilerplate.
 
@@ -266,7 +266,7 @@ Rules:
 Report: ${subject}
 
 Content:
-${cleanedText.substring(0, 15000)}`;
+${cleanedText.substring(0, 30000)}`;
   } else {
     prompt = `Summarize this equity research report. Output ONLY the summary — no disclaimers, legal text, confidentiality notices, or boilerplate.
 
@@ -294,13 +294,13 @@ Rules:
 Report: ${subject}
 
 Content:
-${cleanedText.substring(0, 15000)}`;
+${cleanedText.substring(0, 30000)}`;
   }
 
   try {
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: isBorsXtra ? 2048 : 1024,
+      max_tokens: 2048,
       messages: [{
         role: 'user',
         content: prompt
@@ -481,8 +481,9 @@ async function processEmail(message, imap) {
         // Clean up encoding artifacts
         text = cleanText(text);
 
-        // Truncate text first to leave room for link
-        text = text.substring(0, 1850);
+        // Keep full body text — DB column is TEXT (unlimited).
+        // Only truncate if extremely long to avoid memory issues.
+        text = text.substring(0, 30000);
 
         // Append report URL (max ~150 chars for link)
         if (reportUrl) {

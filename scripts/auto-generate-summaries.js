@@ -64,12 +64,12 @@ Write directly in a professional tone without meta-commentary.
 Report: ${subject}
 
 Content:
-${cleanedText.substring(0, 15000)}`;
+${cleanedText.substring(0, 30000)}`;
 
   try {
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
+      max_tokens: 2048,
       messages: [{
         role: 'user',
         content: prompt
@@ -114,7 +114,7 @@ async function main() {
       AND body_text IS NOT NULL
       AND body_text != ''
       ORDER BY received_date DESC
-      LIMIT 10
+      LIMIT 50
     `);
 
     const docs = result.rows;
