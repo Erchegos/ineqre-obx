@@ -4,13 +4,13 @@ on:
   schedule:
     # All times UTC — Oslo is CET (UTC+1 winter) / CEST (UTC+2 summer)
     #
-    # 1) 07:30 UTC = 08:30 CET — before OSE open: overnight filings + FX + commodities (US close data)
+    # 1) 07:30 UTC = 08:30 CET — before OSE open: overnight filings + FX + commodities
     - cron: '30 7 * * 1-5'
-    # 2) 08:15 UTC = 09:15 CET — right after OSE open: opening announcements + fresh prices
+    # 2) 08:15 UTC = 09:15 CET — right after OSE open: opening announcements
     - cron: '15 8 * * 1-5'
-    # 3) 10:30 UTC = 11:30 CET — midday: filings + prices update
+    # 3) 10:30 UTC = 11:30 CET — midday catch-up
     - cron: '30 10 * * 1-5'
-    # 4) 15:00 UTC = 16:00 CET — just before close: late-day filings + prices
+    # 4) 15:00 UTC = 16:00 CET — before close: late-day filings
     - cron: '0 15 * * 1-5'
     # 5) 15:45 UTC = 16:45 CET — after OSE close: full refresh (all sources)
     - cron: '45 15 * * 1-5'
@@ -21,11 +21,13 @@ on:
         type: string
         default: '2'
 
+# Prices are handled by price-hourly.yml (every hour 09:00-17:00 CET)
+
 jobs:
   intel-refresh:
-    name: Intelligence Refresh
+    name: NewsWeb + Shorts + FX + Commodities
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
 
     steps:
       - name: Checkout code
@@ -47,23 +49,6 @@ jobs:
         working-directory: apps/web
         run: |
           echo 'DATABASE_URL="${{ secrets.DATABASE_URL }}"' > .env.local
-
-      # ─── Yahoo Prices (midday, before close, after close, after open) ──
-      # Not before open (market hasn't moved yet)
-      - name: Yahoo price backfill
-        if: >-
-          ${{
-            github.event.schedule == '15 8 * * 1-5' ||
-            github.event.schedule == '30 10 * * 1-5' ||
-            github.event.schedule == '0 15 * * 1-5' ||
-            github.event.schedule == '45 15 * * 1-5' ||
-            github.event_name == 'workflow_dispatch'
-          }}
-        working-directory: apps/web
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          NODE_TLS_REJECT_UNAUTHORIZED: '0'
-        run: node scripts/backfill-yahoo.mjs
 
       # ─── NewsWeb regulatory filings (every run) ────────────────────────
       - name: Fetch NewsWeb filings
@@ -124,7 +109,6 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Source | When |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Prices (Yahoo) | 09:15, 11:30, 16:00, 16:45 CET |" >> $GITHUB_STEP_SUMMARY
           echo "| NewsWeb | Every run (5x/day) |" >> $GITHUB_STEP_SUMMARY
           echo "| Shorts (SSR) | 16:45 CET (after close) |" >> $GITHUB_STEP_SUMMARY
           echo "| FX (Norges Bank) | 08:30, 16:45 CET |" >> $GITHUB_STEP_SUMMARY

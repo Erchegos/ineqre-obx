@@ -1,0 +1,43 @@
+name: Hourly Price Update
+
+on:
+  schedule:
+    # Every hour from 08:00-16:00 UTC = 09:00-17:00 CET (winter)
+    # Covers full OSE trading session (09:00-16:20 CET) plus buffer
+    # In summer (CEST=UTC+2) this runs 10:00-18:00 which still covers close
+    - cron: '0 8-16 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  price-update:
+    name: Yahoo Price Backfill
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Create env file
+        working-directory: apps/web
+        run: |
+          echo 'DATABASE_URL="${{ secrets.DATABASE_URL }}"' > .env.local
+
+      - name: Yahoo price backfill
+        working-directory: apps/web
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: node scripts/backfill-yahoo.mjs
