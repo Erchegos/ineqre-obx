@@ -28,7 +28,10 @@
     "commodities:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-commodities.ts",
     "yahoo:backfill": "node scripts/backfill-yahoo.mjs",
     "fundamentals:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-yahoo-fundamentals.ts",
-    "newsweb:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-newsweb-filings.ts"
+    "newsweb:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-newsweb-filings.ts",
+    "fx:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-fx-norgesbank.ts",
+    "seafood:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-barentswatch-seafood.ts",
+    "intel:refresh": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-newsweb-filings.ts --days=7 && tsx scripts/fetch-ssr-shorts.ts && tsx scripts/fetch-commodities.ts --days=30 && tsx scripts/fetch-fx-norgesbank.ts --days=30"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
