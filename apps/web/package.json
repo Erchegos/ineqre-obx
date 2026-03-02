@@ -31,6 +31,9 @@
     "newsweb:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-newsweb-filings.ts",
     "fx:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-fx-norgesbank.ts",
     "seafood:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-barentswatch-seafood.ts",
+    "biomass:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-biomass-fiskeridir.ts",
+    "export:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-ssb-salmon-export.ts",
+    "ocean:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-ocean-conditions.ts",
     "intel:refresh": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-newsweb-filings.ts --days=7 && tsx scripts/fetch-ssr-shorts.ts && tsx scripts/fetch-commodities.ts --days=30 && tsx scripts/fetch-fx-norgesbank.ts --days=30"
   },
   "dependencies": {

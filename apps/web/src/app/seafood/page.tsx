@@ -55,6 +55,22 @@ type DiseaseOutbreak = {
   isActive: boolean; predatesWindow: boolean;
 };
 
+type BiomassData = {
+  nationalTrend: Array<{ month: string; total_biomass: number; total_harvest: number; total_feed: number; total_stock: number }>;
+  currentTotals: Array<{ area_number: number; month: string; biomass_tonnes: number; harvest_tonnes: number; stock_count: number }>;
+  yoyComparison: Array<{ area_number: number; current_biomass: number; prev_biomass: number; yoy_change_pct: number | null }>;
+};
+
+type ExportData = {
+  timeSeries: Array<{ week_start: string; price_nok_kg: number | null; volume_tonnes: number | null }>;
+  stats: { currentPrice: number | null; latestWeek: string | null; high52w: number | null; low52w: number | null; avg52w: number | null };
+};
+
+type HarvestData = {
+  national: Array<{ month: string; total_harvest: number; total_mortality: number; total_biomass: number; mortality_rate_pct: number; feed_conversion_ratio: number | null }>;
+  yoyComparison: Array<{ area_number: number; recent_harvest: number; prior_harvest: number; yoy_change_pct: number | null }>;
+};
+
 /* ─── Helpers ──────────────────────────────────────────────────── */
 
 function fmtPct(v: number | null | undefined): string {
@@ -93,9 +109,13 @@ export default function SeafoodPage() {
   const [localities, setLocalities] = useState<Locality[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [diseases, setDiseases] = useState<DiseaseOutbreak[]>([]);
+  const [biomassData, setBiomassData] = useState<BiomassData | null>(null);
+  const [exportData, setExportData] = useState<ExportData | null>(null);
+  const [harvestData, setHarvestData] = useState<HarvestData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"overview" | "map" | "areas">("overview");
+  const [tab, setTab] = useState<"overview" | "map" | "areas" | "biomass">("overview");
+  const [mapLayer, setMapLayer] = useState<"localities" | "biomass">("localities");
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [focusLocation, setFocusLocation] = useState<{ lat: number; lng: number; name: string } | null>(null);
 
@@ -106,11 +126,14 @@ export default function SeafoodPage() {
     };
     async function load() {
       try {
-        const [ov, sal, lice, ar, loc, co, dis] = await Promise.all([
+        const [ov, sal, lice, ar, loc, co, dis, bio, exp, har] = await Promise.all([
           sf("/api/seafood/overview"), sf("/api/seafood/salmon-price?days=365"),
           sf("/api/seafood/lice?weeks=26"), sf("/api/seafood/production-areas"),
           sf("/api/seafood/localities"), sf("/api/seafood/company-exposure"),
           sf("/api/seafood/diseases"),
+          sf("/api/seafood/biomass?months=36&species=salmon"),
+          sf("/api/seafood/export?weeks=104&category=fresh"),
+          sf("/api/seafood/harvest?months=24&species=salmon"),
         ]);
         if (ov) setOverview(ov);
         if (sal) setSalmonData(sal);
@@ -119,6 +142,9 @@ export default function SeafoodPage() {
         setLocalities(loc?.localities || []);
         setCompanies(co?.companies || []);
         setDiseases(dis?.outbreaks || []);
+        if (bio) setBiomassData(bio);
+        if (exp) setExportData(exp);
+        if (har) setHarvestData(har);
       } catch (err) {
         console.error("Seafood load error:", err);
         setError(String(err));
@@ -205,7 +231,7 @@ export default function SeafoodPage() {
 
           {/* ─── Tab Bar ────────────────────────────────────── */}
           <div style={{ display: "flex", gap: 6, padding: "6px 8px", background: "#111", borderBottom: "1px solid #222", alignItems: "center" }}>
-            {(["overview", "map", "areas"] as const).map(t => (
+            {(["overview", "map", "areas", "biomass"] as const).map(t => (
               <button key={t} style={S.tabBtn(tab === t)} onClick={() => setTab(t)}>
                 {t.toUpperCase()}
               </button>
@@ -357,9 +383,41 @@ export default function SeafoodPage() {
 
               {tab === "map" && (
                 <div style={{ padding: 0 }}>
-                  <div style={S.section}>PRODUCTION AREAS & LOCALITIES ({localities.length} sites)</div>
+                  <div style={{ ...S.section, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span>PRODUCTION AREAS & LOCALITIES ({localities.length} sites)</span>
+                    <div style={{ display: "flex", gap: 4 }}>
+                      {(["localities", "biomass"] as const).map(l => (
+                        <button key={l} onClick={() => setMapLayer(l)} style={{ ...S.tabBtn(mapLayer === l), fontSize: 8 }}>
+                          {l === "localities" ? "SITES" : "BIOMASS"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {mapLayer === "biomass" && biomassData?.currentTotals && (
+                    <div style={{ display: "flex", gap: 4, padding: "4px 10px", flexWrap: "wrap" }}>
+                      {biomassData.currentTotals.map(b => {
+                        const yoy = biomassData.yoyComparison.find(y => y.area_number === b.area_number);
+                        const maxBio = Math.max(...biomassData.currentTotals.map(x => x.biomass_tonnes || 1));
+                        const pct = (b.biomass_tonnes / maxBio) * 100;
+                        return (
+                          <div key={b.area_number} style={{ background: "#111", border: "1px solid #222", borderRadius: 3, padding: "3px 6px", fontSize: 9, minWidth: 70 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", gap: 6 }}>
+                              <span style={{ color: "#888" }}>Area {b.area_number}</span>
+                              <span style={{ color: yoy?.yoy_change_pct != null ? (yoy.yoy_change_pct >= 0 ? "#22c55e" : "#ef4444") : "#888", fontSize: 8 }}>
+                                {yoy?.yoy_change_pct != null ? `${yoy.yoy_change_pct >= 0 ? "+" : ""}${yoy.yoy_change_pct}%` : ""}
+                              </span>
+                            </div>
+                            <div style={{ height: 3, background: "#1a1a1a", borderRadius: 1, marginTop: 2 }}>
+                              <div style={{ width: `${pct}%`, height: 3, background: "#f97316", borderRadius: 1 }} />
+                            </div>
+                            <div style={{ fontSize: 8, color: "#666", marginTop: 1 }}>{(b.biomass_tonnes / 1000).toFixed(0)}K t</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                   <div style={{ height: "calc(100vh - 130px)" }}>
-                    <ProductionAreaMap areas={areas} localities={localities} selectedTicker={selectedTicker} onTickerSelect={setSelectedTicker} focusLocation={focusLocation} />
+                    <ProductionAreaMap areas={areas} localities={localities} selectedTicker={selectedTicker} onTickerSelect={setSelectedTicker} focusLocation={focusLocation} biomassData={mapLayer === "biomass" ? biomassData?.currentTotals : undefined} />
                   </div>
                 </div>
               )}
@@ -389,6 +447,217 @@ export default function SeafoodPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {tab === "biomass" && (
+                <div>
+                  {/* ─── Export Price ──────────────────────────────── */}
+                  <div style={S.section}>SSB SALMON EXPORT PRICE (FRESH)</div>
+                  {exportData?.timeSeries && exportData.timeSeries.length > 0 ? (
+                    <div style={{ padding: "8px 10px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+                        <div>
+                          <span style={{ fontSize: 18, fontWeight: 700, color: "#f97316" }}>
+                            NOK {exportData.stats.currentPrice?.toFixed(2) ?? "\u2014"}
+                          </span>
+                          <span style={{ color: "#666", fontSize: 10, marginLeft: 8 }}>/kg</span>
+                        </div>
+                        <div style={{ display: "flex", gap: 12, fontSize: 10 }}>
+                          <span><span style={{ color: "#666" }}>52W H</span> <span style={{ color: "#22c55e" }}>{exportData.stats.high52w?.toFixed(2)}</span></span>
+                          <span><span style={{ color: "#666" }}>52W L</span> <span style={{ color: "#ef4444" }}>{exportData.stats.low52w?.toFixed(2)}</span></span>
+                          <span><span style={{ color: "#666" }}>AVG</span> <span style={{ color: "#aaa" }}>{exportData.stats.avg52w}</span></span>
+                        </div>
+                      </div>
+                      {/* Export price sparkline */}
+                      <div style={{ height: 120, position: "relative" }}>
+                        {(() => {
+                          const pts = exportData.timeSeries.filter(d => d.price_nok_kg != null).slice(-104);
+                          if (pts.length < 2) return <div style={{ color: "#555", padding: 16 }}>Insufficient data</div>;
+                          const prices = pts.map(p => p.price_nok_kg!);
+                          const vols = pts.map(p => p.volume_tonnes || 0);
+                          const minP = Math.min(...prices); const maxP = Math.max(...prices);
+                          const maxV = Math.max(...vols);
+                          const w = 800; const h = 120;
+                          const pricePath = pts.map((p, i) => {
+                            const x = (i / (pts.length - 1)) * w;
+                            const y = h - 20 - ((p.price_nok_kg! - minP) / (maxP - minP || 1)) * (h - 30);
+                            return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+                          }).join(" ");
+                          return (
+                            <svg viewBox={`0 0 ${w} ${h}`} style={{ width: "100%", height: "100%" }} preserveAspectRatio="none">
+                              {/* Volume bars */}
+                              {pts.map((p, i) => {
+                                const x = (i / (pts.length - 1)) * w;
+                                const bh = maxV > 0 ? ((p.volume_tonnes || 0) / maxV) * 30 : 0;
+                                return <rect key={i} x={x - 2} y={h - bh} width={4} height={bh} fill="#1a1a3a" />;
+                              })}
+                              {/* Price line */}
+                              <path d={pricePath} fill="none" stroke="#f97316" strokeWidth={1.5} />
+                              {/* Labels */}
+                              <text x={4} y={12} fill="#555" fontSize={9}>{maxP.toFixed(0)}</text>
+                              <text x={4} y={h - 22} fill="#555" fontSize={9}>{minP.toFixed(0)}</text>
+                            </svg>
+                          );
+                        })()}
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#555", marginTop: 2 }}>
+                        <span>{exportData.timeSeries[0]?.week_start?.slice(0, 10)}</span>
+                        <span>WEEKLY EXPORT PRICE + VOLUME</span>
+                        <span>{exportData.timeSeries[exportData.timeSeries.length - 1]?.week_start?.slice(0, 10)}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ padding: "16px 10px", color: "#555", fontSize: 11 }}>No export price data available.</div>
+                  )}
+
+                  {/* ─── National Biomass Trend ────────────────────── */}
+                  <div style={S.section}>NATIONAL BIOMASS TREND (SALMON)</div>
+                  {biomassData?.nationalTrend && biomassData.nationalTrend.length > 0 ? (
+                    <div style={{ padding: "8px 10px" }}>
+                      {/* Summary cards */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+                        {(() => {
+                          const latest = biomassData.nationalTrend[biomassData.nationalTrend.length - 1];
+                          const prev = biomassData.nationalTrend.length > 12 ? biomassData.nationalTrend[biomassData.nationalTrend.length - 13] : null;
+                          const yoyBio = prev ? ((latest.total_biomass - prev.total_biomass) / prev.total_biomass * 100) : null;
+                          return [
+                            { label: "STANDING BIOMASS", value: `${(latest.total_biomass / 1000).toFixed(0)}K t`, color: "#f97316", sub: yoyBio != null ? `${yoyBio >= 0 ? "+" : ""}${yoyBio.toFixed(1)}% YoY` : null, subColor: yoyBio != null ? (yoyBio >= 0 ? "#22c55e" : "#ef4444") : "#666" },
+                            { label: "MONTHLY HARVEST", value: `${(latest.total_harvest / 1000).toFixed(0)}K t`, color: "#3b82f6" },
+                            { label: "FEED CONSUMPTION", value: `${(latest.total_feed / 1000).toFixed(0)}K t`, color: "#8b5cf6" },
+                            { label: "STOCK COUNT", value: `${(latest.total_stock / 1000000).toFixed(0)}M fish`, color: "#22c55e" },
+                          ].map((card, i) => (
+                            <div key={i} style={{ background: "#111", border: "1px solid #222", borderRadius: 3, padding: "6px 8px" }}>
+                              <div style={{ fontSize: 8, color: "#666", letterSpacing: "0.06em", fontWeight: 700 }}>{card.label}</div>
+                              <div style={{ fontSize: 16, fontWeight: 700, color: card.color, marginTop: 2 }}>{card.value}</div>
+                              {card.sub && <div style={{ fontSize: 9, color: card.subColor, marginTop: 1 }}>{card.sub}</div>}
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                      {/* Biomass trend chart */}
+                      <div style={{ height: 140, position: "relative" }}>
+                        {(() => {
+                          const pts = biomassData.nationalTrend;
+                          const bios = pts.map(p => p.total_biomass);
+                          const harvs = pts.map(p => p.total_harvest);
+                          const maxB = Math.max(...bios); const minB = Math.min(...bios);
+                          const maxH = Math.max(...harvs);
+                          const w = 800; const h = 140;
+                          const bioPath = pts.map((p, i) => {
+                            const x = (i / (pts.length - 1)) * w;
+                            const y = h - 16 - ((p.total_biomass - minB) / (maxB - minB || 1)) * (h - 26);
+                            return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+                          }).join(" ");
+                          return (
+                            <svg viewBox={`0 0 ${w} ${h}`} style={{ width: "100%", height: "100%" }} preserveAspectRatio="none">
+                              {/* Harvest bars */}
+                              {pts.map((p, i) => {
+                                const x = (i / (pts.length - 1)) * w;
+                                const bh = maxH > 0 ? (p.total_harvest / maxH) * 40 : 0;
+                                return <rect key={i} x={x - 6} y={h - bh} width={12} height={bh} fill="#1a2a1a" />;
+                              })}
+                              {/* Biomass line */}
+                              <path d={bioPath} fill="none" stroke="#f97316" strokeWidth={1.5} />
+                              <text x={4} y={12} fill="#555" fontSize={9}>{(maxB / 1000).toFixed(0)}K</text>
+                              <text x={4} y={h - 2} fill="#555" fontSize={9}>{(minB / 1000).toFixed(0)}K</text>
+                            </svg>
+                          );
+                        })()}
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#555", marginTop: 2 }}>
+                        <span>{biomassData.nationalTrend[0]?.month?.slice(0, 7)}</span>
+                        <span style={{ display: "flex", gap: 12 }}>
+                          <span><span style={{ display: "inline-block", width: 8, height: 2, background: "#f97316", marginRight: 4 }} />BIOMASS</span>
+                          <span><span style={{ display: "inline-block", width: 8, height: 8, background: "#1a2a1a", marginRight: 4 }} />HARVEST</span>
+                        </span>
+                        <span>{biomassData.nationalTrend[biomassData.nationalTrend.length - 1]?.month?.slice(0, 7)}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ padding: "16px 10px", color: "#555", fontSize: 11 }}>No biomass data available.</div>
+                  )}
+
+                  {/* ─── Biomass by Area ───────────────────────────── */}
+                  <div style={S.section}>BIOMASS BY PRODUCTION AREA</div>
+                  {biomassData?.currentTotals && biomassData.currentTotals.length > 0 ? (
+                    <div style={{ padding: "4px 0" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "3px 40px 1fr 90px 80px 70px", padding: "4px 8px", fontSize: 9, fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.06em", background: "#111", borderBottom: "1px solid #222" }}>
+                        <div />
+                        <div>AREA</div>
+                        <div>BIOMASS</div>
+                        <div style={{ textAlign: "right" }}>TONNES</div>
+                        <div style={{ textAlign: "right" }}>HARVEST</div>
+                        <div style={{ textAlign: "right" }}>YoY</div>
+                      </div>
+                      {biomassData.currentTotals
+                        .sort((a, b) => a.area_number - b.area_number)
+                        .map(b => {
+                          const maxBio = Math.max(...biomassData.currentTotals.map(x => x.biomass_tonnes || 1));
+                          const pct = (b.biomass_tonnes / maxBio) * 100;
+                          const yoy = biomassData.yoyComparison.find(y => y.area_number === b.area_number);
+                          const areaInfo = areas.find(a => a.areaNumber === b.area_number);
+                          return (
+                            <div key={b.area_number} className="sf-row" style={{ display: "grid", gridTemplateColumns: "3px 40px 1fr 90px 80px 70px", padding: "5px 8px", borderBottom: "1px solid #1a1a1a", alignItems: "center", transition: "background 0.08s" }}>
+                              <div style={{ width: 3, minHeight: 14, background: TL_C[areaInfo?.trafficLight || ""] || "#555", borderRadius: 1 }} />
+                              <div style={{ fontWeight: 600 }}>{b.area_number}</div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                <div style={{ flex: 1, height: 6, background: "#1a1a1a", borderRadius: 2 }}>
+                                  <div style={{ width: `${pct}%`, height: 6, background: "#f97316", borderRadius: 2, opacity: 0.7 }} />
+                                </div>
+                              </div>
+                              <div style={{ textAlign: "right", fontWeight: 600 }}>{(b.biomass_tonnes / 1000).toFixed(1)}K</div>
+                              <div style={{ textAlign: "right", color: "#888" }}>{(b.harvest_tonnes / 1000).toFixed(1)}K</div>
+                              <div style={{ textAlign: "right", color: yoy?.yoy_change_pct != null ? (yoy.yoy_change_pct >= 0 ? "#22c55e" : "#ef4444") : "#888", fontWeight: 600 }}>
+                                {yoy?.yoy_change_pct != null ? `${yoy.yoy_change_pct >= 0 ? "+" : ""}${yoy.yoy_change_pct}%` : "\u2014"}
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  ) : (
+                    <div style={{ padding: "16px 10px", color: "#555", fontSize: 11 }}>No area biomass data available.</div>
+                  )}
+
+                  {/* ─── Harvest & Mortality ───────────────────────── */}
+                  <div style={S.section}>HARVEST & MORTALITY</div>
+                  {harvestData?.national && harvestData.national.length > 0 ? (
+                    <div style={{ padding: "8px 10px" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+                        {(() => {
+                          const latest = harvestData.national[harvestData.national.length - 1];
+                          return [
+                            { label: "MORTALITY RATE", value: `${latest.mortality_rate_pct}%`, color: latest.mortality_rate_pct > 2 ? "#ef4444" : "#f59e0b" },
+                            { label: "FEED CONV. RATIO", value: latest.feed_conversion_ratio?.toFixed(2) ?? "\u2014", color: "#8b5cf6" },
+                            { label: "MONTHLY MORTALITY", value: `${(latest.total_mortality / 1000).toFixed(0)}K t`, color: "#ef4444" },
+                          ].map((card, i) => (
+                            <div key={i} style={{ background: "#111", border: "1px solid #222", borderRadius: 3, padding: "6px 8px" }}>
+                              <div style={{ fontSize: 8, color: "#666", letterSpacing: "0.06em", fontWeight: 700 }}>{card.label}</div>
+                              <div style={{ fontSize: 16, fontWeight: 700, color: card.color, marginTop: 2 }}>{card.value}</div>
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                      {/* Harvest YoY by area */}
+                      {harvestData.yoyComparison.length > 0 && (
+                        <>
+                          <div style={{ fontSize: 9, color: "#666", fontWeight: 700, letterSpacing: "0.06em", marginTop: 12, marginBottom: 4 }}>HARVEST YoY BY AREA (12M)</div>
+                          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                            {harvestData.yoyComparison.map(y => (
+                              <div key={y.area_number} style={{ background: "#111", border: "1px solid #222", borderRadius: 3, padding: "3px 6px", fontSize: 9, minWidth: 55, textAlign: "center" }}>
+                                <div style={{ color: "#888" }}>Area {y.area_number}</div>
+                                <div style={{ fontWeight: 700, color: y.yoy_change_pct != null ? (y.yoy_change_pct >= 0 ? "#22c55e" : "#ef4444") : "#888" }}>
+                                  {y.yoy_change_pct != null ? `${y.yoy_change_pct >= 0 ? "+" : ""}${y.yoy_change_pct}%` : "\u2014"}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ padding: "16px 10px", color: "#555", fontSize: 11 }}>No harvest data available.</div>
+                  )}
                 </div>
               )}
             </div>
@@ -473,12 +742,53 @@ export default function SeafoodPage() {
                 })}
               </div>
 
+              {/* Biomass Summary */}
+              {biomassData?.nationalTrend && biomassData.nationalTrend.length > 0 && (() => {
+                const latest = biomassData.nationalTrend[biomassData.nationalTrend.length - 1];
+                return (
+                  <>
+                    <div style={S.section}>BIOMASS</div>
+                    <div style={{ padding: "6px 10px", fontSize: 10 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 12px" }}>
+                        <span style={{ color: "#666" }}>STANDING</span>
+                        <span style={{ textAlign: "right", color: "#f97316", fontWeight: 600 }}>{(latest.total_biomass / 1000).toFixed(0)}K t</span>
+                        <span style={{ color: "#666" }}>HARVEST/M</span>
+                        <span style={{ textAlign: "right" }}>{(latest.total_harvest / 1000).toFixed(0)}K t</span>
+                        <span style={{ color: "#666" }}>STOCK</span>
+                        <span style={{ textAlign: "right" }}>{(latest.total_stock / 1000000).toFixed(1)}M fish</span>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+
+              {/* Export Price */}
+              {exportData?.stats?.currentPrice != null && (
+                <>
+                  <div style={S.section}>EXPORT PRICE</div>
+                  <div style={{ padding: "6px 10px", fontSize: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                      <span style={{ fontSize: 16, fontWeight: 700, color: "#f97316" }}>
+                        {exportData.stats.currentPrice.toFixed(2)}
+                      </span>
+                      <span style={{ color: "#666", fontSize: 9 }}>NOK/kg</span>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 12px", marginTop: 4 }}>
+                      <span style={{ color: "#666" }}>52W H</span>
+                      <span style={{ textAlign: "right", color: "#22c55e" }}>{exportData.stats.high52w?.toFixed(2)}</span>
+                      <span style={{ color: "#666" }}>52W L</span>
+                      <span style={{ textAlign: "right", color: "#ef4444" }}>{exportData.stats.low52w?.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </>
+              )}
+
               {/* Data Sources */}
               <div style={S.section}>DATA SOURCES</div>
               <div style={{ padding: "6px 10px", fontSize: 9, color: "#555", lineHeight: 1.6 }}>
-                SSB (salmon prices)<br />
+                SSB (salmon export prices)<br />
                 BarentsWatch (lice, disease)<br />
-                Fiskeridirektoratet (localities)<br />
+                Fiskeridirektoratet (biomass, localities)<br />
                 Mattilsynet (traffic lights)
               </div>
             </div>

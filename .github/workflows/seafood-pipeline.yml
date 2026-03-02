@@ -1,0 +1,119 @@
+name: Seafood Data Pipeline
+
+on:
+  schedule:
+    # Monthly on 21st (Fiskeridirektoratet updates ~20th)
+    # 06:00 UTC = 07:00 CET — before market open
+    - cron: '0 6 21 * *'
+    # Weekly on Wednesday (SSB export price updates)
+    # 12:00 UTC = 13:00 CET
+    - cron: '0 12 * * 3'
+  workflow_dispatch:
+    inputs:
+      skip_biomass:
+        description: 'Skip Fiskeridirektoratet biomass fetch'
+        type: boolean
+        default: false
+      skip_export:
+        description: 'Skip SSB export price fetch'
+        type: boolean
+        default: false
+      skip_ocean:
+        description: 'Skip ocean conditions aggregation'
+        type: boolean
+        default: false
+      skip_barentswatch:
+        description: 'Skip BarentsWatch seafood fetch'
+        type: boolean
+        default: false
+
+jobs:
+  seafood-data:
+    name: Biomass + Export + Ocean + BarentsWatch
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Create env file
+        working-directory: apps/web
+        run: |
+          echo 'DATABASE_URL="${{ secrets.DATABASE_URL }}"' > .env.local
+          echo 'BARENTSWATCH_CLIENT_ID="${{ secrets.BARENTSWATCH_CLIENT_ID }}"' >> .env.local
+          echo 'BARENTSWATCH_CLIENT_SECRET="${{ secrets.BARENTSWATCH_CLIENT_SECRET }}"' >> .env.local
+
+      # ─── Fiskeridirektoratet Biomass (monthly) ───────────────────
+      - name: "Fetch biomass data (Fiskeridirektoratet)"
+        if: >-
+          ${{
+            github.event.inputs.skip_biomass != 'true' && (
+              github.event.schedule == '0 6 21 * *' ||
+              github.event_name == 'workflow_dispatch'
+            )
+          }}
+        working-directory: apps/web
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: npx tsx scripts/fetch-biomass-fiskeridir.ts
+
+      # ─── SSB Salmon Export Price (weekly) ────────────────────────
+      - name: "Fetch SSB salmon export price"
+        if: ${{ github.event.inputs.skip_export != 'true' }}
+        working-directory: apps/web
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: npx tsx scripts/fetch-ssb-salmon-export.ts --weeks=52
+
+      # ─── BarentsWatch Lice & Disease (weekly) ───────────────────
+      - name: "Fetch BarentsWatch seafood data"
+        if: ${{ github.event.inputs.skip_barentswatch != 'true' }}
+        working-directory: apps/web
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BARENTSWATCH_CLIENT_ID: ${{ secrets.BARENTSWATCH_CLIENT_ID }}
+          BARENTSWATCH_CLIENT_SECRET: ${{ secrets.BARENTSWATCH_CLIENT_SECRET }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: npx tsx scripts/fetch-barentswatch-seafood.ts --weeks=4
+
+      # ─── Ocean Conditions Aggregation (weekly, after BW data) ───
+      - name: "Aggregate ocean conditions"
+        if: ${{ github.event.inputs.skip_ocean != 'true' }}
+        working-directory: apps/web
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: npx tsx scripts/fetch-ocean-conditions.ts
+
+      # ─── Summary ────────────────────────────────────────────────
+      - name: Pipeline Summary
+        if: always()
+        run: |
+          echo "## Seafood Data Pipeline" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Source | Schedule | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Fiskeridirektoratet (Biomass) | Monthly (21st) | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| SSB (Export Price) | Weekly (Wed) | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| BarentsWatch (Lice/Disease) | Weekly (Wed) | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Ocean Conditions | Weekly (Wed) | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Schedule**: ${{ github.event.schedule || 'manual' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time**: $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY

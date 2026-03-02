@@ -17,12 +17,20 @@ type ProductionArea = {
 
 type FocusLocation = { lat: number; lng: number; name: string } | null;
 
+type BiomassAreaData = {
+  area_number: number;
+  biomass_tonnes: number;
+  harvest_tonnes: number;
+  stock_count: number;
+};
+
 type Props = {
   areas: ProductionArea[];
   localities: Locality[];
   selectedTicker: string | null;
   onTickerSelect: (ticker: string | null) => void;
   focusLocation?: FocusLocation;
+  biomassData?: BiomassAreaData[];
 };
 
 const TRAFFIC_COLORS: Record<string, string> = {
@@ -58,7 +66,7 @@ const MapInner = dynamic(() => import("./ProductionAreaMapInner"), {
   ),
 });
 
-export default function ProductionAreaMap({ areas, localities, selectedTicker, onTickerSelect, focusLocation }: Props) {
+export default function ProductionAreaMap({ areas, localities, selectedTicker, onTickerSelect, focusLocation, biomassData }: Props) {
   // Collect unique tickers from localities
   const tickers: string[] = [];
   const tickerCounts: Record<string, number> = {};
@@ -139,7 +147,7 @@ export default function ProductionAreaMap({ areas, localities, selectedTicker, o
       </div>
 
       <div style={{ flex: 1, minHeight: 0 }}>
-        <MapInner areas={areas} localities={localities} selectedTicker={selectedTicker} focusLocation={focusLocation} />
+        <MapInner areas={areas} localities={localities} selectedTicker={selectedTicker} focusLocation={focusLocation} biomassData={biomassData} />
       </div>
     </div>
   );

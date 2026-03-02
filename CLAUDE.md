@@ -75,6 +75,7 @@ InEqRe_OBX/
 | **Options Analysis** | `/options/[ticker]` | `apps/web/src/app/options/[ticker]/page.tsx` |
 | **Portfolio Optimizer** | `/portfolio` | `apps/web/src/app/portfolio/page.tsx` |
 | **Intelligence Terminal** | `/news` | `apps/web/src/app/news/page.tsx` |
+| **Seafood Intelligence** | `/seafood` | `apps/web/src/app/seafood/page.tsx` |
 
 ---
 
@@ -159,6 +160,21 @@ All endpoints in `apps/web/src/app/api/`
 |----------|---------|
 | `GET /api/fx-pairs` | FX pair data |
 | `GET /api/fx-hedging/exposures` | FX exposure analysis |
+
+### Seafood APIs
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/seafood/overview` | Dashboard summary (price, lice avg, traffic lights) |
+| `GET /api/seafood/salmon-price` | Salmon commodity price history |
+| `GET /api/seafood/lice` | Industry lice levels (weekly) |
+| `GET /api/seafood/production-areas` | 13 production area details + traffic lights |
+| `GET /api/seafood/localities` | Fish farm sites with lice data |
+| `GET /api/seafood/company-exposure` | Per-company seafood risk metrics |
+| `GET /api/seafood/diseases` | Disease outbreak tracker (PD/ILA) |
+| `GET /api/seafood/biomass` | Biomass by area, national trend, YoY (Fiskeridirektoratet) |
+| `GET /api/seafood/harvest` | Harvest volumes, mortality rates, feed conversion |
+| `GET /api/seafood/export` | SSB salmon export price + volume (weekly) |
+| `GET /api/seafood/ocean` | Sea temperature by production area (weekly) |
 
 ### System APIs
 | Endpoint | Purpose |
@@ -319,6 +335,18 @@ Schema files in `packages/db/src/schema/`
 | `newsweb_filings` | Oslo Børs NewsWeb regulatory filings (AI-classified) |
 | `insider_transactions` | Structured insider trade data extracted from filings |
 
+### Seafood Tables
+| Table | Purpose |
+|-------|---------|
+| `seafood_production_areas` | 13 Norwegian coastal zones with traffic light status |
+| `seafood_localities` | Fish farm sites (BarentsWatch/Fiskeridirektoratet) |
+| `seafood_lice_reports` | Weekly sea lice counts per locality (BarentsWatch) |
+| `seafood_diseases` | Disease outbreak reports (PD, ILA) |
+| `seafood_company_metrics` | Aggregated per-company seafood risk metrics |
+| `seafood_biomass_monthly` | Monthly biomass/harvest/mortality by production area (Fiskeridirektoratet) |
+| `seafood_export_weekly` | Weekly salmon export price+volume (SSB table 03024) |
+| `seafood_ocean_conditions` | Sea temperature aggregated per area per week |
+
 ---
 
 ## Data Pipeline
@@ -329,6 +357,9 @@ Schema files in `packages/db/src/schema/`
 3. **Norges Bank** - FX rates (NOK/USD, EUR, GBP)
 4. **Gmail IMAP** - Research emails from Pareto/DNB
 5. **Finanstilsynet SSR** - Short selling positions (`https://ssr.finanstilsynet.no/api/v2/instruments`)
+6. **BarentsWatch** - Seafood lice, disease, locality data (OAuth2 client_credentials)
+7. **Fiskeridirektoratet** - Monthly biomass/harvest/mortality CSV (no auth, free)
+8. **SSB (Statistics Norway)** - Weekly salmon export price+volume via PxWebApi v2 (no auth, free)
 
 ### ML Pipeline (6 steps)
 Located in `apps/web/scripts/ml-daily-pipeline.ts`:
@@ -379,6 +410,10 @@ Run after market close alongside ML pipeline:
 | `fetch-ssr-shorts.ts` | Fetch short positions from Finanstilsynet SSR API |
 | `fetch-commodities.ts` | Fetch commodity prices from Yahoo + calculate stock sensitivity |
 | `fetch-newsweb-filings.ts` | Fetch regulatory filings from Oslo Børs NewsWeb API into `newsweb_filings` |
+| `fetch-barentswatch-seafood.ts` | Fetch lice/disease/locality data from BarentsWatch (OAuth2) |
+| `fetch-biomass-fiskeridir.ts` | Fetch monthly biomass/harvest/mortality from Fiskeridirektoratet (no auth) |
+| `fetch-ssb-salmon-export.ts` | Fetch weekly salmon export price+volume from SSB PxWebApi (no auth) |
+| `fetch-ocean-conditions.ts` | Aggregate sea temperature from lice reports by production area |
 
 ### scripts/
 | Script | Purpose |

@@ -158,6 +158,83 @@ export const seafoodCompanyMetrics = pgTable(
   })
 );
 
+/**
+ * Seafood Biomass Monthly — production area level biomass & harvest data
+ *
+ * Source: Fiskeridirektoratet CSV downloads (register.fiskeridir.no)
+ * Updated monthly on the 20th. Covers all 13 production areas.
+ */
+export const seafoodBiomassMonthly = pgTable(
+  "seafood_biomass_monthly",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    areaNumber: integer("area_number").notNull(),
+    month: date("month").notNull(), // first of month: 2025-01-01
+    species: varchar("species", { length: 40 }).notNull().default("salmon"), // salmon, trout
+    biomasstonnes: numeric("biomass_tonnes", { precision: 12, scale: 2 }),
+    harvestTonnes: numeric("harvest_tonnes", { precision: 12, scale: 2 }),
+    mortalityTonnes: numeric("mortality_tonnes", { precision: 12, scale: 2 }),
+    feedTonnes: numeric("feed_tonnes", { precision: 12, scale: 2 }),
+    stockCount: integer("stock_count"), // number of fish
+    pensInUse: integer("pens_in_use"),
+    sitesInUse: integer("sites_in_use"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    areaMonthSpeciesUnique: unique().on(table.areaNumber, table.month, table.species),
+    areaIdx: index("idx_seafood_biomass_area").on(table.areaNumber),
+    monthIdx: index("idx_seafood_biomass_month").on(table.month),
+  })
+);
+
+/**
+ * Seafood Export Weekly — SSB salmon export price and volume
+ *
+ * Source: Statistics Norway (SSB) PxWebApi v2 — Table 03024
+ * Weekly data: export price NOK/kg and volume in tonnes.
+ */
+export const seafoodExportWeekly = pgTable(
+  "seafood_export_weekly",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    weekStart: date("week_start").notNull(), // Monday of the week
+    priceNokKg: numeric("price_nok_kg", { precision: 8, scale: 2 }),
+    volumeTonnes: numeric("volume_tonnes", { precision: 12, scale: 2 }),
+    category: varchar("category", { length: 40 }).notNull().default("all"), // all, fresh, frozen
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    weekCategoryUnique: unique().on(table.weekStart, table.category),
+    weekIdx: index("idx_seafood_export_week").on(table.weekStart),
+  })
+);
+
+/**
+ * Seafood Ocean Conditions — sea temperature aggregated per production area
+ *
+ * Source: Aggregated from seafood_lice_reports.sea_temperature field
+ * (originally from BarentsWatch FishHealth API)
+ */
+export const seafoodOceanConditions = pgTable(
+  "seafood_ocean_conditions",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    areaNumber: integer("area_number").notNull(),
+    year: integer("year").notNull(),
+    week: integer("week").notNull(),
+    avgSeaTemp: numeric("avg_sea_temp", { precision: 5, scale: 2 }),
+    minSeaTemp: numeric("min_sea_temp", { precision: 5, scale: 2 }),
+    maxSeaTemp: numeric("max_sea_temp", { precision: 5, scale: 2 }),
+    reportingSites: integer("reporting_sites"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    areaYearWeekUnique: unique().on(table.areaNumber, table.year, table.week),
+    areaIdx: index("idx_seafood_ocean_area").on(table.areaNumber),
+    yearWeekIdx: index("idx_seafood_ocean_year_week").on(table.year, table.week),
+  })
+);
+
 // Type exports
 export type SeafoodProductionArea = typeof seafoodProductionAreas.$inferSelect;
 export type NewSeafoodProductionArea = typeof seafoodProductionAreas.$inferInsert;
@@ -173,3 +250,12 @@ export type NewSeafoodDisease = typeof seafoodDiseases.$inferInsert;
 
 export type SeafoodCompanyMetric = typeof seafoodCompanyMetrics.$inferSelect;
 export type NewSeafoodCompanyMetric = typeof seafoodCompanyMetrics.$inferInsert;
+
+export type SeafoodBiomassMonthly = typeof seafoodBiomassMonthly.$inferSelect;
+export type NewSeafoodBiomassMonthly = typeof seafoodBiomassMonthly.$inferInsert;
+
+export type SeafoodExportWeekly = typeof seafoodExportWeekly.$inferSelect;
+export type NewSeafoodExportWeekly = typeof seafoodExportWeekly.$inferInsert;
+
+export type SeafoodOceanCondition = typeof seafoodOceanConditions.$inferSelect;
+export type NewSeafoodOceanCondition = typeof seafoodOceanConditions.$inferInsert;

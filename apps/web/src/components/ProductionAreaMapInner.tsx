@@ -40,11 +40,19 @@ export type Locality = {
 
 type FocusLocation = { lat: number; lng: number; name: string } | null;
 
+type BiomassAreaData = {
+  area_number: number;
+  biomass_tonnes: number;
+  harvest_tonnes: number;
+  stock_count: number;
+};
+
 type Props = {
   areas: ProductionArea[];
   localities: Locality[];
   selectedTicker: string | null;
   focusLocation?: FocusLocation;
+  biomassData?: BiomassAreaData[];
 };
 
 const TRAFFIC_COLORS: Record<string, string> = {
@@ -103,7 +111,7 @@ function FlyToLocation({ focusLocation }: { focusLocation: FocusLocation }) {
 
 const MONO = "'Geist Mono','SF Mono','Consolas',monospace";
 
-export default function ProductionAreaMapInner({ areas, localities, selectedTicker, focusLocation }: Props) {
+export default function ProductionAreaMapInner({ areas, localities, selectedTicker, focusLocation, biomassData }: Props) {
   // Separate highlighted vs dimmed localities
   const { highlighted, dimmed } = useMemo(() => {
     if (!selectedTicker) return { highlighted: localities, dimmed: [] as Locality[] };
@@ -170,6 +178,49 @@ export default function ProductionAreaMapInner({ areas, localities, selectedTick
             </Popup>
           </CircleMarker>
         ))}
+
+        {/* Biomass overlay circles (when biomass layer active) */}
+        {biomassData && biomassData.length > 0 && (() => {
+          const maxBio = Math.max(...biomassData.map(b => b.biomass_tonnes || 1));
+          return biomassData.map(b => {
+            const area = areas.find(a => a.areaNumber === b.area_number);
+            if (!area) return null;
+            const radius = 12 + (b.biomass_tonnes / maxBio) * 28;
+            return (
+              <CircleMarker
+                key={`bio-${b.area_number}`}
+                center={[area.centerLat, area.centerLng]}
+                radius={radius}
+                pathOptions={{
+                  fillColor: "#f97316",
+                  fillOpacity: 0.3,
+                  color: "#f97316",
+                  weight: 1.5,
+                }}
+              >
+                <Popup>
+                  <div style={{ fontSize: 11, minWidth: 200, fontFamily: MONO, color: "#222", lineHeight: 1.5 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>
+                      Area {b.area_number}: {area.name}
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: "#666" }}>Standing Biomass</span>
+                      <span style={{ fontWeight: 700 }}>{(b.biomass_tonnes / 1000).toFixed(1)}K tonnes</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: "#666" }}>Monthly Harvest</span>
+                      <span>{(b.harvest_tonnes / 1000).toFixed(1)}K tonnes</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: "#666" }}>Stock Count</span>
+                      <span>{b.stock_count ? (b.stock_count / 1000000).toFixed(1) + "M fish" : "—"}</span>
+                    </div>
+                  </div>
+                </Popup>
+              </CircleMarker>
+            );
+          });
+        })()}
 
         {/* Dimmed locality markers (non-selected company) */}
         {dimmed.map((loc) => (
