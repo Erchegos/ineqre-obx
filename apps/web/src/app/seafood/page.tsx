@@ -519,13 +519,14 @@ export default function SeafoodPage() {
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
                         {(() => {
                           const latest = biomassData.nationalTrend[biomassData.nationalTrend.length - 1];
+                          if (!latest) return null;
                           const prev = biomassData.nationalTrend.length > 12 ? biomassData.nationalTrend[biomassData.nationalTrend.length - 13] : null;
-                          const yoyBio = prev ? ((latest.total_biomass - prev.total_biomass) / prev.total_biomass * 100) : null;
+                          const yoyBio = prev && prev.total_biomass > 0 ? ((latest.total_biomass - prev.total_biomass) / prev.total_biomass * 100) : null;
                           return [
-                            { label: "STANDING BIOMASS", value: `${(latest.total_biomass / 1000).toFixed(0)}K t`, color: "#f97316", sub: yoyBio != null ? `${yoyBio >= 0 ? "+" : ""}${yoyBio.toFixed(1)}% YoY` : null, subColor: yoyBio != null ? (yoyBio >= 0 ? "#22c55e" : "#ef4444") : "#666" },
-                            { label: "MONTHLY HARVEST", value: `${(latest.total_harvest / 1000).toFixed(0)}K t`, color: "#3b82f6" },
-                            { label: "FEED CONSUMPTION", value: `${(latest.total_feed / 1000).toFixed(0)}K t`, color: "#8b5cf6" },
-                            { label: "STOCK COUNT", value: `${(latest.total_stock / 1000000).toFixed(0)}M fish`, color: "#22c55e" },
+                            { label: "STANDING BIOMASS", value: `${((latest.total_biomass || 0) / 1000).toFixed(0)}K t`, color: "#f97316", sub: yoyBio != null ? `${yoyBio >= 0 ? "+" : ""}${yoyBio.toFixed(1)}% YoY` : null, subColor: yoyBio != null ? (yoyBio >= 0 ? "#22c55e" : "#ef4444") : "#666" },
+                            { label: "MONTHLY HARVEST", value: `${((latest.total_harvest || 0) / 1000).toFixed(0)}K t`, color: "#3b82f6" },
+                            { label: "FEED CONSUMPTION", value: `${((latest.total_feed || 0) / 1000).toFixed(0)}K t`, color: "#8b5cf6" },
+                            { label: "STOCK COUNT", value: `${((latest.total_stock || 0) / 1000000).toFixed(0)}M fish`, color: "#22c55e" },
                           ].map((card, i) => (
                             <div key={i} style={{ background: "#111", border: "1px solid #222", borderRadius: 3, padding: "6px 8px" }}>
                               <div style={{ fontSize: 8, color: "#666", letterSpacing: "0.06em", fontWeight: 700 }}>{card.label}</div>
@@ -626,10 +627,11 @@ export default function SeafoodPage() {
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
                         {(() => {
                           const latest = harvestData.national[harvestData.national.length - 1];
+                          if (!latest) return null;
                           return [
-                            { label: "MORTALITY RATE", value: `${latest.mortality_rate_pct}%`, color: latest.mortality_rate_pct > 2 ? "#ef4444" : "#f59e0b" },
+                            { label: "MORTALITY RATE", value: `${latest.mortality_rate_pct ?? 0}%`, color: (latest.mortality_rate_pct ?? 0) > 2 ? "#ef4444" : "#f59e0b" },
                             { label: "FEED CONV. RATIO", value: latest.feed_conversion_ratio?.toFixed(2) ?? "\u2014", color: "#8b5cf6" },
-                            { label: "MONTHLY MORTALITY", value: `${(latest.total_mortality / 1000).toFixed(0)}K t`, color: "#ef4444" },
+                            { label: "MONTHLY MORTALITY", value: `${((latest.total_mortality || 0) / 1000).toFixed(0)}K t`, color: "#ef4444" },
                           ].map((card, i) => (
                             <div key={i} style={{ background: "#111", border: "1px solid #222", borderRadius: 3, padding: "6px 8px" }}>
                               <div style={{ fontSize: 8, color: "#666", letterSpacing: "0.06em", fontWeight: 700 }}>{card.label}</div>
@@ -745,17 +747,18 @@ export default function SeafoodPage() {
               {/* Biomass Summary */}
               {biomassData?.nationalTrend && biomassData.nationalTrend.length > 0 && (() => {
                 const latest = biomassData.nationalTrend[biomassData.nationalTrend.length - 1];
+                if (!latest) return null;
                 return (
                   <>
                     <div style={S.section}>BIOMASS</div>
                     <div style={{ padding: "6px 10px", fontSize: 10 }}>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 12px" }}>
                         <span style={{ color: "#666" }}>STANDING</span>
-                        <span style={{ textAlign: "right", color: "#f97316", fontWeight: 600 }}>{(latest.total_biomass / 1000).toFixed(0)}K t</span>
+                        <span style={{ textAlign: "right", color: "#f97316", fontWeight: 600 }}>{((latest.total_biomass || 0) / 1000).toFixed(0)}K t</span>
                         <span style={{ color: "#666" }}>HARVEST/M</span>
-                        <span style={{ textAlign: "right" }}>{(latest.total_harvest / 1000).toFixed(0)}K t</span>
+                        <span style={{ textAlign: "right" }}>{((latest.total_harvest || 0) / 1000).toFixed(0)}K t</span>
                         <span style={{ color: "#666" }}>STOCK</span>
-                        <span style={{ textAlign: "right" }}>{(latest.total_stock / 1000000).toFixed(1)}M fish</span>
+                        <span style={{ textAlign: "right" }}>{((latest.total_stock || 0) / 1000000).toFixed(1)}M fish</span>
                       </div>
                     </div>
                   </>

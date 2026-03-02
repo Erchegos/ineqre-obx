@@ -18,9 +18,15 @@ export async function GET(req: NextRequest) {
     const months = parseInt(sp.get("months") || "24");
     const species = sp.get("species") || "salmon";
 
-    const areaFilter = area ? `AND area_number = ${parseInt(area)}` : "";
+    const areaNum = area ? parseInt(area) : null;
 
     // 1) Time series
+    const tsParams: (string | number)[] = [species, months];
+    let tsAreaClause = "";
+    if (areaNum != null && !isNaN(areaNum)) {
+      tsParams.push(areaNum);
+      tsAreaClause = `AND area_number = $${tsParams.length}`;
+    }
     const tsResult = await pool.query(`
       SELECT area_number, month,
              biomass_tonnes::float, harvest_tonnes::float,
@@ -29,19 +35,25 @@ export async function GET(req: NextRequest) {
       FROM seafood_biomass_monthly
       WHERE species = $1
         AND month >= (CURRENT_DATE - INTERVAL '1 month' * $2)::date
-        ${areaFilter}
+        ${tsAreaClause}
       ORDER BY month, area_number
-    `, [species, months]);
+    `, tsParams);
 
     // 2) Current totals (latest month per area)
+    const totParams: (string | number)[] = [species];
+    let totAreaClause = "";
+    if (areaNum != null && !isNaN(areaNum)) {
+      totParams.push(areaNum);
+      totAreaClause = `AND area_number = $${totParams.length}`;
+    }
     const totalsResult = await pool.query(`
       SELECT DISTINCT ON (area_number)
         area_number, month, biomass_tonnes::float, harvest_tonnes::float,
         stock_count
       FROM seafood_biomass_monthly
-      WHERE species = $1 ${areaFilter}
+      WHERE species = $1 ${totAreaClause}
       ORDER BY area_number, month DESC
-    `, [species]);
+    `, totParams);
 
     // 3) National total biomass trend (monthly)
     const nationalResult = await pool.query(`
