@@ -235,6 +235,39 @@ export const seafoodOceanConditions = pgTable(
   })
 );
 
+/**
+ * Salmon Quarterly Operations — company-level quarterly financial/operational data
+ *
+ * Source: Company quarterly/annual reports (manually extracted)
+ * Covers: MOWI, SALM, GSF, LSG, BAKKA, AUSS
+ * Metrics: harvest, revenue, EBIT, cost/kg, price realization, mortality
+ */
+export const salmonQuarterlyOps = pgTable(
+  "salmon_quarterly_ops",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    ticker: varchar("ticker", { length: 20 }).notNull(),
+    year: integer("year").notNull(),
+    quarter: integer("quarter").notNull(), // 1-4
+    harvestTonnesGwt: numeric("harvest_tonnes_gwt", { precision: 12, scale: 0 }),
+    revenueM: numeric("revenue_m", { precision: 12, scale: 1 }),
+    ebitOperationalM: numeric("ebit_operational_m", { precision: 12, scale: 1 }),
+    ebitPerKg: numeric("ebit_per_kg", { precision: 8, scale: 2 }),
+    costPerKg: numeric("cost_per_kg", { precision: 8, scale: 2 }),
+    priceRealizationPerKg: numeric("price_realization_per_kg", { precision: 8, scale: 2 }),
+    mortalityPct: numeric("mortality_pct", { precision: 6, scale: 2 }),
+    currency: varchar("currency", { length: 3 }).notNull().default("NOK"), // NOK, EUR, DKK
+    source: varchar("source", { length: 100 }), // e.g. "Q4 2025 Report"
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    tickerYearQuarterUnique: unique().on(table.ticker, table.year, table.quarter),
+    tickerIdx: index("idx_salmon_qops_ticker").on(table.ticker),
+    yearQuarterIdx: index("idx_salmon_qops_year_quarter").on(table.year, table.quarter),
+  })
+);
+
 // Type exports
 export type SeafoodProductionArea = typeof seafoodProductionAreas.$inferSelect;
 export type NewSeafoodProductionArea = typeof seafoodProductionAreas.$inferInsert;
@@ -259,3 +292,6 @@ export type NewSeafoodExportWeekly = typeof seafoodExportWeekly.$inferInsert;
 
 export type SeafoodOceanCondition = typeof seafoodOceanConditions.$inferSelect;
 export type NewSeafoodOceanCondition = typeof seafoodOceanConditions.$inferInsert;
+
+export type SalmonQuarterlyOps = typeof salmonQuarterlyOps.$inferSelect;
+export type NewSalmonQuarterlyOps = typeof salmonQuarterlyOps.$inferInsert;

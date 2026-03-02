@@ -175,6 +175,7 @@ All endpoints in `apps/web/src/app/api/`
 | `GET /api/seafood/harvest` | Harvest volumes, mortality rates, feed conversion |
 | `GET /api/seafood/export` | SSB salmon export price + volume (weekly) |
 | `GET /api/seafood/ocean` | Sea temperature by production area (weekly) |
+| `GET /api/seafood/quarterly-ops` | Quarterly company ops (EBIT/kg, harvest, cost/kg) from earnings reports |
 
 ### System APIs
 | Endpoint | Purpose |
@@ -346,6 +347,7 @@ Schema files in `packages/db/src/schema/`
 | `seafood_biomass_monthly` | Monthly biomass/harvest/mortality by production area (Fiskeridirektoratet) |
 | `seafood_export_weekly` | Weekly salmon export price+volume (SSB table 03024) |
 | `seafood_ocean_conditions` | Sea temperature aggregated per area per week |
+| `salmon_quarterly_ops` | Company quarterly ops data from earnings reports (EBIT/kg, harvest, cost/kg) |
 
 ---
 

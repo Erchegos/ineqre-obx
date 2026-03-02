@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import SalmonPriceChart from "@/components/SalmonPriceChart";
 import LiceChart from "@/components/LiceChart";
@@ -56,6 +56,7 @@ type DiseaseOutbreak = {
 };
 
 type BiomassData = {
+  timeSeries: Array<{ area_number: number; month: string; biomass_tonnes: number; harvest_tonnes: number; mortality_tonnes: number; feed_tonnes: number; stock_count: number }>;
   nationalTrend: Array<{ month: string; total_biomass: number; total_harvest: number; total_feed: number; total_stock: number }>;
   currentTotals: Array<{ area_number: number; month: string; biomass_tonnes: number; harvest_tonnes: number; stock_count: number }>;
   yoyComparison: Array<{ area_number: number; current_biomass: number; prev_biomass: number; yoy_change_pct: number | null }>;
@@ -67,7 +68,8 @@ type ExportData = {
 };
 
 type HarvestData = {
-  national: Array<{ month: string; total_harvest: number; total_mortality: number; total_biomass: number; mortality_rate_pct: number; feed_conversion_ratio: number | null }>;
+  byArea: Array<{ area_number: number; month: string; harvest_tonnes: number; mortality_tonnes: number; biomass_tonnes: number; feed_tonnes: number; stock_count: number }>;
+  national: Array<{ month: string; total_harvest: number; total_mortality: number; total_biomass: number; total_feed: number; mortality_rate_pct: number; feed_conversion_ratio: number | null }>;
   yoyComparison: Array<{ area_number: number; recent_harvest: number; prior_harvest: number; yoy_change_pct: number | null }>;
 };
 
@@ -112,12 +114,23 @@ export default function SeafoodPage() {
   const [biomassData, setBiomassData] = useState<BiomassData | null>(null);
   const [exportData, setExportData] = useState<ExportData | null>(null);
   const [harvestData, setHarvestData] = useState<HarvestData | null>(null);
+  const [quarterlyOps, setQuarterlyOps] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"overview" | "map" | "areas" | "biomass">("overview");
   const [mapLayer, setMapLayer] = useState<"localities" | "biomass">("localities");
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [focusLocation, setFocusLocation] = useState<{ lat: number; lng: number; name: string } | null>(null);
+  const [qopsDetailOpen, setQopsDetailOpen] = useState(false);
+  const [qopsSort, setQopsSort] = useState<{ col: string; asc: boolean } | null>(null);
+  const [hoveredExportIdx, setHoveredExportIdx] = useState<number | null>(null);
+  const [hoveredBioIdx, setHoveredBioIdx] = useState<number | null>(null);
+  const [hoveredMortIdx, setHoveredMortIdx] = useState<number | null>(null);
+  const [mousePos, setMousePos] = useState<{ x: number; y: number; cw: number }>({ x: 0, y: 0, cw: 800 });
+  const trackMouse = (e: React.MouseEvent) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top, cw: rect.width });
+  };
 
   useEffect(() => {
     const sf = async (url: string) => {
@@ -126,7 +139,7 @@ export default function SeafoodPage() {
     };
     async function load() {
       try {
-        const [ov, sal, lice, ar, loc, co, dis, bio, exp, har] = await Promise.all([
+        const [ov, sal, lice, ar, loc, co, dis, bio, exp, har, qops] = await Promise.all([
           sf("/api/seafood/overview"), sf("/api/seafood/salmon-price?days=365"),
           sf("/api/seafood/lice?weeks=26"), sf("/api/seafood/production-areas"),
           sf("/api/seafood/localities"), sf("/api/seafood/company-exposure"),
@@ -134,6 +147,7 @@ export default function SeafoodPage() {
           sf("/api/seafood/biomass?months=36&species=salmon"),
           sf("/api/seafood/export?weeks=104&category=fresh"),
           sf("/api/seafood/harvest?months=24&species=salmon"),
+          sf("/api/seafood/quarterly-ops?quarters=8"),
         ]);
         if (ov) setOverview(ov);
         if (sal) setSalmonData(sal);
@@ -145,6 +159,7 @@ export default function SeafoodPage() {
         if (bio) setBiomassData(bio);
         if (exp) setExportData(exp);
         if (har) setHarvestData(har);
+        if (qops?.data) setQuarterlyOps(qops.data);
       } catch (err) {
         console.error("Seafood load error:", err);
         setError(String(err));
@@ -189,6 +204,9 @@ export default function SeafoodPage() {
       <style>{`
         .sf-row:hover { background: #151515 !important; }
         @media (max-width: 1000px) { .sf-grid { grid-template-columns: 1fr !important; } .sf-right { display: none !important; } }
+        @keyframes sf-fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .sf-tab-content { animation: sf-fade-in 0.35s ease-out; }
+        .biomass-cta:hover { box-shadow: 0 0 12px rgba(249,115,22,0.15); }
       `}</style>
       <main style={S.page}>
         <div style={S.container}>
@@ -242,7 +260,7 @@ export default function SeafoodPage() {
           <div className="sf-grid" style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 0, marginTop: 1 }}>
 
             {/* ─── Left Panel ─────────────────────────────── */}
-            <div>
+            <div key={tab} className="sf-tab-content">
               {tab === "overview" && (
                 <>
                   {/* Charts Row */}
@@ -254,6 +272,97 @@ export default function SeafoodPage() {
                     <div style={{ padding: 12 }}>
                       <div style={S.section}>INDUSTRY LICE LEVEL</div>
                       <LiceChart data={liceData?.weekly || []} threshold={liceData?.threshold || 0.5} />
+                    </div>
+                  </div>
+
+                  {/* Biomass & Export Teaser */}
+                  <div style={{ borderBottom: "1px solid #222" }}>
+                    <div style={S.section}>BIOMASS & EXPORT INTELLIGENCE</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
+                      {/* Left: Export price mini chart */}
+                      <div style={{ padding: "12px 14px", borderRight: "1px solid #222" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+                          <span style={{ fontSize: 10, color: "#666", fontWeight: 700, letterSpacing: "0.06em" }}>SALMON EXPORT PRICE</span>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: "#f97316" }}>
+                            NOK {exportData?.stats?.currentPrice?.toFixed(2) ?? "\u2014"}/kg
+                          </span>
+                        </div>
+                        {exportData?.timeSeries && exportData.timeSeries.length > 2 ? (() => {
+                          const pts = exportData.timeSeries.filter(d => d.price_nok_kg != null).slice(-52);
+                          const prices = pts.map(p => p.price_nok_kg!);
+                          const vols = pts.map(p => p.volume_tonnes || 0);
+                          const minP = Math.min(...prices); const maxP = Math.max(...prices);
+                          const maxV = Math.max(...vols);
+                          return (
+                            <div style={{ height: 80, position: "relative" }}>
+                              <svg viewBox="0 0 100 30" preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block" }}>
+                                {pts.map((p, i) => {
+                                  const x = (i / (pts.length - 1)) * 100;
+                                  const bw = Math.max(0.4, 100 / pts.length * 0.6);
+                                  const bh = maxV > 0 ? ((p.volume_tonnes || 0) / maxV) * 8 : 0;
+                                  return <rect key={i} x={x - bw / 2} y={30 - bh} width={bw} height={bh} fill="#1a1a3a" />;
+                                })}
+                                <path d={pts.map((p, i) => {
+                                  const x = (i / (pts.length - 1)) * 100;
+                                  const y = 28 - ((p.price_nok_kg! - minP) / (maxP - minP || 1)) * 24;
+                                  return `${i === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
+                                }).join(" ")} fill="none" stroke="#f97316" strokeWidth={0.4} vectorEffect="non-scaling-stroke" />
+                              </svg>
+                              <div style={{ position: "absolute", top: 2, left: 2, fontSize: 9, color: "#555", pointerEvents: "none" }}>{maxP.toFixed(0)}</div>
+                              <div style={{ position: "absolute", bottom: 2, left: 2, fontSize: 9, color: "#555", pointerEvents: "none" }}>{minP.toFixed(0)}</div>
+                            </div>
+                          );
+                        })() : <div style={{ height: 80, display: "flex", alignItems: "center", justifyContent: "center", color: "#444", fontSize: 10 }}>Loading...</div>}
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#555", marginTop: 4 }}>
+                          <span>52W TREND</span>
+                          <div style={{ display: "flex", gap: 10 }}>
+                            <span>H <span style={{ color: "#22c55e" }}>{exportData?.stats?.high52w?.toFixed(0)}</span></span>
+                            <span>L <span style={{ color: "#ef4444" }}>{exportData?.stats?.low52w?.toFixed(0)}</span></span>
+                          </div>
+                        </div>
+                      </div>
+                      {/* Right: Biomass summary + CTA */}
+                      <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                        <div>
+                          <div style={{ fontSize: 10, color: "#666", fontWeight: 700, letterSpacing: "0.06em", marginBottom: 8 }}>NATIONAL BIOMASS</div>
+                          {biomassData?.nationalTrend && biomassData.nationalTrend.length > 0 ? (() => {
+                            const latest = biomassData.nationalTrend[biomassData.nationalTrend.length - 1];
+                            const prev = biomassData.nationalTrend.length > 1 ? biomassData.nationalTrend[biomassData.nationalTrend.length - 2] : null;
+                            const bioChg = prev && Number(prev.total_biomass) > 0 ? ((Number(latest.total_biomass) - Number(prev.total_biomass)) / Number(prev.total_biomass) * 100) : null;
+                            return (
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                                <div style={{ background: "#111", border: "1px solid #222", borderRadius: 3, padding: "8px 10px" }}>
+                                  <div style={{ fontSize: 8, color: "#666", fontWeight: 700 }}>STANDING</div>
+                                  <div style={{ fontSize: 18, fontWeight: 700, color: "#f97316", marginTop: 2 }}>{(Number(latest.total_biomass || 0) / 1000).toFixed(0)}K t</div>
+                                  {bioChg != null && <div style={{ fontSize: 10, color: bioChg >= 0 ? "#22c55e" : "#ef4444", marginTop: 2 }}>{bioChg >= 0 ? "+" : ""}{bioChg.toFixed(1)}% MoM</div>}
+                                </div>
+                                <div style={{ background: "#111", border: "1px solid #222", borderRadius: 3, padding: "8px 10px" }}>
+                                  <div style={{ fontSize: 8, color: "#666", fontWeight: 700 }}>HARVEST</div>
+                                  <div style={{ fontSize: 18, fontWeight: 700, color: "#3b82f6", marginTop: 2 }}>{(Number(latest.total_harvest || 0) / 1000).toFixed(0)}K t</div>
+                                  <div style={{ fontSize: 10, color: "#666", marginTop: 2 }}>{(Number(latest.total_stock || 0) / 1e6).toFixed(0)}M fish</div>
+                                </div>
+                              </div>
+                            );
+                          })() : <div style={{ color: "#444", fontSize: 10 }}>No biomass data</div>}
+                        </div>
+                        <button
+                          onClick={() => setTab("biomass")}
+                          className="biomass-cta"
+                          style={{
+                            marginTop: 10, width: "100%", padding: "9px 0",
+                            background: "#0d0d0d", border: "1px solid #333", borderRadius: 3,
+                            color: "#ccc", fontWeight: 600, fontSize: 11,
+                            cursor: "pointer", letterSpacing: "0.1em",
+                            transition: "all 0.25s ease",
+                            textTransform: "uppercase",
+                            display: "flex", alignItems: "center", justifyContent: "center", gap: 8
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = "#f97316"; e.currentTarget.style.color = "#f97316"; }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = "#333"; e.currentTarget.style.color = "#ccc"; }}
+                        >
+                          <span style={{ fontSize: 14 }}>&#9656;</span> BIOMASS TERMINAL
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -297,6 +406,184 @@ export default function SeafoodPage() {
                       );
                     })}
                   </div>
+
+                  {/* Quarterly Operations Matrix */}
+                  {Object.keys(quarterlyOps).length > 0 && (() => {
+                    const allQs: string[] = [];
+                    for (const rows of Object.values(quarterlyOps)) {
+                      for (const r of rows) {
+                        const lbl = r.label as string;
+                        if (!allQs.includes(lbl)) allQs.push(lbl);
+                      }
+                    }
+                    allQs.sort((a, b) => {
+                      const [qa, ya] = [parseInt(a[1]), parseInt(a.split(" ")[1])];
+                      const [qb, yb] = [parseInt(b[1]), parseInt(b.split(" ")[1])];
+                      return yb * 10 + qb - (ya * 10 + qa);
+                    });
+                    const displayQs = allQs.slice(0, 5);
+                    const displayTickers = ["MOWI", "SALM", "LSG", "GSF", "BAKKA", "AUSS"];
+                    // Convert all to NOK for comparability
+                    const FX: Record<string, number> = { EUR: 11.5, DKK: 1.57, NOK: 1 };
+                    const toNok = (v: number | null, cur: string) => v != null ? v * (FX[cur] || 1) : null;
+                    const gcols = `80px repeat(${displayQs.length}, 1fr)`;
+
+                    // Helper: build byQ map for a ticker
+                    const getByQ = (tk: string) => {
+                      const byQ: Record<string, any> = {};
+                      for (const r of (quarterlyOps[tk] || [])) byQ[r.label] = r;
+                      return byQ;
+                    };
+
+                    // Compute all values per ticker/quarter
+                    const allData: Record<string, Record<string, { cost: number | null; price: number | null; margin: number | null; ebit: number | null; harvest: number | null }>> = {};
+                    for (const tk of displayTickers) {
+                      allData[tk] = {};
+                      const byQ = getByQ(tk);
+                      for (const q of displayQs) {
+                        const d = byQ[q];
+                        const cost = toNok(d?.costPerKg, d?.currency || "NOK");
+                        const price = toNok(d?.pricePerKg, d?.currency || "NOK");
+                        const margin = cost != null && price != null && price > 0 ? ((price - cost) / price) * 100 : null;
+                        const ebit = toNok(d?.ebitPerKg, d?.currency || "NOK");
+                        const harvest = d?.harvestGwt ?? null;
+                        allData[tk][q] = { cost, price, margin, ebit, harvest };
+                      }
+                    }
+
+                    // Sorting
+                    const handleSort = (col: string) => {
+                      setQopsSort(prev => prev?.col === col ? { col, asc: !prev.asc } : { col, asc: false });
+                    };
+                    const arrow = (col: string) => qopsSort?.col === col ? (qopsSort.asc ? " \u25B2" : " \u25BC") : "";
+
+                    const sortedTickers = [...displayTickers];
+                    if (qopsSort) {
+                      const [field, qLabel] = qopsSort.col.split("|");
+                      sortedTickers.sort((a, b) => {
+                        const va = allData[a]?.[qLabel]?.[field as keyof typeof allData[typeof a][typeof qLabel]] as number | null;
+                        const vb = allData[b]?.[qLabel]?.[field as keyof typeof allData[typeof b][typeof qLabel]] as number | null;
+                        const na = va ?? -Infinity;
+                        const nb = vb ?? -Infinity;
+                        return qopsSort.asc ? na - nb : nb - na;
+                      });
+                    }
+
+                    // Grid: ticker col + 3 sub-cols per quarter
+                    const nQ = displayQs.length;
+                    const mergedCols = `56px repeat(${nQ * 3}, 1fr)`;
+
+                    return (
+                    <div style={{ marginTop: 2 }}>
+                      <div style={S.section}>QUARTERLY OPERATIONS</div>
+                      <div style={{ fontSize: 9, color: "#555", padding: "2px 10px 6px", letterSpacing: "0.04em" }}>
+                        All values converted to NOK/kg. Source: company quarterly reports.
+                      </div>
+
+                      {/* Merged Cost / Price / Margin table */}
+                      <div style={{ padding: "0 0 2px", fontSize: 10, overflowX: "auto" }}>
+                        {/* Quarter group headers */}
+                        <div style={{ display: "grid", gridTemplateColumns: mergedCols, background: "#0d0d0d", borderBottom: "1px solid #222" }}>
+                          <div />
+                          {displayQs.map(q => (
+                            <div key={q} style={{ gridColumn: "span 3", textAlign: "center", padding: "4px 0", fontSize: 9, fontWeight: 700, color: "#888", letterSpacing: "0.06em", borderLeft: "1px solid #222" }}>{q}</div>
+                          ))}
+                        </div>
+                        {/* Sub-column headers: Cost | Price | Margin */}
+                        <div style={{ display: "grid", gridTemplateColumns: mergedCols, background: "#111", borderBottom: "1px solid #333" }}>
+                          <div style={{ padding: "3px 6px", fontSize: 8, fontWeight: 700, color: "#666" }}>COMPANY</div>
+                          {displayQs.map(q => (
+                            <React.Fragment key={q}>
+                              <div onClick={() => handleSort(`cost|${q}`)} style={{ textAlign: "right", padding: "3px 4px", fontSize: 8, fontWeight: 600, color: "#f59e0b", cursor: "pointer", userSelect: "none", borderLeft: "1px solid #222" }}>COST{arrow(`cost|${q}`)}</div>
+                              <div onClick={() => handleSort(`price|${q}`)} style={{ textAlign: "right", padding: "3px 4px", fontSize: 8, fontWeight: 600, color: "#3b82f6", cursor: "pointer", userSelect: "none" }}>PRICE{arrow(`price|${q}`)}</div>
+                              <div onClick={() => handleSort(`margin|${q}`)} style={{ textAlign: "right", padding: "3px 4px", fontSize: 8, fontWeight: 600, color: "#22c55e", cursor: "pointer", userSelect: "none" }}>MRG%{arrow(`margin|${q}`)}</div>
+                            </React.Fragment>
+                          ))}
+                        </div>
+                        {/* Data rows */}
+                        {sortedTickers.map(tk => (
+                          <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: mergedCols, borderBottom: "1px solid #1a1a1a", alignItems: "center", transition: "background 0.08s" }}>
+                            <div style={{ padding: "4px 6px" }}>
+                              <Link href={`/stocks/${tk}`} style={{ color: "#58a6ff", textDecoration: "none", fontWeight: 600, fontSize: 10 }}>{tk}</Link>
+                            </div>
+                            {displayQs.map(q => {
+                              const v = allData[tk][q];
+                              const mCol = v.margin == null ? "#444" : v.margin >= 20 ? "#22c55e" : v.margin >= 10 ? "#4ade80" : v.margin > 0 ? "#a3a3a3" : "#ef4444";
+                              return (
+                                <React.Fragment key={q}>
+                                  <div style={{ textAlign: "right", padding: "4px 4px", color: v.cost != null ? "#f59e0b" : "#333", fontSize: 10, borderLeft: "1px solid #1a1a1a" }}>{v.cost != null ? v.cost.toFixed(1) : "\u2014"}</div>
+                                  <div style={{ textAlign: "right", padding: "4px 4px", color: v.price != null ? "#3b82f6" : "#333", fontWeight: 600, fontSize: 10 }}>{v.price != null ? v.price.toFixed(1) : "\u2014"}</div>
+                                  <div style={{ textAlign: "right", padding: "4px 4px", color: mCol, fontWeight: 600, fontSize: 10 }}>{v.margin != null ? `${v.margin.toFixed(0)}%` : "\u2014"}</div>
+                                </React.Fragment>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Collapsible: EBIT/kg + Harvest */}
+                      <div style={{ marginTop: 4 }}>
+                        <div
+                          onClick={() => setQopsDetailOpen(!qopsDetailOpen)}
+                          style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", cursor: "pointer", color: "#888", fontSize: 10, fontWeight: 600, letterSpacing: "0.04em", borderTop: "1px solid #222", userSelect: "none" }}
+                        >
+                          <span style={{ fontSize: 8, transition: "transform 0.2s", transform: qopsDetailOpen ? "rotate(90deg)" : "rotate(0deg)" }}>{"\u25B6"}</span>
+                          EBIT/KG &amp; HARVEST VOLUME
+                        </div>
+                        {qopsDetailOpen && (
+                          <div>
+                            {/* EBIT/kg table */}
+                            <div style={{ padding: "0 0 2px", fontSize: 10 }}>
+                              <div style={{ display: "grid", gridTemplateColumns: `56px repeat(${nQ}, 1fr)`, padding: "4px 8px", fontSize: 9, fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.06em", background: "#111", borderBottom: "1px solid #222" }}>
+                                <div>EBIT/KG</div>
+                                {displayQs.map(q => <div key={q} style={{ textAlign: "right" }}>{q}</div>)}
+                              </div>
+                              {sortedTickers.map(tk => (
+                                <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: `56px repeat(${nQ}, 1fr)`, padding: "5px 8px", borderBottom: "1px solid #1a1a1a", alignItems: "center", transition: "background 0.08s" }}>
+                                  <div>
+                                    <Link href={`/stocks/${tk}`} style={{ color: "#58a6ff", textDecoration: "none", fontWeight: 600, fontSize: 10 }}>{tk}</Link>
+                                  </div>
+                                  {displayQs.map(q => {
+                                    const v = allData[tk][q].ebit;
+                                    const col = v == null ? "#444" : v > 20 ? "#22c55e" : v > 10 ? "#4ade80" : v > 0 ? "#a3a3a3" : "#ef4444";
+                                    return (
+                                      <div key={q} style={{ textAlign: "right", color: col, fontWeight: v != null ? 600 : 400, fontSize: 10 }}>
+                                        {v != null ? v.toFixed(1) : "\u2014"}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Harvest volume table */}
+                            <div style={{ padding: "0 0 2px", fontSize: 10, marginTop: 2 }}>
+                              <div style={{ display: "grid", gridTemplateColumns: `56px repeat(${nQ}, 1fr)`, padding: "4px 8px", fontSize: 9, fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.06em", background: "#111", borderBottom: "1px solid #222" }}>
+                                <div>HARVEST</div>
+                                {displayQs.map(q => <div key={q} style={{ textAlign: "right" }}>{q}</div>)}
+                              </div>
+                              {sortedTickers.map(tk => (
+                                <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: `56px repeat(${nQ}, 1fr)`, padding: "5px 8px", borderBottom: "1px solid #1a1a1a", alignItems: "center", transition: "background 0.08s" }}>
+                                  <div>
+                                    <Link href={`/stocks/${tk}`} style={{ color: "#58a6ff", textDecoration: "none", fontWeight: 600, fontSize: 10 }}>{tk}</Link>
+                                  </div>
+                                  {displayQs.map(q => {
+                                    const v = allData[tk][q].harvest;
+                                    return (
+                                      <div key={q} style={{ textAlign: "right", color: v != null ? "#ccc" : "#444", fontSize: 10 }}>
+                                        {v != null ? (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v))) : "\u2014"}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    );
+                  })()}
 
                   {/* Map */}
                   <div id="seafood-map" style={{ borderBottom: "1px solid #222" }}>
@@ -455,205 +742,462 @@ export default function SeafoodPage() {
                   {/* ─── Export Price ──────────────────────────────── */}
                   <div style={S.section}>SSB SALMON EXPORT PRICE (FRESH)</div>
                   {exportData?.timeSeries && exportData.timeSeries.length > 0 ? (
-                    <div style={{ padding: "8px 10px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+                    <div style={{ padding: "10px 12px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
                         <div>
-                          <span style={{ fontSize: 18, fontWeight: 700, color: "#f97316" }}>
+                          <span style={{ fontSize: 22, fontWeight: 700, color: "#f97316" }}>
                             NOK {exportData.stats.currentPrice?.toFixed(2) ?? "\u2014"}
                           </span>
-                          <span style={{ color: "#666", fontSize: 10, marginLeft: 8 }}>/kg</span>
+                          <span style={{ color: "#666", fontSize: 11, marginLeft: 8 }}>/kg</span>
                         </div>
-                        <div style={{ display: "flex", gap: 12, fontSize: 10 }}>
+                        <div style={{ display: "flex", gap: 16, fontSize: 11 }}>
                           <span><span style={{ color: "#666" }}>52W H</span> <span style={{ color: "#22c55e" }}>{exportData.stats.high52w?.toFixed(2)}</span></span>
                           <span><span style={{ color: "#666" }}>52W L</span> <span style={{ color: "#ef4444" }}>{exportData.stats.low52w?.toFixed(2)}</span></span>
                           <span><span style={{ color: "#666" }}>AVG</span> <span style={{ color: "#aaa" }}>{exportData.stats.avg52w}</span></span>
                         </div>
                       </div>
-                      {/* Export price sparkline */}
-                      <div style={{ height: 120, position: "relative" }}>
-                        {(() => {
-                          const pts = exportData.timeSeries.filter(d => d.price_nok_kg != null).slice(-104);
-                          if (pts.length < 2) return <div style={{ color: "#555", padding: 16 }}>Insufficient data</div>;
-                          const prices = pts.map(p => p.price_nok_kg!);
-                          const vols = pts.map(p => p.volume_tonnes || 0);
-                          const minP = Math.min(...prices); const maxP = Math.max(...prices);
-                          const maxV = Math.max(...vols);
-                          const w = 800; const h = 120;
-                          const pricePath = pts.map((p, i) => {
-                            const x = (i / (pts.length - 1)) * w;
-                            const y = h - 20 - ((p.price_nok_kg! - minP) / (maxP - minP || 1)) * (h - 30);
-                            return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-                          }).join(" ");
-                          return (
-                            <svg viewBox={`0 0 ${w} ${h}`} style={{ width: "100%", height: "100%" }} preserveAspectRatio="none">
+                      {(() => {
+                        const pts = exportData.timeSeries.filter(d => d.price_nok_kg != null).slice(-104);
+                        if (pts.length < 2) return <div style={{ color: "#555", padding: 16 }}>Insufficient data</div>;
+                        const prices = pts.map(p => p.price_nok_kg!);
+                        const vols = pts.map(p => p.volume_tonnes || 0);
+                        const minP = Math.min(...prices); const maxP = Math.max(...prices);
+                        const maxV = Math.max(...vols);
+                        const hov = hoveredExportIdx != null ? pts[hoveredExportIdx] : null;
+                        // Date ticks: every ~3 months
+                        const dateTicks: { idx: number; label: string }[] = [];
+                        let lastQ = "";
+                        pts.forEach((p, i) => {
+                          const d = p.week_start?.slice(0, 7) || "";
+                          const q = d.slice(0, 4) + "-Q" + (Math.floor((parseInt(d.slice(5, 7)) - 1) / 3));
+                          if (q !== lastQ) { dateTicks.push({ idx: i, label: d }); lastQ = q; }
+                        });
+                        return (
+                          <div style={{ position: "relative" }} onMouseLeave={() => setHoveredExportIdx(null)} onMouseMove={trackMouse}>
+                            {/* Hover tooltip follows mouse */}
+                            {hov && hoveredExportIdx != null && (
+                              <div style={{
+                                position: "absolute",
+                                left: mousePos.x > mousePos.cw * 0.65 ? mousePos.x - 16 : mousePos.x + 16,
+                                top: Math.max(4, mousePos.y - 44),
+                                transform: mousePos.x > mousePos.cw * 0.65 ? "translateX(-100%)" : "none",
+                                zIndex: 10,
+                                background: "#111e", border: "1px solid #333", borderRadius: 4, padding: "8px 12px",
+                                fontSize: 12, lineHeight: 1.6, pointerEvents: "none", whiteSpace: "nowrap"
+                              }}>
+                                <div style={{ color: "#aaa", fontWeight: 700 }}>{hov.week_start?.slice(0, 10)}</div>
+                                <div style={{ color: "#f97316" }}>Price: NOK {hov.price_nok_kg?.toFixed(2)}/kg</div>
+                                <div style={{ color: "#6366f1" }}>Volume: {((hov.volume_tonnes || 0) / 1000).toFixed(1)}K t</div>
+                              </div>
+                            )}
+                            <svg viewBox="0 0 100 40" preserveAspectRatio="none" style={{ width: "100%", height: 180, display: "block" }}>
                               {/* Volume bars */}
                               {pts.map((p, i) => {
-                                const x = (i / (pts.length - 1)) * w;
-                                const bh = maxV > 0 ? ((p.volume_tonnes || 0) / maxV) * 30 : 0;
-                                return <rect key={i} x={x - 2} y={h - bh} width={4} height={bh} fill="#1a1a3a" />;
+                                const x = (i / (pts.length - 1)) * 100;
+                                const bw = Math.max(0.3, 100 / pts.length * 0.7);
+                                const bh = maxV > 0 ? ((p.volume_tonnes || 0) / maxV) * 10 : 0;
+                                return <rect key={i} x={x - bw / 2} y={40 - bh} width={bw} height={bh} fill={hoveredExportIdx === i ? "#2a2a5a" : "#1a1a3a"} />;
                               })}
                               {/* Price line */}
-                              <path d={pricePath} fill="none" stroke="#f97316" strokeWidth={1.5} />
-                              {/* Labels */}
-                              <text x={4} y={12} fill="#555" fontSize={9}>{maxP.toFixed(0)}</text>
-                              <text x={4} y={h - 22} fill="#555" fontSize={9}>{minP.toFixed(0)}</text>
+                              <path d={pts.map((p, i) => {
+                                const x = (i / (pts.length - 1)) * 100;
+                                const y = 38 - ((p.price_nok_kg! - minP) / (maxP - minP || 1)) * 34;
+                                return `${i === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
+                              }).join(" ")} fill="none" stroke="#f97316" strokeWidth={0.4} vectorEffect="non-scaling-stroke" />
+                              {/* Hover crosshair */}
+                              {hoveredExportIdx != null && (
+                                <line x1={(hoveredExportIdx / (pts.length - 1)) * 100} y1={0} x2={(hoveredExportIdx / (pts.length - 1)) * 100} y2={40} stroke="#555" strokeWidth={0.15} strokeDasharray="0.5,0.5" vectorEffect="non-scaling-stroke" />
+                              )}
+                              {/* Hit targets */}
+                              {pts.map((_, i) => (
+                                <rect key={`h${i}`} x={(i / (pts.length - 1)) * 100 - 50 / pts.length} y={0} width={100 / pts.length} height={40} fill="transparent" onMouseEnter={() => setHoveredExportIdx(i)} style={{ cursor: "crosshair" }} />
+                              ))}
                             </svg>
-                          );
-                        })()}
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#555", marginTop: 2 }}>
-                        <span>{exportData.timeSeries[0]?.week_start?.slice(0, 10)}</span>
-                        <span>WEEKLY EXPORT PRICE + VOLUME</span>
-                        <span>{exportData.timeSeries[exportData.timeSeries.length - 1]?.week_start?.slice(0, 10)}</span>
-                      </div>
+                            {/* Y-axis labels as HTML */}
+                            <div style={{ position: "absolute", top: 4, left: 6, fontSize: 11, color: "#666", fontWeight: 600, pointerEvents: "none" }}>{maxP.toFixed(0)}</div>
+                            <div style={{ position: "absolute", bottom: 44, left: 6, fontSize: 11, color: "#666", pointerEvents: "none" }}>{minP.toFixed(0)}</div>
+                            {/* Date ticks as HTML */}
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#555", marginTop: 6, paddingBottom: 2 }}>
+                              {dateTicks.map((t, i) => (
+                                <span key={i}>{t.label}</span>
+                              ))}
+                            </div>
+                            <div style={{ textAlign: "center", fontSize: 10, color: "#444", marginTop: 2 }}>WEEKLY EXPORT PRICE + VOLUME</div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   ) : (
                     <div style={{ padding: "16px 10px", color: "#555", fontSize: 11 }}>No export price data available.</div>
                   )}
 
+                  {/* ─── Biomass Distribution Map ──────────────────── */}
+                  <div style={{ ...S.section, marginTop: 8 }}>BIOMASS DISTRIBUTION MAP</div>
+                  <div style={{ padding: "6px 10px" }}>
+                    <div style={{ height: 380, border: "1px solid #222", borderRadius: 4, overflow: "hidden" }}>
+                      <ProductionAreaMap areas={areas} localities={[]} selectedTicker={null} onTickerSelect={() => {}} biomassData={biomassData?.currentTotals} />
+                    </div>
+                    <div style={{ fontSize: 9, color: "#555", marginTop: 4, textAlign: "center" }}>
+                      Circle size = standing biomass by production area. Click circles for details.
+                    </div>
+                  </div>
+
                   {/* ─── National Biomass Trend ────────────────────── */}
-                  <div style={S.section}>NATIONAL BIOMASS TREND (SALMON)</div>
+                  <div style={{ ...S.section, marginTop: 8 }}>NATIONAL BIOMASS TREND (SALMON)</div>
                   {biomassData?.nationalTrend && biomassData.nationalTrend.length > 0 ? (
-                    <div style={{ padding: "8px 10px" }}>
-                      {/* Summary cards */}
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+                    <div style={{ padding: "10px 12px" }}>
+                      {/* Summary cards with MoM + YoY */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
                         {(() => {
-                          const latest = biomassData.nationalTrend[biomassData.nationalTrend.length - 1];
+                          const nt = biomassData.nationalTrend;
+                          const latest = nt[nt.length - 1];
                           if (!latest) return null;
-                          const prev = biomassData.nationalTrend.length > 12 ? biomassData.nationalTrend[biomassData.nationalTrend.length - 13] : null;
-                          const yoyBio = prev && prev.total_biomass > 0 ? ((latest.total_biomass - prev.total_biomass) / prev.total_biomass * 100) : null;
+                          const prev = nt.length > 1 ? nt[nt.length - 2] : null;
+                          const yoyPrev = nt.length > 12 ? nt[nt.length - 13] : null;
+                          const pctChg = (cur: number, ref: number | undefined) => ref && ref > 0 ? ((cur - ref) / ref * 100) : null;
+                          const fmtChg = (v: number | null, suffix = "%") => v != null ? `${v >= 0 ? "+" : ""}${v.toFixed(1)}${suffix}` : null;
+                          const chgColor = (v: number | null) => v != null ? (v >= 0 ? "#22c55e" : "#ef4444") : "#666";
                           return [
-                            { label: "STANDING BIOMASS", value: `${((latest.total_biomass || 0) / 1000).toFixed(0)}K t`, color: "#f97316", sub: yoyBio != null ? `${yoyBio >= 0 ? "+" : ""}${yoyBio.toFixed(1)}% YoY` : null, subColor: yoyBio != null ? (yoyBio >= 0 ? "#22c55e" : "#ef4444") : "#666" },
-                            { label: "MONTHLY HARVEST", value: `${((latest.total_harvest || 0) / 1000).toFixed(0)}K t`, color: "#3b82f6" },
-                            { label: "FEED CONSUMPTION", value: `${((latest.total_feed || 0) / 1000).toFixed(0)}K t`, color: "#8b5cf6" },
-                            { label: "STOCK COUNT", value: `${(Number(latest.total_stock || 0) / 1000000).toFixed(0)}M fish`, color: "#22c55e" },
+                            { label: "STANDING BIOMASS", value: `${(Number(latest.total_biomass || 0) / 1000).toFixed(0)}K t`, color: "#f97316",
+                              mom: fmtChg(pctChg(Number(latest.total_biomass), prev ? Number(prev.total_biomass) : undefined)), momC: chgColor(pctChg(Number(latest.total_biomass), prev ? Number(prev.total_biomass) : undefined)),
+                              yoy: fmtChg(pctChg(Number(latest.total_biomass), yoyPrev ? Number(yoyPrev.total_biomass) : undefined)), yoyC: chgColor(pctChg(Number(latest.total_biomass), yoyPrev ? Number(yoyPrev.total_biomass) : undefined)) },
+                            { label: "MONTHLY HARVEST", value: `${(Number(latest.total_harvest || 0) / 1000).toFixed(0)}K t`, color: "#3b82f6",
+                              mom: fmtChg(pctChg(Number(latest.total_harvest), prev ? Number(prev.total_harvest) : undefined)), momC: chgColor(pctChg(Number(latest.total_harvest), prev ? Number(prev.total_harvest) : undefined)),
+                              yoy: fmtChg(pctChg(Number(latest.total_harvest), yoyPrev ? Number(yoyPrev.total_harvest) : undefined)), yoyC: chgColor(pctChg(Number(latest.total_harvest), yoyPrev ? Number(yoyPrev.total_harvest) : undefined)) },
+                            { label: "FEED CONSUMPTION", value: `${(Number(latest.total_feed || 0) / 1000).toFixed(0)}K t`, color: "#8b5cf6",
+                              mom: fmtChg(pctChg(Number(latest.total_feed), prev ? Number(prev.total_feed) : undefined)), momC: chgColor(pctChg(Number(latest.total_feed), prev ? Number(prev.total_feed) : undefined)),
+                              yoy: fmtChg(pctChg(Number(latest.total_feed), yoyPrev ? Number(yoyPrev.total_feed) : undefined)), yoyC: chgColor(pctChg(Number(latest.total_feed), yoyPrev ? Number(yoyPrev.total_feed) : undefined)) },
+                            { label: "STOCK COUNT", value: `${(Number(latest.total_stock || 0) / 1000000).toFixed(0)}M fish`, color: "#22c55e",
+                              mom: fmtChg(pctChg(Number(latest.total_stock), prev ? Number(prev.total_stock) : undefined)), momC: chgColor(pctChg(Number(latest.total_stock), prev ? Number(prev.total_stock) : undefined)),
+                              yoy: fmtChg(pctChg(Number(latest.total_stock), yoyPrev ? Number(yoyPrev.total_stock) : undefined)), yoyC: chgColor(pctChg(Number(latest.total_stock), yoyPrev ? Number(yoyPrev.total_stock) : undefined)) },
                           ].map((card, i) => (
-                            <div key={i} style={{ background: "#111", border: "1px solid #222", borderRadius: 3, padding: "6px 8px" }}>
-                              <div style={{ fontSize: 8, color: "#666", letterSpacing: "0.06em", fontWeight: 700 }}>{card.label}</div>
-                              <div style={{ fontSize: 16, fontWeight: 700, color: card.color, marginTop: 2 }}>{card.value}</div>
-                              {card.sub && <div style={{ fontSize: 9, color: card.subColor, marginTop: 1 }}>{card.sub}</div>}
+                            <div key={i} style={{ background: "#111", border: "1px solid #222", borderRadius: 4, padding: "12px 16px" }}>
+                              <div style={{ fontSize: 9, color: "#666", letterSpacing: "0.06em", fontWeight: 700 }}>{card.label}</div>
+                              <div style={{ fontSize: 24, fontWeight: 700, color: card.color, marginTop: 4 }}>{card.value}</div>
+                              <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 11 }}>
+                                {card.mom && <span style={{ color: card.momC }}>{card.mom} <span style={{ color: "#555" }}>MoM</span></span>}
+                                {card.yoy && <span style={{ color: card.yoyC }}>{card.yoy} <span style={{ color: "#555" }}>YoY</span></span>}
+                              </div>
                             </div>
                           ));
                         })()}
                       </div>
-                      {/* Biomass trend chart */}
-                      <div style={{ height: 140, position: "relative" }}>
-                        {(() => {
-                          const pts = biomassData.nationalTrend;
-                          const bios = pts.map(p => p.total_biomass);
-                          const harvs = pts.map(p => p.total_harvest);
-                          const maxB = Math.max(...bios); const minB = Math.min(...bios);
-                          const maxH = Math.max(...harvs);
-                          const w = 800; const h = 140;
-                          const bioPath = pts.map((p, i) => {
-                            const x = (i / (pts.length - 1)) * w;
-                            const y = h - 16 - ((p.total_biomass - minB) / (maxB - minB || 1)) * (h - 26);
-                            return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-                          }).join(" ");
-                          return (
-                            <svg viewBox={`0 0 ${w} ${h}`} style={{ width: "100%", height: "100%" }} preserveAspectRatio="none">
+
+                      {/* Enhanced biomass chart: dual Y-axis, feed line, mortality area, tooltips */}
+                      {(() => {
+                        const pts = biomassData.nationalTrend;
+                        const bios = pts.map(p => Number(p.total_biomass));
+                        const harvs = pts.map(p => Number(p.total_harvest));
+                        const feeds = pts.map(p => Number(p.total_feed));
+                        const morts = pts.map(p => {
+                          const hm = harvestData?.national?.find(h => h.month === p.month);
+                          return hm ? Number(hm.total_mortality || 0) : 0;
+                        });
+                        const maxB = Math.max(...bios); const minB = Math.min(...bios);
+                        const maxR = Math.max(...harvs, ...feeds, ...morts);
+                        const hovP = hoveredBioIdx != null ? pts[hoveredBioIdx] : null;
+                        const hovHm = hovP ? harvestData?.national?.find(h => h.month === hovP.month) : null;
+                        // Date ticks every ~3 months
+                        const dateTicks: { idx: number; label: string }[] = [];
+                        let lastBQ = "";
+                        pts.forEach((p, i) => {
+                          const m = p.month?.slice(0, 7) || "";
+                          const q = m.slice(0, 4) + "-Q" + Math.floor((parseInt(m.slice(5, 7) || "1") - 1) / 3);
+                          if (q !== lastBQ) { dateTicks.push({ idx: i, label: m }); lastBQ = q; }
+                        });
+                        // Normalized coordinates (0-100 x, 0-50 y)
+                        const yB = (v: number) => 48 - ((v - minB) / (maxB - minB || 1)) * 44;
+                        const yR = (v: number) => 48 - (v / (maxR || 1)) * 44;
+                        const xP = (i: number) => (i / (pts.length - 1)) * 100;
+                        return (
+                          <div style={{ position: "relative", marginTop: 4 }} onMouseLeave={() => setHoveredBioIdx(null)} onMouseMove={trackMouse}>
+                            {/* HTML tooltip follows mouse */}
+                            {hovP && hoveredBioIdx != null && (
+                              <div style={{
+                                position: "absolute",
+                                left: mousePos.x > mousePos.cw * 0.6 ? mousePos.x - 16 : mousePos.x + 16,
+                                top: Math.max(4, mousePos.y - 60),
+                                transform: mousePos.x > mousePos.cw * 0.6 ? "translateX(-100%)" : "none",
+                                zIndex: 10,
+                                background: "#111e", border: "1px solid #333", borderRadius: 4, padding: "10px 14px",
+                                fontSize: 12, lineHeight: 1.7, pointerEvents: "none", whiteSpace: "nowrap"
+                              }}>
+                                <div style={{ color: "#aaa", fontWeight: 700, marginBottom: 2 }}>{hovP.month?.slice(0, 7)}</div>
+                                <div style={{ color: "#f97316" }}>Biomass: {(Number(hovP.total_biomass) / 1000).toFixed(0)}K t</div>
+                                <div style={{ color: "#3b82f6" }}>Harvest: {(Number(hovP.total_harvest) / 1000).toFixed(0)}K t</div>
+                                <div style={{ color: "#8b5cf6" }}>Feed: {(Number(hovP.total_feed) / 1000).toFixed(0)}K t</div>
+                                <div style={{ color: "#ef4444" }}>Mortality: {(morts[hoveredBioIdx] / 1000).toFixed(0)}K t</div>
+                                <div style={{ color: "#22c55e" }}>Stock: {(Number(hovP.total_stock) / 1e6).toFixed(0)}M fish</div>
+                                {hovHm && <div style={{ color: "#666", fontSize: 10, marginTop: 2 }}>FCR: {Number(hovHm.feed_conversion_ratio || 0).toFixed(2)} | Mort: {Number(hovHm.mortality_rate_pct || 0).toFixed(1)}%</div>}
+                              </div>
+                            )}
+                            {/* Y-axis labels as HTML */}
+                            <div style={{ position: "absolute", top: 2, left: 4, fontSize: 11, color: "#f97316", fontWeight: 700, pointerEvents: "none" }}>{(maxB / 1000).toFixed(0)}K</div>
+                            <div style={{ position: "absolute", bottom: 24, left: 4, fontSize: 11, color: "#f97316", pointerEvents: "none" }}>{(minB / 1000).toFixed(0)}K</div>
+                            <div style={{ position: "absolute", top: 2, right: 4, fontSize: 11, color: "#3b82f6", fontWeight: 700, pointerEvents: "none" }}>{(maxR / 1000).toFixed(0)}K</div>
+                            <div style={{ position: "absolute", bottom: 24, right: 4, fontSize: 11, color: "#3b82f6", pointerEvents: "none" }}>0</div>
+                            <svg viewBox="0 0 100 50" preserveAspectRatio="none" style={{ width: "100%", height: 280, display: "block" }}>
+                              {/* Mortality area */}
+                              <path d={`M${pts.map((_, i) => `${xP(i).toFixed(2)},${yR(morts[i]).toFixed(2)}`).join(" L")} L100,${yR(0).toFixed(2)} L0,${yR(0).toFixed(2)} Z`} fill="#ef4444" opacity={0.06} />
                               {/* Harvest bars */}
                               {pts.map((p, i) => {
-                                const x = (i / (pts.length - 1)) * w;
-                                const bh = maxH > 0 ? (p.total_harvest / maxH) * 40 : 0;
-                                return <rect key={i} x={x - 6} y={h - bh} width={12} height={bh} fill="#1a2a1a" />;
+                                const bh = yR(0) - yR(Number(p.total_harvest));
+                                const bw = Math.max(0.25, 100 / pts.length * 0.5);
+                                return <rect key={i} x={xP(i) - bw / 2} y={yR(Number(p.total_harvest))} width={bw} height={Math.max(0, bh)} fill={hoveredBioIdx === i ? "#2a4a2a" : "#1a2a1a"} />;
                               })}
+                              {/* Feed line (dashed) */}
+                              <path d={pts.map((p, i) => `${i === 0 ? "M" : "L"}${xP(i).toFixed(2)},${yR(Number(p.total_feed)).toFixed(2)}`).join(" ")} fill="none" stroke="#8b5cf6" strokeWidth={0.3} strokeDasharray="1,0.8" vectorEffect="non-scaling-stroke" />
                               {/* Biomass line */}
-                              <path d={bioPath} fill="none" stroke="#f97316" strokeWidth={1.5} />
-                              <text x={4} y={12} fill="#555" fontSize={9}>{(maxB / 1000).toFixed(0)}K</text>
-                              <text x={4} y={h - 2} fill="#555" fontSize={9}>{(minB / 1000).toFixed(0)}K</text>
+                              <path d={pts.map((p, i) => `${i === 0 ? "M" : "L"}${xP(i).toFixed(2)},${yB(Number(p.total_biomass)).toFixed(2)}`).join(" ")} fill="none" stroke="#f97316" strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
+                              {/* Hover crosshair */}
+                              {hoveredBioIdx != null && (
+                                <line x1={xP(hoveredBioIdx)} y1={0} x2={xP(hoveredBioIdx)} y2={50} stroke="#555" strokeWidth={0.15} strokeDasharray="0.5,0.5" vectorEffect="non-scaling-stroke" />
+                              )}
+                              {/* Hit targets */}
+                              {pts.map((_, i) => (
+                                <rect key={`bh${i}`} x={xP(i) - 50 / pts.length} y={0} width={100 / pts.length} height={50} fill="transparent" onMouseEnter={() => setHoveredBioIdx(i)} style={{ cursor: "crosshair" }} />
+                              ))}
                             </svg>
-                          );
-                        })()}
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#555", marginTop: 2 }}>
-                        <span>{biomassData.nationalTrend[0]?.month?.slice(0, 7)}</span>
-                        <span style={{ display: "flex", gap: 12 }}>
-                          <span><span style={{ display: "inline-block", width: 8, height: 2, background: "#f97316", marginRight: 4 }} />BIOMASS</span>
-                          <span><span style={{ display: "inline-block", width: 8, height: 8, background: "#1a2a1a", marginRight: 4 }} />HARVEST</span>
-                        </span>
-                        <span>{biomassData.nationalTrend[biomassData.nationalTrend.length - 1]?.month?.slice(0, 7)}</span>
-                      </div>
+                            {/* Date ticks + legend as HTML */}
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#555", marginTop: 4 }}>
+                              {dateTicks.map((t, i) => <span key={i}>{t.label}</span>)}
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "center", gap: 18, fontSize: 10, color: "#555", marginTop: 4, paddingBottom: 6 }}>
+                              <span><span style={{ display: "inline-block", width: 14, height: 2, background: "#f97316", marginRight: 5, verticalAlign: "middle" }} />BIOMASS</span>
+                              <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#1a2a1a", marginRight: 5, verticalAlign: "middle" }} />HARVEST</span>
+                              <span><span style={{ display: "inline-block", width: 14, height: 2, background: "#8b5cf6", marginRight: 5, verticalAlign: "middle", borderTop: "1px dashed #8b5cf6" }} />FEED</span>
+                              <span><span style={{ display: "inline-block", width: 10, height: 10, background: "rgba(239,68,68,0.12)", marginRight: 5, verticalAlign: "middle" }} />MORTALITY</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   ) : (
                     <div style={{ padding: "16px 10px", color: "#555", fontSize: 11 }}>No biomass data available.</div>
                   )}
 
-                  {/* ─── Biomass by Area ───────────────────────────── */}
-                  <div style={S.section}>BIOMASS BY PRODUCTION AREA</div>
+                  {/* ─── Biomass by Area (with MoM) ────────────────── */}
+                  <div style={{ ...S.section, marginTop: 8 }}>BIOMASS BY PRODUCTION AREA</div>
                   {biomassData?.currentTotals && biomassData.currentTotals.length > 0 ? (
                     <div style={{ padding: "4px 0" }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "3px 40px 1fr 90px 80px 70px", padding: "4px 8px", fontSize: 9, fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.06em", background: "#111", borderBottom: "1px solid #222" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "4px 44px 1fr 80px 72px 68px 68px", padding: "6px 10px", fontSize: 10, fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.06em", background: "#111", borderBottom: "1px solid #222" }}>
                         <div />
                         <div>AREA</div>
                         <div>BIOMASS</div>
                         <div style={{ textAlign: "right" }}>TONNES</div>
                         <div style={{ textAlign: "right" }}>HARVEST</div>
+                        <div style={{ textAlign: "right" }}>MoM</div>
                         <div style={{ textAlign: "right" }}>YoY</div>
                       </div>
-                      {biomassData.currentTotals
-                        .sort((a, b) => a.area_number - b.area_number)
-                        .map(b => {
-                          const maxBio = Math.max(...biomassData.currentTotals.map(x => x.biomass_tonnes || 1));
-                          const pct = (b.biomass_tonnes / maxBio) * 100;
-                          const yoy = biomassData.yoyComparison.find(y => y.area_number === b.area_number);
-                          const areaInfo = areas.find(a => a.areaNumber === b.area_number);
-                          return (
-                            <div key={b.area_number} className="sf-row" style={{ display: "grid", gridTemplateColumns: "3px 40px 1fr 90px 80px 70px", padding: "5px 8px", borderBottom: "1px solid #1a1a1a", alignItems: "center", transition: "background 0.08s" }}>
-                              <div style={{ width: 3, minHeight: 14, background: TL_C[areaInfo?.trafficLight || ""] || "#555", borderRadius: 1 }} />
-                              <div style={{ fontWeight: 600 }}>{b.area_number}</div>
-                              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                <div style={{ flex: 1, height: 6, background: "#1a1a1a", borderRadius: 2 }}>
-                                  <div style={{ width: `${pct}%`, height: 6, background: "#f97316", borderRadius: 2, opacity: 0.7 }} />
+                      {(() => {
+                        // Compute per-area MoM from timeSeries
+                        const areaMoM: Record<number, number | null> = {};
+                        if (biomassData?.timeSeries) {
+                          const byArea = new Map<number, Array<{ month: string; biomass_tonnes: number }>>();
+                          for (const row of biomassData.timeSeries) {
+                            const list = byArea.get(row.area_number) || [];
+                            list.push(row);
+                            byArea.set(row.area_number, list);
+                          }
+                          for (const [areaNum, rows] of byArea) {
+                            rows.sort((a, b) => a.month.localeCompare(b.month));
+                            const n = rows.length;
+                            if (n >= 2) {
+                              const cur = Number(rows[n - 1].biomass_tonnes) || 0;
+                              const prv = Number(rows[n - 2].biomass_tonnes) || 0;
+                              areaMoM[areaNum] = prv > 0 ? ((cur - prv) / prv * 100) : null;
+                            }
+                          }
+                        }
+                        const maxBio = Math.max(...biomassData.currentTotals.map(x => Number(x.biomass_tonnes) || 1));
+                        return biomassData.currentTotals
+                          .sort((a, b) => a.area_number - b.area_number)
+                          .map(b => {
+                            const pct = (Number(b.biomass_tonnes) / maxBio) * 100;
+                            const yoy = biomassData.yoyComparison.find(y => y.area_number === b.area_number);
+                            const areaInfo = areas.find(a => a.areaNumber === b.area_number);
+                            const mom = areaMoM[b.area_number];
+                            return (
+                              <div key={b.area_number} className="sf-row" style={{ display: "grid", gridTemplateColumns: "4px 44px 1fr 80px 72px 68px 68px", padding: "7px 10px", borderBottom: "1px solid #1a1a1a", alignItems: "center", transition: "background 0.08s", fontSize: 11 }}>
+                                <div style={{ width: 4, minHeight: 18, background: TL_C[areaInfo?.trafficLight || ""] || "#555", borderRadius: 1 }} />
+                                <div style={{ fontWeight: 600, fontSize: 12 }}>{b.area_number}</div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                  <div style={{ flex: 1, height: 10, background: "#1a1a1a", borderRadius: 3 }}>
+                                    <div style={{ width: `${pct}%`, height: 10, background: "#f97316", borderRadius: 3, opacity: 0.7 }} />
+                                  </div>
+                                </div>
+                                <div style={{ textAlign: "right", fontWeight: 600 }}>{(Number(b.biomass_tonnes) / 1000).toFixed(1)}K</div>
+                                <div style={{ textAlign: "right", color: "#888" }}>{(Number(b.harvest_tonnes) / 1000).toFixed(1)}K</div>
+                                <div style={{ textAlign: "right", color: mom != null ? (mom >= 0 ? "#22c55e" : "#ef4444") : "#555" }}>
+                                  {mom != null ? `${mom >= 0 ? "+" : ""}${mom.toFixed(1)}%` : "\u2014"}
+                                </div>
+                                <div style={{ textAlign: "right", color: yoy?.yoy_change_pct != null ? (yoy.yoy_change_pct >= 0 ? "#22c55e" : "#ef4444") : "#888", fontWeight: 600 }}>
+                                  {yoy?.yoy_change_pct != null ? `${yoy.yoy_change_pct >= 0 ? "+" : ""}${yoy.yoy_change_pct}%` : "\u2014"}
                                 </div>
                               </div>
-                              <div style={{ textAlign: "right", fontWeight: 600 }}>{(b.biomass_tonnes / 1000).toFixed(1)}K</div>
-                              <div style={{ textAlign: "right", color: "#888" }}>{(b.harvest_tonnes / 1000).toFixed(1)}K</div>
-                              <div style={{ textAlign: "right", color: yoy?.yoy_change_pct != null ? (yoy.yoy_change_pct >= 0 ? "#22c55e" : "#ef4444") : "#888", fontWeight: 600 }}>
-                                {yoy?.yoy_change_pct != null ? `${yoy.yoy_change_pct >= 0 ? "+" : ""}${yoy.yoy_change_pct}%` : "\u2014"}
-                              </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          });
+                      })()}
                     </div>
                   ) : (
                     <div style={{ padding: "16px 10px", color: "#555", fontSize: 11 }}>No area biomass data available.</div>
                   )}
 
-                  {/* ─── Harvest & Mortality ───────────────────────── */}
-                  <div style={S.section}>HARVEST & MORTALITY</div>
+                  {/* ─── Harvest & Mortality (Redesigned) ──────────── */}
+                  <div style={{ ...S.section, marginTop: 12 }}>HARVEST & MORTALITY ANALYSIS</div>
                   {harvestData?.national && harvestData.national.length > 0 ? (
-                    <div style={{ padding: "8px 10px" }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+                    <div style={{ padding: "10px 12px" }}>
+                      {/* 4 larger metric cards with MoM/YoY */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
                         {(() => {
-                          const latest = harvestData.national[harvestData.national.length - 1];
+                          const hn = harvestData.national;
+                          const latest = hn[hn.length - 1];
                           if (!latest) return null;
+                          const prev = hn.length > 1 ? hn[hn.length - 2] : null;
+                          const yoyPrev = hn.length > 12 ? hn[hn.length - 13] : null;
+                          const mortRate = Number(latest.mortality_rate_pct) || 0;
+                          const mortTonnes = Number(latest.total_mortality || 0);
+                          const fcr = Number(latest.feed_conversion_ratio || 0);
+                          const harvBioRatio = Number(latest.total_biomass) > 0 ? (Number(latest.total_harvest) / Number(latest.total_biomass) * 100) : 0;
+                          const prevMortRate = prev ? Number(prev.mortality_rate_pct) || 0 : null;
+                          const yoyMortRate = yoyPrev ? Number(yoyPrev.mortality_rate_pct) || 0 : null;
+                          const prevFcr = prev ? Number(prev.feed_conversion_ratio || 0) : null;
+                          const yoyFcr = yoyPrev ? Number(yoyPrev.feed_conversion_ratio || 0) : null;
+                          const pctChg = (c: number, r: number | null) => r != null && r > 0 ? ((c - r) / r * 100) : null;
+                          const ppChg = (c: number, r: number | null) => r != null ? (c - r) : null;
+                          const fmtPP = (v: number | null) => v != null ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}pp` : null;
+                          const fmtD = (v: number | null) => v != null ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}` : null;
+                          const fmtP = (v: number | null) => v != null ? `${v >= 0 ? "+" : ""}${v.toFixed(1)}%` : null;
+                          const chgC = (v: number | null, invert = false) => v != null ? ((invert ? v <= 0 : v >= 0) ? "#22c55e" : "#ef4444") : "#555";
                           return [
-                            { label: "MORTALITY RATE", value: `${Number(latest.mortality_rate_pct) || 0}%`, color: (Number(latest.mortality_rate_pct) || 0) > 2 ? "#ef4444" : "#f59e0b" },
-                            { label: "FEED CONV. RATIO", value: latest.feed_conversion_ratio != null ? Number(latest.feed_conversion_ratio).toFixed(2) : "\u2014", color: "#8b5cf6" },
-                            { label: "MONTHLY MORTALITY", value: `${(Number(latest.total_mortality || 0) / 1000).toFixed(0)}K t`, color: "#ef4444" },
+                            { label: "MORTALITY RATE", value: `${mortRate.toFixed(2)}%`, color: mortRate > 2 ? "#ef4444" : "#f59e0b",
+                              mom: fmtPP(ppChg(mortRate, prevMortRate)), momC: chgC(ppChg(mortRate, prevMortRate), true),
+                              yoy: fmtPP(ppChg(mortRate, yoyMortRate)), yoyC: chgC(ppChg(mortRate, yoyMortRate), true) },
+                            { label: "MONTHLY MORTALITY", value: `${(mortTonnes / 1000).toFixed(0)}K t`, color: "#ef4444",
+                              mom: fmtP(pctChg(mortTonnes, prev ? Number(prev.total_mortality) : null)), momC: chgC(pctChg(mortTonnes, prev ? Number(prev.total_mortality) : null), true),
+                              yoy: fmtP(pctChg(mortTonnes, yoyPrev ? Number(yoyPrev.total_mortality) : null)), yoyC: chgC(pctChg(mortTonnes, yoyPrev ? Number(yoyPrev.total_mortality) : null), true) },
+                            { label: "FEED CONV. RATIO", value: fcr > 0 ? fcr.toFixed(2) : "\u2014", color: "#8b5cf6",
+                              mom: fmtD(ppChg(fcr, prevFcr)), momC: chgC(ppChg(fcr, prevFcr), true),
+                              yoy: fmtD(ppChg(fcr, yoyFcr)), yoyC: chgC(ppChg(fcr, yoyFcr), true) },
+                            { label: "HARVEST / BIOMASS", value: `${harvBioRatio.toFixed(1)}%`, color: "#3b82f6",
+                              mom: null, momC: "#555", yoy: null, yoyC: "#555" },
                           ].map((card, i) => (
-                            <div key={i} style={{ background: "#111", border: "1px solid #222", borderRadius: 3, padding: "6px 8px" }}>
-                              <div style={{ fontSize: 8, color: "#666", letterSpacing: "0.06em", fontWeight: 700 }}>{card.label}</div>
-                              <div style={{ fontSize: 16, fontWeight: 700, color: card.color, marginTop: 2 }}>{card.value}</div>
+                            <div key={i} style={{ background: "#111", border: "1px solid #222", borderRadius: 4, padding: "12px 16px" }}>
+                              <div style={{ fontSize: 9, color: "#666", letterSpacing: "0.06em", fontWeight: 700 }}>{card.label}</div>
+                              <div style={{ fontSize: 24, fontWeight: 700, color: card.color, marginTop: 4 }}>{card.value}</div>
+                              <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 11 }}>
+                                {card.mom && <span style={{ color: card.momC }}>{card.mom} <span style={{ color: "#555" }}>MoM</span></span>}
+                                {card.yoy && <span style={{ color: card.yoyC }}>{card.yoy} <span style={{ color: "#555" }}>YoY</span></span>}
+                              </div>
                             </div>
                           ));
                         })()}
                       </div>
-                      {/* Harvest YoY by area */}
+
+                      {/* Mortality trend chart */}
+                      <div style={{ fontSize: 10, color: "#666", fontWeight: 700, letterSpacing: "0.06em", marginBottom: 6 }}>MORTALITY TREND</div>
+                      {(() => {
+                        const pts = harvestData.national;
+                        if (pts.length < 2) return <div style={{ color: "#555", padding: 16 }}>Insufficient data</div>;
+                        const mortRates = pts.map(p => Number(p.mortality_rate_pct) || 0);
+                        const mortTonnes = pts.map(p => Number(p.total_mortality || 0));
+                        const maxRate = Math.max(...mortRates); const minRate = Math.min(...mortRates);
+                        const maxTonnes = Math.max(...mortTonnes);
+                        const hovMP = hoveredMortIdx != null ? pts[hoveredMortIdx] : null;
+                        // Date ticks
+                        const mDateTicks: { idx: number; label: string }[] = [];
+                        let lastMQ = "";
+                        pts.forEach((p, i) => {
+                          const m = p.month?.slice(0, 7) || "";
+                          const q = m.slice(0, 4) + "-Q" + Math.floor((parseInt(m.slice(5, 7) || "1") - 1) / 3);
+                          if (q !== lastMQ) { mDateTicks.push({ idx: i, label: m }); lastMQ = q; }
+                        });
+                        const yR2 = (v: number) => 48 - ((v - minRate) / (maxRate - minRate || 1)) * 44;
+                        const yT2 = (v: number) => 48 - (v / (maxTonnes || 1)) * 44;
+                        const xP2 = (i: number) => (i / (pts.length - 1)) * 100;
+                        return (
+                          <div style={{ position: "relative" }} onMouseLeave={() => setHoveredMortIdx(null)} onMouseMove={trackMouse}>
+                            {/* HTML tooltip follows mouse */}
+                            {hovMP && hoveredMortIdx != null && (
+                              <div style={{
+                                position: "absolute",
+                                left: mousePos.x > mousePos.cw * 0.6 ? mousePos.x - 16 : mousePos.x + 16,
+                                top: Math.max(4, mousePos.y - 50),
+                                transform: mousePos.x > mousePos.cw * 0.6 ? "translateX(-100%)" : "none",
+                                zIndex: 10,
+                                background: "#111e", border: "1px solid #333", borderRadius: 4, padding: "10px 14px",
+                                fontSize: 12, lineHeight: 1.7, pointerEvents: "none", whiteSpace: "nowrap"
+                              }}>
+                                <div style={{ color: "#aaa", fontWeight: 700, marginBottom: 2 }}>{hovMP.month?.slice(0, 7)}</div>
+                                <div style={{ color: "#ef4444" }}>Mort Rate: {(Number(hovMP.mortality_rate_pct) || 0).toFixed(2)}%</div>
+                                <div style={{ color: "#ef4444" }}>Mortality: {(Number(hovMP.total_mortality || 0) / 1000).toFixed(0)}K t</div>
+                                <div style={{ color: "#8b5cf6" }}>FCR: {Number(hovMP.feed_conversion_ratio || 0).toFixed(2)}</div>
+                                <div style={{ color: "#3b82f6" }}>Harvest: {(Number(hovMP.total_harvest || 0) / 1000).toFixed(0)}K t</div>
+                              </div>
+                            )}
+                            {/* Y-axis labels as HTML */}
+                            <div style={{ position: "absolute", top: 2, left: 4, fontSize: 11, color: "#ef4444", fontWeight: 700, pointerEvents: "none" }}>{maxRate.toFixed(1)}%</div>
+                            <div style={{ position: "absolute", bottom: 24, left: 4, fontSize: 11, color: "#ef4444", pointerEvents: "none" }}>{minRate.toFixed(1)}%</div>
+                            <div style={{ position: "absolute", top: 2, right: 4, fontSize: 11, color: "#666", pointerEvents: "none" }}>{(maxTonnes / 1000).toFixed(0)}K t</div>
+                            <svg viewBox="0 0 100 50" preserveAspectRatio="none" style={{ width: "100%", height: 240, display: "block" }}>
+                              <path d={`M${pts.map((_, i) => `${xP2(i).toFixed(2)},${yT2(mortTonnes[i]).toFixed(2)}`).join(" L")} L100,${yT2(0).toFixed(2)} L0,${yT2(0).toFixed(2)} Z`} fill="#ef4444" opacity={0.1} />
+                              <path d={pts.map((_, i) => `${i === 0 ? "M" : "L"}${xP2(i).toFixed(2)},${yR2(mortRates[i]).toFixed(2)}`).join(" ")} fill="none" stroke="#ef4444" strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
+                              {hoveredMortIdx != null && (
+                                <line x1={xP2(hoveredMortIdx)} y1={0} x2={xP2(hoveredMortIdx)} y2={50} stroke="#555" strokeWidth={0.15} strokeDasharray="0.5,0.5" vectorEffect="non-scaling-stroke" />
+                              )}
+                              {pts.map((_, i) => (
+                                <rect key={`mh${i}`} x={xP2(i) - 50 / pts.length} y={0} width={100 / pts.length} height={50} fill="transparent" onMouseEnter={() => setHoveredMortIdx(i)} style={{ cursor: "crosshair" }} />
+                              ))}
+                            </svg>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#555", marginTop: 4 }}>
+                              {mDateTicks.map((t, i) => <span key={i}>{t.label}</span>)}
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "center", gap: 18, fontSize: 10, color: "#555", marginTop: 4, paddingBottom: 6 }}>
+                              <span><span style={{ display: "inline-block", width: 14, height: 2, background: "#ef4444", marginRight: 5, verticalAlign: "middle" }} />MORTALITY RATE</span>
+                              <span><span style={{ display: "inline-block", width: 10, height: 10, background: "rgba(239,68,68,0.12)", marginRight: 5, verticalAlign: "middle" }} />MORTALITY TONNES</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Area-by-area harvest comparison table */}
                       {harvestData.yoyComparison.length > 0 && (
                         <>
-                          <div style={{ fontSize: 9, color: "#666", fontWeight: 700, letterSpacing: "0.06em", marginTop: 12, marginBottom: 4 }}>HARVEST YoY BY AREA (12M)</div>
-                          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                            {harvestData.yoyComparison.map(y => (
-                              <div key={y.area_number} style={{ background: "#111", border: "1px solid #222", borderRadius: 3, padding: "3px 6px", fontSize: 9, minWidth: 55, textAlign: "center" }}>
-                                <div style={{ color: "#888" }}>Area {y.area_number}</div>
-                                <div style={{ fontWeight: 700, color: y.yoy_change_pct != null ? (y.yoy_change_pct >= 0 ? "#22c55e" : "#ef4444") : "#888" }}>
-                                  {y.yoy_change_pct != null ? `${y.yoy_change_pct >= 0 ? "+" : ""}${y.yoy_change_pct}%` : "\u2014"}
-                                </div>
-                              </div>
-                            ))}
+                          <div style={{ fontSize: 10, color: "#666", fontWeight: 700, letterSpacing: "0.06em", marginTop: 20, marginBottom: 6 }}>HARVEST COMPARISON BY AREA (12-MONTH ROLLING)</div>
+                          <div style={{ display: "grid", gridTemplateColumns: "4px 40px 1fr 84px 84px 68px 74px", padding: "6px 10px", fontSize: 10, fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.06em", background: "#111", borderBottom: "1px solid #222" }}>
+                            <div />
+                            <div>AREA</div>
+                            <div>NAME</div>
+                            <div style={{ textAlign: "right" }}>12M HARVEST</div>
+                            <div style={{ textAlign: "right" }}>12M PRIOR</div>
+                            <div style={{ textAlign: "right" }}>YoY</div>
+                            <div style={{ textAlign: "right" }}>MORT RATE</div>
                           </div>
+                          {harvestData.yoyComparison
+                            .sort((a, b) => a.area_number - b.area_number)
+                            .map(y => {
+                              const areaInfo = areas.find(a => a.areaNumber === y.area_number);
+                              // Compute area mortality rate from latest month of byArea
+                              const areaRows = harvestData.byArea?.filter(r => r.area_number === y.area_number) || [];
+                              const latestRow = areaRows.sort((a, b) => b.month.localeCompare(a.month))[0];
+                              const mortRate = latestRow && Number(latestRow.biomass_tonnes) > 0
+                                ? (Number(latestRow.mortality_tonnes) / Number(latestRow.biomass_tonnes) * 100) : null;
+                              return (
+                                <div key={y.area_number} className="sf-row" style={{ display: "grid", gridTemplateColumns: "4px 40px 1fr 84px 84px 68px 74px", padding: "7px 10px", borderBottom: "1px solid #1a1a1a", alignItems: "center", transition: "background 0.08s", fontSize: 11 }}>
+                                  <div style={{ width: 4, minHeight: 18, background: TL_C[areaInfo?.trafficLight || ""] || "#555", borderRadius: 1 }} />
+                                  <div style={{ fontWeight: 600, fontSize: 12 }}>{y.area_number}</div>
+                                  <div style={{ color: "#aaa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{areaInfo?.name ?? "\u2014"}</div>
+                                  <div style={{ textAlign: "right", fontWeight: 600 }}>{(Number(y.recent_harvest) / 1000).toFixed(1)}K</div>
+                                  <div style={{ textAlign: "right", color: "#888" }}>{(Number(y.prior_harvest) / 1000).toFixed(1)}K</div>
+                                  <div style={{ textAlign: "right", color: y.yoy_change_pct != null ? (y.yoy_change_pct >= 0 ? "#22c55e" : "#ef4444") : "#888", fontWeight: 600 }}>
+                                    {y.yoy_change_pct != null ? `${y.yoy_change_pct >= 0 ? "+" : ""}${Number(y.yoy_change_pct).toFixed(1)}%` : "\u2014"}
+                                  </div>
+                                  <div style={{ textAlign: "right", color: mortRate != null ? (mortRate > 2 ? "#ef4444" : mortRate > 1.5 ? "#f59e0b" : "#22c55e") : "#555", fontWeight: 600 }}>
+                                    {mortRate != null ? `${mortRate.toFixed(2)}%` : "\u2014"}
+                                  </div>
+                                </div>
+                              );
+                            })}
                         </>
                       )}
                     </div>
