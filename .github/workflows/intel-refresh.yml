@@ -4,15 +4,15 @@ on:
   schedule:
     # All times UTC — Oslo is CET (UTC+1 winter) / CEST (UTC+2 summer)
     #
-    # 1) 07:30 UTC = 08:30 CET — before OSE open: overnight filings + FX rates
+    # 1) 07:30 UTC = 08:30 CET — before OSE open: overnight filings + FX + commodities (US close data)
     - cron: '30 7 * * 1-5'
-    # 2) 08:15 UTC = 09:15 CET — right after OSE open: opening announcements
+    # 2) 08:15 UTC = 09:15 CET — right after OSE open: opening announcements + fresh prices
     - cron: '15 8 * * 1-5'
-    # 3) 10:30 UTC = 11:30 CET — midday catch-up
+    # 3) 10:30 UTC = 11:30 CET — midday: filings + prices update
     - cron: '30 10 * * 1-5'
-    # 4) 15:00 UTC = 16:00 CET — just before close: late-day filings
+    # 4) 15:00 UTC = 16:00 CET — just before close: late-day filings + prices
     - cron: '0 15 * * 1-5'
-    # 5) 15:45 UTC = 16:45 CET — after OSE close: shorts + final filings + FX
+    # 5) 15:45 UTC = 16:45 CET — after OSE close: full refresh (all sources)
     - cron: '45 15 * * 1-5'
   workflow_dispatch:
     inputs:
@@ -23,9 +23,9 @@ on:
 
 jobs:
   intel-refresh:
-    name: NewsWeb + Shorts + FX
+    name: Intelligence Refresh
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout code
@@ -48,7 +48,24 @@ jobs:
         run: |
           echo 'DATABASE_URL="${{ secrets.DATABASE_URL }}"' > .env.local
 
-      # ─── NewsWeb regulatory filings ─────────────────────────────────
+      # ─── Yahoo Prices (midday, before close, after close, after open) ──
+      # Not before open (market hasn't moved yet)
+      - name: Yahoo price backfill
+        if: >-
+          ${{
+            github.event.schedule == '15 8 * * 1-5' ||
+            github.event.schedule == '30 10 * * 1-5' ||
+            github.event.schedule == '0 15 * * 1-5' ||
+            github.event.schedule == '45 15 * * 1-5' ||
+            github.event_name == 'workflow_dispatch'
+          }}
+        working-directory: apps/web
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: node scripts/backfill-yahoo.mjs
+
+      # ─── NewsWeb regulatory filings (every run) ────────────────────────
       - name: Fetch NewsWeb filings
         working-directory: apps/web
         env:
@@ -58,29 +75,60 @@ jobs:
           DAYS="${{ github.event.inputs.days || '2' }}"
           npx tsx scripts/fetch-newsweb-filings.ts --days=$DAYS
 
-      # ─── SSR Short Positions (only after 15:00 UTC / 16:00 CET) ────
+      # ─── SSR Short Positions (after close only — SSR publishes ~15:30 CET)
       - name: Fetch short positions
-        if: ${{ github.event.schedule == '45 15 * * 1-5' || github.event_name == 'workflow_dispatch' }}
+        if: >-
+          ${{
+            github.event.schedule == '45 15 * * 1-5' ||
+            github.event_name == 'workflow_dispatch'
+          }}
         working-directory: apps/web
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NODE_TLS_REJECT_UNAUTHORIZED: '0'
         run: npx tsx scripts/fetch-ssr-shorts.ts
 
-      # ─── Norges Bank FX rates (morning + after close) ──────────────
+      # ─── Norges Bank FX rates (morning + after close) ──────────────────
       - name: Fetch FX rates
-        if: ${{ github.event.schedule == '30 7 * * 1-5' || github.event.schedule == '45 15 * * 1-5' || github.event_name == 'workflow_dispatch' }}
+        if: >-
+          ${{
+            github.event.schedule == '30 7 * * 1-5' ||
+            github.event.schedule == '45 15 * * 1-5' ||
+            github.event_name == 'workflow_dispatch'
+          }}
         working-directory: apps/web
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NODE_TLS_REJECT_UNAUTHORIZED: '0'
         run: npx tsx scripts/fetch-fx-norgesbank.ts --days=7
 
-      # ─── Summary ───────────────────────────────────────────────────
+      # ─── Commodities (morning for US close data + after OSE close) ─────
+      - name: Fetch commodity prices
+        if: >-
+          ${{
+            github.event.schedule == '30 7 * * 1-5' ||
+            github.event.schedule == '45 15 * * 1-5' ||
+            github.event_name == 'workflow_dispatch'
+          }}
+        working-directory: apps/web
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: npx tsx scripts/fetch-commodities.ts --days=7
+
+      # ─── Summary ───────────────────────────────────────────────────────
       - name: Summary
         if: always()
         run: |
           echo "## Intelligence Refresh" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Source | When |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Prices (Yahoo) | 09:15, 11:30, 16:00, 16:45 CET |" >> $GITHUB_STEP_SUMMARY
+          echo "| NewsWeb | Every run (5x/day) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Shorts (SSR) | 16:45 CET (after close) |" >> $GITHUB_STEP_SUMMARY
+          echo "| FX (Norges Bank) | 08:30, 16:45 CET |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commodities | 08:30, 16:45 CET |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Schedule**: ${{ github.event.schedule || 'manual' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Time**: $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
