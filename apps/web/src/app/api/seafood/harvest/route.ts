@@ -39,10 +39,10 @@ export async function GET(req: NextRequest) {
              SUM(biomass_tonnes)::float AS total_biomass,
              SUM(feed_tonnes)::float AS total_feed,
              CASE WHEN SUM(biomass_tonnes) > 0
-               THEN ROUND((SUM(mortality_tonnes) / SUM(biomass_tonnes) * 100)::numeric, 2)
+               THEN ROUND((SUM(mortality_tonnes) / SUM(biomass_tonnes) * 100)::numeric, 2)::float
                ELSE 0 END AS mortality_rate_pct,
              CASE WHEN SUM(harvest_tonnes) > 0
-               THEN ROUND((SUM(feed_tonnes) / SUM(harvest_tonnes))::numeric, 2)
+               THEN ROUND((SUM(feed_tonnes) / SUM(harvest_tonnes))::numeric, 2)::float
                ELSE NULL END AS feed_conversion_ratio
       FROM seafood_biomass_monthly
       WHERE species = $1
@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
              r.harvest AS recent_harvest,
              p.harvest AS prior_harvest,
              CASE WHEN p.harvest > 0
-               THEN ROUND(((r.harvest - p.harvest) / p.harvest * 100)::numeric, 1)
+               THEN ROUND(((r.harvest - p.harvest) / p.harvest * 100)::numeric, 1)::float
                ELSE NULL END AS yoy_change_pct
       FROM recent r
       LEFT JOIN prior p ON r.area_number = p.area_number

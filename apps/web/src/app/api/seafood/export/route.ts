@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
         (SELECT week_start FROM recent LIMIT 1) AS latest_week,
         MAX(price) AS high_52w,
         MIN(price) AS low_52w,
-        ROUND(AVG(price)::numeric, 2) AS avg_52w
+        ROUND(AVG(price)::numeric, 2)::float AS avg_52w
       FROM recent
     `, [category]);
 

@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
              SUM(biomass_tonnes)::float AS total_biomass,
              SUM(harvest_tonnes)::float AS total_harvest,
              SUM(feed_tonnes)::float AS total_feed,
-             SUM(stock_count)::bigint AS total_stock
+             SUM(stock_count)::float AS total_stock
       FROM seafood_biomass_monthly
       WHERE species = $1
         AND month >= (CURRENT_DATE - INTERVAL '1 month' * $2)::date
@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
              c.biomass AS current_biomass,
              p.biomass AS prev_biomass,
              CASE WHEN p.biomass > 0
-               THEN ROUND(((c.biomass - p.biomass) / p.biomass * 100)::numeric, 1)
+               THEN ROUND(((c.biomass - p.biomass) / p.biomass * 100)::numeric, 1)::float
                ELSE NULL END AS yoy_change_pct
       FROM current_data c
       LEFT JOIN prev_year p ON c.area_number = p.area_number
