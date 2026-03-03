@@ -486,15 +486,16 @@ export default function SeafoodPage() {
                         All values converted to NOK/kg. Source: company quarterly reports.
                       </div>
 
-                      {/* Scrollable table — all quarters, auto-scroll to latest 5 */}
+                      {/* Scrollable table — latest 5 visible, scroll left for older */}
                       {(() => {
-                        const qW = 120; // px per quarter column
+                        const visibleQs = 5;
+                        const qW = Math.floor((typeof window !== "undefined" ? Math.min(window.innerWidth * 0.42, 600) : 500) / visibleQs);
                         const stickyW = 60;
                         const cols = `${stickyW}px repeat(${nQ}, ${qW}px)`;
                         return (
                         <div
                           ref={el => { if (el && !el.dataset.scrolled) { el.scrollLeft = el.scrollWidth; el.dataset.scrolled = "1"; } }}
-                          style={{ padding: "0 0 2px", fontSize: 10, overflowX: "auto" }}
+                          style={{ padding: "0 0 2px", fontSize: 10, overflowX: "auto", maxWidth: "100%" }}
                         >
                           <div style={{ minWidth: stickyW + nQ * qW }}>
                             {/* Header */}
@@ -647,11 +648,19 @@ export default function SeafoodPage() {
                                     </div>
                                   )}
                                 </div>
-                                {/* X-axis labels */}
+                                {/* X-axis labels — show full label on first and year transitions */}
                                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#333", marginTop: 3 }}>
-                                  {pts.map((p, i) => (
-                                    <span key={i} style={{ color: hIdx === i ? "#888" : "#333", fontWeight: hIdx === i ? 600 : 400, transition: "color 0.15s" }}>{p.q.replace("Q", "Q").substring(0, 2)}</span>
-                                  ))}
+                                  {pts.map((p, i) => {
+                                    const qNum = p.q.substring(0, 2); // "Q1"
+                                    const yr = p.q.split(" ")[1]?.slice(-2); // "24"
+                                    const prevYr = i > 0 ? pts[i - 1].q.split(" ")[1]?.slice(-2) : "";
+                                    const showYr = i === 0 || yr !== prevYr;
+                                    return (
+                                      <span key={i} style={{ color: hIdx === i ? "#999" : "#444", fontWeight: hIdx === i ? 600 : 400, transition: "color 0.15s" }}>
+                                        {showYr ? `${qNum}\u2019${yr}` : qNum}
+                                      </span>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             );
