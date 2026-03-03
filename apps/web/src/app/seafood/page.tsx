@@ -486,87 +486,113 @@ export default function SeafoodPage() {
                         All values converted to NOK/kg. Source: company quarterly reports.
                       </div>
 
-                      {/* Clean table — latest 5 quarters */}
-                      <div style={{ padding: "0 8px 2px", fontSize: 10 }}>
-                        {/* Header row */}
-                        <div style={{ display: "grid", gridTemplateColumns: "60px repeat(5, 1fr)", borderBottom: "1px solid #333", paddingBottom: 2 }}>
-                          <div />
-                          {latest5.map(q => (
-                            <div key={q} style={{ textAlign: "center", fontSize: 9, fontWeight: 700, color: "#888", letterSpacing: "0.05em", padding: "4px 0" }}>{q}</div>
-                          ))}
-                        </div>
-                        {/* Company rows — each shows cost/price bar + margin */}
-                        {sortedTickers.map(tk => {
-                          return (
-                          <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: "60px repeat(5, 1fr)", borderBottom: "1px solid #1a1a1a", padding: "6px 0", alignItems: "center", transition: "background 0.08s" }}>
-                            <div style={{ padding: "0 4px" }}>
-                              <Link href={`/stocks/${tk}`} style={{ color: TK_COLORS[tk] || "#58a6ff", textDecoration: "none", fontWeight: 700, fontSize: 10 }}>{tk}</Link>
+                      {/* Scrollable table — all quarters, auto-scroll to latest 5 */}
+                      {(() => {
+                        const qW = 120; // px per quarter column
+                        const stickyW = 60;
+                        const cols = `${stickyW}px repeat(${nQ}, ${qW}px)`;
+                        return (
+                        <div
+                          ref={el => { if (el && !el.dataset.scrolled) { el.scrollLeft = el.scrollWidth; el.dataset.scrolled = "1"; } }}
+                          style={{ padding: "0 0 2px", fontSize: 10, overflowX: "auto" }}
+                        >
+                          <div style={{ minWidth: stickyW + nQ * qW }}>
+                            {/* Header */}
+                            <div style={{ display: "grid", gridTemplateColumns: cols, borderBottom: "1px solid #333", paddingBottom: 2 }}>
+                              <div style={{ position: "sticky", left: 0, background: "#0a0a0a", zIndex: 2, padding: "4px 4px" }} />
+                              {displayQs.map(q => (
+                                <div key={q} style={{ textAlign: "center", fontSize: 9, fontWeight: 700, color: "#888", letterSpacing: "0.05em", padding: "4px 0" }}>{q}</div>
+                              ))}
                             </div>
-                            {latest5.map(q => {
-                              const v = allData[tk][q];
-                              const mCol = v.margin == null ? "#333" : v.margin >= 25 ? "#22c55e" : v.margin >= 15 ? "#4ade80" : v.margin > 0 ? "#a3a3a3" : "#ef4444";
-                              return (
-                                <div key={q} style={{ textAlign: "center", padding: "0 2px" }}>
-                                  {v.cost != null && v.price != null ? (
-                                    <>
-                                      <div style={{ display: "flex", justifyContent: "center", gap: 4, fontSize: 10 }}>
-                                        <span style={{ color: "#f59e0b" }}>{v.cost.toFixed(1)}</span>
-                                        <span style={{ color: "#333" }}>/</span>
-                                        <span style={{ color: "#3b82f6", fontWeight: 600 }}>{v.price.toFixed(1)}</span>
-                                      </div>
-                                      <div style={{ fontSize: 10, fontWeight: 700, color: mCol, marginTop: 1 }}>{v.margin != null ? `${v.margin.toFixed(0)}%` : ""}</div>
-                                    </>
-                                  ) : (
-                                    <span style={{ color: "#333" }}>{"\u2014"}</span>
-                                  )}
+                            {/* Rows */}
+                            {sortedTickers.map(tk => (
+                              <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: cols, borderBottom: "1px solid #1a1a1a", padding: "6px 0", alignItems: "center", transition: "background 0.08s" }}>
+                                <div style={{ padding: "0 4px", position: "sticky", left: 0, background: "#0a0a0a", zIndex: 1 }}>
+                                  <Link href={`/stocks/${tk}`} style={{ color: TK_COLORS[tk] || "#58a6ff", textDecoration: "none", fontWeight: 700, fontSize: 10 }}>{tk}</Link>
                                 </div>
-                              );
-                            })}
+                                {displayQs.map(q => {
+                                  const v = allData[tk][q];
+                                  const mCol = v.margin == null ? "#333" : v.margin >= 25 ? "#22c55e" : v.margin >= 15 ? "#4ade80" : v.margin > 0 ? "#a3a3a3" : "#ef4444";
+                                  return (
+                                    <div key={q} style={{ textAlign: "center", padding: "0 2px" }}>
+                                      {v.cost != null && v.price != null ? (
+                                        <>
+                                          <div style={{ display: "flex", justifyContent: "center", gap: 4, fontSize: 10 }}>
+                                            <span style={{ color: "#f59e0b" }}>{v.cost.toFixed(1)}</span>
+                                            <span style={{ color: "#333" }}>/</span>
+                                            <span style={{ color: "#3b82f6", fontWeight: 600 }}>{v.price.toFixed(1)}</span>
+                                          </div>
+                                          <div style={{ fontSize: 10, fontWeight: 700, color: mCol, marginTop: 1 }}>{v.margin != null ? `${v.margin.toFixed(0)}%` : ""}</div>
+                                        </>
+                                      ) : (
+                                        <span style={{ color: "#333" }}>{"\u2014"}</span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ))}
                           </div>
-                          );
-                        })}
-                        {/* Legend */}
-                        <div style={{ display: "flex", gap: 12, justifyContent: "center", padding: "6px 0 2px", fontSize: 9, color: "#555" }}>
-                          <span><span style={{ color: "#f59e0b" }}>Cost</span> / <span style={{ color: "#3b82f6" }}>Price</span> NOK/kg</span>
-                          <span style={{ color: "#22c55e" }}>Margin %</span>
                         </div>
+                        );
+                      })()}
+                      {/* Legend */}
+                      <div style={{ display: "flex", gap: 12, justifyContent: "center", padding: "4px 0 2px", fontSize: 9, color: "#555" }}>
+                        <span><span style={{ color: "#f59e0b" }}>Cost</span> / <span style={{ color: "#3b82f6" }}>Price</span> NOK/kg</span>
+                        <span style={{ color: "#22c55e" }}>Margin %</span>
                       </div>
 
                       {/* Margin trend sparklines per company */}
                       <div style={{ borderTop: "1px solid #222", padding: "8px 8px 4px" }}>
                         <div style={{ fontSize: 9, fontWeight: 700, color: "#555", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>MARGIN TREND</div>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
                           {displayTickers.map(tk => {
                             const pts = allQs.map(q => ({ q, ...allData[tk][q] })).filter(p => p.margin != null);
                             if (pts.length < 2) return null;
+                            const pad = 4; // padding inside chart
                             const maxP = Math.max(...pts.map(p => Math.max(p.cost ?? 0, p.price ?? 0)));
-                            const minP = Math.min(...pts.filter(p => p.cost != null).map(p => p.cost!));
+                            const minP = Math.min(...pts.filter(p => p.cost != null).map(p => p.cost!)) - 2;
                             const range = maxP - minP || 1;
-                            const chartW = 140;
-                            const chartH = 36;
-                            const xStep = chartW / (pts.length - 1);
-                            // Build SVG paths for cost and price lines
-                            const costPath = pts.map((p, i) => `${i === 0 ? "M" : "L"}${(i * xStep).toFixed(1)},${(chartH - ((p.cost! - minP) / range) * chartH).toFixed(1)}`).join(" ");
-                            const pricePath = pts.map((p, i) => `${i === 0 ? "M" : "L"}${(i * xStep).toFixed(1)},${(chartH - ((p.price! - minP) / range) * chartH).toFixed(1)}`).join(" ");
-                            // Margin area (between price and cost)
-                            const marginFill = pts.map((p, i) => `${(i * xStep).toFixed(1)},${(chartH - ((p.price! - minP) / range) * chartH).toFixed(1)}`).join(" ")
-                              + " " + [...pts].reverse().map((p, i) => `${((pts.length - 1 - i) * xStep).toFixed(1)},${(chartH - ((p.cost! - minP) / range) * chartH).toFixed(1)}`).join(" ");
+                            const chartW = 200;
+                            const chartH = 56;
+                            const xStep = (chartW - pad * 2) / (pts.length - 1);
+                            const yOf = (v: number) => pad + (chartH - pad * 2) - ((v - minP) / range) * (chartH - pad * 2);
+                            const xOf = (i: number) => pad + i * xStep;
+                            // Smooth cubic bezier helper
+                            const smooth = (points: { x: number; y: number }[]) => {
+                              if (points.length < 2) return "";
+                              let d = `M${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
+                              for (let i = 1; i < points.length; i++) {
+                                const prev = points[i - 1];
+                                const curr = points[i];
+                                const cpx = (prev.x + curr.x) / 2;
+                                d += ` C${cpx.toFixed(1)},${prev.y.toFixed(1)} ${cpx.toFixed(1)},${curr.y.toFixed(1)} ${curr.x.toFixed(1)},${curr.y.toFixed(1)}`;
+                              }
+                              return d;
+                            };
+                            const costPts = pts.map((p, i) => ({ x: xOf(i), y: yOf(p.cost!) }));
+                            const pricePts = pts.map((p, i) => ({ x: xOf(i), y: yOf(p.price!) }));
+                            const costPath = smooth(costPts);
+                            const pricePath = smooth(pricePts);
+                            // Area fill between price (top) and cost (bottom)
+                            const marginFill = pricePts.map((p, i) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ")
+                              + " " + [...costPts].reverse().map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
                             const latestMargin = pts[pts.length - 1].margin!;
                             const prevMargin = pts.length >= 2 ? pts[pts.length - 2].margin! : latestMargin;
                             const mDelta = latestMargin - prevMargin;
                             const hIdx = marginHover?.tk === tk ? marginHover.idx : -1;
                             const hPt = hIdx >= 0 ? pts[hIdx] : null;
                             return (
-                              <div key={tk} style={{ background: "#111", borderRadius: 6, padding: "6px 8px", border: "1px solid #1a1a1a", position: "relative" }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                                  <span style={{ fontSize: 10, fontWeight: 700, color: TK_COLORS[tk] || "#888" }}>{tk}</span>
+                              <div key={tk} style={{ background: "#0e0e0e", borderRadius: 8, padding: "8px 10px", border: "1px solid #1c1c1c" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: TK_COLORS[tk] || "#888" }}>{tk}</span>
                                   <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                                    <span style={{ fontSize: 12, fontWeight: 700, color: latestMargin >= 20 ? "#22c55e" : latestMargin > 0 ? "#4ade80" : "#ef4444" }}>{latestMargin.toFixed(0)}%</span>
+                                    <span style={{ fontSize: 13, fontWeight: 700, color: latestMargin >= 20 ? "#22c55e" : latestMargin > 0 ? "#4ade80" : "#ef4444" }}>{latestMargin.toFixed(0)}%</span>
                                     <span style={{ fontSize: 9, color: mDelta >= 0 ? "#22c55e" : "#ef4444" }}>{mDelta >= 0 ? "\u25B2" : "\u25BC"}{Math.abs(mDelta).toFixed(0)}pp</span>
                                   </div>
                                 </div>
                                 <div
-                                  style={{ position: "relative" }}
+                                  style={{ position: "relative", cursor: "crosshair" }}
                                   onMouseMove={e => {
                                     const rect = e.currentTarget.getBoundingClientRect();
                                     const xRel = (e.clientX - rect.left) / rect.width;
@@ -577,43 +603,55 @@ export default function SeafoodPage() {
                                   onMouseLeave={() => setMarginHover(null)}
                                 >
                                   <svg width="100%" viewBox={`0 0 ${chartW} ${chartH}`} preserveAspectRatio="none" style={{ display: "block" }}>
-                                    <polygon points={marginFill} fill="#22c55e" opacity="0.08" />
-                                    <path d={costPath} fill="none" stroke="#f59e0b" strokeWidth="1.5" opacity="0.7" />
-                                    <path d={pricePath} fill="none" stroke="#3b82f6" strokeWidth="1.5" />
-                                    {/* Hover indicator line + dots */}
-                                    {hIdx >= 0 && (() => {
-                                      const hx = hIdx * xStep;
-                                      const cy = chartH - ((pts[hIdx].cost! - minP) / range) * chartH;
-                                      const py = chartH - ((pts[hIdx].price! - minP) / range) * chartH;
-                                      return (
-                                        <>
-                                          <line x1={hx} y1={0} x2={hx} y2={chartH} stroke="#555" strokeWidth="0.5" strokeDasharray="2,2" />
-                                          <circle cx={hx} cy={cy} r="2.5" fill="#f59e0b" />
-                                          <circle cx={hx} cy={py} r="2.5" fill="#3b82f6" />
-                                        </>
-                                      );
-                                    })()}
+                                    {/* Grid lines */}
+                                    {[0.25, 0.5, 0.75].map(f => (
+                                      <line key={f} x1={pad} y1={pad + (chartH - pad * 2) * f} x2={chartW - pad} y2={pad + (chartH - pad * 2) * f} stroke="#1a1a1a" strokeWidth="0.5" />
+                                    ))}
+                                    {/* Margin fill */}
+                                    <polygon points={marginFill} fill="#22c55e" opacity="0.06" />
+                                    {/* Lines — smooth curves */}
+                                    <path d={costPath} fill="none" stroke="#f59e0b" strokeWidth="1.8" strokeLinecap="round" opacity="0.8" />
+                                    <path d={pricePath} fill="none" stroke="#3b82f6" strokeWidth="1.8" strokeLinecap="round" />
+                                    {/* Data point dots */}
+                                    {pts.map((_, i) => (
+                                      <React.Fragment key={i}>
+                                        <circle cx={xOf(i)} cy={costPts[i].y} r="1.5" fill="#f59e0b" opacity={hIdx === i ? 1 : 0.3} />
+                                        <circle cx={xOf(i)} cy={pricePts[i].y} r="1.5" fill="#3b82f6" opacity={hIdx === i ? 1 : 0.3} />
+                                      </React.Fragment>
+                                    ))}
+                                    {/* Hover crosshair */}
+                                    {hIdx >= 0 && (
+                                      <>
+                                        <line x1={xOf(hIdx)} y1={pad} x2={xOf(hIdx)} y2={chartH - pad} stroke="#444" strokeWidth="0.5" />
+                                        <circle cx={xOf(hIdx)} cy={costPts[hIdx].y} r="3" fill="#f59e0b" stroke="#0e0e0e" strokeWidth="1" />
+                                        <circle cx={xOf(hIdx)} cy={pricePts[hIdx].y} r="3" fill="#3b82f6" stroke="#0e0e0e" strokeWidth="1" />
+                                      </>
+                                    )}
                                   </svg>
-                                  {/* Floating tooltip */}
+                                  {/* Tooltip */}
                                   {hPt && (
                                     <div style={{
-                                      position: "absolute", top: -52, left: Math.min(Math.max(marginHover!.x - 45, 0), 80),
-                                      background: "#1a1a1a", border: "1px solid #333", borderRadius: 5, padding: "4px 8px",
+                                      position: "absolute", bottom: "calc(100% + 6px)",
+                                      left: `${Math.min(Math.max((hIdx / (pts.length - 1)) * 100, 10), 70)}%`,
+                                      transform: "translateX(-50%)",
+                                      background: "#161616", border: "1px solid #2a2a2a", borderRadius: 6, padding: "5px 10px",
                                       fontSize: 9, color: "#ccc", pointerEvents: "none", zIndex: 10, whiteSpace: "nowrap",
-                                      boxShadow: "0 4px 12px rgba(0,0,0,0.5)"
+                                      boxShadow: "0 2px 8px rgba(0,0,0,0.4)"
                                     }}>
-                                      <div style={{ fontWeight: 700, color: "#888", marginBottom: 2 }}>{hPt.q}</div>
-                                      <div style={{ display: "flex", gap: 8 }}>
-                                        <span>Cost <span style={{ color: "#f59e0b", fontWeight: 700 }}>{hPt.cost!.toFixed(1)}</span></span>
-                                        <span>Price <span style={{ color: "#3b82f6", fontWeight: 700 }}>{hPt.price!.toFixed(1)}</span></span>
-                                        <span>Mrg <span style={{ color: hPt.margin! >= 20 ? "#22c55e" : hPt.margin! > 0 ? "#4ade80" : "#ef4444", fontWeight: 700 }}>{hPt.margin!.toFixed(0)}%</span></span>
+                                      <div style={{ fontWeight: 700, color: "#999", marginBottom: 3, fontSize: 8, letterSpacing: "0.04em" }}>{hPt.q}</div>
+                                      <div style={{ display: "flex", gap: 10 }}>
+                                        <span style={{ color: "#f59e0b" }}><span style={{ color: "#666" }}>C</span> {hPt.cost!.toFixed(1)}</span>
+                                        <span style={{ color: "#3b82f6" }}><span style={{ color: "#666" }}>P</span> {hPt.price!.toFixed(1)}</span>
+                                        <span style={{ color: hPt.margin! >= 20 ? "#22c55e" : hPt.margin! > 0 ? "#4ade80" : "#ef4444", fontWeight: 700 }}>{hPt.margin!.toFixed(0)}%</span>
                                       </div>
                                     </div>
                                   )}
                                 </div>
-                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#444", marginTop: 2 }}>
-                                  <span>{pts[0].q}</span>
-                                  <span>{pts[pts.length - 1].q}</span>
+                                {/* X-axis labels */}
+                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#333", marginTop: 3 }}>
+                                  {pts.map((p, i) => (
+                                    <span key={i} style={{ color: hIdx === i ? "#888" : "#333", fontWeight: hIdx === i ? 600 : 400, transition: "color 0.15s" }}>{p.q.replace("Q", "Q").substring(0, 2)}</span>
+                                  ))}
                                 </div>
                               </div>
                             );
@@ -635,45 +673,58 @@ export default function SeafoodPage() {
                           <span style={{ fontSize: 8, transition: "transform 0.2s", transform: qopsDetailOpen ? "rotate(90deg)" : "rotate(0deg)" }}>{"\u25B6"}</span>
                           EBIT/KG &amp; HARVEST VOLUME
                         </div>
-                        {qopsDetailOpen && (
-                          <div style={{ padding: "0 8px" }}>
-                            {/* EBIT/kg row */}
-                            <div style={{ fontSize: 9, fontWeight: 700, color: "#555", letterSpacing: "0.06em", textTransform: "uppercase", padding: "6px 0 4px" }}>EBIT PER KG</div>
-                            <div style={{ display: "grid", gridTemplateColumns: "60px repeat(5, 1fr)", borderBottom: "1px solid #222", paddingBottom: 2 }}>
-                              <div />
-                              {latest5.map(q => <div key={q} style={{ textAlign: "center", fontSize: 8, color: "#555", fontWeight: 600 }}>{q}</div>)}
-                            </div>
-                            {sortedTickers.map(tk => (
-                              <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: "60px repeat(5, 1fr)", borderBottom: "1px solid #1a1a1a", padding: "4px 0", alignItems: "center", transition: "background 0.08s" }}>
-                                <div style={{ padding: "0 4px" }}>
-                                  <Link href={`/stocks/${tk}`} style={{ color: TK_COLORS[tk] || "#58a6ff", textDecoration: "none", fontWeight: 700, fontSize: 10 }}>{tk}</Link>
+                        {qopsDetailOpen && (() => {
+                          const detQW = 90;
+                          const detSticky = 60;
+                          const detCols = `${detSticky}px repeat(${nQ}, ${detQW}px)`;
+                          return (
+                          <div>
+                            {/* EBIT/kg */}
+                            <div style={{ fontSize: 9, fontWeight: 700, color: "#555", letterSpacing: "0.06em", textTransform: "uppercase", padding: "6px 8px 4px" }}>EBIT PER KG</div>
+                            <div ref={el => { if (el && !el.dataset.scrolled) { el.scrollLeft = el.scrollWidth; el.dataset.scrolled = "1"; } }} style={{ overflowX: "auto" }}>
+                              <div style={{ minWidth: detSticky + nQ * detQW }}>
+                                <div style={{ display: "grid", gridTemplateColumns: detCols, borderBottom: "1px solid #222", paddingBottom: 2, padding: "0 8px" }}>
+                                  <div style={{ position: "sticky", left: 0, background: "#0a0a0a", zIndex: 2 }} />
+                                  {displayQs.map(q => <div key={q} style={{ textAlign: "center", fontSize: 8, color: "#555", fontWeight: 600 }}>{q}</div>)}
                                 </div>
-                                {latest5.map(q => {
-                                  const v = allData[tk][q].ebit;
-                                  const col = v == null ? "#333" : v > 20 ? "#22c55e" : v > 10 ? "#4ade80" : v > 0 ? "#a3a3a3" : "#ef4444";
-                                  return <div key={q} style={{ textAlign: "center", color: col, fontWeight: 600, fontSize: 10 }}>{v != null ? v.toFixed(1) : "\u2014"}</div>;
-                                })}
+                                {sortedTickers.map(tk => (
+                                  <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: detCols, borderBottom: "1px solid #1a1a1a", padding: "4px 8px", alignItems: "center", transition: "background 0.08s" }}>
+                                    <div style={{ padding: "0 4px", position: "sticky", left: 0, background: "#0a0a0a", zIndex: 1 }}>
+                                      <Link href={`/stocks/${tk}`} style={{ color: TK_COLORS[tk] || "#58a6ff", textDecoration: "none", fontWeight: 700, fontSize: 10 }}>{tk}</Link>
+                                    </div>
+                                    {displayQs.map(q => {
+                                      const v = allData[tk][q].ebit;
+                                      const col = v == null ? "#333" : v > 20 ? "#22c55e" : v > 10 ? "#4ade80" : v > 0 ? "#a3a3a3" : "#ef4444";
+                                      return <div key={q} style={{ textAlign: "center", color: col, fontWeight: 600, fontSize: 10 }}>{v != null ? v.toFixed(1) : "\u2014"}</div>;
+                                    })}
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                            {/* Harvest GWT row */}
-                            <div style={{ fontSize: 9, fontWeight: 700, color: "#555", letterSpacing: "0.06em", textTransform: "uppercase", padding: "10px 0 4px" }}>HARVEST VOLUME (GWT)</div>
-                            <div style={{ display: "grid", gridTemplateColumns: "60px repeat(5, 1fr)", borderBottom: "1px solid #222", paddingBottom: 2 }}>
-                              <div />
-                              {latest5.map(q => <div key={q} style={{ textAlign: "center", fontSize: 8, color: "#555", fontWeight: 600 }}>{q}</div>)}
                             </div>
-                            {sortedTickers.map(tk => (
-                              <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: "60px repeat(5, 1fr)", borderBottom: "1px solid #1a1a1a", padding: "4px 0", alignItems: "center", transition: "background 0.08s" }}>
-                                <div style={{ padding: "0 4px" }}>
-                                  <Link href={`/stocks/${tk}`} style={{ color: TK_COLORS[tk] || "#58a6ff", textDecoration: "none", fontWeight: 700, fontSize: 10 }}>{tk}</Link>
+                            {/* Harvest GWT */}
+                            <div style={{ fontSize: 9, fontWeight: 700, color: "#555", letterSpacing: "0.06em", textTransform: "uppercase", padding: "10px 8px 4px" }}>HARVEST VOLUME (GWT)</div>
+                            <div ref={el => { if (el && !el.dataset.scrolled) { el.scrollLeft = el.scrollWidth; el.dataset.scrolled = "1"; } }} style={{ overflowX: "auto" }}>
+                              <div style={{ minWidth: detSticky + nQ * detQW }}>
+                                <div style={{ display: "grid", gridTemplateColumns: detCols, borderBottom: "1px solid #222", paddingBottom: 2, padding: "0 8px" }}>
+                                  <div style={{ position: "sticky", left: 0, background: "#0a0a0a", zIndex: 2 }} />
+                                  {displayQs.map(q => <div key={q} style={{ textAlign: "center", fontSize: 8, color: "#555", fontWeight: 600 }}>{q}</div>)}
                                 </div>
-                                {latest5.map(q => {
-                                  const v = allData[tk][q].harvest;
-                                  return <div key={q} style={{ textAlign: "center", color: v != null ? "#ccc" : "#333", fontSize: 10 }}>{v != null ? (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v))) : "\u2014"}</div>;
-                                })}
+                                {sortedTickers.map(tk => (
+                                  <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: detCols, borderBottom: "1px solid #1a1a1a", padding: "4px 8px", alignItems: "center", transition: "background 0.08s" }}>
+                                    <div style={{ padding: "0 4px", position: "sticky", left: 0, background: "#0a0a0a", zIndex: 1 }}>
+                                      <Link href={`/stocks/${tk}`} style={{ color: TK_COLORS[tk] || "#58a6ff", textDecoration: "none", fontWeight: 700, fontSize: 10 }}>{tk}</Link>
+                                    </div>
+                                    {displayQs.map(q => {
+                                      const v = allData[tk][q].harvest;
+                                      return <div key={q} style={{ textAlign: "center", color: v != null ? "#ccc" : "#333", fontSize: 10 }}>{v != null ? (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v))) : "\u2014"}</div>;
+                                    })}
+                                  </div>
+                                ))}
                               </div>
-                            ))}
+                            </div>
                           </div>
-                        )}
+                          );
+                        })()}
                       </div>
                     </div>
                     );
