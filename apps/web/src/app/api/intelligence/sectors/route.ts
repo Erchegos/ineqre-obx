@@ -25,6 +25,7 @@ export async function GET() {
         JOIN stocks s ON s.ticker = pd.ticker AND s.asset_type = 'equity'
         WHERE pd.close IS NOT NULL
           AND pd.date > NOW() - INTERVAL '10 days'
+          AND EXTRACT(DOW FROM pd.date) NOT IN (0, 6)
       ),
       returns AS (
         SELECT

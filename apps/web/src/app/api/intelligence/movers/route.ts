@@ -16,8 +16,9 @@ export async function GET(req: NextRequest) {
   try {
     const limit = parseInt(req.nextUrl.searchParams.get("limit") || "10");
 
+    // Only look at last 10 days and exclude weekends (DOW 0=Sun, 6=Sat)
     const result = await pool.query(`
-      WITH latest_two AS (
+      WITH recent AS (
         SELECT
           pd.ticker,
           pd.close,
@@ -26,6 +27,8 @@ export async function GET(req: NextRequest) {
           ROW_NUMBER() OVER (PARTITION BY pd.ticker ORDER BY pd.date DESC) AS rn
         FROM prices_daily pd
         JOIN stocks s ON s.ticker = pd.ticker AND s.asset_type = 'equity'
+        WHERE pd.date >= CURRENT_DATE - INTERVAL '10 days'
+          AND EXTRACT(DOW FROM pd.date) NOT IN (0, 6)
       )
       SELECT
         t1.ticker,
@@ -36,8 +39,8 @@ export async function GET(req: NextRequest) {
         t1.volume,
         t1.date AS trade_date,
         CASE WHEN t2.close > 0 THEN (t1.close - t2.close) / t2.close ELSE NULL END AS return_pct
-      FROM latest_two t1
-      JOIN latest_two t2 ON t2.ticker = t1.ticker AND t2.rn = 2
+      FROM recent t1
+      JOIN recent t2 ON t2.ticker = t1.ticker AND t2.rn = 2
       JOIN stocks s ON s.ticker = t1.ticker
       WHERE t1.rn = 1 AND t2.close > 0
       ORDER BY abs((t1.close - t2.close) / t2.close) DESC
