@@ -419,7 +419,7 @@ export default function SeafoodPage() {
                     allQs.sort((a, b) => {
                       const [qa, ya] = [parseInt(a[1]), parseInt(a.split(" ")[1])];
                       const [qb, yb] = [parseInt(b[1]), parseInt(b.split(" ")[1])];
-                      return yb * 10 + qb - (ya * 10 + qa);
+                      return ya * 10 + qa - (yb * 10 + qb);
                     });
                     const displayQs = allQs.slice(0, 5);
                     const displayTickers = ["MOWI", "SALM", "LSG", "GSF", "BAKKA", "AUSS"];
@@ -592,6 +592,82 @@ export default function SeafoodPage() {
                       <ProductionAreaMap areas={areas} localities={localities} selectedTicker={selectedTicker} onTickerSelect={setSelectedTicker} focusLocation={focusLocation} />
                     </div>
                   </div>
+
+                  {/* Areas Teaser */}
+                  {(() => {
+                    const TCO_COLORS: Record<string, string> = { MOWI: "#f97316", SALM: "#3b82f6", LSG: "#22c55e", GSF: "#ef4444", AUSS: "#06b6d4" };
+                    const TCO = ["MOWI", "SALM", "LSG", "GSF", "AUSS"];
+                    const tAreaCo: Record<number, Record<string, number>> = {};
+                    for (const loc of localities) {
+                      const a = loc.productionArea; const tk = loc.ticker;
+                      if (!a || !tk || !loc.isActive) continue;
+                      if (!tAreaCo[a]) tAreaCo[a] = {};
+                      tAreaCo[a][tk] = (tAreaCo[a][tk] || 0) + 1;
+                    }
+                    const topAreas = areas.slice(0, 7);
+                    const totalSites = TCO.reduce((s, tk) => s + localities.filter(l => l.ticker === tk && l.isActive).length, 0);
+                    return (
+                      <div style={{ borderBottom: "1px solid #222", padding: "12px 10px 14px" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "#666", letterSpacing: "0.08em", textTransform: "uppercase" }}>COMPANY PRESENCE — {totalSites} ACTIVE SITES</div>
+                          <button
+                            onClick={() => setTab("areas")}
+                            style={{ background: "linear-gradient(135deg, #1a3a5c, #0f2744)", border: "1px solid #1e4976", borderRadius: 6, padding: "5px 14px", color: "#58a6ff", fontSize: 10, fontWeight: 700, cursor: "pointer", letterSpacing: "0.04em", transition: "all 0.2s" }}
+                            onMouseEnter={e => { e.currentTarget.style.background = "linear-gradient(135deg, #224a6e, #163858)"; e.currentTarget.style.borderColor = "#3b82f6"; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = "linear-gradient(135deg, #1a3a5c, #0f2744)"; e.currentTarget.style.borderColor = "#1e4976"; }}
+                          >
+                            EXPLORE AREAS →
+                          </button>
+                        </div>
+                        {/* Mini heatmap bars per area */}
+                        <div style={{ display: "flex", gap: 3, alignItems: "flex-end", height: 48 }}>
+                          {topAreas.map((a, idx) => {
+                            const areaTotal = Object.values(tAreaCo[a.areaNumber] || {}).reduce((s, v) => s + v, 0);
+                            const maxAreaTotal = Math.max(...topAreas.map(ar => Object.values(tAreaCo[ar.areaNumber] || {}).reduce((s, v) => s + v, 0)), 1);
+                            const barH = Math.max((areaTotal / maxAreaTotal) * 40, 4);
+                            return (
+                              <div key={a.areaNumber} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                                <div style={{
+                                  width: "100%", height: barH, borderRadius: 3, overflow: "hidden", display: "flex", flexDirection: "column-reverse",
+                                  animation: `slideUp 0.6s ease-out ${idx * 0.08}s both`
+                                }}>
+                                  {TCO.map(tk => {
+                                    const sites = tAreaCo[a.areaNumber]?.[tk] || 0;
+                                    if (sites === 0) return null;
+                                    const pct = (sites / areaTotal) * 100;
+                                    return <div key={tk} style={{ width: "100%", height: `${pct}%`, background: TCO_COLORS[tk], minHeight: 2 }} />;
+                                  })}
+                                </div>
+                                <span style={{ fontSize: 8, color: "#555", fontWeight: 600 }}>{a.areaNumber}</span>
+                              </div>
+                            );
+                          })}
+                          {areas.length > 7 && (
+                            <div style={{ flex: 0.5, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#444", fontWeight: 600 }}>+{areas.length - 7}</div>
+                          )}
+                        </div>
+                        {/* Company legend */}
+                        <div style={{ display: "flex", gap: 10, marginTop: 8, justifyContent: "center" }}>
+                          {TCO.map(tk => {
+                            const count = localities.filter(l => l.ticker === tk && l.isActive).length;
+                            return (
+                              <div key={tk} style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 9 }}>
+                                <span style={{ width: 7, height: 7, borderRadius: 2, background: TCO_COLORS[tk], display: "inline-block" }} />
+                                <span style={{ color: TCO_COLORS[tk], fontWeight: 700 }}>{tk}</span>
+                                <span style={{ color: "#555" }}>{count}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <style>{`
+                          @keyframes slideUp {
+                            from { opacity: 0; transform: scaleY(0); transform-origin: bottom; }
+                            to { opacity: 1; transform: scaleY(1); transform-origin: bottom; }
+                          }
+                        `}</style>
+                      </div>
+                    );
+                  })()}
 
                   {/* Disease Outbreaks */}
                   <div>
