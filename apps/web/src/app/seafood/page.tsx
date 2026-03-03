@@ -709,8 +709,67 @@ export default function SeafoodPage() {
                 </div>
               )}
 
-              {tab === "areas" && (
+              {tab === "areas" && (() => {
+                const CO_COLORS: Record<string, string> = { MOWI: "#f97316", SALM: "#3b82f6", LSG: "#22c55e", GSF: "#ef4444", BAKKA: "#a855f7", AUSS: "#06b6d4" };
+                const CO_TICKERS = ["MOWI", "SALM", "LSG", "GSF", "AUSS"];
+                // Build site count per area per company from localities
+                const areaCo: Record<number, Record<string, number>> = {};
+                for (const loc of localities) {
+                  const a = loc.productionArea;
+                  const tk = loc.ticker;
+                  if (!a || !tk || !loc.isActive) continue;
+                  if (!areaCo[a]) areaCo[a] = {};
+                  areaCo[a][tk] = (areaCo[a][tk] || 0) + 1;
+                }
+                return (
                 <div>
+                  {/* Company Presence Matrix */}
+                  <div style={S.section}>COMPANY PRESENCE BY AREA</div>
+                  <div style={{ padding: "6px 8px", overflowX: "auto" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: `52px repeat(${areas.length}, 1fr)`, gap: 2, fontSize: 9 }}>
+                      {/* Header: area numbers */}
+                      <div style={{ padding: "4px 2px", fontWeight: 700, color: "#555" }}>AREA</div>
+                      {areas.map(a => (
+                        <div key={a.areaNumber} style={{ textAlign: "center", padding: "2px 0" }}>
+                          <div style={{ fontWeight: 700, color: "#888", fontSize: 10 }}>{a.areaNumber}</div>
+                          <div style={{ width: 6, height: 6, borderRadius: "50%", background: TL_C[a.trafficLight] || "#333", margin: "2px auto 0" }} />
+                        </div>
+                      ))}
+                      {/* Company rows */}
+                      {CO_TICKERS.map(tk => (
+                        <React.Fragment key={tk}>
+                          <Link href={`/stocks/${tk}`} style={{ padding: "3px 2px", fontWeight: 700, color: CO_COLORS[tk], textDecoration: "none", display: "flex", alignItems: "center", fontSize: 10 }}>{tk}</Link>
+                          {areas.map(a => {
+                            const sites = areaCo[a.areaNumber]?.[tk] || 0;
+                            const totalInArea = Object.values(areaCo[a.areaNumber] || {}).reduce((s, v) => s + v, 0);
+                            const maxSites = Math.max(...areas.map(ar => areaCo[ar.areaNumber]?.[tk] || 0), 1);
+                            const intensity = sites / maxSites;
+                            return (
+                              <div
+                                key={a.areaNumber}
+                                title={sites > 0 ? `${tk}: ${sites} sites in Area ${a.areaNumber} (${totalInArea > 0 ? ((sites / totalInArea) * 100).toFixed(0) : 0}% of area)` : ""}
+                                style={{
+                                  background: sites > 0 ? `${CO_COLORS[tk]}${Math.round(intensity * 160 + 30).toString(16).padStart(2, "0")}` : "#0a0a0a",
+                                  borderRadius: 2,
+                                  minHeight: 26,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                }}
+                              >
+                                {sites > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: intensity > 0.4 ? "#fff" : "#aaa" }}>{sites}</span>}
+                              </div>
+                            );
+                          })}
+                        </React.Fragment>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: 9, color: "#444", textAlign: "center", marginTop: 6, paddingBottom: 4 }}>
+                      Number = active farm sites. Color intensity = relative concentration for each company.
+                    </div>
+                  </div>
+
+                  {/* Area Detail Table */}
                   <div style={S.section}>PRODUCTION AREA DETAIL</div>
                   <div style={{ display: "grid", gridTemplateColumns: "3px 40px 1fr 70px 70px 70px 60px", padding: "4px 8px", fontSize: 9, fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.06em", background: "#111", borderBottom: "1px solid #222" }}>
                     <div />
@@ -721,21 +780,50 @@ export default function SeafoodPage() {
                     <div style={{ textAlign: "right" }}>SITES</div>
                     <div style={{ textAlign: "right" }}>CAP%</div>
                   </div>
-                  {areas.map(a => (
-                    <div key={a.areaNumber} className="sf-row" style={{ display: "grid", gridTemplateColumns: "3px 40px 1fr 70px 70px 70px 60px", padding: "5px 8px", borderBottom: "1px solid #1a1a1a", alignItems: "center", transition: "background 0.08s" }}>
-                      <div style={{ width: 3, minHeight: 14, background: TL_C[a.trafficLight] || "#555", borderRadius: 1 }} />
-                      <div style={{ fontWeight: 600 }}>{a.areaNumber}</div>
-                      <div style={{ fontSize: 11 }}>{a.name}</div>
-                      <div style={{ textAlign: "center" }}><span style={{ ...S.badge(TL_C[a.trafficLight] || "#555"), fontSize: 8 }}>{a.trafficLight?.toUpperCase()}</span></div>
-                      <div style={{ textAlign: "right", color: getLiceColor(a.avgLice), fontWeight: 600 }}>{a.avgLice?.toFixed(3) ?? "\u2014"}</div>
-                      <div style={{ textAlign: "right", color: "#888" }}>{a.localityCount}</div>
-                      <div style={{ textAlign: "right", color: (a.capacityChangePct ?? 0) < 0 ? "#ef4444" : (a.capacityChangePct ?? 0) > 0 ? "#22c55e" : "#888" }}>
-                        {a.capacityChangePct != null ? `${a.capacityChangePct > 0 ? "+" : ""}${a.capacityChangePct}%` : "\u2014"}
+                  {areas.map(a => {
+                    const coInArea = CO_TICKERS.filter(tk => (areaCo[a.areaNumber]?.[tk] || 0) > 0);
+                    const totalTracked = coInArea.reduce((s, tk) => s + (areaCo[a.areaNumber]?.[tk] || 0), 0);
+                    return (
+                    <div key={a.areaNumber}>
+                      <div className="sf-row" style={{ display: "grid", gridTemplateColumns: "3px 40px 1fr 70px 70px 70px 60px", padding: "5px 8px", borderBottom: coInArea.length > 0 ? "none" : "1px solid #1a1a1a", alignItems: "center", transition: "background 0.08s" }}>
+                        <div style={{ width: 3, minHeight: 14, background: TL_C[a.trafficLight] || "#555", borderRadius: 1 }} />
+                        <div style={{ fontWeight: 600 }}>{a.areaNumber}</div>
+                        <div style={{ fontSize: 11 }}>{a.name}</div>
+                        <div style={{ textAlign: "center" }}><span style={{ ...S.badge(TL_C[a.trafficLight] || "#555"), fontSize: 8 }}>{a.trafficLight?.toUpperCase()}</span></div>
+                        <div style={{ textAlign: "right", color: getLiceColor(a.avgLice), fontWeight: 600 }}>{a.avgLice?.toFixed(3) ?? "\u2014"}</div>
+                        <div style={{ textAlign: "right", color: "#888" }}>{a.localityCount}</div>
+                        <div style={{ textAlign: "right", color: (a.capacityChangePct ?? 0) < 0 ? "#ef4444" : (a.capacityChangePct ?? 0) > 0 ? "#22c55e" : "#888" }}>
+                          {a.capacityChangePct != null ? `${a.capacityChangePct > 0 ? "+" : ""}${a.capacityChangePct}%` : "\u2014"}
+                        </div>
                       </div>
+                      {/* Company breakdown bar */}
+                      {coInArea.length > 0 && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "2px 8px 6px 46px", borderBottom: "1px solid #1a1a1a" }}>
+                          {/* Stacked bar */}
+                          <div style={{ display: "flex", height: 6, borderRadius: 3, overflow: "hidden", flex: 1, background: "#111" }}>
+                            {coInArea.map(tk => {
+                              const w = (areaCo[a.areaNumber][tk] / (a.localityCount || totalTracked || 1)) * 100;
+                              return <div key={tk} style={{ width: `${w}%`, background: CO_COLORS[tk], minWidth: 2 }} title={`${tk}: ${areaCo[a.areaNumber][tk]} sites`} />;
+                            })}
+                          </div>
+                          {/* Company labels */}
+                          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                            {coInArea.map(tk => (
+                              <Link key={tk} href={`/stocks/${tk}`} style={{ display: "flex", alignItems: "center", gap: 3, textDecoration: "none", fontSize: 9 }}>
+                                <span style={{ width: 6, height: 6, borderRadius: 1, background: CO_COLORS[tk], display: "inline-block" }} />
+                                <span style={{ color: CO_COLORS[tk], fontWeight: 600 }}>{tk}</span>
+                                <span style={{ color: "#555" }}>{areaCo[a.areaNumber][tk]}</span>
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
-              )}
+                );
+              })()}
 
               {tab === "biomass" && (
                 <div>
