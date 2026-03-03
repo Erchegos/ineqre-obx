@@ -242,6 +242,13 @@ export default function IntelligencePage() {
   const [tickerFilter, setTickerFilter] = useState("");
   const [importanceMin, setImportanceMin] = useState(1);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  // Opening auction: blank equity prices 09:00–09:15 CET (data is 15min delayed)
+  const isOpeningAuction = (() => {
+    const now = new Date();
+    const cet = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Oslo" }));
+    const h = cet.getHours(), m = cet.getMinutes(), dow = cet.getDay();
+    return dow >= 1 && dow <= 5 && (h === 9 && m < 15);
+  })();
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Each fetch is independent — fires in parallel, sets own state when done
@@ -408,14 +415,18 @@ export default function IntelligencePage() {
               return (
                 <span key={c.symbol} style={{ display: "flex", gap: 4, alignItems: "center" }}>
                   <span style={{ color: "#666", fontWeight: 600 }}>{c.name.split(" ")[0].toUpperCase()}</span>
-                  {isSalmon ? (
+                  {isOpeningAuction ? (
+                    <span style={{ color: "#444", fontWeight: 600 }}>{"\u2013\u2013"}</span>
+                  ) : isSalmon ? (
                     <span style={{ color: "#e5e5e5", fontWeight: 600 }}>{"\u20AC"}{c.eurClose ? c.eurClose.toFixed(2) : "\u2013"}</span>
                   ) : (
                     <span style={{ color: "#e5e5e5", fontWeight: 600 }}>{c.currency === "USD" ? "$" : ""}{fmtPrice(c.latest.close)}</span>
                   )}
-                  <span style={{ color: (c.dayReturnPct ?? 0) >= 0 ? "#22c55e" : "#ef4444", fontWeight: 600 }}>
-                    {fmtPctRaw(c.dayReturnPct, 1)}
-                  </span>
+                  {!isOpeningAuction && (
+                    <span style={{ color: (c.dayReturnPct ?? 0) >= 0 ? "#22c55e" : "#ef4444", fontWeight: 600 }}>
+                      {fmtPctRaw(c.dayReturnPct, 1)}
+                    </span>
+                  )}
                 </span>
               );
             })}
@@ -426,11 +437,17 @@ export default function IntelligencePage() {
             {fxRates.map(fx => (
               <span key={fx.pair} style={{ display: "flex", gap: 4, alignItems: "center" }}>
                 <span style={{ color: "#666", fontWeight: 600 }}>{fx.pair}</span>
-                <span style={{ color: "#e5e5e5", fontWeight: 600 }}>{fx.latest.spot.toFixed(4)}</span>
-                {fx.latest.simpleReturn != null && (
-                  <span style={{ color: fx.latest.simpleReturn >= 0 ? "#22c55e" : "#ef4444", fontWeight: 600 }}>
-                    {fmtPct(fx.latest.simpleReturn, 1)}
-                  </span>
+                {isOpeningAuction ? (
+                  <span style={{ color: "#444", fontWeight: 600 }}>{"\u2013\u2013"}</span>
+                ) : (
+                  <>
+                    <span style={{ color: "#e5e5e5", fontWeight: 600 }}>{fx.latest.spot.toFixed(4)}</span>
+                    {fx.latest.simpleReturn != null && (
+                      <span style={{ color: fx.latest.simpleReturn >= 0 ? "#22c55e" : "#ef4444", fontWeight: 600 }}>
+                        {fmtPct(fx.latest.simpleReturn, 1)}
+                      </span>
+                    )}
+                  </>
                 )}
               </span>
             ))}
@@ -441,23 +458,33 @@ export default function IntelligencePage() {
             {obx && (
               <span style={{ display: "flex", gap: 4, alignItems: "center" }}>
                 <span style={{ color: "#666", fontWeight: 600 }}>OBX</span>
-                <span style={{
-                  fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 2,
-                  background: `${obx.index.regimeColor}22`, color: obx.index.regimeColor,
-                  border: `1px solid ${obx.index.regimeColor}44`,
-                }}>
-                  {obx.index.regime.toUpperCase()}
-                </span>
-                {obx.index.lastClose && (
-                  <span style={{ color: "#888" }}>{obx.index.lastClose.toFixed(0)}</span>
+                {isOpeningAuction ? (
+                  <span style={{ color: "#444", fontWeight: 600 }}>{"\u2013\u2013"}</span>
+                ) : (
+                  <>
+                    <span style={{
+                      fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 2,
+                      background: `${obx.index.regimeColor}22`, color: obx.index.regimeColor,
+                      border: `1px solid ${obx.index.regimeColor}44`,
+                    }}>
+                      {obx.index.regime.toUpperCase()}
+                    </span>
+                    {obx.index.lastClose && (
+                      <span style={{ color: "#888" }}>{obx.index.lastClose.toFixed(0)}</span>
+                    )}
+                  </>
                 )}
               </span>
             )}
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#666" }}>
-            <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 4px #22c55e" }} />
-            <span>{lastRefresh.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#666" }}>
+            <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: "0.06em", color: "#f59e0b", opacity: 0.7 }}>15 MIN DELAYED</span>
+            <span style={{ width: 1, height: 10, background: "#333" }} />
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 4px #22c55e" }} />
+              <span>{lastRefresh.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span>
+            </span>
           </div>
         </div>
 
