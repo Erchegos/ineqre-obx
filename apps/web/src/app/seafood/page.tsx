@@ -410,10 +410,9 @@ export default function SeafoodPage() {
                 </>
               )}
             </div>
-          </div>
 
-          {/* ─── Full-Width Overview Sections (below grid) ─── */}
-          {tab === "overview" && Object.keys(quarterlyOps).length > 0 && (() => {
+            {/* ─── Quarterly Ops — spans full width across both columns ─── */}
+            {tab === "overview" && Object.keys(quarterlyOps).length > 0 && (() => {
             const allQs: string[] = [];
             for (const rows of Object.values(quarterlyOps)) {
               for (const r of rows) {
@@ -468,7 +467,7 @@ export default function SeafoodPage() {
             const TK_COLORS: Record<string, string> = { MOWI: "#f97316", SALM: "#3b82f6", LSG: "#22c55e", GSF: "#ef4444", BAKKA: "#a855f7", AUSS: "#06b6d4" };
 
             return (
-            <div style={{ marginTop: 2, borderTop: "1px solid #222" }}>
+            <div style={{ gridColumn: "1 / -1", marginTop: 2, borderTop: "1px solid #222" }}>
               <div style={S.section}>QUARTERLY OPERATIONS</div>
                       <div style={{ fontSize: 9, color: "#555", padding: "2px 10px 6px", letterSpacing: "0.04em" }}>
                         All values converted to NOK/kg. Source: company quarterly reports.
@@ -721,9 +720,9 @@ export default function SeafoodPage() {
             );
           })()}
 
-          {/* ─── Remaining Overview Sections (full-width) ─── */}
-          {tab === "overview" && (
-            <>
+            {/* ─── Remaining Overview Sections (span both columns) ─── */}
+            {tab === "overview" && (
+              <div style={{ gridColumn: "1 / -1" }}>
               {/* Map */}
               <div id="seafood-map" style={{ borderBottom: "1px solid #222" }}>
                 <div style={S.section}>COASTAL MAP</div>
@@ -878,12 +877,11 @@ export default function SeafoodPage() {
                       })
                     )}
                   </div>
-            </>
-          )}
+              </div>
+            )}
 
-          {/* ─── Secondary Grid for other tabs ────────────── */}
-          <div className="sf-grid" style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 0 }}>
-            <div className="sf-tab-content">
+            {/* ─── Other Tabs (left column) ────────────────── */}
+            <div style={{ gridColumn: "1" }}>
               {tab === "map" && (
                 <div style={{ padding: 0 }}>
                   <div style={{ ...S.section, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1513,7 +1511,7 @@ export default function SeafoodPage() {
             </div>
 
             {/* ─── Right Sidebar ──────────────────────────── */}
-            <div className="sf-right" style={S.panel}>
+            <div className="sf-right" style={{ ...S.panel, gridColumn: "2", gridRow: "1 / span 20" }}>
               {/* Salmon Price */}
               <div style={S.section}>SALMON SPOT</div>
               <div style={{ padding: "8px 10px" }}>
