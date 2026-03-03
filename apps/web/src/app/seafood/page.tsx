@@ -643,76 +643,60 @@ export default function SeafoodPage() {
                     </div>
                   </div>
 
-                  {/* Areas Teaser */}
+                  {/* Areas Teaser — Company site distribution */}
                   {(() => {
                     const TCO_COLORS: Record<string, string> = { MOWI: "#f97316", SALM: "#3b82f6", LSG: "#22c55e", GSF: "#ef4444", AUSS: "#06b6d4" };
                     const TCO = ["MOWI", "SALM", "LSG", "GSF", "AUSS"];
-                    const tAreaCo: Record<number, Record<string, number>> = {};
-                    for (const loc of localities) {
-                      const a = loc.productionArea; const tk = loc.ticker;
-                      if (!a || !tk || !loc.isActive) continue;
-                      if (!tAreaCo[a]) tAreaCo[a] = {};
-                      tAreaCo[a][tk] = (tAreaCo[a][tk] || 0) + 1;
+                    // Count sites per company
+                    const coSites: Record<string, number> = {};
+                    for (const tk of TCO) coSites[tk] = localities.filter(l => l.ticker === tk && l.isActive).length;
+                    const maxSites = Math.max(...Object.values(coSites), 1);
+                    const totalSites = Object.values(coSites).reduce((s, v) => s + v, 0);
+                    // Count areas per company
+                    const coAreas: Record<string, number> = {};
+                    for (const tk of TCO) {
+                      const areaSet = new Set<number>();
+                      for (const loc of localities) if (loc.ticker === tk && loc.isActive && loc.productionArea) areaSet.add(loc.productionArea);
+                      coAreas[tk] = areaSet.size;
                     }
-                    const topAreas = areas.slice(0, 7);
-                    const totalSites = TCO.reduce((s, tk) => s + localities.filter(l => l.ticker === tk && l.isActive).length, 0);
                     return (
-                      <div style={{ borderBottom: "1px solid #222", padding: "12px 10px 14px" }}>
+                      <div style={{ borderBottom: "1px solid #222", padding: "10px 10px 12px" }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: "#666", letterSpacing: "0.08em", textTransform: "uppercase" }}>COMPANY PRESENCE — {totalSites} ACTIVE SITES</div>
+                          <div style={S.section}>COMPANY FOOTPRINT</div>
                           <button
                             onClick={() => setTab("areas")}
                             style={{ background: "linear-gradient(135deg, #1a3a5c, #0f2744)", border: "1px solid #1e4976", borderRadius: 6, padding: "5px 14px", color: "#58a6ff", fontSize: 10, fontWeight: 700, cursor: "pointer", letterSpacing: "0.04em", transition: "all 0.2s" }}
                             onMouseEnter={e => { e.currentTarget.style.background = "linear-gradient(135deg, #224a6e, #163858)"; e.currentTarget.style.borderColor = "#3b82f6"; }}
                             onMouseLeave={e => { e.currentTarget.style.background = "linear-gradient(135deg, #1a3a5c, #0f2744)"; e.currentTarget.style.borderColor = "#1e4976"; }}
                           >
-                            EXPLORE AREAS →
+                            EXPLORE ALL AREAS →
                           </button>
                         </div>
-                        {/* Mini heatmap bars per area */}
-                        <div style={{ display: "flex", gap: 3, alignItems: "flex-end", height: 48 }}>
-                          {topAreas.map((a, idx) => {
-                            const areaTotal = Object.values(tAreaCo[a.areaNumber] || {}).reduce((s, v) => s + v, 0);
-                            const maxAreaTotal = Math.max(...topAreas.map(ar => Object.values(tAreaCo[ar.areaNumber] || {}).reduce((s, v) => s + v, 0)), 1);
-                            const barH = Math.max((areaTotal / maxAreaTotal) * 40, 4);
+                        {/* Horizontal bar per company */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "0 2px" }}>
+                          {TCO.map((tk, idx) => {
+                            const sites = coSites[tk];
+                            const pct = (sites / maxSites) * 100;
+                            const areaCnt = coAreas[tk];
                             return (
-                              <div key={a.areaNumber} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                                <div style={{
-                                  width: "100%", height: barH, borderRadius: 3, overflow: "hidden", display: "flex", flexDirection: "column-reverse",
-                                  animation: `slideUp 0.6s ease-out ${idx * 0.08}s both`
-                                }}>
-                                  {TCO.map(tk => {
-                                    const sites = tAreaCo[a.areaNumber]?.[tk] || 0;
-                                    if (sites === 0) return null;
-                                    const pct = (sites / areaTotal) * 100;
-                                    return <div key={tk} style={{ width: "100%", height: `${pct}%`, background: TCO_COLORS[tk], minHeight: 2 }} />;
-                                  })}
+                              <div key={tk} style={{ display: "grid", gridTemplateColumns: "52px 1fr 70px", alignItems: "center", gap: 8, animation: `teaserSlide 0.5s ease-out ${idx * 0.07}s both` }}>
+                                <Link href={`/stocks/${tk}`} style={{ color: TCO_COLORS[tk], textDecoration: "none", fontWeight: 700, fontSize: 12 }}>{tk}</Link>
+                                <div style={{ position: "relative", height: 18, background: "#111", borderRadius: 4, overflow: "hidden" }}>
+                                  <div style={{ height: "100%", width: `${pct}%`, background: `${TCO_COLORS[tk]}30`, borderRadius: 4, borderRight: `2px solid ${TCO_COLORS[tk]}`, transition: "width 0.6s ease-out" }} />
+                                  <span style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", fontSize: 10, fontWeight: 700, color: TCO_COLORS[tk] }}>{sites} sites</span>
                                 </div>
-                                <span style={{ fontSize: 8, color: "#555", fontWeight: 600 }}>{a.areaNumber}</span>
+                                <span style={{ fontSize: 10, color: "#666", textAlign: "right" }}>{areaCnt} of {areas.length} areas</span>
                               </div>
                             );
                           })}
-                          {areas.length > 7 && (
-                            <div style={{ flex: 0.5, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#444", fontWeight: 600 }}>+{areas.length - 7}</div>
-                          )}
                         </div>
-                        {/* Company legend */}
-                        <div style={{ display: "flex", gap: 10, marginTop: 8, justifyContent: "center" }}>
-                          {TCO.map(tk => {
-                            const count = localities.filter(l => l.ticker === tk && l.isActive).length;
-                            return (
-                              <div key={tk} style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 9 }}>
-                                <span style={{ width: 7, height: 7, borderRadius: 2, background: TCO_COLORS[tk], display: "inline-block" }} />
-                                <span style={{ color: TCO_COLORS[tk], fontWeight: 700 }}>{tk}</span>
-                                <span style={{ color: "#555" }}>{count}</span>
-                              </div>
-                            );
-                          })}
+                        <div style={{ fontSize: 9, color: "#444", textAlign: "center", marginTop: 8 }}>
+                          {totalSites} tracked active sites across {areas.length} production areas
                         </div>
                         <style>{`
-                          @keyframes slideUp {
-                            from { opacity: 0; transform: scaleY(0); transform-origin: bottom; }
-                            to { opacity: 1; transform: scaleY(1); transform-origin: bottom; }
+                          @keyframes teaserSlide {
+                            from { opacity: 0; transform: translateX(-12px); }
+                            to { opacity: 1; transform: translateX(0); }
                           }
                         `}</style>
                       </div>
