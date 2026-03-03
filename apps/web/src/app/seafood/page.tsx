@@ -421,7 +421,8 @@ export default function SeafoodPage() {
                       const [qb, yb] = [parseInt(b[1]), parseInt(b.split(" ")[1])];
                       return ya * 10 + qa - (yb * 10 + qb);
                     });
-                    const displayQs = allQs.slice(0, 5);
+                    // Show ALL quarters (chronological), but scroll to show latest 5
+                    const displayQs = allQs;
                     const displayTickers = ["MOWI", "SALM", "LSG", "GSF", "BAKKA", "AUSS"];
                     // Convert all to NOK for comparability
                     const FX: Record<string, number> = { EUR: 11.5, DKK: 1.57, NOK: 1 };
@@ -480,46 +481,60 @@ export default function SeafoodPage() {
                         All values converted to NOK/kg. Source: company quarterly reports.
                       </div>
 
-                      {/* Merged Cost / Price / Margin table */}
-                      <div style={{ padding: "0 0 2px", fontSize: 10, overflowX: "auto" }}>
-                        {/* Quarter group headers */}
-                        <div style={{ display: "grid", gridTemplateColumns: mergedCols, background: "#0d0d0d", borderBottom: "1px solid #222" }}>
-                          <div />
-                          {displayQs.map(q => (
-                            <div key={q} style={{ gridColumn: "span 3", textAlign: "center", padding: "4px 0", fontSize: 9, fontWeight: 700, color: "#888", letterSpacing: "0.06em", borderLeft: "1px solid #222" }}>{q}</div>
-                          ))}
-                        </div>
-                        {/* Sub-column headers: Cost | Price | Margin */}
-                        <div style={{ display: "grid", gridTemplateColumns: mergedCols, background: "#111", borderBottom: "1px solid #333" }}>
-                          <div style={{ padding: "3px 6px", fontSize: 8, fontWeight: 700, color: "#666" }}>COMPANY</div>
-                          {displayQs.map(q => (
-                            <React.Fragment key={q}>
-                              <div onClick={() => handleSort(`cost|${q}`)} style={{ textAlign: "right", padding: "3px 4px", fontSize: 8, fontWeight: 600, color: "#f59e0b", cursor: "pointer", userSelect: "none", borderLeft: "1px solid #222" }}>COST{arrow(`cost|${q}`)}</div>
-                              <div onClick={() => handleSort(`price|${q}`)} style={{ textAlign: "right", padding: "3px 4px", fontSize: 8, fontWeight: 600, color: "#3b82f6", cursor: "pointer", userSelect: "none" }}>PRICE{arrow(`price|${q}`)}</div>
-                              <div onClick={() => handleSort(`margin|${q}`)} style={{ textAlign: "right", padding: "3px 4px", fontSize: 8, fontWeight: 600, color: "#22c55e", cursor: "pointer", userSelect: "none" }}>MRG%{arrow(`margin|${q}`)}</div>
-                            </React.Fragment>
-                          ))}
-                        </div>
-                        {/* Data rows */}
-                        {sortedTickers.map(tk => (
-                          <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: mergedCols, borderBottom: "1px solid #1a1a1a", alignItems: "center", transition: "background 0.08s" }}>
-                            <div style={{ padding: "4px 6px" }}>
-                              <Link href={`/stocks/${tk}`} style={{ color: "#58a6ff", textDecoration: "none", fontWeight: 600, fontSize: 10 }}>{tk}</Link>
-                            </div>
-                            {displayQs.map(q => {
-                              const v = allData[tk][q];
-                              const mCol = v.margin == null ? "#444" : v.margin >= 20 ? "#22c55e" : v.margin >= 10 ? "#4ade80" : v.margin > 0 ? "#a3a3a3" : "#ef4444";
-                              return (
-                                <React.Fragment key={q}>
-                                  <div style={{ textAlign: "right", padding: "4px 4px", color: v.cost != null ? "#f59e0b" : "#333", fontSize: 10, borderLeft: "1px solid #1a1a1a" }}>{v.cost != null ? v.cost.toFixed(1) : "\u2014"}</div>
-                                  <div style={{ textAlign: "right", padding: "4px 4px", color: v.price != null ? "#3b82f6" : "#333", fontWeight: 600, fontSize: 10 }}>{v.price != null ? v.price.toFixed(1) : "\u2014"}</div>
-                                  <div style={{ textAlign: "right", padding: "4px 4px", color: mCol, fontWeight: 600, fontSize: 10 }}>{v.margin != null ? `${v.margin.toFixed(0)}%` : "\u2014"}</div>
-                                </React.Fragment>
-                              );
-                            })}
+                      {/* Merged Cost / Price / Margin table — scrollable, latest Qs visible */}
+                      {(() => {
+                        const qColW = 150; // px per quarter group (3 sub-cols)
+                        const stickyW = 56; // company col
+                        const innerW = stickyW + nQ * qColW;
+                        const scrollCols = `${stickyW}px repeat(${nQ * 3}, ${(qColW / 3).toFixed(0)}px)`;
+                        return (
+                        <div
+                          ref={el => { if (el && !el.dataset.scrolled) { el.scrollLeft = el.scrollWidth; el.dataset.scrolled = "1"; } }}
+                          style={{ padding: "0 0 2px", fontSize: 10, overflowX: "auto", scrollBehavior: "smooth" }}
+                        >
+                          <div style={{ minWidth: innerW }}>
+                          {/* Quarter group headers */}
+                          <div style={{ display: "grid", gridTemplateColumns: scrollCols, background: "#0d0d0d", borderBottom: "1px solid #222" }}>
+                            <div style={{ position: "sticky", left: 0, background: "#0d0d0d", zIndex: 2 }} />
+                            {displayQs.map(q => (
+                              <div key={q} style={{ gridColumn: "span 3", textAlign: "center", padding: "4px 0", fontSize: 9, fontWeight: 700, color: "#888", letterSpacing: "0.06em", borderLeft: "1px solid #222" }}>{q}</div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
+                          {/* Sub-column headers: Cost | Price | Margin */}
+                          <div style={{ display: "grid", gridTemplateColumns: scrollCols, background: "#111", borderBottom: "1px solid #333" }}>
+                            <div style={{ padding: "3px 6px", fontSize: 8, fontWeight: 700, color: "#666", position: "sticky", left: 0, background: "#111", zIndex: 2 }}>COMPANY</div>
+                            {displayQs.map(q => (
+                              <React.Fragment key={q}>
+                                <div onClick={() => handleSort(`cost|${q}`)} style={{ textAlign: "right", padding: "3px 4px", fontSize: 8, fontWeight: 600, color: "#f59e0b", cursor: "pointer", userSelect: "none", borderLeft: "1px solid #222" }}>COST{arrow(`cost|${q}`)}</div>
+                                <div onClick={() => handleSort(`price|${q}`)} style={{ textAlign: "right", padding: "3px 4px", fontSize: 8, fontWeight: 600, color: "#3b82f6", cursor: "pointer", userSelect: "none" }}>PRICE{arrow(`price|${q}`)}</div>
+                                <div onClick={() => handleSort(`margin|${q}`)} style={{ textAlign: "right", padding: "3px 4px", fontSize: 8, fontWeight: 600, color: "#22c55e", cursor: "pointer", userSelect: "none" }}>MRG%{arrow(`margin|${q}`)}</div>
+                              </React.Fragment>
+                            ))}
+                          </div>
+                          {/* Data rows */}
+                          {sortedTickers.map(tk => (
+                            <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: scrollCols, borderBottom: "1px solid #1a1a1a", alignItems: "center", transition: "background 0.08s" }}>
+                              <div style={{ padding: "4px 6px", position: "sticky", left: 0, background: "#0a0a0a", zIndex: 1 }}>
+                                <Link href={`/stocks/${tk}`} style={{ color: "#58a6ff", textDecoration: "none", fontWeight: 600, fontSize: 10 }}>{tk}</Link>
+                              </div>
+                              {displayQs.map(q => {
+                                const v = allData[tk][q];
+                                const mCol = v.margin == null ? "#444" : v.margin >= 20 ? "#22c55e" : v.margin >= 10 ? "#4ade80" : v.margin > 0 ? "#a3a3a3" : "#ef4444";
+                                return (
+                                  <React.Fragment key={q}>
+                                    <div style={{ textAlign: "right", padding: "4px 4px", color: v.cost != null ? "#f59e0b" : "#333", fontSize: 10, borderLeft: "1px solid #1a1a1a" }}>{v.cost != null ? v.cost.toFixed(1) : "\u2014"}</div>
+                                    <div style={{ textAlign: "right", padding: "4px 4px", color: v.price != null ? "#3b82f6" : "#333", fontWeight: 600, fontSize: 10 }}>{v.price != null ? v.price.toFixed(1) : "\u2014"}</div>
+                                    <div style={{ textAlign: "right", padding: "4px 4px", color: mCol, fontWeight: 600, fontSize: 10 }}>{v.margin != null ? `${v.margin.toFixed(0)}%` : "\u2014"}</div>
+                                  </React.Fragment>
+                                );
+                              })}
+                            </div>
+                          ))}
+                          </div>
+                          {nQ > 5 && <div style={{ fontSize: 8, color: "#444", padding: "3px 10px", textAlign: "center" }}>← Scroll left for older quarters</div>}
+                        </div>
+                        );
+                      })()}
 
                       {/* Collapsible: EBIT/kg + Harvest */}
                       <div style={{ marginTop: 4 }}>
@@ -533,14 +548,15 @@ export default function SeafoodPage() {
                         {qopsDetailOpen && (
                           <div>
                             {/* EBIT/kg table */}
-                            <div style={{ padding: "0 0 2px", fontSize: 10 }}>
-                              <div style={{ display: "grid", gridTemplateColumns: `56px repeat(${nQ}, 1fr)`, padding: "4px 8px", fontSize: 9, fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.06em", background: "#111", borderBottom: "1px solid #222" }}>
-                                <div>EBIT/KG</div>
+                            <div ref={el => { if (el && !el.dataset.scrolled) { el.scrollLeft = el.scrollWidth; el.dataset.scrolled = "1"; } }} style={{ padding: "0 0 2px", fontSize: 10, overflowX: "auto" }}>
+                              <div style={{ minWidth: 56 + nQ * 80 }}>
+                              <div style={{ display: "grid", gridTemplateColumns: `56px repeat(${nQ}, 80px)`, padding: "4px 8px", fontSize: 9, fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.06em", background: "#111", borderBottom: "1px solid #222" }}>
+                                <div style={{ position: "sticky", left: 0, background: "#111", zIndex: 2 }}>EBIT/KG</div>
                                 {displayQs.map(q => <div key={q} style={{ textAlign: "right" }}>{q}</div>)}
                               </div>
                               {sortedTickers.map(tk => (
-                                <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: `56px repeat(${nQ}, 1fr)`, padding: "5px 8px", borderBottom: "1px solid #1a1a1a", alignItems: "center", transition: "background 0.08s" }}>
-                                  <div>
+                                <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: `56px repeat(${nQ}, 80px)`, padding: "5px 8px", borderBottom: "1px solid #1a1a1a", alignItems: "center", transition: "background 0.08s" }}>
+                                  <div style={{ position: "sticky", left: 0, background: "#0a0a0a", zIndex: 1 }}>
                                     <Link href={`/stocks/${tk}`} style={{ color: "#58a6ff", textDecoration: "none", fontWeight: 600, fontSize: 10 }}>{tk}</Link>
                                   </div>
                                   {displayQs.map(q => {
@@ -554,17 +570,19 @@ export default function SeafoodPage() {
                                   })}
                                 </div>
                               ))}
+                              </div>
                             </div>
 
                             {/* Harvest volume table */}
-                            <div style={{ padding: "0 0 2px", fontSize: 10, marginTop: 2 }}>
-                              <div style={{ display: "grid", gridTemplateColumns: `56px repeat(${nQ}, 1fr)`, padding: "4px 8px", fontSize: 9, fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.06em", background: "#111", borderBottom: "1px solid #222" }}>
-                                <div>HARVEST</div>
+                            <div ref={el => { if (el && !el.dataset.scrolled) { el.scrollLeft = el.scrollWidth; el.dataset.scrolled = "1"; } }} style={{ padding: "0 0 2px", fontSize: 10, marginTop: 2, overflowX: "auto" }}>
+                              <div style={{ minWidth: 56 + nQ * 80 }}>
+                              <div style={{ display: "grid", gridTemplateColumns: `56px repeat(${nQ}, 80px)`, padding: "4px 8px", fontSize: 9, fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.06em", background: "#111", borderBottom: "1px solid #222" }}>
+                                <div style={{ position: "sticky", left: 0, background: "#111", zIndex: 2 }}>HARVEST</div>
                                 {displayQs.map(q => <div key={q} style={{ textAlign: "right" }}>{q}</div>)}
                               </div>
                               {sortedTickers.map(tk => (
-                                <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: `56px repeat(${nQ}, 1fr)`, padding: "5px 8px", borderBottom: "1px solid #1a1a1a", alignItems: "center", transition: "background 0.08s" }}>
-                                  <div>
+                                <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: `56px repeat(${nQ}, 80px)`, padding: "5px 8px", borderBottom: "1px solid #1a1a1a", alignItems: "center", transition: "background 0.08s" }}>
+                                  <div style={{ position: "sticky", left: 0, background: "#0a0a0a", zIndex: 1 }}>
                                     <Link href={`/stocks/${tk}`} style={{ color: "#58a6ff", textDecoration: "none", fontWeight: 600, fontSize: 10 }}>{tk}</Link>
                                   </div>
                                   {displayQs.map(q => {
@@ -577,6 +595,7 @@ export default function SeafoodPage() {
                                   })}
                                 </div>
                               ))}
+                              </div>
                             </div>
                           </div>
                         )}
