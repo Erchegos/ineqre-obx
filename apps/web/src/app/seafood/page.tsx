@@ -474,6 +474,10 @@ export default function SeafoodPage() {
                     const nQ = displayQs.length;
                     const mergedCols = `56px repeat(${nQ * 3}, 1fr)`;
 
+                    // Show latest 5 quarters in main table
+                    const latest5 = allQs.slice(-5);
+                    const TK_COLORS: Record<string, string> = { MOWI: "#f97316", SALM: "#3b82f6", LSG: "#22c55e", GSF: "#ef4444", BAKKA: "#a855f7", AUSS: "#06b6d4" };
+
                     return (
                     <div style={{ marginTop: 2 }}>
                       <div style={S.section}>QUARTERLY OPERATIONS</div>
@@ -481,63 +485,105 @@ export default function SeafoodPage() {
                         All values converted to NOK/kg. Source: company quarterly reports.
                       </div>
 
-                      {/* Merged Cost / Price / Margin table — scrollable, latest Qs visible */}
-                      {(() => {
-                        const qColW = 150; // px per quarter group (3 sub-cols)
-                        const stickyW = 56; // company col
-                        const innerW = stickyW + nQ * qColW;
-                        const scrollCols = `${stickyW}px repeat(${nQ * 3}, ${(qColW / 3).toFixed(0)}px)`;
-                        return (
-                        <div
-                          ref={el => { if (el && !el.dataset.scrolled) { el.scrollLeft = el.scrollWidth; el.dataset.scrolled = "1"; } }}
-                          style={{ padding: "0 0 2px", fontSize: 10, overflowX: "auto", scrollBehavior: "smooth" }}
-                        >
-                          <div style={{ minWidth: innerW }}>
-                          {/* Quarter group headers */}
-                          <div style={{ display: "grid", gridTemplateColumns: scrollCols, background: "#0d0d0d", borderBottom: "1px solid #222" }}>
-                            <div style={{ position: "sticky", left: 0, background: "#0d0d0d", zIndex: 2 }} />
-                            {displayQs.map(q => (
-                              <div key={q} style={{ gridColumn: "span 3", textAlign: "center", padding: "4px 0", fontSize: 9, fontWeight: 700, color: "#888", letterSpacing: "0.06em", borderLeft: "1px solid #222" }}>{q}</div>
-                            ))}
-                          </div>
-                          {/* Sub-column headers: Cost | Price | Margin */}
-                          <div style={{ display: "grid", gridTemplateColumns: scrollCols, background: "#111", borderBottom: "1px solid #333" }}>
-                            <div style={{ padding: "3px 6px", fontSize: 8, fontWeight: 700, color: "#666", position: "sticky", left: 0, background: "#111", zIndex: 2 }}>COMPANY</div>
-                            {displayQs.map(q => (
-                              <React.Fragment key={q}>
-                                <div onClick={() => handleSort(`cost|${q}`)} style={{ textAlign: "right", padding: "3px 4px", fontSize: 8, fontWeight: 600, color: "#f59e0b", cursor: "pointer", userSelect: "none", borderLeft: "1px solid #222" }}>COST{arrow(`cost|${q}`)}</div>
-                                <div onClick={() => handleSort(`price|${q}`)} style={{ textAlign: "right", padding: "3px 4px", fontSize: 8, fontWeight: 600, color: "#3b82f6", cursor: "pointer", userSelect: "none" }}>PRICE{arrow(`price|${q}`)}</div>
-                                <div onClick={() => handleSort(`margin|${q}`)} style={{ textAlign: "right", padding: "3px 4px", fontSize: 8, fontWeight: 600, color: "#22c55e", cursor: "pointer", userSelect: "none" }}>MRG%{arrow(`margin|${q}`)}</div>
-                              </React.Fragment>
-                            ))}
-                          </div>
-                          {/* Data rows */}
-                          {sortedTickers.map(tk => (
-                            <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: scrollCols, borderBottom: "1px solid #1a1a1a", alignItems: "center", transition: "background 0.08s" }}>
-                              <div style={{ padding: "4px 6px", position: "sticky", left: 0, background: "#0a0a0a", zIndex: 1 }}>
-                                <Link href={`/stocks/${tk}`} style={{ color: "#58a6ff", textDecoration: "none", fontWeight: 600, fontSize: 10 }}>{tk}</Link>
-                              </div>
-                              {displayQs.map(q => {
-                                const v = allData[tk][q];
-                                const mCol = v.margin == null ? "#444" : v.margin >= 20 ? "#22c55e" : v.margin >= 10 ? "#4ade80" : v.margin > 0 ? "#a3a3a3" : "#ef4444";
-                                return (
-                                  <React.Fragment key={q}>
-                                    <div style={{ textAlign: "right", padding: "4px 4px", color: v.cost != null ? "#f59e0b" : "#333", fontSize: 10, borderLeft: "1px solid #1a1a1a" }}>{v.cost != null ? v.cost.toFixed(1) : "\u2014"}</div>
-                                    <div style={{ textAlign: "right", padding: "4px 4px", color: v.price != null ? "#3b82f6" : "#333", fontWeight: 600, fontSize: 10 }}>{v.price != null ? v.price.toFixed(1) : "\u2014"}</div>
-                                    <div style={{ textAlign: "right", padding: "4px 4px", color: mCol, fontWeight: 600, fontSize: 10 }}>{v.margin != null ? `${v.margin.toFixed(0)}%` : "\u2014"}</div>
-                                  </React.Fragment>
-                                );
-                              })}
-                            </div>
+                      {/* Clean table — latest 5 quarters */}
+                      <div style={{ padding: "0 8px 2px", fontSize: 10 }}>
+                        {/* Header row */}
+                        <div style={{ display: "grid", gridTemplateColumns: "60px repeat(5, 1fr)", borderBottom: "1px solid #333", paddingBottom: 2 }}>
+                          <div />
+                          {latest5.map(q => (
+                            <div key={q} style={{ textAlign: "center", fontSize: 9, fontWeight: 700, color: "#888", letterSpacing: "0.05em", padding: "4px 0" }}>{q}</div>
                           ))}
-                          </div>
-                          {nQ > 5 && <div style={{ fontSize: 8, color: "#444", padding: "3px 10px", textAlign: "center" }}>← Scroll left for older quarters</div>}
                         </div>
-                        );
-                      })()}
+                        {/* Company rows — each shows cost/price bar + margin */}
+                        {sortedTickers.map(tk => {
+                          return (
+                          <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: "60px repeat(5, 1fr)", borderBottom: "1px solid #1a1a1a", padding: "6px 0", alignItems: "center", transition: "background 0.08s" }}>
+                            <div style={{ padding: "0 4px" }}>
+                              <Link href={`/stocks/${tk}`} style={{ color: TK_COLORS[tk] || "#58a6ff", textDecoration: "none", fontWeight: 700, fontSize: 10 }}>{tk}</Link>
+                            </div>
+                            {latest5.map(q => {
+                              const v = allData[tk][q];
+                              const mCol = v.margin == null ? "#333" : v.margin >= 25 ? "#22c55e" : v.margin >= 15 ? "#4ade80" : v.margin > 0 ? "#a3a3a3" : "#ef4444";
+                              return (
+                                <div key={q} style={{ textAlign: "center", padding: "0 2px" }}>
+                                  {v.cost != null && v.price != null ? (
+                                    <>
+                                      <div style={{ display: "flex", justifyContent: "center", gap: 4, fontSize: 10 }}>
+                                        <span style={{ color: "#f59e0b" }}>{v.cost.toFixed(1)}</span>
+                                        <span style={{ color: "#333" }}>/</span>
+                                        <span style={{ color: "#3b82f6", fontWeight: 600 }}>{v.price.toFixed(1)}</span>
+                                      </div>
+                                      <div style={{ fontSize: 10, fontWeight: 700, color: mCol, marginTop: 1 }}>{v.margin != null ? `${v.margin.toFixed(0)}%` : ""}</div>
+                                    </>
+                                  ) : (
+                                    <span style={{ color: "#333" }}>{"\u2014"}</span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          );
+                        })}
+                        {/* Legend */}
+                        <div style={{ display: "flex", gap: 12, justifyContent: "center", padding: "6px 0 2px", fontSize: 9, color: "#555" }}>
+                          <span><span style={{ color: "#f59e0b" }}>Cost</span> / <span style={{ color: "#3b82f6" }}>Price</span> NOK/kg</span>
+                          <span style={{ color: "#22c55e" }}>Margin %</span>
+                        </div>
+                      </div>
+
+                      {/* Margin trend sparklines per company */}
+                      <div style={{ borderTop: "1px solid #222", padding: "8px 8px 4px" }}>
+                        <div style={{ fontSize: 9, fontWeight: 700, color: "#555", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>MARGIN TREND</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+                          {displayTickers.map(tk => {
+                            const pts = allQs.map(q => ({ q, ...allData[tk][q] })).filter(p => p.margin != null);
+                            if (pts.length < 2) return null;
+                            const maxP = Math.max(...pts.map(p => Math.max(p.cost ?? 0, p.price ?? 0)));
+                            const minP = Math.min(...pts.filter(p => p.cost != null).map(p => p.cost!));
+                            const range = maxP - minP || 1;
+                            const chartW = 140;
+                            const chartH = 36;
+                            const xStep = chartW / (pts.length - 1);
+                            // Build SVG paths for cost and price lines
+                            const costPath = pts.map((p, i) => `${i === 0 ? "M" : "L"}${(i * xStep).toFixed(1)},${(chartH - ((p.cost! - minP) / range) * chartH).toFixed(1)}`).join(" ");
+                            const pricePath = pts.map((p, i) => `${i === 0 ? "M" : "L"}${(i * xStep).toFixed(1)},${(chartH - ((p.price! - minP) / range) * chartH).toFixed(1)}`).join(" ");
+                            // Margin area (between price and cost)
+                            const marginFill = pts.map((p, i) => `${(i * xStep).toFixed(1)},${(chartH - ((p.price! - minP) / range) * chartH).toFixed(1)}`).join(" ")
+                              + " " + [...pts].reverse().map((p, i) => `${((pts.length - 1 - i) * xStep).toFixed(1)},${(chartH - ((p.cost! - minP) / range) * chartH).toFixed(1)}`).join(" ");
+                            const latestMargin = pts[pts.length - 1].margin!;
+                            const prevMargin = pts.length >= 2 ? pts[pts.length - 2].margin! : latestMargin;
+                            const mDelta = latestMargin - prevMargin;
+                            return (
+                              <div key={tk} style={{ background: "#111", borderRadius: 6, padding: "6px 8px", border: "1px solid #1a1a1a" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                                  <span style={{ fontSize: 10, fontWeight: 700, color: TK_COLORS[tk] || "#888" }}>{tk}</span>
+                                  <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                                    <span style={{ fontSize: 12, fontWeight: 700, color: latestMargin >= 20 ? "#22c55e" : latestMargin > 0 ? "#4ade80" : "#ef4444" }}>{latestMargin.toFixed(0)}%</span>
+                                    <span style={{ fontSize: 9, color: mDelta >= 0 ? "#22c55e" : "#ef4444" }}>{mDelta >= 0 ? "\u25B2" : "\u25BC"}{Math.abs(mDelta).toFixed(0)}pp</span>
+                                  </div>
+                                </div>
+                                <svg width="100%" viewBox={`0 0 ${chartW} ${chartH}`} preserveAspectRatio="none" style={{ display: "block" }}>
+                                  <polygon points={marginFill} fill="#22c55e" opacity="0.08" />
+                                  <path d={costPath} fill="none" stroke="#f59e0b" strokeWidth="1.5" opacity="0.7" />
+                                  <path d={pricePath} fill="none" stroke="#3b82f6" strokeWidth="1.5" />
+                                </svg>
+                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#444", marginTop: 2 }}>
+                                  <span>{pts[0].q}</span>
+                                  <span>{pts[pts.length - 1].q}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div style={{ display: "flex", gap: 12, justifyContent: "center", padding: "6px 0 0", fontSize: 8, color: "#444" }}>
+                          <span><span style={{ display: "inline-block", width: 12, height: 2, background: "#f59e0b", verticalAlign: "middle", marginRight: 3 }} />Cost/kg</span>
+                          <span><span style={{ display: "inline-block", width: 12, height: 2, background: "#3b82f6", verticalAlign: "middle", marginRight: 3 }} />Price/kg</span>
+                          <span><span style={{ display: "inline-block", width: 8, height: 8, background: "#22c55e", opacity: 0.15, verticalAlign: "middle", marginRight: 3, borderRadius: 1 }} />Margin</span>
+                        </div>
+                      </div>
 
                       {/* Collapsible: EBIT/kg + Harvest */}
-                      <div style={{ marginTop: 4 }}>
+                      <div style={{ marginTop: 2 }}>
                         <div
                           onClick={() => setQopsDetailOpen(!qopsDetailOpen)}
                           style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", cursor: "pointer", color: "#888", fontSize: 10, fontWeight: 600, letterSpacing: "0.04em", borderTop: "1px solid #222", userSelect: "none" }}
@@ -546,57 +592,42 @@ export default function SeafoodPage() {
                           EBIT/KG &amp; HARVEST VOLUME
                         </div>
                         {qopsDetailOpen && (
-                          <div>
-                            {/* EBIT/kg table */}
-                            <div ref={el => { if (el && !el.dataset.scrolled) { el.scrollLeft = el.scrollWidth; el.dataset.scrolled = "1"; } }} style={{ padding: "0 0 2px", fontSize: 10, overflowX: "auto" }}>
-                              <div style={{ minWidth: 56 + nQ * 80 }}>
-                              <div style={{ display: "grid", gridTemplateColumns: `56px repeat(${nQ}, 80px)`, padding: "4px 8px", fontSize: 9, fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.06em", background: "#111", borderBottom: "1px solid #222" }}>
-                                <div style={{ position: "sticky", left: 0, background: "#111", zIndex: 2 }}>EBIT/KG</div>
-                                {displayQs.map(q => <div key={q} style={{ textAlign: "right" }}>{q}</div>)}
-                              </div>
-                              {sortedTickers.map(tk => (
-                                <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: `56px repeat(${nQ}, 80px)`, padding: "5px 8px", borderBottom: "1px solid #1a1a1a", alignItems: "center", transition: "background 0.08s" }}>
-                                  <div style={{ position: "sticky", left: 0, background: "#0a0a0a", zIndex: 1 }}>
-                                    <Link href={`/stocks/${tk}`} style={{ color: "#58a6ff", textDecoration: "none", fontWeight: 600, fontSize: 10 }}>{tk}</Link>
-                                  </div>
-                                  {displayQs.map(q => {
-                                    const v = allData[tk][q].ebit;
-                                    const col = v == null ? "#444" : v > 20 ? "#22c55e" : v > 10 ? "#4ade80" : v > 0 ? "#a3a3a3" : "#ef4444";
-                                    return (
-                                      <div key={q} style={{ textAlign: "right", color: col, fontWeight: v != null ? 600 : 400, fontSize: 10 }}>
-                                        {v != null ? v.toFixed(1) : "\u2014"}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              ))}
-                              </div>
+                          <div style={{ padding: "0 8px" }}>
+                            {/* EBIT/kg row */}
+                            <div style={{ fontSize: 9, fontWeight: 700, color: "#555", letterSpacing: "0.06em", textTransform: "uppercase", padding: "6px 0 4px" }}>EBIT PER KG</div>
+                            <div style={{ display: "grid", gridTemplateColumns: "60px repeat(5, 1fr)", borderBottom: "1px solid #222", paddingBottom: 2 }}>
+                              <div />
+                              {latest5.map(q => <div key={q} style={{ textAlign: "center", fontSize: 8, color: "#555", fontWeight: 600 }}>{q}</div>)}
                             </div>
-
-                            {/* Harvest volume table */}
-                            <div ref={el => { if (el && !el.dataset.scrolled) { el.scrollLeft = el.scrollWidth; el.dataset.scrolled = "1"; } }} style={{ padding: "0 0 2px", fontSize: 10, marginTop: 2, overflowX: "auto" }}>
-                              <div style={{ minWidth: 56 + nQ * 80 }}>
-                              <div style={{ display: "grid", gridTemplateColumns: `56px repeat(${nQ}, 80px)`, padding: "4px 8px", fontSize: 9, fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.06em", background: "#111", borderBottom: "1px solid #222" }}>
-                                <div style={{ position: "sticky", left: 0, background: "#111", zIndex: 2 }}>HARVEST</div>
-                                {displayQs.map(q => <div key={q} style={{ textAlign: "right" }}>{q}</div>)}
-                              </div>
-                              {sortedTickers.map(tk => (
-                                <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: `56px repeat(${nQ}, 80px)`, padding: "5px 8px", borderBottom: "1px solid #1a1a1a", alignItems: "center", transition: "background 0.08s" }}>
-                                  <div style={{ position: "sticky", left: 0, background: "#0a0a0a", zIndex: 1 }}>
-                                    <Link href={`/stocks/${tk}`} style={{ color: "#58a6ff", textDecoration: "none", fontWeight: 600, fontSize: 10 }}>{tk}</Link>
-                                  </div>
-                                  {displayQs.map(q => {
-                                    const v = allData[tk][q].harvest;
-                                    return (
-                                      <div key={q} style={{ textAlign: "right", color: v != null ? "#ccc" : "#444", fontSize: 10 }}>
-                                        {v != null ? (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v))) : "\u2014"}
-                                      </div>
-                                    );
-                                  })}
+                            {sortedTickers.map(tk => (
+                              <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: "60px repeat(5, 1fr)", borderBottom: "1px solid #1a1a1a", padding: "4px 0", alignItems: "center", transition: "background 0.08s" }}>
+                                <div style={{ padding: "0 4px" }}>
+                                  <Link href={`/stocks/${tk}`} style={{ color: TK_COLORS[tk] || "#58a6ff", textDecoration: "none", fontWeight: 700, fontSize: 10 }}>{tk}</Link>
                                 </div>
-                              ))}
+                                {latest5.map(q => {
+                                  const v = allData[tk][q].ebit;
+                                  const col = v == null ? "#333" : v > 20 ? "#22c55e" : v > 10 ? "#4ade80" : v > 0 ? "#a3a3a3" : "#ef4444";
+                                  return <div key={q} style={{ textAlign: "center", color: col, fontWeight: 600, fontSize: 10 }}>{v != null ? v.toFixed(1) : "\u2014"}</div>;
+                                })}
                               </div>
+                            ))}
+                            {/* Harvest GWT row */}
+                            <div style={{ fontSize: 9, fontWeight: 700, color: "#555", letterSpacing: "0.06em", textTransform: "uppercase", padding: "10px 0 4px" }}>HARVEST VOLUME (GWT)</div>
+                            <div style={{ display: "grid", gridTemplateColumns: "60px repeat(5, 1fr)", borderBottom: "1px solid #222", paddingBottom: 2 }}>
+                              <div />
+                              {latest5.map(q => <div key={q} style={{ textAlign: "center", fontSize: 8, color: "#555", fontWeight: 600 }}>{q}</div>)}
                             </div>
+                            {sortedTickers.map(tk => (
+                              <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: "60px repeat(5, 1fr)", borderBottom: "1px solid #1a1a1a", padding: "4px 0", alignItems: "center", transition: "background 0.08s" }}>
+                                <div style={{ padding: "0 4px" }}>
+                                  <Link href={`/stocks/${tk}`} style={{ color: TK_COLORS[tk] || "#58a6ff", textDecoration: "none", fontWeight: 700, fontSize: 10 }}>{tk}</Link>
+                                </div>
+                                {latest5.map(q => {
+                                  const v = allData[tk][q].harvest;
+                                  return <div key={q} style={{ textAlign: "center", color: v != null ? "#ccc" : "#333", fontSize: 10 }}>{v != null ? (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v))) : "\u2014"}</div>;
+                                })}
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
