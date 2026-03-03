@@ -407,84 +407,96 @@ export default function SeafoodPage() {
                       );
                     })}
                   </div>
-                </>
-              )}
-            </div>
 
-            {/* ─── Quarterly Ops — spans full width across both columns ─── */}
-            {tab === "overview" && Object.keys(quarterlyOps).length > 0 && (() => {
-            const allQs: string[] = [];
-            for (const rows of Object.values(quarterlyOps)) {
-              for (const r of rows) {
-                const lbl = r.label as string;
-                if (!allQs.includes(lbl)) allQs.push(lbl);
-              }
-            }
-            allQs.sort((a, b) => {
-              const [qa, ya] = [parseInt(a[1]), parseInt(a.split(" ")[1])];
-              const [qb, yb] = [parseInt(b[1]), parseInt(b.split(" ")[1])];
-              return ya * 10 + qa - (yb * 10 + qb);
-            });
-            const displayQs = allQs;
-            const displayTickers = ["MOWI", "SALM", "LSG", "GSF", "BAKKA", "AUSS"];
-            const FX: Record<string, number> = { EUR: 11.5, DKK: 1.57, NOK: 1 };
-            const toNok = (v: number | null, cur: string) => v != null ? v * (FX[cur] || 1) : null;
+                  {/* Quarterly Operations Matrix */}
+                  {Object.keys(quarterlyOps).length > 0 && (() => {
+                    const allQs: string[] = [];
+                    for (const rows of Object.values(quarterlyOps)) {
+                      for (const r of rows) {
+                        const lbl = r.label as string;
+                        if (!allQs.includes(lbl)) allQs.push(lbl);
+                      }
+                    }
+                    allQs.sort((a, b) => {
+                      const [qa, ya] = [parseInt(a[1]), parseInt(a.split(" ")[1])];
+                      const [qb, yb] = [parseInt(b[1]), parseInt(b.split(" ")[1])];
+                      return ya * 10 + qa - (yb * 10 + qb);
+                    });
+                    // Show ALL quarters (chronological), but scroll to show latest 5
+                    const displayQs = allQs;
+                    const displayTickers = ["MOWI", "SALM", "LSG", "GSF", "BAKKA", "AUSS"];
+                    // Convert all to NOK for comparability
+                    const FX: Record<string, number> = { EUR: 11.5, DKK: 1.57, NOK: 1 };
+                    const toNok = (v: number | null, cur: string) => v != null ? v * (FX[cur] || 1) : null;
+                    const gcols = `80px repeat(${displayQs.length}, 1fr)`;
 
-            const getByQ = (tk: string) => {
-              const byQ: Record<string, any> = {};
-              for (const r of (quarterlyOps[tk] || [])) byQ[r.label] = r;
-              return byQ;
-            };
+                    // Helper: build byQ map for a ticker
+                    const getByQ = (tk: string) => {
+                      const byQ: Record<string, any> = {};
+                      for (const r of (quarterlyOps[tk] || [])) byQ[r.label] = r;
+                      return byQ;
+                    };
 
-            const allData: Record<string, Record<string, { cost: number | null; price: number | null; margin: number | null; ebit: number | null; harvest: number | null }>> = {};
-            for (const tk of displayTickers) {
-              allData[tk] = {};
-              const byQ = getByQ(tk);
-              for (const q of displayQs) {
-                const d = byQ[q];
-                const cost = toNok(d?.costPerKg, d?.currency || "NOK");
-                const price = toNok(d?.pricePerKg, d?.currency || "NOK");
-                const margin = cost != null && price != null && price > 0 ? ((price - cost) / price) * 100 : null;
-                const ebit = toNok(d?.ebitPerKg, d?.currency || "NOK");
-                const harvest = d?.harvestGwt ?? null;
-                allData[tk][q] = { cost, price, margin, ebit, harvest };
-              }
-            }
+                    // Compute all values per ticker/quarter
+                    const allData: Record<string, Record<string, { cost: number | null; price: number | null; margin: number | null; ebit: number | null; harvest: number | null }>> = {};
+                    for (const tk of displayTickers) {
+                      allData[tk] = {};
+                      const byQ = getByQ(tk);
+                      for (const q of displayQs) {
+                        const d = byQ[q];
+                        const cost = toNok(d?.costPerKg, d?.currency || "NOK");
+                        const price = toNok(d?.pricePerKg, d?.currency || "NOK");
+                        const margin = cost != null && price != null && price > 0 ? ((price - cost) / price) * 100 : null;
+                        const ebit = toNok(d?.ebitPerKg, d?.currency || "NOK");
+                        const harvest = d?.harvestGwt ?? null;
+                        allData[tk][q] = { cost, price, margin, ebit, harvest };
+                      }
+                    }
 
-            const sortedTickers = [...displayTickers];
-            if (qopsSort) {
-              const [field, qLabel] = qopsSort.col.split("|");
-              sortedTickers.sort((a, b) => {
-                const va = allData[a]?.[qLabel]?.[field as keyof typeof allData[typeof a][typeof qLabel]] as number | null;
-                const vb = allData[b]?.[qLabel]?.[field as keyof typeof allData[typeof b][typeof qLabel]] as number | null;
-                const na = va ?? -Infinity;
-                const nb = vb ?? -Infinity;
-                return qopsSort.asc ? na - nb : nb - na;
-              });
-            }
+                    // Sorting
+                    const handleSort = (col: string) => {
+                      setQopsSort(prev => prev?.col === col ? { col, asc: !prev.asc } : { col, asc: false });
+                    };
+                    const arrow = (col: string) => qopsSort?.col === col ? (qopsSort.asc ? " \u25B2" : " \u25BC") : "";
 
-            const latest5 = allQs.slice(-5);
-            const TK_COLORS: Record<string, string> = { MOWI: "#f97316", SALM: "#3b82f6", LSG: "#22c55e", GSF: "#ef4444", BAKKA: "#a855f7", AUSS: "#06b6d4" };
+                    const sortedTickers = [...displayTickers];
+                    if (qopsSort) {
+                      const [field, qLabel] = qopsSort.col.split("|");
+                      sortedTickers.sort((a, b) => {
+                        const va = allData[a]?.[qLabel]?.[field as keyof typeof allData[typeof a][typeof qLabel]] as number | null;
+                        const vb = allData[b]?.[qLabel]?.[field as keyof typeof allData[typeof b][typeof qLabel]] as number | null;
+                        const na = va ?? -Infinity;
+                        const nb = vb ?? -Infinity;
+                        return qopsSort.asc ? na - nb : nb - na;
+                      });
+                    }
 
-            return (
-            <div style={{ gridColumn: "1 / -1", marginTop: 2, borderTop: "1px solid #222" }}>
-              <div style={S.section}>QUARTERLY OPERATIONS</div>
+                    // Grid: ticker col + 3 sub-cols per quarter
+                    const nQ = displayQs.length;
+                    const mergedCols = `56px repeat(${nQ * 3}, 1fr)`;
+
+                    // Show latest 5 quarters in main table
+                    const latest5 = allQs.slice(-5);
+                    const TK_COLORS: Record<string, string> = { MOWI: "#f97316", SALM: "#3b82f6", LSG: "#22c55e", GSF: "#ef4444", BAKKA: "#a855f7", AUSS: "#06b6d4" };
+
+                    return (
+                    <div style={{ marginTop: 2 }}>
+                      <div style={S.section}>QUARTERLY OPERATIONS</div>
                       <div style={{ fontSize: 9, color: "#555", padding: "2px 10px 6px", letterSpacing: "0.04em" }}>
                         All values converted to NOK/kg. Source: company quarterly reports.
                       </div>
 
-                      {/* Quarterly table — all quarters, scrollable, latest 5 visible */}
+                      {/* Scrollable table — 5 quarters visible at full width, scroll left for older */}
                       {(() => {
-                        const nQ = displayQs.length;
-                        const stickyW = 80;
-                        const qColW = "calc((100% - 80px) / 5)";
+                        const stickyW = 76;
+                        const qColW = `calc((100% - ${stickyW}px) / 5)`;
                         const cols = `${stickyW}px repeat(${nQ}, ${qColW})`;
                         return (
                         <div
                           ref={el => { if (el && !el.dataset.scrolled) { el.scrollLeft = el.scrollWidth; el.dataset.scrolled = "1"; } }}
-                          style={{ overflowX: "auto", fontSize: 11 }}
+                          style={{ padding: "0 0 2px", fontSize: 11, overflowX: "auto" }}
                         >
-                          <div style={{ minWidth: stickyW + nQ * 160, padding: "4px 0" }}>
+                          <div style={{ minWidth: `calc(${stickyW}px + ${nQ} * ${qColW})` }}>
                             {/* Header */}
                             <div style={{ display: "grid", gridTemplateColumns: cols, borderBottom: "1px solid #333", paddingBottom: 4 }}>
                               <div style={{ position: "sticky", left: 0, background: "#0a0a0a", zIndex: 2 }} />
@@ -495,14 +507,14 @@ export default function SeafoodPage() {
                             {/* Rows */}
                             {sortedTickers.map(tk => (
                               <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: cols, borderBottom: "1px solid #1a1a1a", padding: "10px 0", alignItems: "center", transition: "background 0.08s" }}>
-                                <div style={{ padding: "0 10px", position: "sticky", left: 0, background: "#0a0a0a", zIndex: 1 }}>
+                                <div style={{ padding: "0 8px", position: "sticky", left: 0, background: "#0a0a0a", zIndex: 1 }}>
                                   <Link href={`/stocks/${tk}`} style={{ color: TK_COLORS[tk] || "#58a6ff", textDecoration: "none", fontWeight: 700, fontSize: 12 }}>{tk}</Link>
                                 </div>
                                 {displayQs.map(q => {
                                   const v = allData[tk][q];
                                   const mCol = v.margin == null ? "#333" : v.margin >= 25 ? "#22c55e" : v.margin >= 15 ? "#4ade80" : v.margin > 0 ? "#a3a3a3" : "#ef4444";
                                   return (
-                                    <div key={q} style={{ textAlign: "center", padding: "0 8px" }}>
+                                    <div key={q} style={{ textAlign: "center", padding: "0 6px" }}>
                                       {v.cost != null && v.price != null ? (
                                         <>
                                           <div style={{ display: "flex", justifyContent: "center", gap: 8, fontSize: 12 }}>
@@ -670,68 +682,71 @@ export default function SeafoodPage() {
                           EBIT/KG &amp; HARVEST VOLUME
                         </div>
                         {qopsDetailOpen && (() => {
-                          const detCols = `80px repeat(${latest5.length}, 1fr)`;
+                          const detQW = 90;
+                          const detSticky = 60;
+                          const detCols = `${detSticky}px repeat(${nQ}, ${detQW}px)`;
                           return (
                           <div>
                             {/* EBIT/kg */}
                             <div style={{ fontSize: 9, fontWeight: 700, color: "#555", letterSpacing: "0.06em", textTransform: "uppercase", padding: "6px 8px 4px" }}>EBIT PER KG</div>
-                            <div style={{ padding: "0 8px" }}>
-                                <div style={{ display: "grid", gridTemplateColumns: detCols, borderBottom: "1px solid #222", paddingBottom: 2 }}>
-                                  <div />
-                                  {latest5.map(q => <div key={q} style={{ textAlign: "center", fontSize: 8, color: "#555", fontWeight: 600 }}>{q}</div>)}
+                            <div ref={el => { if (el && !el.dataset.scrolled) { el.scrollLeft = el.scrollWidth; el.dataset.scrolled = "1"; } }} style={{ overflowX: "auto" }}>
+                              <div style={{ minWidth: detSticky + nQ * detQW }}>
+                                <div style={{ display: "grid", gridTemplateColumns: detCols, borderBottom: "1px solid #222", paddingBottom: 2, padding: "0 8px" }}>
+                                  <div style={{ position: "sticky", left: 0, background: "#0a0a0a", zIndex: 2 }} />
+                                  {displayQs.map(q => <div key={q} style={{ textAlign: "center", fontSize: 8, color: "#555", fontWeight: 600 }}>{q}</div>)}
                                 </div>
                                 {sortedTickers.map(tk => (
-                                  <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: detCols, borderBottom: "1px solid #1a1a1a", padding: "4px 0", alignItems: "center", transition: "background 0.08s" }}>
-                                    <div style={{ padding: "0 6px" }}>
+                                  <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: detCols, borderBottom: "1px solid #1a1a1a", padding: "4px 8px", alignItems: "center", transition: "background 0.08s" }}>
+                                    <div style={{ padding: "0 4px", position: "sticky", left: 0, background: "#0a0a0a", zIndex: 1 }}>
                                       <Link href={`/stocks/${tk}`} style={{ color: TK_COLORS[tk] || "#58a6ff", textDecoration: "none", fontWeight: 700, fontSize: 10 }}>{tk}</Link>
                                     </div>
-                                    {latest5.map(q => {
+                                    {displayQs.map(q => {
                                       const v = allData[tk][q].ebit;
                                       const col = v == null ? "#333" : v > 20 ? "#22c55e" : v > 10 ? "#4ade80" : v > 0 ? "#a3a3a3" : "#ef4444";
                                       return <div key={q} style={{ textAlign: "center", color: col, fontWeight: 600, fontSize: 10 }}>{v != null ? v.toFixed(1) : "\u2014"}</div>;
                                     })}
                                   </div>
                                 ))}
+                              </div>
                             </div>
                             {/* Harvest GWT */}
                             <div style={{ fontSize: 9, fontWeight: 700, color: "#555", letterSpacing: "0.06em", textTransform: "uppercase", padding: "10px 8px 4px" }}>HARVEST VOLUME (GWT)</div>
-                            <div style={{ padding: "0 8px" }}>
-                                <div style={{ display: "grid", gridTemplateColumns: detCols, borderBottom: "1px solid #222", paddingBottom: 2 }}>
-                                  <div />
-                                  {latest5.map(q => <div key={q} style={{ textAlign: "center", fontSize: 8, color: "#555", fontWeight: 600 }}>{q}</div>)}
+                            <div ref={el => { if (el && !el.dataset.scrolled) { el.scrollLeft = el.scrollWidth; el.dataset.scrolled = "1"; } }} style={{ overflowX: "auto" }}>
+                              <div style={{ minWidth: detSticky + nQ * detQW }}>
+                                <div style={{ display: "grid", gridTemplateColumns: detCols, borderBottom: "1px solid #222", paddingBottom: 2, padding: "0 8px" }}>
+                                  <div style={{ position: "sticky", left: 0, background: "#0a0a0a", zIndex: 2 }} />
+                                  {displayQs.map(q => <div key={q} style={{ textAlign: "center", fontSize: 8, color: "#555", fontWeight: 600 }}>{q}</div>)}
                                 </div>
                                 {sortedTickers.map(tk => (
-                                  <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: detCols, borderBottom: "1px solid #1a1a1a", padding: "4px 0", alignItems: "center", transition: "background 0.08s" }}>
-                                    <div style={{ padding: "0 6px" }}>
+                                  <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: detCols, borderBottom: "1px solid #1a1a1a", padding: "4px 8px", alignItems: "center", transition: "background 0.08s" }}>
+                                    <div style={{ padding: "0 4px", position: "sticky", left: 0, background: "#0a0a0a", zIndex: 1 }}>
                                       <Link href={`/stocks/${tk}`} style={{ color: TK_COLORS[tk] || "#58a6ff", textDecoration: "none", fontWeight: 700, fontSize: 10 }}>{tk}</Link>
                                     </div>
-                                    {latest5.map(q => {
+                                    {displayQs.map(q => {
                                       const v = allData[tk][q].harvest;
                                       return <div key={q} style={{ textAlign: "center", color: v != null ? "#ccc" : "#333", fontSize: 10 }}>{v != null ? (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v))) : "\u2014"}</div>;
                                     })}
                                   </div>
                                 ))}
+                              </div>
                             </div>
                           </div>
                           );
                         })()}
                       </div>
                     </div>
-            );
-          })()}
+                    );
+                  })()}
 
-            {/* ─── Remaining Overview Sections (span both columns) ─── */}
-            {tab === "overview" && (
-              <div style={{ gridColumn: "1 / -1" }}>
-              {/* Map */}
-              <div id="seafood-map" style={{ borderBottom: "1px solid #222" }}>
-                <div style={S.section}>COASTAL MAP</div>
-                <div style={{ height: 460 }}>
-                  <ProductionAreaMap areas={areas} localities={localities} selectedTicker={selectedTicker} onTickerSelect={setSelectedTicker} focusLocation={focusLocation} />
-                </div>
-              </div>
+                  {/* Map */}
+                  <div id="seafood-map" style={{ borderBottom: "1px solid #222" }}>
+                    <div style={S.section}>COASTAL MAP</div>
+                    <div style={{ height: 460 }}>
+                      <ProductionAreaMap areas={areas} localities={localities} selectedTicker={selectedTicker} onTickerSelect={setSelectedTicker} focusLocation={focusLocation} />
+                    </div>
+                  </div>
 
-              {/* Areas Teaser — Company sites by traffic light zone */}
+                  {/* Areas Teaser — Company sites by traffic light zone */}
                   {(() => {
                     const TCO_COLORS: Record<string, string> = { MOWI: "#f97316", SALM: "#3b82f6", LSG: "#22c55e", GSF: "#ef4444", AUSS: "#06b6d4" };
                     const TCO = ["MOWI", "SALM", "LSG", "GSF", "AUSS"];
@@ -877,11 +892,9 @@ export default function SeafoodPage() {
                       })
                     )}
                   </div>
-              </div>
-            )}
+                </>
+              )}
 
-            {/* ─── Other Tabs (left column) ────────────────── */}
-            <div style={{ gridColumn: "1" }}>
               {tab === "map" && (
                 <div style={{ padding: 0 }}>
                   <div style={{ ...S.section, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1511,7 +1524,7 @@ export default function SeafoodPage() {
             </div>
 
             {/* ─── Right Sidebar ──────────────────────────── */}
-            <div className="sf-right" style={{ ...S.panel, gridColumn: "2", gridRow: "1 / span 20" }}>
+            <div className="sf-right" style={S.panel}>
               {/* Salmon Price */}
               <div style={S.section}>SALMON SPOT</div>
               <div style={{ padding: "8px 10px" }}>
