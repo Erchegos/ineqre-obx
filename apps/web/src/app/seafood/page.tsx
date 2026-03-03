@@ -123,6 +123,7 @@ export default function SeafoodPage() {
   const [focusLocation, setFocusLocation] = useState<{ lat: number; lng: number; name: string } | null>(null);
   const [qopsDetailOpen, setQopsDetailOpen] = useState(false);
   const [qopsSort, setQopsSort] = useState<{ col: string; asc: boolean } | null>(null);
+  const [marginHover, setMarginHover] = useState<{ tk: string; idx: number; x: number; y: number } | null>(null);
   const [hoveredExportIdx, setHoveredExportIdx] = useState<number | null>(null);
   const [hoveredBioIdx, setHoveredBioIdx] = useState<number | null>(null);
   const [hoveredMortIdx, setHoveredMortIdx] = useState<number | null>(null);
@@ -553,8 +554,10 @@ export default function SeafoodPage() {
                             const latestMargin = pts[pts.length - 1].margin!;
                             const prevMargin = pts.length >= 2 ? pts[pts.length - 2].margin! : latestMargin;
                             const mDelta = latestMargin - prevMargin;
+                            const hIdx = marginHover?.tk === tk ? marginHover.idx : -1;
+                            const hPt = hIdx >= 0 ? pts[hIdx] : null;
                             return (
-                              <div key={tk} style={{ background: "#111", borderRadius: 6, padding: "6px 8px", border: "1px solid #1a1a1a" }}>
+                              <div key={tk} style={{ background: "#111", borderRadius: 6, padding: "6px 8px", border: "1px solid #1a1a1a", position: "relative" }}>
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                                   <span style={{ fontSize: 10, fontWeight: 700, color: TK_COLORS[tk] || "#888" }}>{tk}</span>
                                   <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
@@ -562,11 +565,52 @@ export default function SeafoodPage() {
                                     <span style={{ fontSize: 9, color: mDelta >= 0 ? "#22c55e" : "#ef4444" }}>{mDelta >= 0 ? "\u25B2" : "\u25BC"}{Math.abs(mDelta).toFixed(0)}pp</span>
                                   </div>
                                 </div>
-                                <svg width="100%" viewBox={`0 0 ${chartW} ${chartH}`} preserveAspectRatio="none" style={{ display: "block" }}>
-                                  <polygon points={marginFill} fill="#22c55e" opacity="0.08" />
-                                  <path d={costPath} fill="none" stroke="#f59e0b" strokeWidth="1.5" opacity="0.7" />
-                                  <path d={pricePath} fill="none" stroke="#3b82f6" strokeWidth="1.5" />
-                                </svg>
+                                <div
+                                  style={{ position: "relative" }}
+                                  onMouseMove={e => {
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const xRel = (e.clientX - rect.left) / rect.width;
+                                    const idx = Math.round(xRel * (pts.length - 1));
+                                    const clamped = Math.max(0, Math.min(pts.length - 1, idx));
+                                    setMarginHover({ tk, idx: clamped, x: e.clientX - rect.left, y: e.clientY - rect.top });
+                                  }}
+                                  onMouseLeave={() => setMarginHover(null)}
+                                >
+                                  <svg width="100%" viewBox={`0 0 ${chartW} ${chartH}`} preserveAspectRatio="none" style={{ display: "block" }}>
+                                    <polygon points={marginFill} fill="#22c55e" opacity="0.08" />
+                                    <path d={costPath} fill="none" stroke="#f59e0b" strokeWidth="1.5" opacity="0.7" />
+                                    <path d={pricePath} fill="none" stroke="#3b82f6" strokeWidth="1.5" />
+                                    {/* Hover indicator line + dots */}
+                                    {hIdx >= 0 && (() => {
+                                      const hx = hIdx * xStep;
+                                      const cy = chartH - ((pts[hIdx].cost! - minP) / range) * chartH;
+                                      const py = chartH - ((pts[hIdx].price! - minP) / range) * chartH;
+                                      return (
+                                        <>
+                                          <line x1={hx} y1={0} x2={hx} y2={chartH} stroke="#555" strokeWidth="0.5" strokeDasharray="2,2" />
+                                          <circle cx={hx} cy={cy} r="2.5" fill="#f59e0b" />
+                                          <circle cx={hx} cy={py} r="2.5" fill="#3b82f6" />
+                                        </>
+                                      );
+                                    })()}
+                                  </svg>
+                                  {/* Floating tooltip */}
+                                  {hPt && (
+                                    <div style={{
+                                      position: "absolute", top: -52, left: Math.min(Math.max(marginHover!.x - 45, 0), 80),
+                                      background: "#1a1a1a", border: "1px solid #333", borderRadius: 5, padding: "4px 8px",
+                                      fontSize: 9, color: "#ccc", pointerEvents: "none", zIndex: 10, whiteSpace: "nowrap",
+                                      boxShadow: "0 4px 12px rgba(0,0,0,0.5)"
+                                    }}>
+                                      <div style={{ fontWeight: 700, color: "#888", marginBottom: 2 }}>{hPt.q}</div>
+                                      <div style={{ display: "flex", gap: 8 }}>
+                                        <span>Cost <span style={{ color: "#f59e0b", fontWeight: 700 }}>{hPt.cost!.toFixed(1)}</span></span>
+                                        <span>Price <span style={{ color: "#3b82f6", fontWeight: 700 }}>{hPt.price!.toFixed(1)}</span></span>
+                                        <span>Mrg <span style={{ color: hPt.margin! >= 20 ? "#22c55e" : hPt.margin! > 0 ? "#4ade80" : "#ef4444", fontWeight: 700 }}>{hPt.margin!.toFixed(0)}%</span></span>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
                                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#444", marginTop: 2 }}>
                                   <span>{pts[0].q}</span>
                                   <span>{pts[pts.length - 1].q}</span>
@@ -643,22 +687,28 @@ export default function SeafoodPage() {
                     </div>
                   </div>
 
-                  {/* Areas Teaser — Company site distribution */}
+                  {/* Areas Teaser — Company sites by traffic light zone */}
                   {(() => {
                     const TCO_COLORS: Record<string, string> = { MOWI: "#f97316", SALM: "#3b82f6", LSG: "#22c55e", GSF: "#ef4444", AUSS: "#06b6d4" };
                     const TCO = ["MOWI", "SALM", "LSG", "GSF", "AUSS"];
-                    // Count sites per company
-                    const coSites: Record<string, number> = {};
-                    for (const tk of TCO) coSites[tk] = localities.filter(l => l.ticker === tk && l.isActive).length;
-                    const maxSites = Math.max(...Object.values(coSites), 1);
-                    const totalSites = Object.values(coSites).reduce((s, v) => s + v, 0);
-                    // Count areas per company
-                    const coAreas: Record<string, number> = {};
+                    const areaTL: Record<number, string> = {};
+                    for (const a of areas) areaTL[a.areaNumber] = a.trafficLight || "";
+                    // Count sites per company per traffic light
+                    const coByTL: Record<string, { green: number; yellow: number; red: number; total: number; areaCnt: number }> = {};
                     for (const tk of TCO) {
+                      const c = { green: 0, yellow: 0, red: 0, total: 0 };
                       const areaSet = new Set<number>();
-                      for (const loc of localities) if (loc.ticker === tk && loc.isActive && loc.productionArea) areaSet.add(loc.productionArea);
-                      coAreas[tk] = areaSet.size;
+                      for (const loc of localities) {
+                        if (loc.ticker !== tk || !loc.isActive || !loc.productionArea) continue;
+                        areaSet.add(loc.productionArea);
+                        const tl = areaTL[loc.productionArea] || "";
+                        if (tl === "green") c.green++; else if (tl === "yellow") c.yellow++; else if (tl === "red") c.red++;
+                        c.total++;
+                      }
+                      coByTL[tk] = { ...c, areaCnt: areaSet.size };
                     }
+                    const maxSites = Math.max(...TCO.map(tk => coByTL[tk].total), 1);
+                    const totalSites = TCO.reduce((s, tk) => s + coByTL[tk].total, 0);
                     return (
                       <div style={{ borderBottom: "1px solid #222", padding: "10px 10px 12px" }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
@@ -672,26 +722,34 @@ export default function SeafoodPage() {
                             EXPLORE ALL AREAS →
                           </button>
                         </div>
-                        {/* Horizontal bar per company */}
+                        {/* Horizontal bars — segmented green/yellow/red */}
                         <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "0 2px" }}>
                           {TCO.map((tk, idx) => {
-                            const sites = coSites[tk];
-                            const pct = (sites / maxSites) * 100;
-                            const areaCnt = coAreas[tk];
+                            const d = coByTL[tk];
+                            const barPct = (d.total / maxSites) * 100;
                             return (
                               <div key={tk} style={{ display: "grid", gridTemplateColumns: "52px 1fr 70px", alignItems: "center", gap: 8, animation: `teaserSlide 0.5s ease-out ${idx * 0.07}s both` }}>
                                 <Link href={`/stocks/${tk}`} style={{ color: TCO_COLORS[tk], textDecoration: "none", fontWeight: 700, fontSize: 12 }}>{tk}</Link>
-                                <div style={{ position: "relative", height: 18, background: "#111", borderRadius: 4, overflow: "hidden" }}>
-                                  <div style={{ height: "100%", width: `${pct}%`, background: `${TCO_COLORS[tk]}30`, borderRadius: 4, borderRight: `2px solid ${TCO_COLORS[tk]}`, transition: "width 0.6s ease-out" }} />
-                                  <span style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", fontSize: 10, fontWeight: 700, color: TCO_COLORS[tk] }}>{sites} sites</span>
+                                <div style={{ position: "relative", height: 20, background: "#111", borderRadius: 4, overflow: "hidden" }}>
+                                  <div style={{ display: "flex", height: "100%", width: `${barPct}%`, borderRadius: 4, overflow: "hidden" }}>
+                                    {d.green > 0 && <div style={{ width: `${(d.green / d.total) * 100}%`, background: "#22c55e", height: "100%" }} title={`${d.green} sites in green zones`} />}
+                                    {d.yellow > 0 && <div style={{ width: `${(d.yellow / d.total) * 100}%`, background: "#f59e0b", height: "100%" }} title={`${d.yellow} sites in yellow zones`} />}
+                                    {d.red > 0 && <div style={{ width: `${(d.red / d.total) * 100}%`, background: "#ef4444", height: "100%" }} title={`${d.red} sites in red zones`} />}
+                                  </div>
+                                  <span style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", fontSize: 10, fontWeight: 700, color: "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>{d.total} sites</span>
                                 </div>
-                                <span style={{ fontSize: 10, color: "#666", textAlign: "right" }}>{areaCnt} of {areas.length} areas</span>
+                                <span style={{ fontSize: 10, color: "#666", textAlign: "right" }}>{d.areaCnt}/{areas.length} areas</span>
                               </div>
                             );
                           })}
                         </div>
-                        <div style={{ fontSize: 9, color: "#444", textAlign: "center", marginTop: 8 }}>
-                          {totalSites} tracked active sites across {areas.length} production areas
+                        {/* Legend */}
+                        <div style={{ display: "flex", gap: 14, justifyContent: "center", marginTop: 8, fontSize: 9, color: "#555" }}>
+                          <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "#22c55e", verticalAlign: "middle", marginRight: 3 }} />Green</span>
+                          <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "#f59e0b", verticalAlign: "middle", marginRight: 3 }} />Yellow</span>
+                          <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "#ef4444", verticalAlign: "middle", marginRight: 3 }} />Red</span>
+                          <span style={{ color: "#444" }}>|</span>
+                          <span>{totalSites} sites across {areas.length} areas</span>
                         </div>
                         <style>{`
                           @keyframes teaserSlide {
