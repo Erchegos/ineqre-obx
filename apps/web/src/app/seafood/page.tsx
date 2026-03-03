@@ -486,16 +486,16 @@ export default function SeafoodPage() {
                         All values converted to NOK/kg. Source: company quarterly reports.
                       </div>
 
-                      {/* Scrollable table — latest 5 visible, scroll left for older */}
+                      {/* Scrollable table — exactly 5 visible, scroll left for older */}
                       {(() => {
-                        const visibleQs = 5;
-                        const qW = Math.floor((typeof window !== "undefined" ? Math.min(window.innerWidth * 0.42, 600) : 500) / visibleQs);
                         const stickyW = 60;
+                        const qW = 110; // fixed px per quarter
                         const cols = `${stickyW}px repeat(${nQ}, ${qW}px)`;
+                        const visibleW = stickyW + 5 * qW; // only 5 quarters visible
                         return (
                         <div
                           ref={el => { if (el && !el.dataset.scrolled) { el.scrollLeft = el.scrollWidth; el.dataset.scrolled = "1"; } }}
-                          style={{ padding: "0 0 2px", fontSize: 10, overflowX: "auto", maxWidth: "100%" }}
+                          style={{ padding: "0 0 2px", fontSize: 10, overflowX: "auto", maxWidth: visibleW }}
                         >
                           <div style={{ minWidth: stickyW + nQ * qW }}>
                             {/* Header */}
