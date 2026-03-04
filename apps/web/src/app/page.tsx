@@ -299,6 +299,18 @@ export default function HomePage() {
                 visible={modulesReveal.visible}
                 delay={7}
               />
+              <FeatureCard
+                href="/shipping"
+                title="Shipping Intelligence"
+                description="OSE shipping terminal. Fleet tracking on global map with vessel-level charter rates, BDI/BDTI/BCTI indices, rate exposure matrix, contract expiry tracking, and quarterly TCE comparison across 10 companies."
+                tags={[
+                  { label: "Fleet Map", color: "var(--info)" },
+                  { label: "Rates", color: "var(--warning)" },
+                  { label: "10 Companies", color: "var(--success)" },
+                ]}
+                visible={modulesReveal.visible}
+                delay={8}
+              />
             </div>
           </section>
 
@@ -490,7 +502,7 @@ function FeatureCard({ href, title, description, tags, visible, delay }: {
         transition: `opacity 0.5s ease ${delay * 0.1}s, transform 0.5s ease ${delay * 0.1}s, border-color 0.25s ease, box-shadow 0.25s ease`,
       }}
     >
-      <div style={{ display: "flex", gap: 5, marginBottom: 12, flexWrap: "wrap", minHeight: 24 }}>
+      <div style={{ display: "flex", gap: 4, marginBottom: 10, flexWrap: "wrap", minHeight: 16 }}>
         {tags.map(t => (
           <TagPill key={t.label} label={t.label} color={t.color} />
         ))}
@@ -564,18 +576,17 @@ function TagPill({ label, color }: { label: string; color: string }) {
   return (
     <span style={{
       display: "inline-block",
-      padding: "3px 8px",
-      borderRadius: 3,
-      fontSize: 10,
+      padding: "1px 5px",
+      borderRadius: 2,
+      fontSize: 8,
       fontFamily: "monospace",
       fontWeight: 600,
-      letterSpacing: "0.04em",
+      letterSpacing: "0.05em",
       textTransform: "uppercase" as const,
-      lineHeight: 1.2,
+      lineHeight: 1.3,
       whiteSpace: "nowrap" as const,
-      background: `${hex}22`,
-      color: hex,
-      border: `1px solid ${hex}30`,
+      background: `${hex}15`,
+      color: `${hex}bb`,
     }}>
       {label}
     </span>

@@ -45,7 +45,10 @@
     "research:dnb-markets": "tsx scripts/fetch-dnb-markets-research.ts",
     "research:dnb-markets:dry": "tsx scripts/fetch-dnb-markets-research.ts --dry-run",
     "research:dnb-markets:all": "tsx scripts/fetch-dnb-markets-research.ts --all-macro",
-    "research:dnb-markets:back": "tsx scripts/fetch-dnb-markets-research.ts --scan-back"
+    "research:dnb-markets:back": "tsx scripts/fetch-dnb-markets-research.ts --scan-back",
+    "shipping:rates": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-shipping-rates.ts",
+    "shipping:pareto": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-shipping-rates-pareto.ts",
+    "shipping:pareto:show": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-shipping-rates-pareto.ts --show"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

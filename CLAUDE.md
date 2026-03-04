@@ -76,6 +76,7 @@ InEqRe_OBX/
 | **Portfolio Optimizer** | `/portfolio` | `apps/web/src/app/portfolio/page.tsx` |
 | **Intelligence Terminal** | `/news` | `apps/web/src/app/news/page.tsx` |
 | **Seafood Intelligence** | `/seafood` | `apps/web/src/app/seafood/page.tsx` |
+| **Shipping Intelligence** | `/shipping` | `apps/web/src/app/shipping/page.tsx` |
 
 ---
 
@@ -178,6 +179,20 @@ All endpoints in `apps/web/src/app/api/`
 | `GET /api/seafood/ocean` | Sea temperature by production area (weekly) |
 | `GET /api/seafood/quarterly-ops` | Quarterly company ops (EBIT/kg, harvest, cost/kg) from earnings reports |
 
+### Shipping APIs
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/shipping/overview` | Fleet KPIs, BDI/BDTI/BCTI indices with change |
+| `GET /api/shipping/companies` | All companies with fleet stats, latest rates, stock price |
+| `GET /api/shipping/companies/[ticker]` | Company detail: vessels, contracts, quarterly rates |
+| `GET /api/shipping/positions` | Vessel positions with contract/rate data (for map) |
+| `GET /api/shipping/vessels` | Vessel list with contract info, filterable |
+| `GET /api/shipping/rates/market` | Market rate time series (BDI/BDTI/BCTI) |
+| `GET /api/shipping/rates/company` | Company quarterly TCE data |
+| `GET /api/shipping/contracts` | Vessel contracts with rate vs spot comparison |
+| `GET /api/shipping/ports` | Reference ports |
+| `GET /api/shipping/exposure-matrix` | Company x vessel_class rate heatmap |
+
 ### System APIs
 | Endpoint | Purpose |
 |----------|---------|
@@ -270,6 +285,10 @@ All in `apps/web/src/components/`
 - `MethodologySection.tsx` - Expandable methodology explanations
 - `MarketCorrelation.tsx` - Market-level correlation
 
+### Shipping
+- `ShippingMap.tsx` - Map wrapper with sector/company filter bars (dynamic import, no SSR)
+- `ShippingMapInner.tsx` - react-leaflet global vessel map, dark theme, vessel/port markers with rich popups
+
 ---
 
 ## Database Schema
@@ -350,6 +369,17 @@ Schema files in `packages/db/src/schema/`
 | `seafood_ocean_conditions` | Sea temperature aggregated per area per week |
 | `salmon_quarterly_ops` | Company quarterly ops data from earnings reports (EBIT/kg, harvest, cost/kg) |
 
+### Shipping Tables
+| Table | Purpose |
+|-------|---------|
+| `shipping_companies` | OSE-listed shipping companies (sector, fleet size, color) |
+| `shipping_vessels` | Individual vessels (IMO, DWT/TEU, type, class, built year) |
+| `shipping_positions` | AIS-derived vessel positions (lat/lon, speed, heading, destination) |
+| `shipping_vessel_contracts` | Charter contracts (TC/SPOT/COA, rate, charterer, expiry) |
+| `shipping_company_rates` | Quarterly company TCE rates by vessel class |
+| `shipping_market_rates` | Daily market rate indices (BDI, BDTI, BCTI) |
+| `shipping_ports` | Reference ports with coordinates and sector |
+
 ---
 
 ## Data Pipeline
@@ -423,6 +453,7 @@ Run after market close alongside ML pipeline:
 | `fetch-redeye-research.ts` | Scrape commissioned research from Redeye (GraphQL API, OSE-only filter) |
 | `fetch-dnb-carnegie-research.ts` | Scrape commissioned research from DNB Carnegie Access (sitemap + REST API, NO-country filter, PDF download) |
 | `fetch-dnb-markets-research.ts` | Scrape DNB Markets macro/FI research PDFs (public getreport.aspx, ID range scan, pdftotext metadata extraction) |
+| `fetch-shipping-rates.ts` | Fetch BDI market rate from Yahoo Finance (`^BDI`), store in `shipping_market_rates` |
 
 ### scripts/
 | Script | Purpose |
@@ -486,6 +517,7 @@ pnpm run research:dnb-markets     # Fetch DNB Markets macro research PDFs (2026+
 pnpm run research:dnb-markets:dry # Dry run (scan only)
 pnpm run research:dnb-markets:all # Include all macro (no Norway keyword filter)
 pnpm run research:dnb-markets:back # Scan further back (older IDs from 260000)
+pnpm run shipping:rates     # Fetch BDI from Yahoo Finance
 ```
 
 ---
@@ -784,6 +816,30 @@ The optimize API (`POST /api/portfolio/optimize`) enriches results with:
 ### Persistence
 - Save/load named portfolios via `portfolio_configs` table (scoped by profile)
 - CRUD API at `/api/portfolio/configs` (filtered by JWT profile)
+
+---
+
+## Shipping Intelligence Details
+
+Located at `/shipping`. Monolithic "use client" page following the seafood terminal pattern.
+
+### Companies Tracked (10 OSE-Listed)
+FRO (Frontline), HAFNI (Hafnia), FLNG (Flex LNG), SOFF (Solstad Offshore), BORR (Borr Drilling), DOFG (DOF Group), 2020 (2020 Bulkers), HAVI (Havila Shipping), GOGL (Golden Ocean), MPCC (MPC Container Ships)
+
+### 4 Tabs
+1. **OVERVIEW** — Fleet KPIs (vessels, utilization, at-sea %), BDI/BDTI/BCTI index cards with change, company grid with stock price + fleet stats
+2. **MAP & FLEET** — Global react-leaflet map with vessel markers colored by company, sector/company filter bars, vessel popups showing charter rate, destination, contract info
+3. **RATES** — Market rate time series charts (mini SVG sparklines), quarterly company TCE comparison table, rate exposure heatmap (company x vessel_class, colored by delta vs spot)
+4. **CONTRACTS** — Contract expiry tracking, grouped by company, rate vs spot comparison, days remaining color-coded (green >180d, yellow 60-180d, red <60d)
+
+### Data Sources
+- **Seed data**: Static vessel fleet, positions, contracts, quarterly TCE rates (from company reports)
+- **Yahoo Finance**: BDI index (`^BDI`) via `fetch-shipping-rates.ts`
+- **Future**: Kystverket AIS (free Norwegian government vessel tracking), Pareto daily shipping PDFs
+
+### Map Implementation
+- `ShippingMap.tsx` wrapper (dynamic import, no SSR) with sector/company filter bars
+- `ShippingMapInner.tsx`: react-leaflet `MapContainer` center `[25,20]` zoom 2, dark theme via CSS filter, `FlyToVessel` animation, vessel `CircleMarker` with radius by DWT, rich `Popup` with rate/contract info
 
 ---
 

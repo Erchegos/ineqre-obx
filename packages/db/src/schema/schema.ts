@@ -65,3 +65,28 @@ export {
   type InsiderTransaction,
   type NewInsiderTransaction,
 } from "./filings";
+
+// Shipping intelligence
+export {
+  shippingCompanies,
+  shippingVessels,
+  shippingPositions,
+  shippingVesselContracts,
+  shippingCompanyRates,
+  shippingMarketRates,
+  shippingPorts,
+  type ShippingCompany,
+  type NewShippingCompany,
+  type ShippingVessel,
+  type NewShippingVessel,
+  type ShippingPosition,
+  type NewShippingPosition,
+  type ShippingVesselContract,
+  type NewShippingVesselContract,
+  type ShippingCompanyRate,
+  type NewShippingCompanyRate,
+  type ShippingMarketRate,
+  type NewShippingMarketRate,
+  type ShippingPort,
+  type NewShippingPort,
+} from "./shipping";
