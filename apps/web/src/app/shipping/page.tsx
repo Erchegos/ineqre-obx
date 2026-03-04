@@ -418,6 +418,10 @@ export default function ShippingPage() {
 
     return (
       <div style={{ position: "relative" }}>
+        {/* Y-axis labels above chart */}
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#444", padding: "0 2px", marginBottom: 2 }}>
+          <span>{fmtNum(maxV)}</span>
+        </div>
         <div
           style={{ height, cursor: "crosshair" }}
           onMouseMove={(e) => {
@@ -431,14 +435,12 @@ export default function ShippingPage() {
           onMouseLeave={() => setHoveredRateIdx(null)}
         >
           <svg viewBox="0 0 100 40" preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block" }}>
-            {/* gradient fill */}
             <defs>
               <linearGradient id={`grad-${key}`} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={accentColor} stopOpacity="0.15" />
                 <stop offset="100%" stopColor={accentColor} stopOpacity="0.01" />
               </linearGradient>
             </defs>
-            {/* area fill */}
             <path
               d={
                 series.map((s, i) => {
@@ -449,7 +451,6 @@ export default function ShippingPage() {
               }
               fill={`url(#grad-${key})`}
             />
-            {/* line */}
             <path
               d={series.map((s, i) => {
                 const x = (i / (series.length - 1)) * 100;
@@ -461,7 +462,6 @@ export default function ShippingPage() {
               strokeWidth={0.4}
               vectorEffect="non-scaling-stroke"
             />
-            {/* hover vertical */}
             {hIdx >= 0 && (() => {
               const x = (hIdx / (series.length - 1)) * 100;
               const y = 38 - ((series[hIdx].value - minV) / range) * 34;
@@ -474,9 +474,6 @@ export default function ShippingPage() {
             })()}
           </svg>
         </div>
-        {/* Y axis labels */}
-        <div style={{ position: "absolute", top: 2, left: 4, fontSize: 9, color: "#555", pointerEvents: "none" }}>{fmtNum(maxV)}</div>
-        <div style={{ position: "absolute", bottom: 2, left: 4, fontSize: 9, color: "#555", pointerEvents: "none" }}>{fmtNum(minV)}</div>
         {/* Tooltip */}
         {hIdx >= 0 && (
           <div style={{
@@ -494,10 +491,10 @@ export default function ShippingPage() {
             <div style={{ fontSize: 12, fontWeight: 700, color: accentColor }}>{fmtNum(series[hIdx].value)}</div>
           </div>
         )}
-        {/* Stats bar */}
+        {/* Stats bar below chart */}
         {stats && (
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#555", marginTop: 4, padding: "0 4px" }}>
-            <span>AVG <span style={{ color: "#888" }}>{fmtNum(stats.avg)}</span></span>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#555", marginTop: 6, padding: "0 2px" }}>
+            <span>Avg<span style={{ color: "#888", marginLeft: 3 }}>{fmtNum(stats.avg)}</span></span>
             <span>H <span style={{ color: "#22c55e" }}>{fmtNum(stats.high)}</span></span>
             <span>L <span style={{ color: "#ef4444" }}>{fmtNum(stats.low)}</span></span>
             <span style={{ color: "#666" }}>{stats.latestDate}</span>
@@ -648,7 +645,7 @@ export default function ShippingPage() {
                 return (
                   <div style={{ borderBottom: "1px solid #222" }}>
                     <div style={{ ...S.section, fontSize: 9 }}>MARKET PULSE — LATEST RATES</div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 0 }}>
                       {rateCards.map((rc, i) => {
                         const stats = marketStats[rc.key];
                         const series = marketRates[rc.key] || [];
@@ -659,26 +656,26 @@ export default function ShippingPage() {
                         const low = stats?.low ?? (series.length > 0 ? Math.min(...series.map(s => s.value)) : null);
                         return (
                           <div key={rc.key} style={{
-                            padding: "8px 10px",
-                            borderRight: (i + 1) % 7 !== 0 ? "1px solid #1a1a1a" : undefined,
+                            padding: "10px 14px",
+                            borderRight: "1px solid #1a1a1a",
                             borderBottom: "1px solid #1a1a1a",
                             cursor: "pointer",
                           }} onClick={() => setTab("rates")}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                              <span style={{ fontSize: 8, fontWeight: 700, color: "#555", letterSpacing: "0.06em" }}>{rc.label}</span>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                              <span style={{ fontSize: 9, fontWeight: 700, color: "#555", letterSpacing: "0.06em" }}>{rc.label}</span>
                               {chg != null && (
-                                <span style={{ fontSize: 8, fontWeight: 700, color: chg >= 0 ? "#22c55e" : "#ef4444" }}>
+                                <span style={{ fontSize: 9, fontWeight: 700, color: chg >= 0 ? "#22c55e" : "#ef4444" }}>
                                   {chg >= 0 ? "▲" : "▼"} {Math.abs(chg).toFixed(1)}%
                                 </span>
                               )}
                             </div>
-                            <div style={{ fontSize: 16, fontWeight: 700, color: rc.color, marginTop: 2 }}>
+                            <div style={{ fontSize: 18, fontWeight: 700, color: rc.color, lineHeight: 1.1 }}>
                               {latest != null ? `${rc.prefix || ""}${latest >= 1000 ? fmtNum(latest) : latest.toFixed(1)}` : "\u2014"}
                             </div>
-                            <div style={{ fontSize: 8, color: "#444", marginTop: 1 }}>{rc.unit}</div>
+                            <div style={{ fontSize: 9, color: "#444", marginTop: 2 }}>{rc.unit}</div>
                             {/* Sparkline */}
                             {series.length >= 2 && (
-                              <svg viewBox="0 0 60 16" preserveAspectRatio="none" style={{ width: "100%", height: 20, display: "block", marginTop: 4 }}>
+                              <svg viewBox="0 0 60 16" preserveAspectRatio="none" style={{ width: "100%", height: 28, display: "block", marginTop: 6 }}>
                                 <defs>
                                   <linearGradient id={`sp-${rc.key}`} x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="0%" stopColor={rc.color} stopOpacity="0.2" />
@@ -704,13 +701,15 @@ export default function ShippingPage() {
                             )}
                             {/* H/L range bar */}
                             {high != null && low != null && latest != null && high > low && (
-                              <div style={{ position: "relative", height: 4, background: "#1a1a1a", borderRadius: 2, marginTop: 3 }}>
-                                <div style={{
-                                  position: "absolute", left: 0, top: 0, height: "100%", borderRadius: 2,
-                                  width: `${((latest - low) / (high - low)) * 100}%`,
-                                  background: `linear-gradient(90deg, ${rc.color}44, ${rc.color})`,
-                                }} />
-                                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 2, fontSize: 7, color: "#444" }}>
+                              <div style={{ marginTop: 6 }}>
+                                <div style={{ position: "relative", height: 4, background: "#1a1a1a", borderRadius: 2 }}>
+                                  <div style={{
+                                    position: "absolute", left: 0, top: 0, height: "100%", borderRadius: 2,
+                                    width: `${((latest - low) / (high - low)) * 100}%`,
+                                    background: `linear-gradient(90deg, ${rc.color}44, ${rc.color})`,
+                                  }} />
+                                </div>
+                                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3, fontSize: 8, color: "#444" }}>
                                   <span>L {low >= 1000 ? fmtNum(low) : low.toFixed(0)}</span>
                                   <span>H {high >= 1000 ? fmtNum(high) : high.toFixed(0)}</span>
                                 </div>
@@ -1000,11 +999,11 @@ export default function ShippingPage() {
                       const w52Chg = latest != null && series.length > 0 && series[0].value > 0 ? ((latest - series[0].value) / series[0].value) * 100 : null;
                       return (
                         <div key={rd.key} style={{
-                          padding: "12px 14px",
+                          padding: "14px 18px",
                           borderRight: i < 3 ? "1px solid #1a1a1a" : undefined,
                           background: "#0a0a0a",
                         }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                             <span style={{ fontSize: 9, fontWeight: 700, color: "#555", letterSpacing: "0.08em" }}>{rd.desc.toUpperCase()}</span>
                             {chg != null && (
                               <span style={{
@@ -1062,28 +1061,28 @@ export default function ShippingPage() {
                     const low = stats?.low;
                     return (
                       <div key={rd.key} style={{ borderRight: i < 3 ? "1px solid #1a1a1a" : undefined, borderBottom: "1px solid #1a1a1a" }}>
-                        <div style={{ padding: "10px 10px 0" }}>
+                        <div style={{ padding: "14px 16px 0" }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                             <div>
-                              <span style={{ fontSize: 10, fontWeight: 700, color: rd.color }}>{rd.label}</span>
-                              <span style={{ fontSize: 8, color: "#444", marginLeft: 6 }}>{rd.sub}</span>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: rd.color }}>{rd.label}</span>
+                              <span style={{ fontSize: 9, color: "#444", marginLeft: 6 }}>{rd.sub}</span>
                             </div>
                             {chg != null && (
-                              <span style={{ fontSize: 9, fontWeight: 700, color: chg >= 0 ? "#22c55e" : "#ef4444" }}>
+                              <span style={{ fontSize: 10, fontWeight: 700, color: chg >= 0 ? "#22c55e" : "#ef4444" }}>
                                 {chg >= 0 ? "▲" : "▼"}{Math.abs(chg).toFixed(1)}%
                               </span>
                             )}
                           </div>
-                          <div style={{ fontSize: 22, fontWeight: 800, color: rd.color, marginTop: 4 }}>
+                          <div style={{ fontSize: 24, fontWeight: 800, color: rd.color, marginTop: 6 }}>
                             {latest != null ? `$${fmtNum(Math.round(latest))}` : "\u2014"}
                           </div>
-                          <div style={{ display: "flex", gap: 8, fontSize: 8, color: "#555", marginTop: 2 }}>
-                            {high != null && <span>52w H: <span style={{ color: "#888" }}>${fmtNum(Math.round(high))}</span></span>}
-                            {low != null && <span>L: <span style={{ color: "#888" }}>${fmtNum(Math.round(low))}</span></span>}
+                          <div style={{ display: "flex", gap: 10, fontSize: 9, color: "#555", marginTop: 4 }}>
+                            {high != null && <span>52w Hi: <span style={{ color: "#888" }}>${fmtNum(Math.round(high))}</span></span>}
+                            {low != null && <span>Lo: <span style={{ color: "#888" }}>${fmtNum(Math.round(low))}</span></span>}
                           </div>
                         </div>
-                        <div style={{ padding: "4px 10px 8px" }}>
-                          {renderRateChart(rd.key, series, "100%", 80, rd.color)}
+                        <div style={{ padding: "8px 16px 14px" }}>
+                          {renderRateChart(rd.key, series, "100%", 100, rd.color)}
                         </div>
                       </div>
                     );
@@ -1111,28 +1110,28 @@ export default function ShippingPage() {
                     const low = stats?.low;
                     return (
                       <div key={rd.key} style={{ borderRight: i < 2 ? "1px solid #1a1a1a" : undefined, borderBottom: "1px solid #1a1a1a" }}>
-                        <div style={{ padding: "10px 10px 0" }}>
+                        <div style={{ padding: "14px 16px 0" }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                             <div>
-                              <span style={{ fontSize: 10, fontWeight: 700, color: rd.color }}>{rd.label}</span>
-                              <span style={{ fontSize: 8, color: "#444", marginLeft: 6 }}>{rd.sub}</span>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: rd.color }}>{rd.label}</span>
+                              <span style={{ fontSize: 9, color: "#444", marginLeft: 6 }}>{rd.sub}</span>
                             </div>
                             {chg != null && (
-                              <span style={{ fontSize: 9, fontWeight: 700, color: chg >= 0 ? "#22c55e" : "#ef4444" }}>
+                              <span style={{ fontSize: 10, fontWeight: 700, color: chg >= 0 ? "#22c55e" : "#ef4444" }}>
                                 {chg >= 0 ? "▲" : "▼"}{Math.abs(chg).toFixed(1)}%
                               </span>
                             )}
                           </div>
-                          <div style={{ fontSize: 22, fontWeight: 800, color: rd.color, marginTop: 4 }}>
+                          <div style={{ fontSize: 24, fontWeight: 800, color: rd.color, marginTop: 6 }}>
                             {latest != null ? `$${fmtNum(Math.round(latest))}` : "\u2014"}
                           </div>
-                          <div style={{ display: "flex", gap: 8, fontSize: 8, color: "#555", marginTop: 2 }}>
-                            {high != null && <span>52w H: <span style={{ color: "#888" }}>${fmtNum(Math.round(high))}</span></span>}
-                            {low != null && <span>L: <span style={{ color: "#888" }}>${fmtNum(Math.round(low))}</span></span>}
+                          <div style={{ display: "flex", gap: 10, fontSize: 9, color: "#555", marginTop: 4 }}>
+                            {high != null && <span>52w Hi: <span style={{ color: "#888" }}>${fmtNum(Math.round(high))}</span></span>}
+                            {low != null && <span>Lo: <span style={{ color: "#888" }}>${fmtNum(Math.round(low))}</span></span>}
                           </div>
                         </div>
-                        <div style={{ padding: "4px 10px 8px" }}>
-                          {renderRateChart(rd.key, series, "100%", 80, rd.color)}
+                        <div style={{ padding: "8px 16px 14px" }}>
+                          {renderRateChart(rd.key, series, "100%", 100, rd.color)}
                         </div>
                       </div>
                     );
@@ -1160,28 +1159,28 @@ export default function ShippingPage() {
                     const low = stats?.low;
                     return (
                       <div key={rd.key} style={{ borderRight: i < 2 ? "1px solid #1a1a1a" : undefined, borderBottom: "1px solid #1a1a1a" }}>
-                        <div style={{ padding: "10px 10px 0" }}>
+                        <div style={{ padding: "14px 16px 0" }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                             <div>
-                              <span style={{ fontSize: 10, fontWeight: 700, color: rd.color }}>{rd.label}</span>
-                              <span style={{ fontSize: 8, color: "#444", marginLeft: 6 }}>{rd.sub}</span>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: rd.color }}>{rd.label}</span>
+                              <span style={{ fontSize: 9, color: "#444", marginLeft: 6 }}>{rd.sub}</span>
                             </div>
                             {chg != null && (
-                              <span style={{ fontSize: 9, fontWeight: 700, color: chg >= 0 ? "#22c55e" : "#ef4444" }}>
+                              <span style={{ fontSize: 10, fontWeight: 700, color: chg >= 0 ? "#22c55e" : "#ef4444" }}>
                                 {chg >= 0 ? "▲" : "▼"}{Math.abs(chg).toFixed(1)}%
                               </span>
                             )}
                           </div>
-                          <div style={{ fontSize: 22, fontWeight: 800, color: rd.color, marginTop: 4 }}>
+                          <div style={{ fontSize: 24, fontWeight: 800, color: rd.color, marginTop: 6 }}>
                             {latest != null ? (rd.key === "SCFI" ? fmtNum(Math.round(latest)) : `$${fmtNum(Math.round(latest))}`) : "\u2014"}
                           </div>
-                          <div style={{ display: "flex", gap: 8, fontSize: 8, color: "#555", marginTop: 2 }}>
-                            {high != null && <span>52w H: <span style={{ color: "#888" }}>{rd.key === "SCFI" ? "" : "$"}{fmtNum(Math.round(high))}</span></span>}
-                            {low != null && <span>L: <span style={{ color: "#888" }}>{rd.key === "SCFI" ? "" : "$"}{fmtNum(Math.round(low))}</span></span>}
+                          <div style={{ display: "flex", gap: 10, fontSize: 9, color: "#555", marginTop: 4 }}>
+                            {high != null && <span>52w Hi: <span style={{ color: "#888" }}>{rd.key === "SCFI" ? "" : "$"}{fmtNum(Math.round(high))}</span></span>}
+                            {low != null && <span>Lo: <span style={{ color: "#888" }}>{rd.key === "SCFI" ? "" : "$"}{fmtNum(Math.round(low))}</span></span>}
                           </div>
                         </div>
-                        <div style={{ padding: "4px 10px 8px" }}>
-                          {renderRateChart(rd.key, series, "100%", 80, rd.color)}
+                        <div style={{ padding: "8px 16px 14px" }}>
+                          {renderRateChart(rd.key, series, "100%", 100, rd.color)}
                         </div>
                       </div>
                     );
@@ -1210,8 +1209,8 @@ export default function ShippingPage() {
                     </div>
                   )}
                 </div>
-                <div style={{ padding: "4px 10px 12px" }}>
-                  {renderRateChart("BDI", marketRates["BDI"] || [], "100%", 180, "#f97316")}
+                <div style={{ padding: "8px 16px 16px" }}>
+                  {renderRateChart("BDI", marketRates["BDI"] || [], "100%", 200, "#f97316")}
                 </div>
               </div>
 
@@ -1234,28 +1233,28 @@ export default function ShippingPage() {
                     const low = stats?.low;
                     return (
                       <div key={rd.key} style={{ borderRight: i < 1 ? "1px solid #1a1a1a" : undefined }}>
-                        <div style={{ padding: "10px 10px 0" }}>
+                        <div style={{ padding: "14px 16px 0" }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                             <div>
-                              <span style={{ fontSize: 10, fontWeight: 700, color: rd.color }}>{rd.label}</span>
-                              <span style={{ fontSize: 8, color: "#444", marginLeft: 6 }}>{rd.unit}</span>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: rd.color }}>{rd.label}</span>
+                              <span style={{ fontSize: 9, color: "#444", marginLeft: 6 }}>{rd.unit}</span>
                             </div>
                             {chg != null && (
-                              <span style={{ fontSize: 9, fontWeight: 700, color: chg >= 0 ? "#22c55e" : "#ef4444" }}>
+                              <span style={{ fontSize: 10, fontWeight: 700, color: chg >= 0 ? "#22c55e" : "#ef4444" }}>
                                 {chg >= 0 ? "▲" : "▼"}{Math.abs(chg).toFixed(1)}%
                               </span>
                             )}
                           </div>
-                          <div style={{ fontSize: 22, fontWeight: 800, color: rd.color, marginTop: 4 }}>
+                          <div style={{ fontSize: 24, fontWeight: 800, color: rd.color, marginTop: 6 }}>
                             ${latest != null ? latest.toFixed(1) : "\u2014"}
                           </div>
-                          <div style={{ display: "flex", gap: 8, fontSize: 8, color: "#555", marginTop: 2 }}>
-                            {high != null && <span>52w H: <span style={{ color: "#888" }}>${high.toFixed(1)}</span></span>}
-                            {low != null && <span>L: <span style={{ color: "#888" }}>${low.toFixed(1)}</span></span>}
+                          <div style={{ display: "flex", gap: 10, fontSize: 9, color: "#555", marginTop: 4 }}>
+                            {high != null && <span>52w Hi: <span style={{ color: "#888" }}>${high.toFixed(1)}</span></span>}
+                            {low != null && <span>Lo: <span style={{ color: "#888" }}>${low.toFixed(1)}</span></span>}
                           </div>
                         </div>
-                        <div style={{ padding: "4px 10px 8px" }}>
-                          {renderRateChart(rd.key, series, "100%", 80, rd.color)}
+                        <div style={{ padding: "8px 16px 14px" }}>
+                          {renderRateChart(rd.key, series, "100%", 100, rd.color)}
                         </div>
                       </div>
                     );
