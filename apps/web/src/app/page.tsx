@@ -112,20 +112,6 @@ export default function HomePage() {
           border-color: var(--accent) !important;
           box-shadow: 0 4px 16px rgba(59, 130, 246, 0.08);
         }
-        .tag-pill {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          padding: 3px 8px;
-          border-radius: 3px;
-          font-size: 10px;
-          font-family: monospace;
-          font-weight: 600;
-          letter-spacing: 0.04em;
-          text-transform: uppercase;
-          line-height: 1;
-          white-space: nowrap;
-        }
       `}</style>
 
       <main style={{
@@ -294,7 +280,6 @@ export default function HomePage() {
                 title="Intelligence Terminal"
                 description="Real-time market intelligence hub. AI-classified NewsWeb filings with sentiment analysis, Finanstilsynet short positions with sparklines, commodity prices (Brent, gas, metals) with stock sensitivity betas."
                 tags={[
-                  { label: "News", color: "var(--accent)" },
                   { label: "Shorts", color: "var(--danger)" },
                   { label: "Commodities", color: "var(--warning)" },
                   { label: "Live", color: "var(--success)" },
@@ -310,7 +295,6 @@ export default function HomePage() {
                   { label: "Salmon", color: "var(--warning)" },
                   { label: "Lice", color: "var(--danger)" },
                   { label: "Map", color: "var(--info)" },
-                  { label: "Risk", color: "var(--accent)" },
                 ]}
                 visible={modulesReveal.visible}
                 delay={7}
@@ -575,15 +559,23 @@ const COLOR_MAP: Record<string, string> = {
   "var(--info)": "#06b6d4",
 };
 
-function TagPill({ label, color, small }: { label: string; color: string; small?: boolean }) {
+function TagPill({ label, color }: { label: string; color: string }) {
   const hex = COLOR_MAP[color] || color;
   return (
-    <span className="tag-pill" style={{
+    <span style={{
+      display: "inline-block",
+      padding: "3px 8px",
+      borderRadius: 3,
+      fontSize: 10,
+      fontFamily: "monospace",
+      fontWeight: 600,
+      letterSpacing: "0.04em",
+      textTransform: "uppercase" as const,
+      lineHeight: 1.2,
+      whiteSpace: "nowrap" as const,
       background: `${hex}22`,
       color: hex,
       border: `1px solid ${hex}30`,
-      fontSize: 10,
-      padding: "3px 8px",
     }}>
       {label}
     </span>
