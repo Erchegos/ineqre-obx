@@ -11,6 +11,10 @@ type ResearchDocument = {
   ai_summary: string | null;
   received_date: string;
   attachment_count: number;
+  source_url: string | null;
+  target_price: number | null;
+  rating: string | null;
+  tickers_mentioned: string[] | null;
   attachments: {
     id: string;
     filename: string;
@@ -1200,6 +1204,44 @@ export default function ResearchPortalPage() {
                     }}>
                       {doc.source}
                     </span>
+                    {doc.source_url && (
+                      <span style={{
+                        fontSize: 11,
+                        color: '#8B5CF6',
+                        padding: '3px 8px',
+                        background: '#8B5CF620',
+                        borderRadius: 4,
+                        fontWeight: 500,
+                      }}>
+                        Commissioned
+                      </span>
+                    )}
+                    {doc.target_price && (
+                      <span style={{
+                        fontSize: 11,
+                        color: '#F59E0B',
+                        padding: '3px 8px',
+                        background: '#F59E0B20',
+                        borderRadius: 4,
+                        fontWeight: 500,
+                      }}>
+                        TP: {doc.target_price}
+                      </span>
+                    )}
+                    {doc.rating && (
+                      <span style={{
+                        fontSize: 11,
+                        color: doc.rating.toLowerCase().includes('buy') ? '#10B981' :
+                               doc.rating.toLowerCase().includes('sell') ? '#EF4444' : '#6B7280',
+                        padding: '3px 8px',
+                        background: (doc.rating.toLowerCase().includes('buy') ? '#10B981' :
+                                     doc.rating.toLowerCase().includes('sell') ? '#EF4444' : '#6B7280') + '20',
+                        borderRadius: 4,
+                        fontWeight: 500,
+                      }}>
+                        {doc.rating}
+                      </span>
+                    )}
                     <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>
                       {new Date(doc.received_date).toLocaleDateString('en-US', {
                         year: 'numeric',
@@ -1320,6 +1362,30 @@ export default function ResearchPortalPage() {
                     </>
                   );
                 })()}
+
+                {doc.source_url && (
+                  <a
+                    href={doc.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      padding: '12px 24px',
+                      background: '#8B5CF6',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 6,
+                      fontSize: 14,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      textDecoration: 'none',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseOver={(e) => { e.currentTarget.style.background = '#7C3AED'; }}
+                    onMouseOut={(e) => { e.currentTarget.style.background = '#8B5CF6'; }}
+                  >
+                    View Original
+                  </a>
+                )}
 
                 {/* Show full content button */}
                 <button

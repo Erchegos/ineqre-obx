@@ -34,7 +34,18 @@
     "biomass:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-biomass-fiskeridir.ts",
     "export:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-ssb-salmon-export.ts",
     "ocean:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-ocean-conditions.ts",
-    "intel:refresh": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-newsweb-filings.ts --days=7 && tsx scripts/fetch-ssr-shorts.ts && tsx scripts/fetch-commodities.ts --days=30 && tsx scripts/fetch-fx-norgesbank.ts --days=30"
+    "intel:refresh": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-newsweb-filings.ts --days=7 && tsx scripts/fetch-ssr-shorts.ts && tsx scripts/fetch-commodities.ts --days=30 && tsx scripts/fetch-fx-norgesbank.ts --days=30",
+    "research:redeye": "tsx scripts/fetch-redeye-research.ts",
+    "research:redeye:backfill": "tsx scripts/fetch-redeye-research.ts --backfill",
+    "research:redeye:list": "tsx scripts/fetch-redeye-research.ts --list",
+    "research:carnegie": "tsx scripts/fetch-dnb-carnegie-research.ts",
+    "research:carnegie:dry": "tsx scripts/fetch-dnb-carnegie-research.ts --dry-run",
+    "research:carnegie:stats": "tsx scripts/fetch-dnb-carnegie-research.ts --stats",
+    "research:carnegie:all": "tsx scripts/fetch-dnb-carnegie-research.ts --all",
+    "research:dnb-markets": "tsx scripts/fetch-dnb-markets-research.ts",
+    "research:dnb-markets:dry": "tsx scripts/fetch-dnb-markets-research.ts --dry-run",
+    "research:dnb-markets:all": "tsx scripts/fetch-dnb-markets-research.ts --all-macro",
+    "research:dnb-markets:back": "tsx scripts/fetch-dnb-markets-research.ts --scan-back"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

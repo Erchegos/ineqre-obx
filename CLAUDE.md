@@ -296,7 +296,7 @@ Schema files in `packages/db/src/schema/`
 ### Research Tables
 | Table | Purpose |
 |-------|---------|
-| `research_documents` | Broker research with full-text search |
+| `research_documents` | Broker research with full-text search, target_price, rating, source_url (dedup for scraped reports) |
 | `research_attachments` | PDF files with storage paths |
 | `research_access_tokens` | Password-protected access control |
 
@@ -357,9 +357,12 @@ Schema files in `packages/db/src/schema/`
 1. **IBKR Gateway** (port 4002) - Primary real-time data
 2. **Yahoo Finance** - Fallback for prices/fundamentals + commodity prices (BZ=F, CL=F, NG=F, ALI=F, GC=F, SI=F)
 3. **Norges Bank** - FX rates (NOK/USD, EUR, GBP)
-4. **Gmail IMAP** - Research emails from Pareto/DNB
-5. **Finanstilsynet SSR** - Short selling positions (`https://ssr.finanstilsynet.no/api/v2/instruments`)
-6. **BarentsWatch** - Seafood lice, disease, locality data (OAuth2 client_credentials)
+4. **Gmail IMAP** - Research emails from Pareto/DNB/Arctic/ABG/SpareBank 1/Redeye/MFN
+5. **Redeye GraphQL** - Commissioned research scraper (redeye.se/api/graphql, OSE-only filter)
+6. **DNB Carnegie Access** - Commissioned research via REST API (sitemap + /carnegie-api/, NO-country filter, PDF download)
+7. **DNB Markets Research** - Macro/FI/currencies analysis PDFs via public getreport.aspx endpoint (MRP_XXXXXX IDs, Referer-gated)
+8. **Finanstilsynet SSR** - Short selling positions (`https://ssr.finanstilsynet.no/api/v2/instruments`)
+9. **BarentsWatch** - Seafood lice, disease, locality data (OAuth2 client_credentials)
 7. **Fiskeridirektoratet** - Monthly biomass/harvest/mortality CSV (no auth, free)
 8. **SSB (Statistics Norway)** - Weekly salmon export price+volume via PxWebApi v2 (no auth, free)
 
@@ -416,11 +419,14 @@ Run after market close alongside ML pipeline:
 | `fetch-biomass-fiskeridir.ts` | Fetch monthly biomass/harvest/mortality from Fiskeridirektoratet (no auth) |
 | `fetch-ssb-salmon-export.ts` | Fetch weekly salmon export price+volume from SSB PxWebApi (no auth) |
 | `fetch-ocean-conditions.ts` | Aggregate sea temperature from lice reports by production area |
+| `fetch-redeye-research.ts` | Scrape commissioned research from Redeye (GraphQL API, OSE-only filter) |
+| `fetch-dnb-carnegie-research.ts` | Scrape commissioned research from DNB Carnegie Access (sitemap + REST API, NO-country filter, PDF download) |
+| `fetch-dnb-markets-research.ts` | Scrape DNB Markets macro/FI research PDFs (public getreport.aspx, ID range scan, pdftotext metadata extraction) |
 
 ### scripts/
 | Script | Purpose |
 |--------|---------|
-| `email-processor.js` | Import research emails via IMAP |
+| `email-processor.js` | Import research emails via IMAP (--backfill-all for full 2026 rescan) |
 | `gmail-pdf-downloader.js` | Download PDF attachments |
 | `generate-summaries.js` | AI-powered research summaries |
 | `import-yahoo-adjusted.ts` | Import Yahoo historical data |
@@ -468,6 +474,17 @@ pnpm run import:new-tickers  # Import new tickers
 pnpm run shorts:fetch       # Fetch Finanstilsynet short positions
 pnpm run commodities:fetch  # Fetch commodity prices + sensitivity
 pnpm run newsweb:fetch      # Fetch Oslo Børs NewsWeb filings
+pnpm run research:redeye    # Fetch Redeye commissioned research (OSE-only)
+pnpm run research:redeye:backfill  # Backfill all Redeye history
+pnpm run research:redeye:list      # List OSE company matches
+pnpm run research:carnegie  # Fetch DNB Carnegie Access Norwegian research (2026+)
+pnpm run research:carnegie:dry    # Dry run (scan only)
+pnpm run research:carnegie:stats  # Show country distribution
+pnpm run research:carnegie:all    # Include all Nordic (SE/NO/FI/DK)
+pnpm run research:dnb-markets     # Fetch DNB Markets macro research PDFs (2026+)
+pnpm run research:dnb-markets:dry # Dry run (scan only)
+pnpm run research:dnb-markets:all # Include all macro (no Norway keyword filter)
+pnpm run research:dnb-markets:back # Scan further back (older IDs from 260000)
 ```
 
 ---

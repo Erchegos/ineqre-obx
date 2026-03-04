@@ -47,6 +47,10 @@ export async function GET(req: NextRequest) {
         d.ai_summary,
         d.received_date,
         d.attachment_count,
+        d.source_url,
+        d.target_price,
+        d.rating,
+        d.tickers_mentioned,
         COALESCE(
           json_agg(
             json_build_object(
@@ -82,7 +86,7 @@ export async function GET(req: NextRequest) {
       query += ` WHERE ${conditions.join(' AND ')}`;
     }
 
-    query += ` GROUP BY d.id, d.ticker, d.source, d.subject, d.body_text, d.ai_summary, d.received_date, d.attachment_count`;
+    query += ` GROUP BY d.id, d.ticker, d.source, d.subject, d.body_text, d.ai_summary, d.received_date, d.attachment_count, d.source_url, d.target_price, d.rating, d.tickers_mentioned`;
     query += ` ORDER BY d.received_date DESC`;
     query += ` LIMIT $${paramCount + 1}`;
     params.push(limit);

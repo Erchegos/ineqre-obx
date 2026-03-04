@@ -229,10 +229,11 @@ export default function HomePage() {
               <FeatureCard
                 href="/research"
                 title="Research Portal"
-                description="AI-summarized broker research from Pareto Securities & DNB Markets. Full-text search across reports with PDF viewer. Automated email ingestion and Claude-powered summaries."
+                description="AI-summarized broker research from Pareto Securities, DNB Carnegie, and Xtrainvestor. Full-text search across 1,500+ reports with PDF viewer. Automated email ingestion, web scraping, and Claude-powered English summaries."
                 tags={[
                   { label: "AI Summaries", color: "var(--success)" },
                   { label: "PDF", color: "var(--warning)" },
+                  { label: "3 Sources", color: "var(--info)" },
                 ]}
                 visible={modulesReveal.visible}
                 delay={1}
@@ -251,7 +252,7 @@ export default function HomePage() {
               <FeatureCard
                 href="/volatility/obx"
                 title="OBX Volatility Dashboard"
-                description="Index-level volatility intelligence. Constituent heatmap with regime classification, vol cone, systemic risk via rolling pairwise correlation, GARCH/MSGARCH models."
+                description="Index-level volatility intelligence with 6-regime classification (Crisis to Low & Stable). Constituent heatmap, vol cone (5th-95th percentile), systemic risk via rolling correlation, GARCH/MSGARCH models."
                 tags={[
                   { label: "Regime", color: "var(--warning)" },
                   { label: "GARCH", color: "var(--accent)" },
@@ -263,7 +264,7 @@ export default function HomePage() {
               <FeatureCard
                 href="/options"
                 title="Options Analytics"
-                description="Black-Scholes pricing with full Greeks chain. IV skew visualization, open interest distribution, and a multi-leg P&L strategy builder with time-decay payoff diagrams."
+                description="Black-Scholes pricing with full Greeks chain for US-listed OSE stocks. IV skew visualization, open interest distribution, max pain, put/call ratios, and a multi-leg P&L strategy builder with preset strategies."
                 tags={[
                   { label: "Greeks", color: "var(--success)" },
                   { label: "P&L Builder", color: "var(--accent)" },
@@ -275,7 +276,7 @@ export default function HomePage() {
               <FeatureCard
                 href="/portfolio"
                 title="Portfolio Optimizer"
-                description="Markowitz mean-variance optimization with 5 modes. Efficient frontier, ML-powered investment signals, risk decomposition, mode comparison, and portfolio-level risk alerts."
+                description="Markowitz mean-variance optimization with 5 modes (EW, MinVar, MaxSharpe, RiskParity, MaxDiv). Efficient frontier visualization, Ledoit-Wolf covariance, risk decomposition, stress scenarios, and FX exposure analysis."
                 tags={[
                   { label: "Optimization", color: "var(--success)" },
                   { label: "ML Signals", color: "var(--accent)" },
@@ -287,7 +288,7 @@ export default function HomePage() {
               <FeatureCard
                 href="/news"
                 title="Intelligence Terminal"
-                description="Bloomberg-style command center. Real-time AI-classified news feed with sentiment, Finanstilsynet short positions with sparklines, commodity prices with stock sensitivity betas."
+                description="Real-time market intelligence hub. AI-classified NewsWeb filings with sentiment analysis, Finanstilsynet short positions with sparklines, commodity prices (Brent, gas, metals) with stock sensitivity betas."
                 tags={[
                   { label: "News", color: "var(--accent)" },
                   { label: "Shorts", color: "var(--error)" },
@@ -342,7 +343,7 @@ export default function HomePage() {
                 { title: "ML Price Predictions", accent: "var(--warning)", text: "Ridge regression on 17 factors (momentum, volatility, fundamentals). Walk-forward validation, daily signals (-1 to +1), probability-weighted forecasts." },
                 { title: "Factor Backtesting", accent: "var(--accent)", text: "Strategy backtesting with signal thresholds and holding periods. Factor attribution, cumulative returns, hit rates, and per-ticker trade detail." },
                 { title: "Time Series Analysis", accent: "var(--info)", text: "Log-return decomposition, ACF diagnostics, monthly seasonality patterns, and 30-day rolling volatility correlation with OBX index." },
-                { title: "Research Aggregation", accent: "var(--success)", text: "Claude AI summarization via Anthropic API. IMAP ingestion from Pareto & DNB. PDF text extraction, document deduplication, and full-text search." },
+                { title: "Research Aggregation", accent: "var(--success)", text: "Claude AI summarization via Anthropic API. IMAP ingestion from Pareto & Xtrainvestor, web scraping from DNB Carnegie. PDF text extraction, document deduplication, and full-text search." },
                 { title: "Options Analytics", accent: "var(--warning)", text: "Black-Scholes pricing, IV solver, multi-leg P&L with time decay. Max pain, put/call ratios, IV term structure. Editable positions with strike stepping." },
               ].map((cap, i) => (
                 <CapabilityCard
@@ -380,9 +381,9 @@ export default function HomePage() {
               gap: 16
             }}>
               {[
-                { title: "Commodities Integration", accent: "var(--warning)", text: "Brent crude, TTF/NBP gas, Nord Pool power, base metals. Cross-asset correlation with energy-exposed OSE equities. Sector beta decomposition and hedging ratios." },
-                { title: "FX Hedging Analytics", accent: "var(--info)", text: "Multi-currency exposure for NOK portfolios. Forward rate pricing via IRP, carry trade P&L, optimal hedge ratios. Currency beta for export-heavy equities." },
                 { title: "DCC-GARCH Correlation", accent: "var(--accent)", text: "Dynamic conditional correlation for time-varying co-movement. Copula models (Gaussian, Student-t) for tail dependence. VaR/CVaR and systemic risk indicators." },
+                { title: "Additional Research Sources", accent: "var(--success)", text: "Redeye commissioned research, Arctic Securities, ABG Sundal Collier. Automated web scraping with OSE-only filtering and AI summarization." },
+                { title: "CNN Signal Models", accent: "var(--warning)", text: "Convolutional neural network for pattern recognition on OHLCV data. Multi-timeframe signal generation and ensemble with existing ML predictions." },
               ].map((cap, i) => (
                 <CapabilityCard
                   key={cap.title}
@@ -406,7 +407,7 @@ export default function HomePage() {
             fontFamily: "monospace"
           }}>
             <p style={{ marginBottom: 8, lineHeight: 1.6 }}>
-              <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Tech Stack:</strong> Next.js 16 · TypeScript · PostgreSQL 17 · Drizzle ORM · Python · scikit-learn · Interactive Brokers TWS API · Anthropic Claude API
+              <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Tech Stack:</strong> Next.js 15 · TypeScript · PostgreSQL 17 · Drizzle ORM · Python · scikit-learn · Interactive Brokers TWS API · Anthropic Claude API
             </p>
             <p style={{ marginBottom: 8, lineHeight: 1.6 }}>
               <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Architecture:</strong> Server-side compute · Connection pooling · Transaction pooler (Supabase) · JWT authentication · Vercel edge deployment
@@ -501,11 +502,13 @@ function FeatureCard({ href, title, description, tags, visible, delay }: {
         transition: `opacity 0.5s ease ${delay * 0.1}s, transform 0.5s ease ${delay * 0.1}s, border-color 0.25s ease, box-shadow 0.25s ease`,
       }}
     >
-      <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 5, marginBottom: 12, flexWrap: "wrap", minHeight: 24 }}>
         {tags.map(t => (
           <span key={t.label} className="tag-pill" style={{
             background: `color-mix(in srgb, ${t.color} 15%, transparent)`,
             color: t.color,
+            fontSize: tags.length > 3 ? 9 : 10,
+            padding: tags.length > 3 ? "2px 6px" : "2px 8px",
           }}>
             {t.label}
           </span>

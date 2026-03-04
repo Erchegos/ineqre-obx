@@ -60,14 +60,32 @@ const CONFIG = {
     'noreply@research.paretosec.com',
     'research@pareto.no',
     'info@xtrainvestor.com',
-    // Add more senders as needed
+    // DNB Carnegie (emails via MFN / Modular Finance)
+    'noreply@dnbcarnegie.com',
+    'research@dnbcarnegie.com',
+    'cr@carnegie.se',
+    'noreply@carnegie.se',
+    'noreply@mfn.se',
+    'no-reply@mfn.se',
+    // Redeye
+    'noreply@redeye.se',
+    'research@redeye.se',
+    // Arctic Securities
+    'research@arctic.com',
+    'noreply@arctic.com',
+    // ABG Sundal Collier
+    'research@abgsc.com',
+    'noreply@abgsc.com',
+    // SpareBank 1 Markets
+    'research@sb1markets.no',
+    'noreply@sb1markets.no',
   ],
 
   // Local storage directory (relative to project root)
   storageDir: process.env.STORAGE_DIR || path.join(__dirname, '..', 'storage', 'research'),
 
-  // Processing limits
-  batchSize: 500, // Process max 500 emails per run
+  // Processing limits (increased with --backfill-all)
+  batchSize: process.argv.includes('--backfill-all') ? 5000 : 500,
   maxAttachmentSize: 50 * 1024 * 1024, // 50 MB
 };
 
@@ -101,11 +119,16 @@ function extractTicker(subject) {
 /**
  * Identify source from sender email
  */
-function identifySource(email) {
+function identifySource(email, subject) {
   if (email.includes('pareto')) return 'Pareto Securities';
   if (email.includes('xtrainvestor')) return 'Xtrainvestor';
+  if (email.includes('carnegie') || email.includes('dnbcarnegie')) return 'DNB Carnegie';
+  if (email.includes('mfn.se')) return 'DNB Carnegie'; // MFN distributes DNB Carnegie research
   if (email.includes('dnb')) return 'DNB Markets';
+  if (email.includes('redeye')) return 'Redeye';
+  if (email.includes('arctic')) return 'Arctic Securities';
   if (email.includes('abg')) return 'ABG Sundal Collier';
+  if (email.includes('sb1markets')) return 'SpareBank 1 Markets';
   return 'Unknown';
 }
 
@@ -805,11 +828,16 @@ async function main() {
     // Select inbox
     await imap.mailboxOpen('INBOX');
 
-    // Search window: 3 days normally, 90 days for --reimport-truncated
-    const sinceDate = new Date();
+    // Search window: 3 days normally, 90 days for --reimport-truncated, since Jan 2026 for --backfill-all
+    const backfillAll = process.argv.includes('--backfill-all');
     const reimportMode = process.argv.includes('--reimport-truncated');
-    sinceDate.setDate(sinceDate.getDate() - (reimportMode ? 90 : 3));
-    console.log(`Searching for research emails since ${sinceDate.toISOString().split('T')[0]}...`);
+    const sinceDate = new Date();
+    if (backfillAll) {
+      sinceDate.setFullYear(2026, 0, 1); // Go back to Jan 1, 2026
+    } else {
+      sinceDate.setDate(sinceDate.getDate() - (reimportMode ? 90 : 3));
+    }
+    console.log(`Searching for research emails since ${sinceDate.toISOString().split('T')[0]}${backfillAll ? ' (BACKFILL since 2026-01-01)' : ''}...`);
     let processed = 0;
     let totalCount = 0;
 

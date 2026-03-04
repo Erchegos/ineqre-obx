@@ -1,0 +1,83 @@
+name: DNB Carnegie Research
+
+on:
+  schedule:
+    # Run daily at 07:00 UTC = 08:00 CET — before market open
+    - cron: '0 7 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  fetch-research:
+    name: DNB Carnegie Macro + Equity Research
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Install poppler (pdftotext)
+        run: sudo apt-get install -y poppler-utils
+
+      - name: Create env file
+        working-directory: apps/web
+        run: |
+          echo 'DATABASE_URL="${{ secrets.DATABASE_URL }}"' > .env.local
+
+      # ─── DNB Carnegie Macro Research (MRP_ PDFs) ─────────────────────
+      - name: Fetch DNB Carnegie macro research
+        working-directory: apps/web
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: npx tsx scripts/fetch-dnb-markets-research.ts
+
+      # ─── Generate AI Summaries for new reports ───────────────────────
+      - name: Generate AI summaries
+        working-directory: .
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: node scripts/generate-dnb-summaries.js
+
+      # ─── DNB Carnegie Equity Research (Access portal) ────────────────
+      - name: Fetch DNB Carnegie equity research
+        working-directory: apps/web
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: npx tsx scripts/fetch-dnb-carnegie-research.ts || echo "DNB Carnegie equity scraper not yet available, skipping"
+
+      # ─── Summary ─────────────────────────────────────────────────────
+      - name: Summary
+        if: always()
+        run: |
+          echo "## DNB Carnegie Research" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Source | Type |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|------|" >> $GITHUB_STEP_SUMMARY
+          echo "| DNB Carnegie Macro | MRP_ PDFs (macro/FI/currencies) |" >> $GITHUB_STEP_SUMMARY
+          echo "| DNB Carnegie Equity | Commissioned equity research |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time**: $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
