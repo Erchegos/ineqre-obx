@@ -11,8 +11,10 @@ import { pool } from "@/lib/db";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Vessel class to market index mapping with adjustment factors
+// Vessel class/type to market index mapping with adjustment factors
+// Keys cover both vessel_class (CamelCase) and vessel_type (snake_case from DB)
 const VESSEL_CLASS_INDEX_MAP: Record<string, { index: string; factor: number } | null> = {
+  // vessel_class keys (CamelCase)
   VLCC: { index: "VLCC_TD3C_TCE", factor: 1.0 },
   Suezmax: { index: "SUEZMAX_TD20_TCE", factor: 1.0 },
   Aframax: { index: "AFRAMAX_TCE", factor: 1.0 },
@@ -28,6 +30,22 @@ const VESSEL_CLASS_INDEX_MAP: Record<string, { index: string; factor: number } |
   LNG: { index: "LNG_SPOT_TFDE", factor: 1.0 },
   VLGC: { index: "VLGC_ME_ASIA", factor: 1.0 },
   PCTC: null,
+  // vessel_type keys (snake_case from DB)
+  vlcc: { index: "VLCC_TD3C_TCE", factor: 1.0 },
+  suezmax: { index: "SUEZMAX_TD20_TCE", factor: 1.0 },
+  aframax_lr2: { index: "AFRAMAX_TCE", factor: 1.0 },
+  capesize: { index: "CAPESIZE_5TC", factor: 1.0 },
+  newcastlemax: { index: "CAPESIZE_5TC", factor: 1.05 },
+  panamax_bulk: { index: "PANAMAX_TCE", factor: 1.0 },
+  ultramax: { index: "ULTRAMAX_TCE", factor: 1.0 },
+  lr2_tanker: { index: "LR2_TCE", factor: 1.0 },
+  mr_tanker: { index: "MR_TC2_TCE", factor: 1.0 },
+  handy_tanker: { index: "MR_TC2_TCE", factor: 0.85 },
+  container_feeder: { index: "SCFI", factor: 1.0 },
+  chemical_tanker: { index: "MR_TC2_TCE", factor: 0.8 },
+  lng_carrier: { index: "LNG_SPOT_TFDE", factor: 1.0 },
+  vlgc: { index: "VLGC_ME_ASIA", factor: 1.0 },
+  pctc: null,
 };
 
 export async function GET(request: NextRequest) {
@@ -83,7 +101,7 @@ export async function GET(request: NextRequest) {
 
     // Enrich contracts with rate vs spot
     const contracts = contractsResult.rows.map(row => {
-      const vesselClass = row.vessel_class || "";
+      const vesselClass = row.vessel_class || row.vessel_type || "";
       const mapping = VESSEL_CLASS_INDEX_MAP[vesselClass] || null;
       let spotRate: number | null = null;
       let rateVsSpot: number | null = null;
