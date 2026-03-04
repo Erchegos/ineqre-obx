@@ -1532,6 +1532,18 @@ export default function ShippingPage() {
             </div>
           )}
 
+          {/* ── Data Sources ── */}
+          <div style={{ borderTop: "1px solid #1a1a1a", marginTop: 16, padding: "12px 10px", fontSize: 9, color: "#444", lineHeight: 1.8 }}>
+            <span style={{ fontWeight: 700, color: "#555", letterSpacing: "0.06em" }}>DATA SOURCES</span>
+            <div style={{ marginTop: 4 }}>
+              <span style={{ color: "#666" }}>Market Rates:</span> Pareto Shipping Daily, Clarksons Research &middot;{" "}
+              <span style={{ color: "#666" }}>Fleet & Vessels:</span> Company filings, AIS data &middot;{" "}
+              <span style={{ color: "#666" }}>Contracts:</span> Quarterly fleet reports, broker estimates &middot;{" "}
+              <span style={{ color: "#666" }}>Commodities:</span> ICE Brent, SGX Iron Ore &middot;{" "}
+              <span style={{ color: "#666" }}>Indices:</span> Baltic Exchange (BDI, BDTI, BCTI), Shanghai Shipping Exchange (SCFI)
+            </div>
+          </div>
+
         </div>
       </main>
     </>

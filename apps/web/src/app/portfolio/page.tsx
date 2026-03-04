@@ -3019,7 +3019,18 @@ export default function PortfolioPage() {
 
       </div>{/* end results dimmer */}
 
-      {/* Bottom spacer */}
+      {/* Data Sources */}
+      <div style={{ borderTop: "1px solid #1a1a1a", marginTop: 16, padding: "12px 16px", fontSize: 9, color: "#444", fontFamily: "'Geist Mono', monospace", lineHeight: 1.8 }}>
+        <span style={{ fontWeight: 700, color: "#555", letterSpacing: "0.06em" }}>DATA SOURCES</span>
+        <div style={{ marginTop: 4 }}>
+          <span style={{ color: "#666" }}>Prices:</span> Interactive Brokers TWS API, Yahoo Finance &middot;{" "}
+          <span style={{ color: "#666" }}>Covariance:</span> Sample, Ledoit-Wolf shrinkage, EWMA (&lambda;=0.94) &middot;{" "}
+          <span style={{ color: "#666" }}>Expected Returns:</span> ML predictions (Ridge/GB/RF ensemble) &middot;{" "}
+          <span style={{ color: "#666" }}>FX Exposure:</span> Company filings (revenue by currency) &middot;{" "}
+          <span style={{ color: "#666" }}>Sectors:</span> Oslo Stock Exchange classification
+        </div>
+      </div>
+
       <div style={{ paddingBottom: 40 }} />
     </main>
   );

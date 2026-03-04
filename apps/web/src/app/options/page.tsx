@@ -293,6 +293,16 @@ export default function OptionsOverviewPage() {
             </div>
           </>
         )}
+
+        {/* Data Sources */}
+        <div style={{ borderTop: "1px solid #1a1a1a", marginTop: 16, padding: "12px 16px", fontSize: 9, color: "#444", fontFamily: "monospace", lineHeight: 1.8 }}>
+          <span style={{ fontWeight: 700, color: "#555", letterSpacing: "0.06em" }}>DATA SOURCES</span>
+          <div style={{ marginTop: 4 }}>
+            <span style={{ color: "#666" }}>Options Data:</span> Yahoo Finance (15-min delayed) &middot;{" "}
+            <span style={{ color: "#666" }}>Aggregated Stats:</span> Open interest, IV, max pain, P/C ratio computed from chain data &middot;{" "}
+            <span style={{ color: "#666" }}>Underlying Prices:</span> Interactive Brokers TWS API, Yahoo Finance
+          </div>
+        </div>
       </main>
     </div>
   );

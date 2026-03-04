@@ -1163,9 +1163,20 @@ export default function OptionsPage() {
           </div>
         </section>
 
-        <div style={{ fontSize: 10, color: "#333", textAlign: "center", padding: "4px 0 16px", fontFamily: "monospace" }}>
-          Data pre-loaded from Yahoo Finance (15-min delayed) | <span style={{ color: "#1a5c2e" }}>Dimmed</span> bid/ask = Black-Scholes theoretical
+        <div style={{ fontSize: 10, color: "#333", textAlign: "center", padding: "4px 0 8px", fontFamily: "monospace" }}>
+          <span style={{ color: "#1a5c2e" }}>Dimmed</span> bid/ask = Black-Scholes theoretical
           {data?.lastUpdated && <> | Last refresh: {new Date(data.lastUpdated).toLocaleString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</>}
+        </div>
+
+        {/* Data Sources */}
+        <div style={{ borderTop: "1px solid #1a1a1a", padding: "12px 16px", fontSize: 9, color: "#444", fontFamily: "monospace", lineHeight: 1.8 }}>
+          <span style={{ fontWeight: 700, color: "#555", letterSpacing: "0.06em" }}>DATA SOURCES</span>
+          <div style={{ marginTop: 4 }}>
+            <span style={{ color: "#666" }}>Options Chain:</span> Yahoo Finance (15-min delayed) &middot;{" "}
+            <span style={{ color: "#666" }}>Pricing Model:</span> Black-Scholes (IV solver, Newton-Raphson) &middot;{" "}
+            <span style={{ color: "#666" }}>Greeks:</span> Analytical B-S (delta, gamma, theta, vega) &middot;{" "}
+            <span style={{ color: "#666" }}>Underlying:</span> Interactive Brokers TWS API, Yahoo Finance
+          </div>
         </div>
       </main>
     </div>

@@ -525,6 +525,17 @@ export default function PredictionsPage() {
       </div>
         </>
       )}
+
+      {/* Data Sources */}
+      <div style={{ borderTop: "1px solid var(--border)", marginTop: 16, padding: "12px 16px", fontSize: 9, color: "var(--muted-foreground)", lineHeight: 1.8 }}>
+        <span style={{ fontWeight: 700, letterSpacing: "0.06em" }}>DATA SOURCES</span>
+        <div style={{ marginTop: 4 }}>
+          <span style={{ color: "var(--foreground)", opacity: 0.5 }}>Factors:</span> 19 technical & fundamental factors (momentum, volatility, beta, IVOL, B/M, E/P, DY) &middot;{" "}
+          <span style={{ color: "var(--foreground)", opacity: 0.5 }}>Model:</span> Ridge regression ensemble (60% Gradient Boosting + 40% Random Forest) &middot;{" "}
+          <span style={{ color: "var(--foreground)", opacity: 0.5 }}>Prices:</span> Interactive Brokers TWS API, Yahoo Finance &middot;{" "}
+          <span style={{ color: "var(--foreground)", opacity: 0.5 }}>Fundamentals:</span> Yahoo Finance
+        </div>
+      </div>
     </div>
   );
 }

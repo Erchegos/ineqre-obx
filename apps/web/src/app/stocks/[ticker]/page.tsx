@@ -2811,6 +2811,17 @@ export default function StockTickerPage() {
         isOpen={isPanelOpen}
         onClose={() => setIsPanelOpen(false)}
       />
+
+      {/* Data Sources */}
+      <div style={{ borderTop: "1px solid #1a1a1a", marginTop: 16, padding: "12px 16px", fontSize: 9, color: "#444", fontFamily: "'Geist Mono', monospace", lineHeight: 1.8 }}>
+        <span style={{ fontWeight: 700, color: "#555", letterSpacing: "0.06em" }}>DATA SOURCES</span>
+        <div style={{ marginTop: 4 }}>
+          <span style={{ color: "#666" }}>Prices:</span> Interactive Brokers TWS API (primary), Yahoo Finance (fallback) &middot;{" "}
+          <span style={{ color: "#666" }}>Fundamentals:</span> Yahoo Finance (E/P, B/M, Dividend Yield, Market Cap) &middot;{" "}
+          <span style={{ color: "#666" }}>Volatility:</span> Calculated from daily returns (Yang-Zhang, EWMA) &middot;{" "}
+          <span style={{ color: "#666" }}>Research:</span> Pareto Securities, DNB Markets, Carnegie
+        </div>
+      </div>
     </main>
   );
 }

@@ -433,6 +433,17 @@ export default function VolatilityPage() {
           regime={regime.current}
         />
       )}
+
+      {/* Data Sources */}
+      <div style={{ borderTop: "1px solid var(--border)", marginTop: 16, padding: "12px 16px", fontSize: 9, color: "var(--muted-foreground)", lineHeight: 1.8 }}>
+        <span style={{ fontWeight: 700, letterSpacing: "0.06em" }}>DATA SOURCES</span>
+        <div style={{ marginTop: 4 }}>
+          <span style={{ color: "var(--foreground)", opacity: 0.5 }}>Prices:</span> Interactive Brokers TWS API, Yahoo Finance &middot;{" "}
+          <span style={{ color: "var(--foreground)", opacity: 0.5 }}>Volatility Estimators:</span> Yang-Zhang, Rogers-Satchell, Parkinson, Garman-Klass, EWMA &middot;{" "}
+          <span style={{ color: "var(--foreground)", opacity: 0.5 }}>GARCH/Regime:</span> Python ML service (arch, hmmlearn) &middot;{" "}
+          <span style={{ color: "var(--foreground)", opacity: 0.5 }}>VaR:</span> Historical, Parametric, GARCH-based
+        </div>
+      </div>
     </main>
   );
 }

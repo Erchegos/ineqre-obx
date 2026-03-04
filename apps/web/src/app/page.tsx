@@ -412,8 +412,11 @@ export default function HomePage() {
             <p style={{ marginBottom: 8, lineHeight: 1.6 }}>
               <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Architecture:</strong> Server-side compute · Connection pooling · Transaction pooler (Supabase) · JWT authentication · Vercel edge deployment
             </p>
-            <p style={{ lineHeight: 1.6 }}>
+            <p style={{ marginBottom: 8, lineHeight: 1.6 }}>
               <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Data:</strong> Real-time OHLCV ingestion via IBKR · 160K+ daily data points · Supabase storage for PDF attachments
+            </p>
+            <p style={{ lineHeight: 1.6 }}>
+              <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Sources:</strong> Interactive Brokers TWS API · Yahoo Finance · Norges Bank (FX rates) · Pareto Securities · DNB Markets · Carnegie · Baltic Exchange · Oslo Stock Exchange
             </p>
           </footer>
 

@@ -259,6 +259,17 @@ export default function OBXVolatilityDashboard() {
         <span style={{ fontWeight: 700, color: "var(--foreground)" }}>Market Assessment:</span>{" "}
         {idx.interpretation}
       </div>
+
+      {/* Data Sources */}
+      <div style={{ borderTop: "1px solid var(--border)", marginTop: 16, padding: "12px 16px", fontSize: 9, color: "var(--muted-foreground)", lineHeight: 1.8 }}>
+        <span style={{ fontWeight: 700, letterSpacing: "0.06em" }}>DATA SOURCES</span>
+        <div style={{ marginTop: 4 }}>
+          <span style={{ color: "var(--foreground)", opacity: 0.5 }}>Prices:</span> Interactive Brokers TWS API, Yahoo Finance &middot;{" "}
+          <span style={{ color: "var(--foreground)", opacity: 0.5 }}>Volatility:</span> Yang-Zhang estimator, EWMA &middot;{" "}
+          <span style={{ color: "var(--foreground)", opacity: 0.5 }}>Regime:</span> 6-regime classification (percentile-based) &middot;{" "}
+          <span style={{ color: "var(--foreground)", opacity: 0.5 }}>Correlation:</span> Rolling 60-day window, OBX constituent data
+        </div>
+      </div>
     </main>
   );
 }
