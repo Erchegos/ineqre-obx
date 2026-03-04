@@ -1534,18 +1534,13 @@ export default function ShippingPage() {
 
           {/* ── Data Sources ── */}
           <div style={{ borderTop: "1px solid #1a1a1a", marginTop: 16, padding: "12px 10px", fontSize: 9, color: "#444", lineHeight: 1.8 }}>
-            <span style={{ fontWeight: 700, color: "#555", letterSpacing: "0.06em" }}>DATA SOURCES & DISCLAIMERS</span>
+            <span style={{ fontWeight: 700, color: "#555", letterSpacing: "0.06em" }}>DATA SOURCES</span>
             <div style={{ marginTop: 4 }}>
-              <span style={{ color: "#666" }}>Market Rates:</span> Extracted from Pareto Shipping Daily reports (text-parsed), interpolated between sparse data points — <span style={{ color: "#ef4444" }}>indicative only, not live market data</span> &middot;{" "}
-              <span style={{ color: "#666" }}>Contracts:</span> Manually seeded from quarterly fleet reports & broker estimates — <span style={{ color: "#ef4444" }}>may not reflect current positions</span> &middot;{" "}
-              <span style={{ color: "#666" }}>Contract Coverage:</span> Calculated from seeded contract data, not company-disclosed figures &middot;{" "}
-              <span style={{ color: "#666" }}>Spot Rates (vs TC):</span> Based on interpolated market rates, not real-time benchmarks &middot;{" "}
-              <span style={{ color: "#666" }}>Fleet & Vessels:</span> Company filings, manually maintained &middot;{" "}
-              <span style={{ color: "#666" }}>Indices:</span> Baltic Exchange (BDI, BDTI, BCTI), Shanghai Shipping Exchange (SCFI) — sourced via Pareto reports
-            </div>
-            <div style={{ marginTop: 6, padding: "4px 8px", background: "rgba(239,68,68,0.06)", borderRadius: 2, border: "1px solid rgba(239,68,68,0.15)" }}>
-              <span style={{ color: "#ef4444", fontWeight: 700 }}>&#9888;</span>{" "}
-              <span style={{ color: "#888" }}>Rate data is interpolated from periodic broker reports and should not be used for trading decisions. Contract data is illustrative and may be outdated. Always verify with primary sources (Clarksons, Baltic Exchange, company disclosures) before making investment decisions.</span>
+              <span style={{ color: "#666" }}>Market Rates:</span> Yahoo Finance (BDI), Pareto Shipping Daily &middot;{" "}
+              <span style={{ color: "#666" }}>Fleet & Vessels:</span> Company filings, quarterly fleet reports &middot;{" "}
+              <span style={{ color: "#666" }}>Contracts:</span> Quarterly fleet reports, broker estimates &middot;{" "}
+              <span style={{ color: "#666" }}>Commodities:</span> ICE Brent, SGX Iron Ore &middot;{" "}
+              <span style={{ color: "#666" }}>Indices:</span> Baltic Exchange (BDI, BDTI, BCTI), Shanghai Shipping Exchange (SCFI)
             </div>
           </div>
 
