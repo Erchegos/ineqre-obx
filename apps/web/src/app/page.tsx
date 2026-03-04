@@ -113,14 +113,18 @@ export default function HomePage() {
           box-shadow: 0 4px 16px rgba(59, 130, 246, 0.08);
         }
         .tag-pill {
-          display: inline-block;
-          padding: 2px 8px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 3px 8px;
           border-radius: 3px;
           font-size: 10px;
           font-family: monospace;
           font-weight: 600;
           letter-spacing: 0.04em;
           text-transform: uppercase;
+          line-height: 1;
+          white-space: nowrap;
         }
       `}</style>
 
@@ -291,7 +295,7 @@ export default function HomePage() {
                 description="Real-time market intelligence hub. AI-classified NewsWeb filings with sentiment analysis, Finanstilsynet short positions with sparklines, commodity prices (Brent, gas, metals) with stock sensitivity betas."
                 tags={[
                   { label: "News", color: "var(--accent)" },
-                  { label: "Shorts", color: "var(--error)" },
+                  { label: "Shorts", color: "var(--danger)" },
                   { label: "Commodities", color: "var(--warning)" },
                   { label: "Live", color: "var(--success)" },
                 ]}
@@ -304,7 +308,7 @@ export default function HomePage() {
                 description="Norwegian aquaculture dashboard. Salmon spot prices, sea lice monitoring, production area traffic lights, disease outbreaks, and company biological risk exposure matrix."
                 tags={[
                   { label: "Salmon", color: "var(--warning)" },
-                  { label: "Lice", color: "var(--error)" },
+                  { label: "Lice", color: "var(--danger)" },
                   { label: "Map", color: "var(--info)" },
                   { label: "Risk", color: "var(--accent)" },
                 ]}
@@ -504,14 +508,7 @@ function FeatureCard({ href, title, description, tags, visible, delay }: {
     >
       <div style={{ display: "flex", gap: 5, marginBottom: 12, flexWrap: "wrap", minHeight: 24 }}>
         {tags.map(t => (
-          <span key={t.label} className="tag-pill" style={{
-            background: `color-mix(in srgb, ${t.color} 15%, transparent)`,
-            color: t.color,
-            fontSize: tags.length > 3 ? 9 : 10,
-            padding: tags.length > 3 ? "2px 6px" : "2px 8px",
-          }}>
-            {t.label}
-          </span>
+          <TagPill key={t.label} label={t.label} color={t.color} />
         ))}
       </div>
       <h3 style={{
@@ -566,5 +563,29 @@ function CapabilityCard({ title, accent, children, visible, delay }: {
         {children}
       </p>
     </div>
+  );
+}
+
+// Map CSS var names to hex colors for reliable tag rendering
+const COLOR_MAP: Record<string, string> = {
+  "var(--accent)": "#3b82f6",
+  "var(--success)": "#10b981",
+  "var(--warning)": "#f59e0b",
+  "var(--danger)": "#ef4444",
+  "var(--info)": "#06b6d4",
+};
+
+function TagPill({ label, color, small }: { label: string; color: string; small?: boolean }) {
+  const hex = COLOR_MAP[color] || color;
+  return (
+    <span className="tag-pill" style={{
+      background: `${hex}22`,
+      color: hex,
+      border: `1px solid ${hex}30`,
+      fontSize: 10,
+      padding: "3px 8px",
+    }}>
+      {label}
+    </span>
   );
 }

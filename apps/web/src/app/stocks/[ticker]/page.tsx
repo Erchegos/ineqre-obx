@@ -219,6 +219,10 @@ export default function StockTickerPage() {
   const [stockSector, setStockSector] = useState<string>("");
   const [sectorPeers, setSectorPeers] = useState<Array<{ ticker: string; name: string }>>([]);
   const [prefetchedNews, setPrefetchedNews] = useState<any[] | null>(null);
+  const [priceTargets, setPriceTargets] = useState<Array<{
+    date: string; company: string; broker: string | null;
+    action: string; rating: string | null; ratingColor: string | null;
+  }>>([]);
 
   // Filter and sort state for Daily Returns table
   const [returnFilter, setReturnFilter] = useState<"all" | "positive" | "negative" | "large_positive" | "large_negative" | "custom">("all");
@@ -370,8 +374,8 @@ export default function StockTickerPage() {
       setStockMetaLoading(true);
 
       try {
-        // Run ALL 4 API calls in PARALLEL for faster load (including news prefetch)
-        const [factorRes, stocksRes, fundRes, newsRes] = await Promise.all([
+        // Run ALL 5 API calls in PARALLEL for faster load (including news prefetch + price targets)
+        const [factorRes, stocksRes, fundRes, newsRes, ptRes] = await Promise.all([
           fetch(`/api/factors/tickers`, {
             method: "GET",
             headers: { accept: "application/json" },
@@ -382,6 +386,7 @@ export default function StockTickerPage() {
           }),
           fetch(`/api/factors/${encodeURIComponent(ticker)}?type=fundamental&limit=1`),
           fetch(`/api/news/ticker/${encodeURIComponent(ticker)}?limit=20`),
+          fetch(`/api/research/price-targets/${encodeURIComponent(ticker)}`),
         ]);
 
         let factorExists = false;
@@ -411,6 +416,14 @@ export default function StockTickerPage() {
           try {
             const newsJson = await newsRes.json();
             setPrefetchedNews(newsJson.events || []);
+          } catch { /* non-fatal */ }
+        }
+
+        // Parse price targets
+        if (!cancelled && ptRes.ok) {
+          try {
+            const ptJson = await ptRes.json();
+            setPriceTargets(ptJson.targets || []);
           } catch { /* non-fatal */ }
         }
 
@@ -1310,7 +1323,52 @@ export default function StockTickerPage() {
             </div>
           </div>
 
-          {/* Row 3: Significant Moves — full width */}
+          {/* Row 3: Price Target Changes (Xtrainvestor) — only if data exists */}
+          {priceTargets.length > 0 && (
+            <div style={{ border: "1px solid var(--border)", borderRadius: 3, overflow: "hidden", marginBottom: 10 }}>
+              <div style={{
+                padding: "4px 8px", background: "rgba(255,255,255,0.03)",
+                borderBottom: "1px solid var(--border)",
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+              }}>
+                <span style={{ fontSize: 9, fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.06em", color: "var(--muted-foreground)" }}>
+                  ANALYST PRICE TARGETS
+                </span>
+                <span style={{ fontSize: 9, color: "var(--muted-foreground)", fontFamily: "monospace" }}>
+                  via BørsXtra · last 90d
+                </span>
+              </div>
+              <div style={{ padding: "6px 10px" }}>
+                {priceTargets.map((pt, i) => (
+                  <div key={i} style={{
+                    display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+                    fontSize: 12, padding: "4px 0",
+                    borderBottom: i < priceTargets.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none",
+                  }}>
+                    <span style={{ fontSize: 10, color: "var(--muted-foreground)", fontFamily: "monospace", minWidth: 68, flexShrink: 0 }}>
+                      {pt.date}
+                    </span>
+                    {pt.broker && (
+                      <span style={{
+                        fontSize: 10, padding: "1px 5px", background: "rgba(255,255,255,0.08)",
+                        borderRadius: 3, color: "#aaa", fontWeight: 500, flexShrink: 0,
+                      }}>{pt.broker}</span>
+                    )}
+                    <span style={{ color: "var(--foreground)", flex: 1 }}>{pt.action}</span>
+                    {pt.rating && pt.ratingColor && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 3,
+                        background: `${pt.ratingColor}18`, color: pt.ratingColor,
+                        border: `1px solid ${pt.ratingColor}40`, flexShrink: 0,
+                      }}>{pt.rating}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Row 4: Significant Moves — full width */}
           <div style={{ border: "1px solid var(--border)", borderRadius: 3, overflow: "hidden", marginBottom: 10 }}>
             <div style={{
               padding: "4px 8px", background: "rgba(255,255,255,0.03)",
