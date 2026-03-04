@@ -502,7 +502,7 @@ function FeatureCard({ href, title, description, tags, visible, delay }: {
         transition: `opacity 0.5s ease ${delay * 0.1}s, transform 0.5s ease ${delay * 0.1}s, border-color 0.25s ease, box-shadow 0.25s ease`,
       }}
     >
-      <div style={{ display: "flex", gap: 4, marginBottom: 10, flexWrap: "wrap", minHeight: 16 }}>
+      <div style={{ display: "flex", gap: 4, marginBottom: 10, flexWrap: "wrap", alignItems: "center", minHeight: 16 }}>
         {tags.map(t => (
           <TagPill key={t.label} label={t.label} color={t.color} />
         ))}
@@ -575,15 +575,17 @@ function TagPill({ label, color }: { label: string; color: string }) {
   const hex = COLOR_MAP[color] || color;
   return (
     <span style={{
-      display: "inline-block",
-      padding: "1px 5px",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      height: 16,
+      padding: "0 6px",
       borderRadius: 2,
       fontSize: 8,
       fontFamily: "monospace",
       fontWeight: 600,
       letterSpacing: "0.05em",
       textTransform: "uppercase" as const,
-      lineHeight: 1.3,
       whiteSpace: "nowrap" as const,
       background: `${hex}15`,
       color: `${hex}bb`,
