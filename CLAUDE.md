@@ -59,7 +59,7 @@ InEqRe_OBX/
 
 | Feature | URL Route | File Path |
 |---------|-----------|-----------|
-| **Homepage** | `/` | `apps/web/src/app/page.tsx` |
+| **Homepage** | `/` | `apps/web/src/app/page.tsx` (max 3 tags per feature card) |
 | **Universe Explorer** | `/stocks` | `apps/web/src/app/stocks/page.tsx` |
 | **Stock Detail** | `/stocks/[ticker]` | `apps/web/src/app/stocks/[ticker]/page.tsx` |
 | **Research Portal** | `/research` | `apps/web/src/app/research/page.tsx` |
@@ -133,6 +133,7 @@ All endpoints in `apps/web/src/app/api/`
 | `GET /api/research/documents/[id]/attachments/[aid]` | PDF attachments |
 | `POST /api/research/auth` | Password authentication |
 | `POST /api/research/generate-summaries` | AI summary generation |
+| `GET /api/research/price-targets/[ticker]` | Parsed Xtrainvestor price target changes for a ticker (last 90d) |
 
 ### Portfolio APIs
 | Endpoint | Purpose |
