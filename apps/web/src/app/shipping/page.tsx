@@ -497,7 +497,7 @@ export default function ShippingPage() {
             <span>Avg<span style={{ color: "#888", marginLeft: 3 }}>{fmtNum(stats.avg)}</span></span>
             <span>H <span style={{ color: "#22c55e" }}>{fmtNum(stats.high)}</span></span>
             <span>L <span style={{ color: "#ef4444" }}>{fmtNum(stats.low)}</span></span>
-            <span style={{ color: "#666" }}>{stats.latestDate}</span>
+            <span style={{ color: "#666" }}>{fmtDate(stats.latestDate)}</span>
           </div>
         )}
       </div>
