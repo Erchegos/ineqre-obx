@@ -187,6 +187,33 @@ function fmtPrice(v: number | null): string {
   return v >= 100 ? v.toFixed(0) : v >= 1 ? v.toFixed(2) : v.toFixed(4);
 }
 
+/** Short date label: "09:15" if today, "4 Mar" if this week, "4/3" if older */
+function fmtTradeStamp(dateStr: string | null | undefined): string {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  if (dDate.getTime() === today.getTime()) {
+    return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  }
+  const diffDays = Math.floor((today.getTime() - dDate.getTime()) / 86400000);
+  if (diffDays <= 5) {
+    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  }
+  return `${d.getDate()}/${d.getMonth() + 1}`;
+}
+
+/** Returns true if date is NOT today (stale) */
+function isStale(dateStr: string | null | undefined): boolean {
+  if (!dateStr) return true;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return true;
+  const now = new Date();
+  return d.toDateString() !== now.toDateString();
+}
+
 function sparklineSvg(data: number[], w = 60, h = 16, color = "#3b82f6"): string {
   if (data.length < 2) return "";
   const mn = Math.min(...data), mx = Math.max(...data);
@@ -701,19 +728,23 @@ export default function IntelligencePage() {
                             {avg >= 0 ? "+" : ""}{avg.toFixed(2)}%
                           </span>
                         </div>
-                        {expanded && sec.stocks.map((st: SectorData["stocks"][number]) => (
+                        {expanded && sec.stocks.map((st: SectorData["stocks"][number]) => {
+                          const stale = isStale(st.tradeDate);
+                          return (
                           <Link key={st.ticker} href={`/stocks/${st.ticker}`} className="intel-row" style={{
-                            display: "grid", gridTemplateColumns: "60px 1fr 56px",
+                            display: "grid", gridTemplateColumns: "60px 1fr 36px 56px",
                             padding: "3px 10px 3px 20px", textDecoration: "none", color: "inherit",
                             borderBottom: "1px solid #111", background: "#0a0a0a",
                           }}>
-                            <span style={{ fontSize: 9, fontWeight: 600, color: "#ccc" }}>{st.ticker}</span>
+                            <span style={{ fontSize: 9, fontWeight: 600, color: stale ? "#555" : "#ccc" }}>{st.ticker}</span>
                             <span style={{ fontSize: 9, color: "#555", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{st.name}</span>
-                            <span style={{ textAlign: "right", fontSize: 10, fontWeight: 700, color: st.returnPct > 0 ? "#4ade80" : st.returnPct < 0 ? "#f97316" : "#666" }}>
+                            <span style={{ fontSize: 7, color: "#444", textAlign: "right" }}>{fmtTradeStamp(st.tradeDate)}</span>
+                            <span style={{ textAlign: "right", fontSize: 10, fontWeight: 700, color: stale ? "#666" : (st.returnPct > 0 ? "#4ade80" : st.returnPct < 0 ? "#f97316" : "#666") }}>
                               {st.returnPct >= 0 ? "+" : ""}{st.returnPct.toFixed(2)}%
                             </span>
                           </Link>
-                        ))}
+                          );
+                        })}
                       </div>
                     );
                   })
@@ -725,28 +756,36 @@ export default function IntelligencePage() {
                   {/* Gainers */}
                   <div style={{ borderRight: "1px solid #1a1a1a" }}>
                     <div style={{ fontSize: 8, fontWeight: 700, color: "#22c55e", padding: "3px 10px", background: "#22c55e08", letterSpacing: "0.06em" }}>GAINERS</div>
-                    {movers.gainers.slice(0, 8).map(m => (
+                    {movers.gainers.slice(0, 8).map(m => {
+                      const stale = isStale(m.tradeDate);
+                      return (
                       <Link key={m.ticker} href={`/stocks/${m.ticker}`} className="intel-row" style={{
-                        display: "flex", justifyContent: "space-between", padding: "3px 10px",
+                        display: "grid", gridTemplateColumns: "1fr auto auto", gap: 6, padding: "3px 10px",
                         textDecoration: "none", color: "inherit", borderBottom: "1px solid #111",
                       }}>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: "#e5e5e5" }}>{m.ticker}</span>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: "#22c55e" }}>{fmtPctRaw(m.returnPct * 100, 1)}</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: stale ? "#666" : "#e5e5e5" }}>{m.ticker}</span>
+                        <span style={{ fontSize: 7, color: "#444", alignSelf: "center" }}>{fmtTradeStamp(m.tradeDate)}</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: stale ? "#666" : "#22c55e" }}>{fmtPctRaw(m.returnPct * 100, 1)}</span>
                       </Link>
-                    ))}
+                      );
+                    })}
                   </div>
                   {/* Losers */}
                   <div>
                     <div style={{ fontSize: 8, fontWeight: 700, color: "#ef4444", padding: "3px 10px", background: "#ef444408", letterSpacing: "0.06em" }}>LOSERS</div>
-                    {movers.losers.slice(0, 8).map(m => (
+                    {movers.losers.slice(0, 8).map(m => {
+                      const stale = isStale(m.tradeDate);
+                      return (
                       <Link key={m.ticker} href={`/stocks/${m.ticker}`} className="intel-row" style={{
-                        display: "flex", justifyContent: "space-between", padding: "3px 10px",
+                        display: "grid", gridTemplateColumns: "1fr auto auto", gap: 6, padding: "3px 10px",
                         textDecoration: "none", color: "inherit", borderBottom: "1px solid #111",
                       }}>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: "#e5e5e5" }}>{m.ticker}</span>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: "#ef4444" }}>{fmtPctRaw(m.returnPct * 100, 1)}</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: stale ? "#666" : "#e5e5e5" }}>{m.ticker}</span>
+                        <span style={{ fontSize: 7, color: "#444", alignSelf: "center" }}>{fmtTradeStamp(m.tradeDate)}</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: stale ? "#666" : "#ef4444" }}>{fmtPctRaw(m.returnPct * 100, 1)}</span>
                       </Link>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -758,12 +797,14 @@ export default function IntelligencePage() {
                   fxRates.map(fx => {
                     const spotData = fx.timeSeries?.spot?.map(s => s.value) || [];
                     const sparkColor = spotData.length > 1 ? (spotData[spotData.length - 1] >= spotData[0] ? "#22c55e" : "#ef4444") : "#555";
-                    const retColor = (fx.latest.simpleReturn ?? 0) >= 0 ? "#22c55e" : "#ef4444";
+                    const stale = isStale(fx.latest.date);
+                    const retColor = stale ? "#666" : ((fx.latest.simpleReturn ?? 0) >= 0 ? "#22c55e" : "#ef4444");
 
                     return (
-                      <div key={fx.pair} style={{ display: "grid", gridTemplateColumns: "68px 1fr auto auto", padding: "5px 10px", borderBottom: "1px solid #1a1a1a", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: "#e5e5e5" }}>{fx.pair}</span>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "#e5e5e5" }}>{fx.latest.spot.toFixed(4)}</span>
+                      <div key={fx.pair} style={{ display: "grid", gridTemplateColumns: "68px 1fr auto auto auto", padding: "5px 10px", borderBottom: "1px solid #1a1a1a", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: stale ? "#666" : "#e5e5e5" }}>{fx.pair}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: stale ? "#888" : "#e5e5e5" }}>{fx.latest.spot.toFixed(4)}</span>
+                        <span style={{ fontSize: 7, color: "#444" }}>{fmtTradeStamp(fx.latest.date)}</span>
                         <span style={{ fontSize: 10, fontWeight: 600, color: retColor }}>
                           {fx.latest.simpleReturn != null ? fmtPct(fx.latest.simpleReturn, 2) : "\u2014"}
                         </span>
