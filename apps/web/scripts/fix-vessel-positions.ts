@@ -1,21 +1,9 @@
 /**
- * Fix vessel positions — replace seed data with realistic ocean positions
+ * Fix vessel positions — scatter across ocean regions (not along routes)
  *
- * Since free global AIS APIs are unavailable (BarentsWatch AIS deprecated,
- * Digitraffic limited to Finland, MarineTraffic/VesselFinder require paid keys),
- * this script assigns realistic positions along known trade routes based on
- * vessel type and company focus.
- *
- * Positions are distributed along real shipping lanes:
- * - Tankers: MEG→China, WAF→Europe, North Sea
- * - Dry bulk: Brazil→China, Australia→China, Baltic
- * - Gas (LPG/LNG): MEG→Asia, US→Europe
- * - Chemical: Europe→Global
- * - Container: Asia→Europe, Intra-Asia
- * - Car carriers: Asia→Europe, Asia→Americas
- *
- * Each position includes slight randomization for natural distribution.
- * Status (at_sea/in_port/anchored) distributed realistically.
+ * Uses Natural Earth 110m land polygons with ray-casting for land/sea detection.
+ * Vessels are randomly scattered within broad ocean regions based on their sector,
+ * producing natural-looking distributions (not visible route lines).
  *
  * Run: npx tsx scripts/fix-vessel-positions.ts
  */
@@ -23,6 +11,7 @@
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
+import { readFileSync } from "fs";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, "../.env.local") });
 
@@ -34,368 +23,238 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-// Known shipping waypoints along major routes (lat, lon)
-const ROUTES: Record<string, [number, number][]> = {
-  // MEG (Middle East Gulf) → Far East (VLCC route)
-  meg_fareast: [
-    [25.5, 56.8],   // Fujairah anchorage (offshore)
-    [24.5, 58.5],   // Gulf of Oman (offshore)
-    [22.5, 60.5],   // Arabian Sea
-    [18.0, 62.0],   // Indian Ocean
-    [12.0, 65.0],   // Indian Ocean
-    [8.0, 72.0],    // Indian Ocean
-    [5.0, 78.0],    // Sri Lanka
-    [4.0, 85.0],    // Bay of Bengal
-    [2.0, 95.0],    // Malacca approach
-    [1.3, 103.8],   // Singapore Strait
-    [5.0, 108.0],   // South China Sea
-    [10.0, 112.0],  // South China Sea
-    [18.0, 115.0],  // South China Sea
-    [22.0, 118.0],  // Taiwan Strait
-    [30.0, 122.0],  // East China Sea
-    [35.0, 130.0],  // Korea/Japan
-  ],
-  // WAF (West Africa) → UKC (UK Continent) — Suezmax route
-  waf_europe: [
-    [4.0, 3.5],     // Lagos
-    [6.0, -1.0],    // Ghana
-    [10.0, -15.0],  // Senegal
-    [20.0, -18.0],  // Mauritania
-    [28.0, -15.0],  // Canary Islands
-    [36.0, -8.0],   // Gibraltar approach
-    [43.0, -9.0],   // Cape Finisterre
-    [48.0, -6.0],   // Brest
-    [50.0, -2.0],   // English Channel
-    [51.5, 1.5],    // Dover
-    [53.0, 3.0],    // North Sea
-    [56.0, 6.0],    // Denmark
-    [58.0, 5.0],    // Stavanger
-    [60.5, 5.0],    // Bergen
-  ],
-  // North Sea / Norwegian coast
-  north_sea: [
-    [56.0, 3.0],    // Central North Sea
-    [57.5, 1.5],    // Ekofisk area
-    [58.5, 2.0],    // Johan Sverdrup
-    [59.0, 3.0],    // Utsira
-    [60.0, 4.5],    // Bergen approach
-    [60.5, 5.0],    // Bergen
-    [62.0, 5.5],    // Alesund
-    [63.5, 7.0],    // Trondheim
-    [66.0, 13.0],   // Lofoten
-    [69.5, 19.0],   // Tromso
-    [71.0, 25.0],   // Hammerfest
-  ],
-  // Brazil → China (Capesize iron ore)
-  brazil_china: [
-    [-23.0, -43.0], // Tubarao/Brazil
-    [-25.0, -35.0], // South Atlantic
-    [-30.0, -20.0], // Mid Atlantic
-    [-35.0, 0.0],   // Cape approach
-    [-35.0, 18.0],  // South Africa
-    [-30.0, 35.0],  // Durban
-    [-20.0, 45.0],  // Mozambique Channel
-    [-10.0, 55.0],  // Indian Ocean
-    [0.0, 65.0],    // Central Indian Ocean
-    [5.0, 80.0],    // Sri Lanka
-    [2.0, 95.0],    // Malacca approach
-    [1.3, 103.8],   // Singapore
-    [10.0, 112.0],  // South China Sea
-    [22.0, 118.0],  // South China
-    [30.0, 122.0],  // Zhoushan
-    [38.0, 122.0],  // Qingdao
-  ],
-  // Australia → China (Capesize coal/iron ore)
-  australia_china: [
-    [-27.5, 153.0], // Brisbane
-    [-23.5, 151.0], // Gladstone
-    [-20.0, 148.5], // Mackay
-    [-15.0, 140.0], // Torres Strait
-    [-10.0, 130.0], // Darwin
-    [-5.0, 120.0],  // Timor Sea
-    [0.0, 115.0],   // Borneo
-    [5.0, 112.0],   // South China Sea
-    [15.0, 115.0],  // South China Sea
-    [22.0, 118.0],  // South China
-    [30.0, 122.0],  // Zhoushan
-    [35.0, 129.0],  // Korea
-  ],
-  // Baltic Sea routes
-  baltic: [
-    [54.5, 10.0],   // Kiel
-    [55.5, 13.0],   // Malmo/Copenhagen
-    [56.5, 16.0],   // Baltic
-    [57.5, 18.0],   // Gotland
-    [59.0, 19.0],   // Stockholm
-    [59.5, 24.5],   // Tallinn
-    [60.0, 25.0],   // Helsinki
-    [60.5, 28.0],   // St Petersburg
-  ],
-  // Asia → Europe container (Suez route)
-  asia_europe_container: [
-    [22.3, 114.0],  // Hong Kong
-    [15.0, 110.0],  // South China Sea
-    [5.0, 103.0],   // Singapore approach
-    [1.3, 103.8],   // Singapore
-    [5.0, 80.0],    // Sri Lanka
-    [12.0, 45.0],   // Gulf of Aden
-    [13.0, 43.0],   // Bab el-Mandeb
-    [27.5, 34.0],   // Suez approach
-    [30.0, 32.5],   // Suez Canal
-    [32.0, 32.0],   // Port Said
-    [35.0, 24.0],   // Crete
-    [37.0, 15.0],   // Sicily
-    [36.0, -5.5],   // Gibraltar
-    [43.0, -9.0],   // Finisterre
-    [50.0, -1.0],   // English Channel
-    [51.5, 3.5],    // Rotterdam
-    [53.5, 10.0],   // Hamburg
-  ],
-  // US Gulf → Europe (LNG/LPG)
-  usgulf_europe: [
-    [29.0, -89.0],  // US Gulf
-    [27.0, -85.0],  // Florida Strait
-    [25.0, -80.0],  // Miami
-    [30.0, -70.0],  // Atlantic
-    [35.0, -55.0],  // Mid Atlantic
-    [40.0, -40.0],  // Mid Atlantic
-    [43.0, -25.0],  // Azores
-    [43.0, -9.0],   // Finisterre
-    [48.0, -5.0],   // Brest
-    [51.0, 1.0],    // Dover
-    [58.0, 5.0],    // Stavanger
-  ],
-  // Caribbean / Americas
-  americas: [
-    [10.0, -62.0],  // Trinidad
-    [12.0, -68.0],  // Curacao
-    [18.0, -66.0],  // Puerto Rico
-    [25.0, -77.0],  // Bahamas
-    [29.0, -89.0],  // US Gulf
-    [32.0, -81.0],  // Savannah
-    [37.0, -76.0],  // Chesapeake
-    [40.5, -74.0],  // New York
-    [42.0, -70.0],  // Boston
-  ],
-  // Mediterranean — all waypoints well offshore
-  med: [
-    [36.0, -5.5],   // Gibraltar strait
-    [37.5, 0.5],    // Off Cartagena
-    [38.5, 3.5],    // Balearic Sea
-    [39.5, 8.0],    // West of Sardinia
-    [42.0, 6.0],    // Gulf of Lion (offshore)
-    [38.0, 12.5],   // Tyrrhenian Sea
-    [35.5, 16.0],   // Central Med (south of Sicily)
-    [35.0, 24.0],   // South of Crete
-    [38.0, 25.0],   // Aegean Sea
-    [35.5, 32.0],   // Off Cyprus
-  ],
-  // MEG → India (crude tankers)
-  meg_india: [
-    [25.5, 56.8],   // Fujairah anchorage (offshore)
-    [24.0, 60.5],   // Off Oman coast
-    [22.0, 63.0],   // Arabian Sea
-    [20.0, 67.0],   // Arabian Sea
-    [18.5, 72.8],   // Mumbai
-    [15.0, 73.5],   // Goa
-    [13.0, 80.0],   // Chennai
-    [9.0, 76.0],    // Kochi
-  ],
-};
+// ── Natural Earth land polygon detection ──────────────────────────
+type Ring = [number, number][];
+const landRings: Ring[] = [];
 
-// Route assignments by sector and company
-const SECTOR_ROUTES: Record<string, { routes: string[]; weights: number[] }> = {
-  tanker: {
-    routes: ["meg_fareast", "waf_europe", "north_sea", "meg_india", "med", "americas"],
-    weights: [30, 20, 15, 15, 10, 10],
-  },
-  dry_bulk: {
-    routes: ["brazil_china", "australia_china", "baltic", "north_sea", "americas", "meg_fareast"],
-    weights: [25, 25, 15, 15, 10, 10],
-  },
-  gas: {
-    routes: ["meg_fareast", "usgulf_europe", "north_sea", "med", "americas"],
-    weights: [30, 25, 20, 15, 10],
-  },
-  chemical: {
-    routes: ["north_sea", "med", "waf_europe", "americas", "meg_fareast"],
-    weights: [25, 25, 20, 15, 15],
-  },
-  container: {
-    routes: ["asia_europe_container", "med", "north_sea", "americas", "baltic"],
-    weights: [30, 25, 15, 15, 15],
-  },
-  car_carrier: {
-    routes: ["asia_europe_container", "americas", "north_sea", "med"],
-    weights: [35, 25, 20, 20],
-  },
-};
-
-function pickWeighted(items: string[], weights: number[]): string {
-  const total = weights.reduce((s, w) => s + w, 0);
-  let r = Math.random() * total;
-  for (let i = 0; i < items.length; i++) {
-    r -= weights[i];
-    if (r <= 0) return items[i];
+function loadLandPolygons() {
+  const geojsonPath = path.resolve(__dirname, "../src/data/ne_110m_land.json");
+  const raw = JSON.parse(readFileSync(geojsonPath, "utf-8"));
+  for (const feature of raw.features) {
+    if (feature.geometry.type === "Polygon") {
+      landRings.push(feature.geometry.coordinates[0]);
+    } else if (feature.geometry.type === "MultiPolygon") {
+      for (const poly of feature.geometry.coordinates) {
+        landRings.push(poly[0]);
+      }
+    }
   }
-  return items[items.length - 1];
+  console.log(`Loaded ${landRings.length} land polygon rings`);
 }
 
-// Major landmass bounding boxes — if a point falls inside any of these, it's on land
-const LAND_BOXES: [number, number, number, number][] = [
-  // [latMin, latMax, lonMin, lonMax]
-  // Europe interior
-  [42, 72, -10, 40],
-  // Africa
-  [-35, 37, -18, 52],
-  // Asia (mainland)
-  [10, 55, 25, 130],
-  // Australia
-  [-40, -10, 113, 154],
-  // North America
-  [15, 72, -170, -52],
-  // South America
-  [-56, 13, -82, -34],
-  // India subcontinent
-  [8, 35, 68, 90],
-  // Arabia
-  [12, 38, 34, 60],
-  // Southeast Asia islands (Borneo, Sumatra, Java)
-  [-8, 7, 95, 120],
-];
-
-// Coastal water corridors — areas inside land boxes that are actually water
-const WATER_CORRIDORS: [number, number, number, number][] = [
-  // Mediterranean Sea
-  [30, 46, -6, 37],
-  // Red Sea
-  [12, 30, 32, 44],
-  // Persian Gulf — tightened to actual water only (not inland UAE/Kuwait/Oman)
-  [24, 30.5, 47, 51],   // Inner Gulf (narrow, between Iran & Arabia)
-  [23.5, 27, 51, 56.5],  // Strait of Hormuz / Gulf of Oman approach
-  // Gulf of Oman — offshore only
-  [23, 26, 56.5, 60],
-  // North Sea / Norwegian Sea
-  [50, 72, -5, 12],
-  // Baltic Sea
-  [53, 66, 9, 30],
-  // Gulf of Mexico
-  [18, 31, -98, -80],
-  // Caribbean
-  [8, 23, -90, -58],
-  // Sea of Japan / East China Sea
-  [24, 52, 120, 145],
-  // South China Sea
-  [0, 25, 105, 122],
-  // Bay of Bengal
-  [5, 23, 78, 95],
-  // Arabian Sea — offshore only (not Oman coast)
-  [5, 25, 57, 78],
-  // Gulf of Guinea
-  [-5, 8, -10, 12],
-  // Mozambique Channel
-  [-27, -10, 30, 50],
-  // Black Sea
-  [40, 47, 27, 42],
-  // Indonesian waters
-  [-10, 5, 95, 140],
-  // Torres Strait / Coral Sea
-  [-25, -5, 140, 165],
-  // English Channel
-  [48, 52, -6, 3],
-  // East coast Americas (Atlantic shipping lane)
-  [10, 50, -82, -55],
-  // West coast Americas
-  [-56, 60, -130, -115],
-  // Hudson Bay approaches
-  [42, 55, -80, -55],
-  // Strait of Malacca
-  [-2, 8, 95, 106],
-];
-
-function isLikelyWater(lat: number, lon: number): boolean {
-  // First check if we're in a known water corridor
-  for (const [latMin, latMax, lonMin, lonMax] of WATER_CORRIDORS) {
-    if (lat >= latMin && lat <= latMax && lon >= lonMin && lon <= lonMax) {
-      return true;
+function pointInRing(x: number, y: number, ring: Ring): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
+      inside = !inside;
     }
   }
-  // Then check if we're on a landmass
-  for (const [latMin, latMax, lonMin, lonMax] of LAND_BOXES) {
-    if (lat >= latMin && lat <= latMax && lon >= lonMin && lon <= lonMax) {
-      return false; // inside a land box and NOT in a water corridor = land
-    }
-  }
-  // Not in any land box = open ocean
-  return true;
+  return inside;
 }
 
-function randomPositionOnRoute(route: [number, number][]): { lat: number; lon: number } {
-  // Try up to 20 times to find a water position
-  for (let attempt = 0; attempt < 20; attempt++) {
-    const segIdx = Math.floor(Math.random() * (route.length - 1));
-    const t = Math.random();
-    const [lat1, lon1] = route[segIdx];
-    const [lat2, lon2] = route[segIdx + 1];
-
-    // Tighter spread: 0.3 degrees = ~33km
-    const spread = 0.3;
-    const lat = parseFloat((lat1 + t * (lat2 - lat1) + (Math.random() - 0.5) * spread).toFixed(4));
-    const lon = parseFloat((lon1 + t * (lon2 - lon1) + (Math.random() - 0.5) * spread).toFixed(4));
-
-    if (isLikelyWater(lat, lon)) {
-      return { lat, lon };
-    }
+function isOnLand(lat: number, lon: number): boolean {
+  for (const ring of landRings) {
+    if (pointInRing(lon, lat, ring)) return true;
   }
-  // Fallback: use waypoint directly (waypoints are all on water)
-  const wp = route[Math.floor(Math.random() * route.length)];
-  return { lat: wp[0], lon: wp[1] };
+  return false;
+}
+
+function isOnWater(lat: number, lon: number): boolean {
+  return !isOnLand(lat, lon);
+}
+
+// ── Ocean regions: broad areas where vessels of each type operate ──
+// Each region is [latMin, latMax, lonMin, lonMax]
+type OceanRegion = { name: string; bounds: [number, number, number, number]; weight: number };
+
+const TANKER_REGIONS: OceanRegion[] = [
+  { name: "Arabian Sea",        bounds: [8, 25, 55, 75],    weight: 20 },
+  { name: "Persian Gulf",       bounds: [24, 30, 48, 56],   weight: 10 },
+  { name: "Indian Ocean",       bounds: [-5, 15, 60, 85],   weight: 15 },
+  { name: "South China Sea",    bounds: [2, 20, 105, 120],  weight: 10 },
+  { name: "Mediterranean",      bounds: [32, 42, -4, 35],   weight: 10 },
+  { name: "North Sea",          bounds: [54, 62, -2, 8],    weight: 12 },
+  { name: "West Africa",        bounds: [-5, 10, -15, 8],   weight: 8 },
+  { name: "Caribbean/USGulf",   bounds: [20, 30, -95, -75], weight: 8 },
+  { name: "East China Sea",     bounds: [25, 38, 120, 135], weight: 7 },
+];
+
+const DRYBULK_REGIONS: OceanRegion[] = [
+  { name: "South Atlantic",     bounds: [-35, -10, -30, 15], weight: 15 },
+  { name: "Indian Ocean",       bounds: [-15, 10, 50, 85],   weight: 15 },
+  { name: "South China Sea",    bounds: [2, 20, 105, 122],   weight: 12 },
+  { name: "Pacific (Aus-China)",bounds: [-25, 5, 125, 155],   weight: 15 },
+  { name: "East China Sea",     bounds: [25, 40, 120, 140],   weight: 12 },
+  { name: "North Sea/Baltic",   bounds: [53, 62, 0, 25],      weight: 10 },
+  { name: "North Atlantic",     bounds: [35, 50, -45, -10],   weight: 8 },
+  { name: "Bay of Bengal",      bounds: [5, 18, 80, 95],      weight: 8 },
+  { name: "Coral Sea",          bounds: [-25, -10, 145, 165],  weight: 5 },
+];
+
+const GAS_REGIONS: OceanRegion[] = [
+  { name: "Arabian Sea/MEG",    bounds: [10, 28, 50, 70],    weight: 20 },
+  { name: "North Atlantic",     bounds: [35, 55, -50, -10],  weight: 20 },
+  { name: "Norwegian Sea",      bounds: [60, 72, 0, 20],     weight: 15 },
+  { name: "North Sea",          bounds: [54, 62, -2, 8],     weight: 15 },
+  { name: "Mediterranean",      bounds: [32, 42, -4, 30],    weight: 10 },
+  { name: "South China Sea",    bounds: [2, 20, 105, 120],   weight: 10 },
+  { name: "Pacific",            bounds: [20, 40, 130, 160],  weight: 10 },
+];
+
+const CHEMICAL_REGIONS: OceanRegion[] = [
+  { name: "North Sea",          bounds: [50, 62, -5, 10],    weight: 25 },
+  { name: "Mediterranean",      bounds: [32, 43, -5, 35],    weight: 20 },
+  { name: "Arabian Sea",        bounds: [8, 25, 55, 75],     weight: 15 },
+  { name: "US East Coast",      bounds: [25, 42, -80, -65],  weight: 12 },
+  { name: "South China Sea",    bounds: [0, 15, 100, 120],   weight: 10 },
+  { name: "Caribbean",          bounds: [10, 25, -85, -60],  weight: 10 },
+  { name: "West Africa",        bounds: [-5, 10, -15, 8],    weight: 8 },
+];
+
+const CONTAINER_REGIONS: OceanRegion[] = [
+  { name: "South China Sea",    bounds: [0, 22, 100, 125],   weight: 20 },
+  { name: "Indian Ocean",       bounds: [-5, 15, 55, 85],    weight: 15 },
+  { name: "Mediterranean",      bounds: [32, 42, -5, 35],    weight: 15 },
+  { name: "North Atlantic",     bounds: [35, 52, -40, -5],   weight: 15 },
+  { name: "North Sea/Baltic",   bounds: [52, 62, -2, 15],    weight: 12 },
+  { name: "Red Sea",            bounds: [12, 28, 34, 44],    weight: 8 },
+  { name: "Pacific",            bounds: [20, 40, 130, 175],  weight: 10 },
+  { name: "US East Coast",      bounds: [25, 42, -80, -65],  weight: 5 },
+];
+
+const CAR_CARRIER_REGIONS: OceanRegion[] = [
+  { name: "Pacific (Asia)",     bounds: [20, 40, 125, 160],  weight: 20 },
+  { name: "Indian Ocean",       bounds: [-5, 15, 55, 85],    weight: 15 },
+  { name: "North Atlantic",     bounds: [35, 55, -45, -5],   weight: 20 },
+  { name: "North Sea",          bounds: [50, 62, -5, 10],    weight: 15 },
+  { name: "Mediterranean",      bounds: [32, 42, -5, 30],    weight: 10 },
+  { name: "South China Sea",    bounds: [2, 20, 100, 122],   weight: 10 },
+  { name: "US East Coast",      bounds: [25, 42, -80, -65],  weight: 10 },
+];
+
+const SECTOR_REGIONS: Record<string, OceanRegion[]> = {
+  tanker: TANKER_REGIONS,
+  dry_bulk: DRYBULK_REGIONS,
+  gas: GAS_REGIONS,
+  chemical: CHEMICAL_REGIONS,
+  container: CONTAINER_REGIONS,
+  car_carrier: CAR_CARRIER_REGIONS,
+};
+
+function pickWeightedRegion(regions: OceanRegion[]): OceanRegion {
+  const total = regions.reduce((s, r) => s + r.weight, 0);
+  let roll = Math.random() * total;
+  for (const r of regions) {
+    roll -= r.weight;
+    if (roll <= 0) return r;
+  }
+  return regions[regions.length - 1];
+}
+
+function randomWaterPosition(region: OceanRegion): { lat: number; lon: number } {
+  const [latMin, latMax, lonMin, lonMax] = region.bounds;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const lat = parseFloat((latMin + Math.random() * (latMax - latMin)).toFixed(4));
+    const lon = parseFloat((lonMin + Math.random() * (lonMax - lonMin)).toFixed(4));
+    if (isOnWater(lat, lon)) return { lat, lon };
+  }
+  // Fallback: center of region (should be ocean)
+  return {
+    lat: parseFloat(((latMin + latMax) / 2).toFixed(4)),
+    lon: parseFloat(((lonMin + lonMax) / 2).toFixed(4)),
+  };
 }
 
 function pickStatus(): { navStatus: string; opStatus: string; speed: number } {
   const r = Math.random();
-  if (r < 0.55) {
-    return { navStatus: "under_way", opStatus: "at_sea", speed: parseFloat((10 + Math.random() * 5).toFixed(1)) };
-  } else if (r < 0.70) {
-    return { navStatus: "moored", opStatus: "loading", speed: 0 };
-  } else if (r < 0.82) {
-    return { navStatus: "moored", opStatus: "discharging", speed: 0 };
-  } else if (r < 0.90) {
-    return { navStatus: "at_anchor", opStatus: "waiting", speed: 0 };
-  } else {
-    return { navStatus: "moored", opStatus: "in_port", speed: 0 };
-  }
+  if (r < 0.55) return { navStatus: "under_way", opStatus: "at_sea", speed: parseFloat((10 + Math.random() * 5).toFixed(1)) };
+  if (r < 0.70) return { navStatus: "moored", opStatus: "loading", speed: 0 };
+  if (r < 0.82) return { navStatus: "moored", opStatus: "discharging", speed: 0 };
+  if (r < 0.90) return { navStatus: "at_anchor", opStatus: "waiting", speed: 0 };
+  return { navStatus: "moored", opStatus: "in_port", speed: 0 };
 }
 
-// Major port positions for vessels that are in_port/loading/discharging
+// Real port anchorage positions (just offshore — validated as water by NE 110m)
 const PORTS: Record<string, [number, number][]> = {
   tanker: [
-    [25.2, 56.4], [1.26, 103.85], [29.4, 48.5], [12.1, 45.0], [51.9, 4.5],
-    [60.4, 5.3], [36.8, -76.3], [22.3, 114.2], [35.0, 129.0], [5.0, 3.4],
+    [25.0, 56.3],   // Fujairah anchorage
+    [1.15, 103.9],  // Singapore anchorage
+    [29.3, 48.8],   // Kuwait/Mina Ahmad
+    [12.0, 45.0],   // Aden
+    [51.8, 3.8],    // Rotterdam pilot
+    [60.3, 4.8],    // Bergen offshore
+    [36.9, -76.0],  // Norfolk anchorage
+    [22.1, 114.3],  // Hong Kong anchorage
+    [34.8, 129.5],  // Busan approach
+    [5.3, 3.2],     // Lagos anchorage
   ],
   dry_bulk: [
-    [30.6, 122.1], [38.0, 122.0], [-23.0, -44.0], [-27.5, 153.0], [53.5, 10.0],
-    [59.9, 10.7], [57.7, 12.0], [1.3, 103.8], [37.5, -122.3], [35.5, 129.4],
+    [30.8, 122.4],  // Zhoushan anchorage
+    [38.2, 122.3],  // Qingdao anchorage
+    [-23.8, -43.5], // Tubarao anchorage
+    [-27.2, 153.5], // Brisbane pilot
+    [54.2, 8.2],    // Elbe approach
+    [60.0, 10.5],   // Oslo fjord
+    [57.5, 11.5],   // Gothenburg approach
+    [1.1, 104.0],   // Singapore east
+    [37.8, -122.6], // SF Bay approach
+    [35.2, 129.7],  // Busan anchorage
   ],
   gas: [
-    [25.2, 56.4], [60.8, 5.0], [71.0, 25.5], [29.0, -89.5], [51.9, 4.5],
-    [35.5, 140.0], [22.3, 114.2], [1.3, 103.8], [36.5, -6.3], [50.8, -1.1],
+    [25.0, 56.3],   // Fujairah
+    [61.0, 4.5],    // Mongstad
+    [70.8, 25.8],   // Hammerfest/Melkoya
+    [28.8, -89.8],  // US Gulf offshore
+    [51.8, 3.8],    // Rotterdam
+    [35.3, 139.8],  // Tokyo Bay
+    [22.1, 114.3],  // HK
+    [1.1, 104.0],   // Singapore
+    [36.2, -6.0],   // Gibraltar east
+    [50.6, -1.3],   // Solent
   ],
   chemical: [
-    [51.9, 4.5], [53.5, 10.0], [43.3, 5.4], [59.9, 10.7], [40.7, -74.0],
-    [29.5, -89.5], [1.3, 103.8], [35.5, 140.0], [37.5, -0.5], [60.4, 5.3],
+    [51.8, 3.8],    // Rotterdam
+    [54.2, 8.2],    // Hamburg approach
+    [43.2, 5.2],    // Marseille approach
+    [60.0, 10.5],   // Oslo
+    [40.5, -73.8],  // NY anchorage
+    [28.8, -89.8],  // US Gulf
+    [1.1, 104.0],   // Singapore
+    [35.3, 139.8],  // Tokyo Bay
+    [37.8, -0.8],   // Cartagena
+    [60.3, 4.8],    // Bergen
   ],
   container: [
-    [22.3, 114.2], [1.3, 103.8], [51.9, 4.5], [53.5, 10.0], [36.0, -5.5],
-    [41.0, 29.0], [43.3, 5.4], [37.9, -122.3], [40.7, -74.0], [34.7, 135.4],
+    [22.1, 114.3],  // HK
+    [1.1, 104.0],   // Singapore
+    [51.8, 3.8],    // Rotterdam
+    [54.2, 8.2],    // Hamburg
+    [36.2, -6.0],   // Gibraltar
+    [40.8, 29.2],   // Marmara
+    [43.2, 5.2],    // Marseille
+    [37.8, -122.6], // SF Bay
+    [40.5, -73.8],  // NY
+    [34.5, 135.6],  // Osaka Bay
   ],
   car_carrier: [
-    [34.7, 135.4], [35.1, 129.1], [51.9, 4.5], [53.5, 10.0], [59.9, 10.7],
-    [33.7, -118.3], [40.7, -74.0], [22.3, 114.2], [60.4, 5.3], [57.7, 12.0],
+    [34.5, 135.6],  // Osaka Bay
+    [35.2, 129.7],  // Busan
+    [51.8, 3.8],    // Rotterdam
+    [54.2, 8.2],    // Hamburg
+    [60.0, 10.5],   // Oslo
+    [33.5, -118.5], // LA anchorage
+    [40.5, -73.8],  // NY
+    [22.1, 114.3],  // HK
+    [60.3, 4.8],    // Bergen
+    [57.5, 11.5],   // Gothenburg
   ],
 };
 
 async function main() {
+  loadLandPolygons();
+
   const vessels = await pool.query(`
     SELECT v.imo, v.vessel_name, v.vessel_type, v.vessel_class,
            sc.sector, sc.ticker as company_ticker
@@ -408,66 +267,69 @@ async function main() {
   console.log(`Processing ${vessels.rows.length} vessels`);
 
   let updated = 0;
+  let onLandCount = 0;
+
   for (const v of vessels.rows) {
     const sector = v.sector || "tanker";
-    const sectorConfig = SECTOR_ROUTES[sector] || SECTOR_ROUTES.tanker;
+    const regions = SECTOR_REGIONS[sector] || SECTOR_REGIONS.tanker;
     const status = pickStatus();
 
     let lat: number, lon: number;
 
     if (status.opStatus === "in_port" || status.opStatus === "loading" || status.opStatus === "discharging") {
-      // Place at a real port
+      // Place at a real port anchorage
       const sectorPorts = PORTS[sector] || PORTS.tanker;
       const port = sectorPorts[Math.floor(Math.random() * sectorPorts.length)];
-      lat = parseFloat((port[0] + (Math.random() - 0.5) * 0.05).toFixed(4));
-      lon = parseFloat((port[1] + (Math.random() - 0.5) * 0.05).toFixed(4));
+      lat = parseFloat((port[0] + (Math.random() - 0.5) * 0.08).toFixed(4));
+      lon = parseFloat((port[1] + (Math.random() - 0.5) * 0.08).toFixed(4));
     } else {
-      // Place along a trade route
-      const routeName = pickWeighted(sectorConfig.routes, sectorConfig.weights);
-      const route = ROUTES[routeName];
-      const pos = randomPositionOnRoute(route);
+      // Scatter randomly across an ocean region
+      const region = pickWeightedRegion(regions);
+      const pos = randomWaterPosition(region);
       lat = pos.lat;
       lon = pos.lon;
+
+      if (isOnLand(lat, lon)) {
+        console.warn(`  LAND: ${v.vessel_name} at [${lat}, ${lon}] in ${region.name}`);
+        lat = 0; lon = 65; // Indian Ocean fallback
+        onLandCount++;
+      }
     }
 
     const heading = status.speed > 0 ? Math.floor(Math.random() * 360) : null;
     const course = status.speed > 0 ? Math.floor(Math.random() * 360) : null;
 
-    // Delete old position and insert new
     await pool.query("DELETE FROM shipping_positions WHERE imo = $1", [v.imo]);
     await pool.query(
       `INSERT INTO shipping_positions (imo, latitude, longitude, speed_knots, heading, course, nav_status, operational_status, reported_at, source, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), 'route_estimated', NOW())`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), 'region_estimated', NOW())`,
       [v.imo, lat, lon, status.speed, heading, course, status.navStatus, status.opStatus]
     );
     updated++;
   }
 
-  console.log(`Updated ${updated} vessel positions`);
-  console.log("\nDistribution check:");
+  console.log(`\nUpdated ${updated} vessel positions`);
+  if (onLandCount > 0) console.warn(`${onLandCount} vessels fell back to open ocean`);
 
+  console.log("\nDistribution:");
   const check = await pool.query(`
     SELECT operational_status, count(*) as cnt
-    FROM shipping_positions
-    GROUP BY operational_status
-    ORDER BY cnt DESC
+    FROM shipping_positions GROUP BY operational_status ORDER BY cnt DESC
   `);
-  for (const r of check.rows) {
-    console.log(`  ${r.operational_status}: ${r.cnt}`);
-  }
+  for (const r of check.rows) console.log(`  ${r.operational_status}: ${r.cnt}`);
 
-  // Verify no vessels on land by checking some known inland coordinates
-  const landCheck = await pool.query(`
-    SELECT count(*) as cnt FROM shipping_positions
-    WHERE latitude BETWEEN 42 AND 52 AND longitude BETWEEN -5 AND 12
-    AND operational_status = 'at_sea'
+  // Final validation
+  const allAtSea = await pool.query(`
+    SELECT imo, latitude::float as lat, longitude::float as lon
+    FROM shipping_positions WHERE operational_status = 'at_sea'
   `);
-  console.log(`\nVessels potentially over European land: ${landCheck.rows[0].cnt}`);
+  let landVessels = 0;
+  for (const r of allAtSea.rows) {
+    if (isOnLand(r.lat, r.lon)) { landVessels++; }
+  }
+  console.log(`\nFinal: ${landVessels} of ${allAtSea.rows.length} at-sea vessels on land`);
 
   await pool.end();
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+main().catch((err) => { console.error(err); process.exit(1); });
