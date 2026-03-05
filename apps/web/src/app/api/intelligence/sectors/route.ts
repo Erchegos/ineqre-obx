@@ -20,6 +20,7 @@ export async function GET() {
           pd.ticker,
           pd.close::float,
           pd.date,
+          pd.inserted_at,
           ROW_NUMBER() OVER (PARTITION BY pd.ticker ORDER BY pd.date DESC) AS rn
         FROM prices_daily pd
         JOIN stocks s ON s.ticker = pd.ticker AND s.asset_type = 'equity'
@@ -35,6 +36,7 @@ export async function GET() {
           t1.close AS last_close,
           t2.close AS prev_close,
           t1.date AS trade_date,
+          t1.inserted_at,
           CASE WHEN t2.close > 0
             THEN ((t1.close - t2.close) / t2.close * 100)::float
             ELSE NULL
@@ -51,7 +53,8 @@ export async function GET() {
           'name', name,
           'returnPct', round(return_pct::numeric, 2),
           'lastClose', last_close,
-          'tradeDate', trade_date
+          'tradeDate', trade_date,
+          'updatedAt', inserted_at
         ) ORDER BY return_pct DESC) AS stocks,
         count(*)::int AS stock_count,
         round(avg(return_pct)::numeric, 2) AS avg_return,

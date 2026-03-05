@@ -66,7 +66,7 @@ type SectorData = {
   worstTicker: string | null;
   upCount: number;
   downCount: number;
-  stocks: { ticker: string; name: string; returnPct: number; lastClose: number; tradeDate: string }[];
+  stocks: { ticker: string; name: string; returnPct: number; lastClose: number; tradeDate: string; updatedAt: string | null }[];
 };
 
 type Mover = {
@@ -78,6 +78,7 @@ type Mover = {
   returnPct: number;
   volume: number | null;
   tradeDate: string;
+  updatedAt: string | null;
 };
 
 type InsiderTrade = {
@@ -190,19 +191,23 @@ function fmtPrice(v: number | null): string {
 /** Short date label: "09:15" if today, "4 Mar" if this week, "4/3" if older */
 const TZ = "Europe/Oslo";
 
-/** Show date stamp only for non-today data (today = fresh, no label needed) */
-function fmtTradeStamp(dateStr: string | null | undefined): string {
+/** Show the Oslo time when the price was imported (e.g. "09:26") */
+function fmtUpdatedAt(updatedAt: string | null | undefined): string {
+  if (!updatedAt) return "";
+  const d = new Date(updatedAt);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: TZ });
+}
+
+/** Show date for non-today data, nothing for today */
+function fmtDateStamp(dateStr: string | null | undefined): string {
   if (!dateStr) return "";
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return "";
   const osloNow = new Date().toLocaleDateString("en-CA", { timeZone: TZ });
   const osloDate = d.toLocaleDateString("en-CA", { timeZone: TZ });
   if (osloDate === osloNow) return "";
-  const diffDays = Math.floor((new Date(osloNow).getTime() - new Date(osloDate).getTime()) / 86400000);
-  if (diffDays <= 5) {
-    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: TZ });
-  }
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "numeric", timeZone: TZ });
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: TZ });
 }
 
 
@@ -297,14 +302,30 @@ export default function IntelligencePage() {
     safeFetch("/api/intelligence/sectors").then(async res => {
       if (!res) return;
       const d = await res.json();
-      setSectors(d.sectors || []);
-      setSectorTradeDate(d.tradeDate || null);
+      const latestDate = d.tradeDate;
+      // Filter out stocks with stale trade dates
+      const filtered = (d.sectors || []).map((sec: SectorData) => {
+        const freshStocks = latestDate
+          ? sec.stocks.filter(st => st.tradeDate && new Date(st.tradeDate).toISOString().slice(0, 10) === new Date(latestDate).toISOString().slice(0, 10))
+          : sec.stocks;
+        const upCount = freshStocks.filter(s => s.returnPct > 0).length;
+        const downCount = freshStocks.filter(s => s.returnPct < 0).length;
+        const avgReturn = freshStocks.length > 0 ? freshStocks.reduce((s, st) => s + st.returnPct, 0) / freshStocks.length : 0;
+        return { ...sec, stocks: freshStocks, stockCount: freshStocks.length, upCount, downCount, avgReturn };
+      }).filter((sec: SectorData) => sec.stockCount > 0);
+      setSectors(filtered);
+      setSectorTradeDate(latestDate || null);
     });
 
     safeFetch("/api/intelligence/movers").then(async res => {
       if (!res) return;
       const d = await res.json();
-      setMovers({ gainers: d.gainers || [], losers: d.losers || [] });
+      // Filter to only the latest trade date (remove stale tickers)
+      const latestDate = d.tradeDate;
+      const filterLatest = (arr: Mover[]) => latestDate
+        ? arr.filter(m => m.tradeDate && new Date(m.tradeDate).toISOString().slice(0, 10) === new Date(latestDate).toISOString().slice(0, 10))
+        : arr;
+      setMovers({ gainers: filterLatest(d.gainers || []), losers: filterLatest(d.losers || []) });
     });
 
     safeFetch("/api/shorts").then(async res => {
@@ -728,13 +749,12 @@ export default function IntelligencePage() {
                           }}>
                             <span style={{ fontSize: 9, fontWeight: 600, color: "#ccc" }}>{st.ticker}</span>
                             <span style={{ fontSize: 9, color: "#555", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{st.name}</span>
-                            <span style={{ fontSize: 7, color: "#444", textAlign: "right" }}>{fmtTradeStamp(st.tradeDate)}</span>
+                            <span style={{ fontSize: 7, color: "#444", textAlign: "right" }}>{fmtUpdatedAt(st.updatedAt)}</span>
                             <span style={{ textAlign: "right", fontSize: 10, fontWeight: 700, color: st.returnPct > 0 ? "#4ade80" : st.returnPct < 0 ? "#f97316" : "#666" }}>
                               {st.returnPct >= 0 ? "+" : ""}{st.returnPct.toFixed(2)}%
                             </span>
                           </Link>
-                          );
-                        })}
+                        ))}
                       </div>
                     );
                   })
@@ -752,7 +772,7 @@ export default function IntelligencePage() {
                         textDecoration: "none", color: "inherit", borderBottom: "1px solid #111",
                       }}>
                         <span style={{ fontSize: 10, fontWeight: 700, color: "#e5e5e5" }}>{m.ticker}</span>
-                        <span style={{ fontSize: 7, color: "#444", alignSelf: "center" }}>{fmtTradeStamp(m.tradeDate)}</span>
+                        <span style={{ fontSize: 7, color: "#444", alignSelf: "center" }}>{fmtUpdatedAt(m.updatedAt)}</span>
                         <span style={{ fontSize: 10, fontWeight: 700, color: "#22c55e" }}>{fmtPctRaw(m.returnPct * 100, 1)}</span>
                       </Link>
                     ))}
@@ -766,7 +786,7 @@ export default function IntelligencePage() {
                         textDecoration: "none", color: "inherit", borderBottom: "1px solid #111",
                       }}>
                         <span style={{ fontSize: 10, fontWeight: 700, color: "#e5e5e5" }}>{m.ticker}</span>
-                        <span style={{ fontSize: 7, color: "#444", alignSelf: "center" }}>{fmtTradeStamp(m.tradeDate)}</span>
+                        <span style={{ fontSize: 7, color: "#444", alignSelf: "center" }}>{fmtUpdatedAt(m.updatedAt)}</span>
                         <span style={{ fontSize: 10, fontWeight: 700, color: "#ef4444" }}>{fmtPctRaw(m.returnPct * 100, 1)}</span>
                       </Link>
                     ))}
@@ -787,7 +807,7 @@ export default function IntelligencePage() {
                       <div key={fx.pair} style={{ display: "grid", gridTemplateColumns: "68px 1fr auto auto auto", padding: "5px 10px", borderBottom: "1px solid #1a1a1a", alignItems: "center", gap: 8 }}>
                         <span style={{ fontSize: 10, fontWeight: 700, color: "#e5e5e5" }}>{fx.pair}</span>
                         <span style={{ fontSize: 11, fontWeight: 700, color: "#e5e5e5" }}>{fx.latest.spot.toFixed(4)}</span>
-                        <span style={{ fontSize: 7, color: "#444" }}>{fmtTradeStamp(fx.latest.date)}</span>
+                        <span style={{ fontSize: 7, color: "#444" }}>{fmtDateStamp(fx.latest.date)}</span>
                         <span style={{ fontSize: 10, fontWeight: 600, color: retColor }}>
                           {fx.latest.simpleReturn != null ? fmtPct(fx.latest.simpleReturn, 2) : "\u2014"}
                         </span>

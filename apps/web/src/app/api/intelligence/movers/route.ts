@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
           pd.close,
           pd.volume,
           pd.date,
+          pd.inserted_at,
           ROW_NUMBER() OVER (PARTITION BY pd.ticker ORDER BY pd.date DESC) AS rn
         FROM prices_daily pd
         JOIN stocks s ON s.ticker = pd.ticker AND s.asset_type = 'equity'
@@ -38,6 +39,7 @@ export async function GET(req: NextRequest) {
         t2.close AS prev_close,
         t1.volume,
         t1.date AS trade_date,
+        t1.inserted_at,
         CASE WHEN t2.close > 0 THEN (t1.close - t2.close) / t2.close ELSE NULL END AS return_pct
       FROM recent t1
       JOIN recent t2 ON t2.ticker = t1.ticker AND t2.rn = 2
@@ -55,6 +57,7 @@ export async function GET(req: NextRequest) {
       returnPct: r.return_pct ? parseFloat(r.return_pct) : 0,
       volume: r.volume ? parseInt(r.volume) : null,
       tradeDate: r.trade_date,
+      updatedAt: r.inserted_at,
     }));
 
     const gainers = all.filter(m => m.returnPct > 0).slice(0, limit);
