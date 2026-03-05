@@ -199,6 +199,7 @@ export default function ShippingPage() {
   const [marketRates, setMarketRates] = useState<Record<string, { date: string; value: number }[]>>({});
   const [marketStats, setMarketStats] = useState<Record<string, MarketRateStats>>({});
   const [rateDays, setRateDays] = useState(30);
+  const [yoyRates, setYoyRates] = useState<Record<string, { oneYearAgo: number; current: number; changePct: number }>>({});
   const [companyRates, setCompanyRates] = useState<CompanyRate[]>([]);
   const [ports, setPorts] = useState<PortItem[]>([]);
   const [exposureMatrix, setExposureMatrix] = useState<ExposureCell[]>([]);
@@ -243,8 +244,10 @@ export default function ShippingPage() {
         setLoading(false);
 
         // Batch 2: supplementary data (loads after page is visible)
-        const [mr, cr, pt, em] = await Promise.all([
-          sf(`/api/shipping/rates/market?index=BDI,BDTI,BCTI,CAPESIZE_5TC,VLCC_TD3C_TCE,SUEZMAX_TD20_TCE,AFRAMAX_TCE,LR2_TCE,MR_TC2_TCE,PANAMAX_TCE,ULTRAMAX_TCE,VLGC_ME_ASIA,LNG_SPOT_TFDE,SCFI,BRENT,IRON_ORE&days=${rateDays}`),
+        const rateIndices = "BDI,BDTI,BCTI,CAPESIZE_5TC,VLCC_TD3C_TCE,SUEZMAX_TD20_TCE,AFRAMAX_TCE,LR2_TCE,MR_TC2_TCE,PANAMAX_TCE,ULTRAMAX_TCE,VLGC_ME_ASIA,LNG_SPOT_TFDE,SCFI,BRENT,IRON_ORE";
+        const [mr, yoy, cr, pt, em] = await Promise.all([
+          sf(`/api/shipping/rates/market?index=${rateIndices}&days=${rateDays}`),
+          sf(`/api/shipping/rates/market?index=${rateIndices}&days=400`),
           sf("/api/shipping/rates/company?quarters=8"),
           sf("/api/shipping/ports"),
           sf("/api/shipping/exposure-matrix"),
@@ -252,6 +255,32 @@ export default function ShippingPage() {
         if (mr) {
           setMarketRates(mr.series || {});
           setMarketStats(mr.stats || {});
+        }
+        // Compute YoY: value ~365 days ago vs latest
+        if (yoy?.series) {
+          const yoyMap: Record<string, { oneYearAgo: number; current: number; changePct: number }> = {};
+          const now = Date.now();
+          const targetMs = now - 365 * 86400000;
+          for (const [idx, pts] of Object.entries(yoy.series as Record<string, { date: string; value: number }[]>)) {
+            if (!pts || pts.length < 2) continue;
+            const current = pts[pts.length - 1].value;
+            // Find point closest to 1Y ago
+            let closest = pts[0];
+            let bestDiff = Infinity;
+            for (const p of pts) {
+              const diff = Math.abs(new Date(p.date).getTime() - targetMs);
+              if (diff < bestDiff) { bestDiff = diff; closest = p; }
+            }
+            // Only use if the closest point is within 30 days of the target
+            if (bestDiff < 30 * 86400000 && closest.value > 0) {
+              yoyMap[idx] = {
+                oneYearAgo: closest.value,
+                current,
+                changePct: ((current - closest.value) / closest.value) * 100,
+              };
+            }
+          }
+          setYoyRates(yoyMap);
         }
         setCompanyRates(cr?.data || []);
         setPorts(pt?.ports || []);
@@ -534,35 +563,33 @@ export default function ShippingPage() {
               </span>
             </div>
             <div style={{ display: "flex", gap: 12, fontSize: 10, alignItems: "center" }}>
-              <span style={{ color: "#888" }}>BDI</span>
-              <span style={{ color: "#f97316", fontWeight: 600 }}>
-                {overview?.bdi ? fmtNum(overview.bdi.value) : "\u2014"}
-              </span>
-              {overview?.bdi && (
-                <span style={{ color: overview.bdi.change >= 0 ? "#22c55e" : "#ef4444", fontWeight: 600 }}>
-                  {fmtPct(overview.bdi.change)}
-                </span>
-              )}
+              {[
+                { label: "BDI", key: "BDI", color: "#f97316", data: overview?.bdi },
+                { label: "BDTI", key: "BDTI", color: "#3b82f6", data: overview?.bdti },
+                { label: "BCTI", key: "BCTI", color: "#a855f7", data: overview?.bcti },
+              ].map((idx, i) => (
+                <React.Fragment key={idx.key}>
+                  {i > 0 && <span style={{ color: "#333" }}>|</span>}
+                  <span style={{ color: "#888" }}>{idx.label}</span>
+                  <span style={{ color: idx.color, fontWeight: 600 }}>{idx.data ? fmtNum(idx.data.value) : "\u2014"}</span>
+                  {idx.data && <span style={{ color: idx.data.change >= 0 ? "#22c55e" : "#ef4444", fontWeight: 600 }}>{fmtPct(idx.data.change)}</span>}
+                </React.Fragment>
+              ))}
               <span style={{ color: "#333" }}>|</span>
-              <span style={{ color: "#888" }}>BDTI</span>
-              <span style={{ color: "#3b82f6", fontWeight: 600 }}>
-                {overview?.bdti ? fmtNum(overview.bdti.value) : "\u2014"}
-              </span>
-              {overview?.bdti && (
-                <span style={{ color: overview.bdti.change >= 0 ? "#22c55e" : "#ef4444", fontWeight: 600 }}>
-                  {fmtPct(overview.bdti.change)}
-                </span>
-              )}
-              <span style={{ color: "#333" }}>|</span>
-              <span style={{ color: "#888" }}>BCTI</span>
-              <span style={{ color: "#a855f7", fontWeight: 600 }}>
-                {overview?.bcti ? fmtNum(overview.bcti.value) : "\u2014"}
-              </span>
-              {overview?.bcti && (
-                <span style={{ color: overview.bcti.change >= 0 ? "#22c55e" : "#ef4444", fontWeight: 600 }}>
-                  {fmtPct(overview.bcti.change)}
-                </span>
-              )}
+              {/* Commodity benchmarks from market rates */}
+              {(() => {
+                const brent = marketStats["BRENT"];
+                const iron = marketStats["IRON_ORE"];
+                return (
+                  <>
+                    <span style={{ color: "#888" }}>BRENT</span>
+                    <span style={{ color: "#eab308", fontWeight: 600 }}>{brent ? `$${brent.latest.toFixed(1)}` : "\u2014"}</span>
+                    <span style={{ color: "#333" }}>|</span>
+                    <span style={{ color: "#888" }}>IRON</span>
+                    <span style={{ color: "#94a3b8", fontWeight: 600 }}>{iron ? `$${iron.latest.toFixed(1)}` : "\u2014"}</span>
+                  </>
+                );
+              })()}
             </div>
           </div>
 
@@ -979,70 +1006,8 @@ export default function ShippingPage() {
           {tab === "rates" && (
             <div key="rates" className="sh-tab-content">
 
-              {/* ── SECTION 1: Rate Summary Strip ── */}
-              {(() => {
-                const rateData: { label: string; key: string; color: string; unit: string; prefix?: string; desc: string }[] = [
-                  { label: "BDI", key: "BDI", color: "#f97316", unit: "pts", desc: "Baltic Dry Index" },
-                  { label: "BDTI", key: "BDTI", color: "#dc2626", unit: "pts", desc: "Baltic Dirty Tanker" },
-                  { label: "BCTI", key: "BCTI", color: "#a855f7", unit: "pts", desc: "Baltic Clean Tanker" },
-                  { label: "SCFI", key: "SCFI", color: "#ec4899", unit: "pts", desc: "Shanghai Container" },
-                ];
-                return (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 0, borderBottom: "1px solid #222" }}>
-                    {rateData.map((rd, i) => {
-                      const stats = marketStats[rd.key];
-                      const series = marketRates[rd.key] || [];
-                      const latest = stats?.latest ?? series.at(-1)?.value;
-                      const prev = series.length >= 2 ? series[series.length - 2]?.value : null;
-                      const chg = latest != null && prev != null && prev > 0 ? ((latest - prev) / prev) * 100 : null;
-                      const high = stats?.high ?? (series.length > 0 ? Math.max(...series.map(s => s.value)) : null);
-                      const low = stats?.low ?? (series.length > 0 ? Math.min(...series.map(s => s.value)) : null);
-                      const w52Chg = latest != null && series.length > 0 && series[0].value > 0 ? ((latest - series[0].value) / series[0].value) * 100 : null;
-                      return (
-                        <div key={rd.key} style={{
-                          padding: "14px 18px",
-                          borderRight: i < 3 ? "1px solid #1a1a1a" : undefined,
-                          background: "#0a0a0a",
-                        }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                            <span style={{ fontSize: 9, fontWeight: 700, color: "#555", letterSpacing: "0.08em" }}>{rd.desc.toUpperCase()}</span>
-                            {chg != null && (
-                              <span style={{
-                                fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 2,
-                                background: chg >= 0 ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)",
-                                color: chg >= 0 ? "#22c55e" : "#ef4444",
-                              }}>
-                                {chg >= 0 ? "+" : ""}{chg.toFixed(1)}%
-                              </span>
-                            )}
-                          </div>
-                          <div style={{ fontSize: 28, fontWeight: 800, color: rd.color, lineHeight: 1 }}>
-                            {latest != null ? fmtNum(Math.round(latest)) : "\u2014"}
-                          </div>
-                          <div style={{ display: "flex", gap: 10, marginTop: 6, fontSize: 9 }}>
-                            {high != null && <span style={{ color: "#555" }}>H <span style={{ color: "#888", fontWeight: 600 }}>{fmtNum(Math.round(high))}</span></span>}
-                            {low != null && <span style={{ color: "#555" }}>L <span style={{ color: "#888", fontWeight: 600 }}>{fmtNum(Math.round(low))}</span></span>}
-                            {w52Chg != null && <span style={{ color: "#555" }}>52w <span style={{ color: w52Chg >= 0 ? "#22c55e" : "#ef4444", fontWeight: 600 }}>{w52Chg >= 0 ? "+" : ""}{w52Chg.toFixed(0)}%</span></span>}
-                          </div>
-                          {/* Range bar */}
-                          {high != null && low != null && latest != null && high > low && (
-                            <div style={{ position: "relative", height: 4, background: "#1a1a1a", borderRadius: 2, marginTop: 6 }}>
-                              <div style={{
-                                position: "absolute", left: 0, top: 0, height: "100%", borderRadius: 2,
-                                width: `${Math.min(100, ((latest - low) / (high - low)) * 100)}%`,
-                                background: `linear-gradient(90deg, ${rd.color}44, ${rd.color})`,
-                              }} />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
-
               {/* ── Timeframe Selector ── */}
-              <div style={{ display: "flex", gap: 6, padding: "10px 18px", background: "#0a0a0a", borderBottom: "1px solid #222" }}>
+              <div style={{ display: "flex", gap: 6, padding: "10px 18px", background: "#0a0a0a", borderBottom: "1px solid #222", alignItems: "center" }}>
                 {([
                   { label: "7D", days: 7 },
                   { label: "30D", days: 30 },
@@ -1054,245 +1019,134 @@ export default function ShippingPage() {
                     key={tf.label}
                     onClick={() => setRateDays(tf.days)}
                     style={{
-                      padding: "3px 10px",
-                      fontSize: 10,
-                      fontWeight: 700,
-                      borderRadius: 999,
-                      border: "none",
-                      cursor: "pointer",
+                      padding: "3px 10px", fontSize: 10, fontWeight: 700, borderRadius: 999,
+                      border: "none", cursor: "pointer", letterSpacing: "0.04em",
                       background: rateDays === tf.days ? "#3b82f6" : "#1a1a1a",
                       color: rateDays === tf.days ? "#fff" : "#888",
-                      letterSpacing: "0.04em",
                     }}
                   >
                     {tf.label}
                   </button>
                 ))}
+                <span style={{ fontSize: 9, color: "#444", marginLeft: "auto" }}>TCE $/DAY</span>
               </div>
 
-              {/* ── SECTION 2: Tanker Rates ── */}
-              <div style={{ borderBottom: "1px solid #222" }}>
-                <div style={{ ...S.section, background: "#0e0e0e" }}>
-                  <span style={{ color: "#ef4444" }}>&#9679;</span> TANKER RATES — TCE ($/DAY)
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 0 }}>
-                  {[
-                    { label: "VLCC TD3C", key: "VLCC_TD3C_TCE", color: "#ef4444", sub: "MEG → China" },
-                    { label: "Suezmax TD20", key: "SUEZMAX_TD20_TCE", color: "#fb923c", sub: "WAF → UKC" },
-                    { label: "Aframax", key: "AFRAMAX_TCE", color: "#f59e0b", sub: "Cross-Med" },
-                    { label: "MR TC2", key: "MR_TC2_TCE", color: "#a855f7", sub: "UKC → USAC" },
-                  ].map((rd, i) => {
-                    const stats = marketStats[rd.key];
-                    const series = marketRates[rd.key] || [];
-                    const latest = stats?.latest ?? series.at(-1)?.value;
-                    const prev = series.length >= 2 ? series[series.length - 2]?.value : null;
-                    const chg = latest != null && prev != null && prev > 0 ? ((latest - prev) / prev) * 100 : null;
-                    const high = stats?.high;
-                    const low = stats?.low;
-                    return (
-                      <div key={rd.key} style={{ borderRight: i < 3 ? "1px solid #1a1a1a" : undefined, borderBottom: "1px solid #1a1a1a" }}>
-                        <div style={{ padding: "14px 16px 0" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <div>
-                              <span style={{ fontSize: 11, fontWeight: 700, color: rd.color }}>{rd.label}</span>
-                              <span style={{ fontSize: 9, color: "#444", marginLeft: 6 }}>{rd.sub}</span>
-                            </div>
-                            {chg != null && (
-                              <span style={{ fontSize: 10, fontWeight: 700, color: chg >= 0 ? "#22c55e" : "#ef4444" }}>
-                                {chg >= 0 ? "▲" : "▼"}{Math.abs(chg).toFixed(1)}%
-                              </span>
-                            )}
+              {/* ── Key Rates Grid (3x2) ── */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0 }}>
+                {([
+                  { label: "VLCC TD3C", key: "VLCC_TD3C_TCE", color: "#ef4444", sub: "MEG \u2192 China", sector: "tanker" },
+                  { label: "Suezmax TD20", key: "SUEZMAX_TD20_TCE", color: "#fb923c", sub: "WAF \u2192 UKC", sector: "tanker" },
+                  { label: "Aframax", key: "AFRAMAX_TCE", color: "#f59e0b", sub: "Cross-Med", sector: "tanker" },
+                  { label: "Capesize 5TC", key: "CAPESIZE_5TC", color: "#3b82f6", sub: "Dry Bulk", sector: "dry_bulk" },
+                  { label: "Panamax P4TC", key: "PANAMAX_TCE", color: "#2563eb", sub: "Dry Bulk", sector: "dry_bulk" },
+                  { label: "VLGC ME\u2192Asia", key: "VLGC_ME_ASIA", color: "#22c55e", sub: "LPG Carrier", sector: "gas" },
+                ] as const).map((rd, i) => {
+                  const stats = marketStats[rd.key];
+                  const series = marketRates[rd.key] || [];
+                  const latest = stats?.latest ?? series.at(-1)?.value;
+                  const prev = series.length >= 2 ? series[series.length - 2]?.value : null;
+                  const chg = latest != null && prev != null && prev > 0 ? ((latest - prev) / prev) * 100 : null;
+                  const high = stats?.high;
+                  const low = stats?.low;
+                  // Period change (first to last in visible window)
+                  const first = series[0]?.value;
+                  const periodChg = latest != null && first != null && first > 0 ? ((latest - first) / first) * 100 : null;
+                  // Range position (0-100)
+                  const rangePct = high != null && low != null && latest != null && high > low ? ((latest - low) / (high - low)) * 100 : null;
+                  const sectorCol = SECTOR_COLORS[rd.sector] || "#888";
+                  return (
+                    <div key={rd.key} style={{
+                      borderRight: (i % 3 < 2) ? "1px solid #1a1a1a" : undefined,
+                      borderBottom: "1px solid #1a1a1a",
+                      padding: "16px 20px 12px",
+                    }}>
+                      {/* Header */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <div style={{ width: 6, height: 6, borderRadius: "50%", background: sectorCol }} />
+                            <span style={{ fontSize: 12, fontWeight: 700, color: rd.color, letterSpacing: "0.02em" }}>{rd.label}</span>
                           </div>
-                          <div style={{ fontSize: 24, fontWeight: 800, color: rd.color, marginTop: 6 }}>
-                            {latest != null ? `$${fmtNum(Math.round(latest))}` : "\u2014"}
-                          </div>
-                          <div style={{ display: "flex", gap: 10, fontSize: 9, color: "#555", marginTop: 4 }}>
-                            {high != null && <span>52w Hi: <span style={{ color: "#888" }}>${fmtNum(Math.round(high))}</span></span>}
-                            {low != null && <span>Lo: <span style={{ color: "#888" }}>${fmtNum(Math.round(low))}</span></span>}
-                          </div>
+                          <div style={{ fontSize: 9, color: "#555", marginTop: 2, marginLeft: 12 }}>{rd.sub}</div>
                         </div>
-                        <div style={{ padding: "8px 16px 14px" }}>
-                          {renderRateChart(rd.key, series, "100%", 100, rd.color)}
+                        <div style={{ textAlign: "right" }}>
+                          {chg != null && (
+                            <div style={{
+                              fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 3,
+                              background: chg >= 0 ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)",
+                              color: chg >= 0 ? "#22c55e" : "#ef4444",
+                              display: "inline-block",
+                            }}>
+                              {chg >= 0 ? "\u25B2" : "\u25BC"} {Math.abs(chg).toFixed(1)}%
+                            </div>
+                          )}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
 
-              {/* ── SECTION 3: Dry Bulk Rates ── */}
-              <div style={{ borderBottom: "1px solid #222" }}>
-                <div style={{ ...S.section, background: "#0e0e0e" }}>
-                  <span style={{ color: "#3b82f6" }}>&#9679;</span> DRY BULK RATES — TCE ($/DAY)
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 0 }}>
-                  {[
-                    { label: "Capesize 5TC", key: "CAPESIZE_5TC", color: "#3b82f6", sub: "C5TC Average" },
-                    { label: "Panamax", key: "PANAMAX_TCE", color: "#2563eb", sub: "P4TC Average" },
-                    { label: "Ultramax", key: "ULTRAMAX_TCE", color: "#60a5fa", sub: "BSI Average" },
-                  ].map((rd, i) => {
-                    const stats = marketStats[rd.key];
-                    const series = marketRates[rd.key] || [];
-                    const latest = stats?.latest ?? series.at(-1)?.value;
-                    const prev = series.length >= 2 ? series[series.length - 2]?.value : null;
-                    const chg = latest != null && prev != null && prev > 0 ? ((latest - prev) / prev) * 100 : null;
-                    const high = stats?.high;
-                    const low = stats?.low;
-                    return (
-                      <div key={rd.key} style={{ borderRight: i < 2 ? "1px solid #1a1a1a" : undefined, borderBottom: "1px solid #1a1a1a" }}>
-                        <div style={{ padding: "14px 16px 0" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <div>
-                              <span style={{ fontSize: 11, fontWeight: 700, color: rd.color }}>{rd.label}</span>
-                              <span style={{ fontSize: 9, color: "#444", marginLeft: 6 }}>{rd.sub}</span>
-                            </div>
-                            {chg != null && (
-                              <span style={{ fontSize: 10, fontWeight: 700, color: chg >= 0 ? "#22c55e" : "#ef4444" }}>
-                                {chg >= 0 ? "▲" : "▼"}{Math.abs(chg).toFixed(1)}%
-                              </span>
-                            )}
-                          </div>
-                          <div style={{ fontSize: 24, fontWeight: 800, color: rd.color, marginTop: 6 }}>
-                            {latest != null ? `$${fmtNum(Math.round(latest))}` : "\u2014"}
-                          </div>
-                          <div style={{ display: "flex", gap: 10, fontSize: 9, color: "#555", marginTop: 4 }}>
-                            {high != null && <span>52w Hi: <span style={{ color: "#888" }}>${fmtNum(Math.round(high))}</span></span>}
-                            {low != null && <span>Lo: <span style={{ color: "#888" }}>${fmtNum(Math.round(low))}</span></span>}
-                          </div>
-                        </div>
-                        <div style={{ padding: "8px 16px 14px" }}>
-                          {renderRateChart(rd.key, series, "100%", 100, rd.color)}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* ── SECTION 4: Specialty & Gas Rates ── */}
-              <div style={{ borderBottom: "1px solid #222" }}>
-                <div style={{ ...S.section, background: "#0e0e0e" }}>
-                  <span style={{ color: "#22c55e" }}>&#9679;</span> GAS, LNG & SPECIALTY
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 0 }}>
-                  {[
-                    { label: "VLGC ME→Asia", key: "VLGC_ME_ASIA", color: "#22c55e", sub: "LPG Carrier" },
-                    { label: "LNG Spot TFDE", key: "LNG_SPOT_TFDE", color: "#10b981", sub: "LNG Carrier" },
-                    { label: "SCFI", key: "SCFI", color: "#ec4899", sub: "Container Freight" },
-                  ].map((rd, i) => {
-                    const stats = marketStats[rd.key];
-                    const series = marketRates[rd.key] || [];
-                    const latest = stats?.latest ?? series.at(-1)?.value;
-                    const prev = series.length >= 2 ? series[series.length - 2]?.value : null;
-                    const chg = latest != null && prev != null && prev > 0 ? ((latest - prev) / prev) * 100 : null;
-                    const high = stats?.high;
-                    const low = stats?.low;
-                    return (
-                      <div key={rd.key} style={{ borderRight: i < 2 ? "1px solid #1a1a1a" : undefined, borderBottom: "1px solid #1a1a1a" }}>
-                        <div style={{ padding: "14px 16px 0" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <div>
-                              <span style={{ fontSize: 11, fontWeight: 700, color: rd.color }}>{rd.label}</span>
-                              <span style={{ fontSize: 9, color: "#444", marginLeft: 6 }}>{rd.sub}</span>
-                            </div>
-                            {chg != null && (
-                              <span style={{ fontSize: 10, fontWeight: 700, color: chg >= 0 ? "#22c55e" : "#ef4444" }}>
-                                {chg >= 0 ? "▲" : "▼"}{Math.abs(chg).toFixed(1)}%
-                              </span>
-                            )}
-                          </div>
-                          <div style={{ fontSize: 24, fontWeight: 800, color: rd.color, marginTop: 6 }}>
-                            {latest != null ? (rd.key === "SCFI" ? fmtNum(Math.round(latest)) : `$${fmtNum(Math.round(latest))}`) : "\u2014"}
-                          </div>
-                          <div style={{ display: "flex", gap: 10, fontSize: 9, color: "#555", marginTop: 4 }}>
-                            {high != null && <span>52w Hi: <span style={{ color: "#888" }}>{rd.key === "SCFI" ? "" : "$"}{fmtNum(Math.round(high))}</span></span>}
-                            {low != null && <span>Lo: <span style={{ color: "#888" }}>{rd.key === "SCFI" ? "" : "$"}{fmtNum(Math.round(low))}</span></span>}
-                          </div>
-                        </div>
-                        <div style={{ padding: "8px 16px 14px" }}>
-                          {renderRateChart(rd.key, series, "100%", 100, rd.color)}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* ── SECTION 5: BDI Full-Width Chart ── */}
-              <div style={{ borderBottom: "1px solid #222" }}>
-                <div style={{ ...S.section, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                  <span>BALTIC DRY INDEX — 1 YEAR</span>
-                  {marketStats["BDI"] && (
-                    <div style={{ display: "flex", gap: 12, alignItems: "baseline" }}>
-                      <span style={{ fontSize: 20, fontWeight: 800, color: "#f97316" }}>{fmtNum(marketStats["BDI"].latest)}</span>
-                      {(() => {
-                        const s = marketRates["BDI"] || [];
-                        const first = s[0]?.value;
-                        const last = s.at(-1)?.value;
-                        const ytd = first && last ? ((last - first) / first) * 100 : null;
-                        return ytd != null ? (
-                          <span style={{ fontSize: 10, fontWeight: 700, color: ytd >= 0 ? "#22c55e" : "#ef4444" }}>
-                            YTD {ytd >= 0 ? "+" : ""}{ytd.toFixed(1)}%
+                      {/* Rate + Period Change */}
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 4 }}>
+                        <span style={{ fontSize: 28, fontWeight: 800, color: rd.color, lineHeight: 1 }}>
+                          {latest != null ? `$${fmtNum(Math.round(latest))}` : "\u2014"}
+                        </span>
+                        {periodChg != null && (
+                          <span style={{ fontSize: 10, color: periodChg >= 0 ? "#22c55e" : "#ef4444", fontWeight: 600 }}>
+                            {periodChg >= 0 ? "+" : ""}{periodChg.toFixed(0)}% period
                           </span>
-                        ) : null;
-                      })()}
-                    </div>
-                  )}
-                </div>
-                <div style={{ padding: "8px 16px 16px" }}>
-                  {renderRateChart("BDI", marketRates["BDI"] || [], "100%", 200, "#f97316")}
-                </div>
-              </div>
-
-              {/* ── SECTION 6: Commodity Benchmarks ── */}
-              <div style={{ borderBottom: "1px solid #222" }}>
-                <div style={{ ...S.section, background: "#0e0e0e" }}>
-                  <span style={{ color: "#eab308" }}>&#9679;</span> COMMODITY BENCHMARKS
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
-                  {[
-                    { label: "Brent Crude", key: "BRENT", color: "#eab308", unit: "$/bbl" },
-                    { label: "Iron Ore 62% Fe", key: "IRON_ORE", color: "#94a3b8", unit: "$/t" },
-                  ].map((rd, i) => {
-                    const stats = marketStats[rd.key];
-                    const series = marketRates[rd.key] || [];
-                    const latest = stats?.latest ?? series.at(-1)?.value;
-                    const prev = series.length >= 2 ? series[series.length - 2]?.value : null;
-                    const chg = latest != null && prev != null && prev > 0 ? ((latest - prev) / prev) * 100 : null;
-                    const high = stats?.high;
-                    const low = stats?.low;
-                    return (
-                      <div key={rd.key} style={{ borderRight: i < 1 ? "1px solid #1a1a1a" : undefined }}>
-                        <div style={{ padding: "14px 16px 0" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <div>
-                              <span style={{ fontSize: 11, fontWeight: 700, color: rd.color }}>{rd.label}</span>
-                              <span style={{ fontSize: 9, color: "#444", marginLeft: 6 }}>{rd.unit}</span>
-                            </div>
-                            {chg != null && (
-                              <span style={{ fontSize: 10, fontWeight: 700, color: chg >= 0 ? "#22c55e" : "#ef4444" }}>
-                                {chg >= 0 ? "▲" : "▼"}{Math.abs(chg).toFixed(1)}%
-                              </span>
-                            )}
-                          </div>
-                          <div style={{ fontSize: 24, fontWeight: 800, color: rd.color, marginTop: 6 }}>
-                            ${latest != null ? latest.toFixed(1) : "\u2014"}
-                          </div>
-                          <div style={{ display: "flex", gap: 10, fontSize: 9, color: "#555", marginTop: 4 }}>
-                            {high != null && <span>52w Hi: <span style={{ color: "#888" }}>${high.toFixed(1)}</span></span>}
-                            {low != null && <span>Lo: <span style={{ color: "#888" }}>${low.toFixed(1)}</span></span>}
-                          </div>
-                        </div>
-                        <div style={{ padding: "8px 16px 14px" }}>
-                          {renderRateChart(rd.key, series, "100%", 100, rd.color)}
-                        </div>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
+
+                      {/* YoY comparison */}
+                      {(() => {
+                        const yoy = yoyRates[rd.key];
+                        if (!yoy) return null;
+                        const up = yoy.changePct >= 0;
+                        return (
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, fontSize: 9, color: "#666" }}>
+                            <span>1Y ago <span style={{ color: "#888", fontWeight: 600 }}>${fmtNum(Math.round(yoy.oneYearAgo))}</span></span>
+                            <span style={{
+                              fontWeight: 700, padding: "1px 5px", borderRadius: 3,
+                              background: up ? "rgba(34,197,94,0.08)" : "rgba(239,68,68,0.08)",
+                              color: up ? "#22c55e" : "#ef4444",
+                            }}>
+                              {up ? "▲" : "▼"} {Math.abs(yoy.changePct).toFixed(0)}% YoY
+                            </span>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Chart */}
+                      <div style={{ marginBottom: 10 }}>
+                        {renderRateChart(rd.key, series, "100%", 120, rd.color)}
+                      </div>
+
+                      {/* Range bar */}
+                      {rangePct != null && (
+                        <div style={{ marginBottom: 8 }}>
+                          <div style={{ position: "relative", height: 4, background: "#1a1a1a", borderRadius: 2 }}>
+                            <div style={{
+                              position: "absolute", left: 0, top: 0, height: "100%", borderRadius: 2,
+                              width: `${Math.min(100, rangePct)}%`,
+                              background: `linear-gradient(90deg, ${rd.color}44, ${rd.color})`,
+                            }} />
+                            {/* Current position marker */}
+                            <div style={{
+                              position: "absolute", top: -2, height: 8, width: 2, borderRadius: 1,
+                              background: "#fff",
+                              left: `${Math.min(98, rangePct)}%`,
+                            }} />
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#555", marginTop: 3 }}>
+                            <span>Lo <span style={{ color: "#ef4444" }}>${low != null ? fmtNum(Math.round(low)) : "\u2014"}</span></span>
+                            <span>Hi <span style={{ color: "#22c55e" }}>${high != null ? fmtNum(Math.round(high)) : "\u2014"}</span></span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
-              {/* ── SECTION 7: Company vs Market Rate Table ── */}
+              {/* ── Company vs Market Rate Table ── */}
               {vesselClasses.length > 0 && (() => {
                 const companyTickers = [...new Set(companyRates.map(r => r.ticker))].sort();
                 const latestRates: Record<string, Record<string, number>> = {};
@@ -1355,11 +1209,6 @@ export default function ShippingPage() {
                           ))}
                         </tbody>
                       </table>
-                    </div>
-                    {/* Legend */}
-                    <div style={{ display: "flex", gap: 14, justifyContent: "center", padding: "6px 0 4px", fontSize: 9, color: "#555" }}>
-                      <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 1, background: "rgba(34,197,94,0.3)", marginRight: 3, verticalAlign: "middle" }} /> Above market</span>
-                      <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 1, background: "rgba(239,68,68,0.3)", marginRight: 3, verticalAlign: "middle" }} /> Below market</span>
                     </div>
                   </div>
                 );
