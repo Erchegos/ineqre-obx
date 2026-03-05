@@ -198,6 +198,7 @@ export default function ShippingPage() {
   const [contracts, setContracts] = useState<ContractItem[]>([]);
   const [marketRates, setMarketRates] = useState<Record<string, { date: string; value: number }[]>>({});
   const [marketStats, setMarketStats] = useState<Record<string, MarketRateStats>>({});
+  const [rateDays, setRateDays] = useState(30);
   const [companyRates, setCompanyRates] = useState<CompanyRate[]>([]);
   const [ports, setPorts] = useState<PortItem[]>([]);
   const [exposureMatrix, setExposureMatrix] = useState<ExposureCell[]>([]);
@@ -243,7 +244,7 @@ export default function ShippingPage() {
 
         // Batch 2: supplementary data (loads after page is visible)
         const [mr, cr, pt, em] = await Promise.all([
-          sf("/api/shipping/rates/market?index=BDI,BDTI,BCTI,CAPESIZE_5TC,VLCC_TD3C_TCE,SUEZMAX_TD20_TCE,AFRAMAX_TCE,LR2_TCE,MR_TC2_TCE,PANAMAX_TCE,ULTRAMAX_TCE,VLGC_ME_ASIA,LNG_SPOT_TFDE,SCFI,BRENT,IRON_ORE&days=365"),
+          sf(`/api/shipping/rates/market?index=BDI,BDTI,BCTI,CAPESIZE_5TC,VLCC_TD3C_TCE,SUEZMAX_TD20_TCE,AFRAMAX_TCE,LR2_TCE,MR_TC2_TCE,PANAMAX_TCE,ULTRAMAX_TCE,VLGC_ME_ASIA,LNG_SPOT_TFDE,SCFI,BRENT,IRON_ORE&days=${rateDays}`),
           sf("/api/shipping/rates/company?quarters=8"),
           sf("/api/shipping/ports"),
           sf("/api/shipping/exposure-matrix"),
@@ -262,7 +263,7 @@ export default function ShippingPage() {
       }
     }
     load();
-  }, []);
+  }, [rateDays]);
 
   /* ─── Derived data ────────────────────────────────────────────── */
 
@@ -1039,6 +1040,35 @@ export default function ShippingPage() {
                   </div>
                 );
               })()}
+
+              {/* ── Timeframe Selector ── */}
+              <div style={{ display: "flex", gap: 6, padding: "10px 18px", background: "#0a0a0a", borderBottom: "1px solid #222" }}>
+                {([
+                  { label: "7D", days: 7 },
+                  { label: "30D", days: 30 },
+                  { label: "90D", days: 90 },
+                  { label: "1Y", days: 365 },
+                  { label: "ALL", days: 3650 },
+                ] as const).map((tf) => (
+                  <button
+                    key={tf.label}
+                    onClick={() => setRateDays(tf.days)}
+                    style={{
+                      padding: "3px 10px",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      borderRadius: 999,
+                      border: "none",
+                      cursor: "pointer",
+                      background: rateDays === tf.days ? "#3b82f6" : "#1a1a1a",
+                      color: rateDays === tf.days ? "#fff" : "#888",
+                      letterSpacing: "0.04em",
+                    }}
+                  >
+                    {tf.label}
+                  </button>
+                ))}
+              </div>
 
               {/* ── SECTION 2: Tanker Rates ── */}
               <div style={{ borderBottom: "1px solid #222" }}>
