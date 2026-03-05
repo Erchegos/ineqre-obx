@@ -454,6 +454,7 @@ Run after market close alongside ML pipeline:
 | `fetch-dnb-carnegie-research.ts` | Scrape commissioned research from DNB Carnegie Access (sitemap + REST API, NO-country filter, PDF download) |
 | `fetch-dnb-markets-research.ts` | Scrape DNB Markets macro/FI research PDFs (public getreport.aspx, ID range scan, pdftotext metadata extraction) |
 | `fetch-shipping-rates.ts` | Fetch BDI market rate from Yahoo Finance (`^BDI`), store in `shipping_market_rates` |
+| `parse-shipping-daily.ts` | Parse Pareto Shipping Daily PDFs from research portal for 16+ rate indices (tanker, drybulk, LPG, LNG, commodities) |
 
 ### scripts/
 | Script | Purpose |
@@ -518,6 +519,9 @@ pnpm run research:dnb-markets:dry # Dry run (scan only)
 pnpm run research:dnb-markets:all # Include all macro (no Norway keyword filter)
 pnpm run research:dnb-markets:back # Scan further back (older IDs from 260000)
 pnpm run shipping:rates     # Fetch BDI from Yahoo Finance
+pnpm run shipping:parse-daily     # Parse latest Pareto Shipping Daily PDF rates
+pnpm run shipping:parse-daily:all # Backfill all historical Pareto reports
+pnpm run shipping:parse-daily:dry # Dry run (parse only, no DB insert)
 ```
 
 ---
@@ -829,12 +833,13 @@ FRO (Frontline), HAFNI (Hafnia), FLNG (Flex LNG), SOFF (Solstad Offshore), BORR 
 ### 4 Tabs
 1. **OVERVIEW** — Fleet KPIs (vessels, utilization, at-sea %), BDI/BDTI/BCTI index cards with change, company grid with stock price + fleet stats
 2. **MAP & FLEET** — Global react-leaflet map with vessel markers colored by company, sector/company filter bars, vessel popups showing charter rate, destination, contract info
-3. **RATES** — Market rate time series charts (mini SVG sparklines), quarterly company TCE comparison table, rate exposure heatmap (company x vessel_class, colored by delta vs spot)
+3. **RATES** — Market rate time series charts (mini SVG sparklines) with timeframe selector (7D/30D/90D/1Y/ALL, default 30D), quarterly company TCE comparison table, rate exposure heatmap (company x vessel_class, colored by delta vs spot)
 4. **CONTRACTS** — Contract expiry tracking, grouped by company, rate vs spot comparison, days remaining color-coded (green >180d, yellow 60-180d, red <60d)
 
 ### Data Sources
 - **Seed data**: Static vessel fleet, positions, contracts, quarterly TCE rates (from company reports)
 - **Yahoo Finance**: BDI index (`^BDI`) via `fetch-shipping-rates.ts`
+- **Pareto Shipping Daily PDFs**: 16+ rate indices (VLCC, Suezmax, Aframax, LR2, MR, BDI, Capesize, Panamax, Ultramax, VLGC, LNG, Brent, WTI, Iron Ore, Henry Hub, TTF) via `parse-shipping-daily.ts`
 - **Future**: Kystverket AIS (free Norwegian government vessel tracking), Pareto daily shipping PDFs
 
 ### Map Implementation
