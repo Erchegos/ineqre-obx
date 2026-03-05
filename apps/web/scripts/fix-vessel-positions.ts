@@ -177,18 +177,18 @@ const ROUTES: Record<string, [number, number][]> = {
     [40.5, -74.0],  // New York
     [42.0, -70.0],  // Boston
   ],
-  // Mediterranean
+  // Mediterranean — all waypoints well offshore
   med: [
-    [36.0, -5.5],   // Gibraltar
-    [37.0, -1.0],   // Cartagena
-    [39.5, 2.5],    // Balearic
-    [41.0, 9.0],    // Sardinia
-    [43.3, 5.4],    // Marseille
-    [44.5, 12.5],   // Ravenna
-    [37.0, 15.5],   // Sicily
-    [37.5, 24.0],   // Piraeus
-    [40.5, 29.0],   // Marmara
-    [36.5, 32.0],   // Cyprus
+    [36.0, -5.5],   // Gibraltar strait
+    [37.5, 0.5],    // Off Cartagena
+    [38.5, 3.5],    // Balearic Sea
+    [39.5, 8.0],    // West of Sardinia
+    [42.0, 6.0],    // Gulf of Lion (offshore)
+    [38.0, 12.5],   // Tyrrhenian Sea
+    [35.5, 16.0],   // Central Med (south of Sicily)
+    [35.0, 24.0],   // South of Crete
+    [38.0, 25.0],   // Aegean Sea
+    [35.5, 32.0],   // Off Cyprus
   ],
   // MEG → India (crude tankers)
   meg_india: [
@@ -241,19 +241,112 @@ function pickWeighted(items: string[], weights: number[]): string {
   return items[items.length - 1];
 }
 
-function randomPositionOnRoute(route: [number, number][]): { lat: number; lon: number } {
-  // Pick a random segment along the route
-  const segIdx = Math.floor(Math.random() * (route.length - 1));
-  const t = Math.random(); // interpolation factor
-  const [lat1, lon1] = route[segIdx];
-  const [lat2, lon2] = route[segIdx + 1];
+// Major landmass bounding boxes — if a point falls inside any of these, it's on land
+const LAND_BOXES: [number, number, number, number][] = [
+  // [latMin, latMax, lonMin, lonMax]
+  // Europe interior
+  [42, 72, -10, 40],
+  // Africa
+  [-35, 37, -18, 52],
+  // Asia (mainland)
+  [10, 55, 25, 130],
+  // Australia
+  [-40, -10, 113, 154],
+  // North America
+  [15, 72, -170, -52],
+  // South America
+  [-56, 13, -82, -34],
+  // India subcontinent
+  [8, 35, 68, 90],
+  // Arabia
+  [12, 38, 34, 60],
+  // Southeast Asia islands (Borneo, Sumatra, Java)
+  [-8, 7, 95, 120],
+];
 
-  // Interpolate + add small random offset (simulating real vessel spread)
-  const spread = 1.5; // degrees of random spread from route center
-  return {
-    lat: parseFloat((lat1 + t * (lat2 - lat1) + (Math.random() - 0.5) * spread).toFixed(4)),
-    lon: parseFloat((lon1 + t * (lon2 - lon1) + (Math.random() - 0.5) * spread).toFixed(4)),
-  };
+// Coastal water corridors — areas inside land boxes that are actually water
+const WATER_CORRIDORS: [number, number, number, number][] = [
+  // Mediterranean Sea
+  [30, 46, -6, 37],
+  // Red Sea
+  [12, 30, 32, 44],
+  // Persian Gulf
+  [23, 31, 47, 57],
+  // North Sea / Norwegian Sea
+  [50, 72, -5, 12],
+  // Baltic Sea
+  [53, 66, 9, 30],
+  // Gulf of Mexico
+  [18, 31, -98, -80],
+  // Caribbean
+  [8, 23, -90, -58],
+  // Sea of Japan / East China Sea
+  [24, 52, 120, 145],
+  // South China Sea
+  [0, 25, 105, 122],
+  // Bay of Bengal
+  [5, 23, 78, 95],
+  // Arabian Sea
+  [5, 25, 55, 78],
+  // Gulf of Guinea
+  [-5, 8, -10, 12],
+  // Mozambique Channel
+  [-27, -10, 30, 50],
+  // Black Sea
+  [40, 47, 27, 42],
+  // Indonesian waters
+  [-10, 5, 95, 140],
+  // Torres Strait / Coral Sea
+  [-25, -5, 140, 165],
+  // English Channel
+  [48, 52, -6, 3],
+  // East coast Americas (Atlantic shipping lane)
+  [10, 50, -82, -55],
+  // West coast Americas
+  [-56, 60, -130, -115],
+  // Hudson Bay approaches
+  [42, 55, -80, -55],
+  // Strait of Malacca
+  [-2, 8, 95, 106],
+];
+
+function isLikelyWater(lat: number, lon: number): boolean {
+  // First check if we're in a known water corridor
+  for (const [latMin, latMax, lonMin, lonMax] of WATER_CORRIDORS) {
+    if (lat >= latMin && lat <= latMax && lon >= lonMin && lon <= lonMax) {
+      return true;
+    }
+  }
+  // Then check if we're on a landmass
+  for (const [latMin, latMax, lonMin, lonMax] of LAND_BOXES) {
+    if (lat >= latMin && lat <= latMax && lon >= lonMin && lon <= lonMax) {
+      return false; // inside a land box and NOT in a water corridor = land
+    }
+  }
+  // Not in any land box = open ocean
+  return true;
+}
+
+function randomPositionOnRoute(route: [number, number][]): { lat: number; lon: number } {
+  // Try up to 20 times to find a water position
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const segIdx = Math.floor(Math.random() * (route.length - 1));
+    const t = Math.random();
+    const [lat1, lon1] = route[segIdx];
+    const [lat2, lon2] = route[segIdx + 1];
+
+    // Tighter spread: 0.3 degrees = ~33km
+    const spread = 0.3;
+    const lat = parseFloat((lat1 + t * (lat2 - lat1) + (Math.random() - 0.5) * spread).toFixed(4));
+    const lon = parseFloat((lon1 + t * (lon2 - lon1) + (Math.random() - 0.5) * spread).toFixed(4));
+
+    if (isLikelyWater(lat, lon)) {
+      return { lat, lon };
+    }
+  }
+  // Fallback: use waypoint directly (waypoints are all on water)
+  const wp = route[Math.floor(Math.random() * route.length)];
+  return { lat: wp[0], lon: wp[1] };
 }
 
 function pickStatus(): { navStatus: string; opStatus: string; speed: number } {
