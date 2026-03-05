@@ -38,17 +38,6 @@ const VESSEL_TYPE_LABELS: Record<string, string> = {
   vlgc: "VLGC",
 };
 
-function MapStyler() {
-  const map = useMap();
-  useEffect(() => {
-    const container = map.getContainer();
-    const tilePane = container.querySelector(".leaflet-tile-pane") as HTMLElement;
-    if (tilePane) {
-      tilePane.style.filter = "invert(1) hue-rotate(180deg) brightness(0.8) contrast(1.2) saturate(0.3)";
-    }
-  }, [map]);
-  return null;
-}
 
 function FlyToVessel({ focusVessel }: { focusVessel: FocusVessel }) {
   const map = useMap();
@@ -145,10 +134,10 @@ export default function ShippingMapInner({ positions, ports, selectedTicker, foc
         minZoom={2}
       >
         <TileLayer
-          attribution='&copy; <a href="https://osm.org/copyright">OSM</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://osm.org/copyright">OSM</a>'
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          subdomains="abcd"
         />
-        <MapStyler />
         <FlyToVessel focusVessel={focusVessel ?? null} />
 
         {/* Port markers — small gray dots */}

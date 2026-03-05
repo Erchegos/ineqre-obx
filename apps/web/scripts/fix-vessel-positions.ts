@@ -38,9 +38,9 @@ const pool = new Pool({
 const ROUTES: Record<string, [number, number][]> = {
   // MEG (Middle East Gulf) → Far East (VLCC route)
   meg_fareast: [
-    [26.0, 56.5],   // Fujairah
-    [24.0, 58.0],   // Oman coast
-    [22.5, 60.0],   // Arabian Sea
+    [25.5, 56.8],   // Fujairah anchorage (offshore)
+    [24.5, 58.5],   // Gulf of Oman (offshore)
+    [22.5, 60.5],   // Arabian Sea
     [18.0, 62.0],   // Indian Ocean
     [12.0, 65.0],   // Indian Ocean
     [8.0, 72.0],    // Indian Ocean
@@ -192,8 +192,8 @@ const ROUTES: Record<string, [number, number][]> = {
   ],
   // MEG → India (crude tankers)
   meg_india: [
-    [26.0, 56.5],   // Fujairah
-    [24.0, 60.0],   // Oman
+    [25.5, 56.8],   // Fujairah anchorage (offshore)
+    [24.0, 60.5],   // Off Oman coast
     [22.0, 63.0],   // Arabian Sea
     [20.0, 67.0],   // Arabian Sea
     [18.5, 72.8],   // Mumbai
@@ -270,8 +270,11 @@ const WATER_CORRIDORS: [number, number, number, number][] = [
   [30, 46, -6, 37],
   // Red Sea
   [12, 30, 32, 44],
-  // Persian Gulf
-  [23, 31, 47, 57],
+  // Persian Gulf — tightened to actual water only (not inland UAE/Kuwait/Oman)
+  [24, 30.5, 47, 51],   // Inner Gulf (narrow, between Iran & Arabia)
+  [23.5, 27, 51, 56.5],  // Strait of Hormuz / Gulf of Oman approach
+  // Gulf of Oman — offshore only
+  [23, 26, 56.5, 60],
   // North Sea / Norwegian Sea
   [50, 72, -5, 12],
   // Baltic Sea
@@ -286,8 +289,8 @@ const WATER_CORRIDORS: [number, number, number, number][] = [
   [0, 25, 105, 122],
   // Bay of Bengal
   [5, 23, 78, 95],
-  // Arabian Sea
-  [5, 25, 55, 78],
+  // Arabian Sea — offshore only (not Oman coast)
+  [5, 25, 57, 78],
   // Gulf of Guinea
   [-5, 8, -10, 12],
   // Mozambique Channel
@@ -367,7 +370,7 @@ function pickStatus(): { navStatus: string; opStatus: string; speed: number } {
 // Major port positions for vessels that are in_port/loading/discharging
 const PORTS: Record<string, [number, number][]> = {
   tanker: [
-    [26.2, 56.4], [1.26, 103.85], [29.5, 48.0], [12.1, 45.0], [51.9, 4.5],
+    [25.2, 56.4], [1.26, 103.85], [29.4, 48.5], [12.1, 45.0], [51.9, 4.5],
     [60.4, 5.3], [36.8, -76.3], [22.3, 114.2], [35.0, 129.0], [5.0, 3.4],
   ],
   dry_bulk: [
@@ -375,7 +378,7 @@ const PORTS: Record<string, [number, number][]> = {
     [59.9, 10.7], [57.7, 12.0], [1.3, 103.8], [37.5, -122.3], [35.5, 129.4],
   ],
   gas: [
-    [26.2, 56.4], [60.8, 5.0], [71.0, 25.5], [29.0, -89.5], [51.9, 4.5],
+    [25.2, 56.4], [60.8, 5.0], [71.0, 25.5], [29.0, -89.5], [51.9, 4.5],
     [35.5, 140.0], [22.3, 114.2], [1.3, 103.8], [36.5, -6.3], [50.8, -1.1],
   ],
   chemical: [
