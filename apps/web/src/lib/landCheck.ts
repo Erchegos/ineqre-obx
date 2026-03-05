@@ -3,7 +3,7 @@
  * Accurate to ~100km coastline resolution — more than enough for vessel positioning.
  */
 
-import landGeoJSON from "@/data/ne_110m_land.json";
+import landGeoJSON from "@/data/ne_50m_land.json";
 
 type Ring = [number, number][]; // [lon, lat] pairs (GeoJSON format)
 

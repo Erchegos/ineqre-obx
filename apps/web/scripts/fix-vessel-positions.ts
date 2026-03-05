@@ -28,7 +28,7 @@ type Ring = [number, number][];
 const landRings: Ring[] = [];
 
 function loadLandPolygons() {
-  const geojsonPath = path.resolve(__dirname, "../src/data/ne_110m_land.json");
+  const geojsonPath = path.resolve(__dirname, "../src/data/ne_50m_land.json");
   const raw = JSON.parse(readFileSync(geojsonPath, "utf-8"));
   for (const feature of raw.features) {
     if (feature.geometry.type === "Polygon") {
