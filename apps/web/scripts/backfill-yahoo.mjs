@@ -260,7 +260,8 @@ async function upsertPrices(prices) {
           close = EXCLUDED.close,
           adj_close = EXCLUDED.adj_close,
           volume = EXCLUDED.volume,
-          source = EXCLUDED.source
+          source = EXCLUDED.source,
+          inserted_at = NOW()
         RETURNING (xmax = 0) AS is_insert
       `, [
         price.ticker,
