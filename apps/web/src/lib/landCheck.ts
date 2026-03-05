@@ -9,12 +9,15 @@ type Ring = [number, number][]; // [lon, lat] pairs (GeoJSON format)
 
 // Extract all outer rings from the GeoJSON at module load time
 const landRings: Ring[] = [];
-for (const feature of (landGeoJSON as { features: Array<{ geometry: { type: string; coordinates: number[][][] } }> }).features) {
-  if (feature.geometry.type === "Polygon") {
-    landRings.push(feature.geometry.coordinates[0] as Ring);
-  } else if (feature.geometry.type === "MultiPolygon") {
-    for (const poly of (feature.geometry.coordinates as number[][][][])) {
-      landRings.push(poly[0] as Ring);
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+for (const feature of (landGeoJSON as any).features) {
+  const geom = feature.geometry;
+  if (geom.type === "Polygon") {
+    landRings.push(geom.coordinates[0]);
+  } else if (geom.type === "MultiPolygon") {
+    for (const poly of geom.coordinates) {
+      landRings.push(poly[0]);
     }
   }
 }
