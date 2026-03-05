@@ -655,25 +655,23 @@ export default function ShippingPage() {
               {/* Market Pulse — ticker-tape style rate cards */}
               {(() => {
                 const rateCards: { label: string; key: string; color: string; unit: string; prefix?: string }[] = [
-                  { label: "BDI", key: "BDI", color: "#f97316", unit: "pts" },
-                  { label: "VLCC TCE", key: "VLCC_TD3C_TCE", color: "#ef4444", unit: "/day", prefix: "$" },
-                  { label: "SUEZMAX", key: "SUEZMAX_TD20_TCE", color: "#fb923c", unit: "/day", prefix: "$" },
-                  { label: "AFRAMAX", key: "AFRAMAX_TCE", color: "#f59e0b", unit: "/day", prefix: "$" },
-                  { label: "MR TCE", key: "MR_TC2_TCE", color: "#a855f7", unit: "/day", prefix: "$" },
-                  { label: "CAPESIZE", key: "CAPESIZE_5TC", color: "#3b82f6", unit: "/day", prefix: "$" },
-                  { label: "PANAMAX", key: "PANAMAX_TCE", color: "#2563eb", unit: "/day", prefix: "$" },
-                  { label: "BDTI", key: "BDTI", color: "#dc2626", unit: "pts" },
-                  { label: "BCTI", key: "BCTI", color: "#7c3aed", unit: "pts" },
-                  { label: "VLGC ME→Asia", key: "VLGC_ME_ASIA", color: "#22c55e", unit: "/day", prefix: "$" },
-                  { label: "LNG SPOT", key: "LNG_SPOT_TFDE", color: "#10b981", unit: "/day", prefix: "$" },
-                  { label: "BRENT", key: "BRENT", color: "#eab308", unit: "/bbl", prefix: "$" },
-                  { label: "IRON ORE", key: "IRON_ORE", color: "#94a3b8", unit: "/t", prefix: "$" },
-                  { label: "SCFI", key: "SCFI", color: "#ec4899", unit: "pts" },
+                  { label: "BDI", key: "BDI", color: "#c0c0c0", unit: "pts" },
+                  { label: "VLCC TCE", key: "VLCC_TD3C_TCE", color: "#c0c0c0", unit: "/day", prefix: "$" },
+                  { label: "SUEZMAX", key: "SUEZMAX_TD20_TCE", color: "#c0c0c0", unit: "/day", prefix: "$" },
+                  { label: "AFRAMAX", key: "AFRAMAX_TCE", color: "#c0c0c0", unit: "/day", prefix: "$" },
+                  { label: "MR TCE", key: "MR_TC2_TCE", color: "#c0c0c0", unit: "/day", prefix: "$" },
+                  { label: "CAPESIZE", key: "CAPESIZE_5TC", color: "#c0c0c0", unit: "/day", prefix: "$" },
+                  { label: "PANAMAX", key: "PANAMAX_TCE", color: "#c0c0c0", unit: "/day", prefix: "$" },
+                  { label: "BDTI", key: "BDTI", color: "#c0c0c0", unit: "pts" },
+                  { label: "BCTI", key: "BCTI", color: "#c0c0c0", unit: "pts" },
+                  { label: "VLGC", key: "VLGC_ME_ASIA", color: "#c0c0c0", unit: "/day", prefix: "$" },
+                  { label: "LNG SPOT", key: "LNG_SPOT_TFDE", color: "#c0c0c0", unit: "/day", prefix: "$" },
+                  { label: "SCFI", key: "SCFI", color: "#c0c0c0", unit: "pts" },
                 ];
                 return (
                   <div style={{ borderBottom: "1px solid #222" }}>
                     <div style={{ ...S.section, fontSize: 9 }}>MARKET PULSE — LATEST RATES</div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 0 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 0 }}>
                       {rateCards.map((rc, i) => {
                         const stats = marketStats[rc.key];
                         const series = marketRates[rc.key] || [];
@@ -697,7 +695,7 @@ export default function ShippingPage() {
                                 </span>
                               )}
                             </div>
-                            <div style={{ fontSize: 18, fontWeight: 700, color: rc.color, lineHeight: 1.1 }}>
+                            <div style={{ fontSize: 20, fontWeight: 700, color: "#e0e0e0", lineHeight: 1.1 }}>
                               {latest != null ? `${rc.prefix || ""}${latest >= 1000 ? fmtNum(latest) : latest.toFixed(1)}` : "\u2014"}
                             </div>
                             <div style={{ fontSize: 9, color: "#444", marginTop: 2 }}>{rc.unit}</div>

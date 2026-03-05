@@ -72,7 +72,20 @@ export async function GET(request: NextRequest) {
         }
         // else: silently drop the spike
       }
-      series[idx] = filtered;
+      // Apply 3-point weighted moving average to smooth interpolation artifacts
+      if (filtered.length >= 3) {
+        const smoothed: typeof filtered = [filtered[0]];
+        for (let i = 1; i < filtered.length - 1; i++) {
+          smoothed.push({
+            date: filtered[i].date,
+            value: Math.round((filtered[i - 1].value * 0.2 + filtered[i].value * 0.6 + filtered[i + 1].value * 0.2) * 100) / 100,
+          });
+        }
+        smoothed.push(filtered[filtered.length - 1]);
+        series[idx] = smoothed;
+      } else {
+        series[idx] = filtered;
+      }
     }
 
     // Compute stats from filtered series (not raw DB) so stats match charts

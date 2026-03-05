@@ -80,9 +80,22 @@ export async function GET(request: NextRequest) {
       ORDER BY sc.company_name ASC, v.vessel_name ASC
     `, params);
 
-    return NextResponse.json({
-      positions: result.rows,
+    // Null out positions that are clearly seed data (integer lat/lon = estimated, not AIS)
+    // These vessels still appear in lists but won't render on the map
+    const positions = result.rows.map((v) => {
+      if (v.latitude == null || v.longitude == null) return v;
+      const lat = Number(v.latitude);
+      const lon = Number(v.longitude);
+      const isRound = lat === Math.round(lat) && lon === Math.round(lon);
+      if (!isRound) return v; // precise decimal coordinates = real AIS data
+      // Round coords for moored/in_port vessels at known ports are likely OK
+      const status = String(v.operational_status || v.nav_status || "");
+      if (status === "in_port" || status === "loading" || status === "discharging") return v;
+      // All other round-coordinate positions are unreliable seed data
+      return { ...v, latitude: null, longitude: null };
     });
+
+    return NextResponse.json({ positions });
   } catch (err) {
     console.error("[shipping/positions]", err);
     return NextResponse.json({ error: "Failed to fetch vessel positions" }, { status: 500 });
