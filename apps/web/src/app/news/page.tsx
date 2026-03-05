@@ -188,30 +188,33 @@ function fmtPrice(v: number | null): string {
 }
 
 /** Short date label: "09:15" if today, "4 Mar" if this week, "4/3" if older */
+const TZ = "Europe/Oslo";
+
 function fmtTradeStamp(dateStr: string | null | undefined): string {
   if (!dateStr) return "";
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return "";
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  if (dDate.getTime() === today.getTime()) {
-    return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  // Compare dates in Oslo timezone
+  const osloNow = new Date().toLocaleDateString("en-CA", { timeZone: TZ }); // YYYY-MM-DD
+  const osloDate = d.toLocaleDateString("en-CA", { timeZone: TZ });
+  if (osloDate === osloNow) {
+    return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: TZ });
   }
-  const diffDays = Math.floor((today.getTime() - dDate.getTime()) / 86400000);
+  const diffDays = Math.floor((new Date(osloNow).getTime() - new Date(osloDate).getTime()) / 86400000);
   if (diffDays <= 5) {
-    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: TZ });
   }
-  return `${d.getDate()}/${d.getMonth() + 1}`;
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "numeric", timeZone: TZ });
 }
 
-/** Returns true if date is NOT today (stale) */
+/** Returns true if date is NOT today in Oslo timezone (stale) */
 function isStale(dateStr: string | null | undefined): boolean {
   if (!dateStr) return true;
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return true;
-  const now = new Date();
-  return d.toDateString() !== now.toDateString();
+  const osloNow = new Date().toLocaleDateString("en-CA", { timeZone: TZ });
+  const osloDate = d.toLocaleDateString("en-CA", { timeZone: TZ });
+  return osloDate !== osloNow;
 }
 
 function sparklineSvg(data: number[], w = 60, h = 16, color = "#3b82f6"): string {
@@ -690,7 +693,7 @@ export default function IntelligencePage() {
                 <SectionHeader title="SECTOR PERFORMANCE" count={filteredSectors.reduce((s, sec) => s + sec.stockCount, 0)} />
                 {sectorTradeDate && (
                   <div style={{ fontSize: 8, color: "#555", padding: "2px 10px", background: "#0d0d0d" }}>
-                    as of {new Date(sectorTradeDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                    as of {new Date(sectorTradeDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: TZ })}
                   </div>
                 )}
                 {filteredSectors.length === 0 ? (
