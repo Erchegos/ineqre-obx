@@ -320,12 +320,7 @@ export default function IntelligencePage() {
     safeFetch("/api/intelligence/movers").then(async res => {
       if (!res) return;
       const d = await res.json();
-      // Filter to only the latest trade date (remove stale tickers)
-      const latestDate = d.tradeDate;
-      const filterLatest = (arr: Mover[]) => latestDate
-        ? arr.filter(m => m.tradeDate && new Date(m.tradeDate).toISOString().slice(0, 10) === new Date(latestDate).toISOString().slice(0, 10))
-        : arr;
-      setMovers({ gainers: filterLatest(d.gainers || []), losers: filterLatest(d.losers || []) });
+      setMovers({ gainers: d.gainers || [], losers: d.losers || [] });
     });
 
     safeFetch("/api/shorts").then(async res => {
