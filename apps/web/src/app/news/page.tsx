@@ -766,7 +766,7 @@ export default function IntelligencePage() {
                   {/* Gainers */}
                   <div style={{ borderRight: "1px solid #1a1a1a" }}>
                     <div style={{ fontSize: 8, fontWeight: 700, color: "#22c55e", padding: "3px 10px", background: "#22c55e08", letterSpacing: "0.06em" }}>GAINERS</div>
-                    {movers.gainers.slice(0, 8).map(m => (
+                    {movers.gainers.slice(0, 10).map(m => (
                       <Link key={m.ticker} href={`/stocks/${m.ticker}`} className="intel-row" style={{
                         display: "grid", gridTemplateColumns: "1fr auto auto", gap: 6, padding: "3px 10px",
                         textDecoration: "none", color: "inherit", borderBottom: "1px solid #111",
@@ -780,7 +780,7 @@ export default function IntelligencePage() {
                   {/* Losers */}
                   <div>
                     <div style={{ fontSize: 8, fontWeight: 700, color: "#ef4444", padding: "3px 10px", background: "#ef444408", letterSpacing: "0.06em" }}>LOSERS</div>
-                    {movers.losers.slice(0, 8).map(m => (
+                    {movers.losers.slice(0, 10).map(m => (
                       <Link key={m.ticker} href={`/stocks/${m.ticker}`} className="intel-row" style={{
                         display: "grid", gridTemplateColumns: "1fr auto auto", gap: 6, padding: "3px 10px",
                         textDecoration: "none", color: "inherit", borderBottom: "1px solid #111",
