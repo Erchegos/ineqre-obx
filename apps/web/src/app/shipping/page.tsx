@@ -213,7 +213,7 @@ export default function ShippingPage() {
   const [companySort, setCompanySort] = useState<{ col: string; asc: boolean }>({ col: "fleet_size", asc: false });
   const [contractSort, setContractSort] = useState<{ col: string; asc: boolean }>({ col: "company_ticker", asc: true });
   const [contractGroup, setContractGroup] = useState(true);
-  const [aisOnly, setAisOnly] = useState(false);
+  // All positions are AIS-verified (no fake estimated positions)
 
   const [hoveredRateIdx, setHoveredRateIdx] = useState<{ key: string; idx: number } | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -235,7 +235,7 @@ export default function ShippingPage() {
         const [ov, co, pos, con] = await Promise.all([
           sf("/api/shipping/overview"),
           sf("/api/shipping/companies"),
-          sf(`/api/shipping/positions${aisOnly ? "?verified=true" : ""}`),
+          sf("/api/shipping/positions"),
           sf("/api/shipping/contracts"),
         ]);
         if (ov) setOverview(ov);
@@ -293,7 +293,7 @@ export default function ShippingPage() {
       }
     }
     load();
-  }, [rateDays, aisOnly]);
+  }, [rateDays]);
 
   /* ─── Derived data ────────────────────────────────────────────── */
 
@@ -556,8 +556,11 @@ export default function ShippingPage() {
               <Link href="/" style={{ fontSize: 10, color: "#666", textDecoration: "none" }}>HOME</Link>
               <span style={{ color: "#333" }}>/</span>
               <span style={S.title}>SHIPPING INTELLIGENCE</span>
-              <span style={{ ...S.badge("#1a1a1a"), color: aisOnly ? "#22c55e" : "#888", border: `1px solid ${aisOnly ? "#22c55e33" : "#333"}` }}>
-                {positions.length} {aisOnly ? "AIS VERIFIED" : "VESSELS TRACKED"}
+              <span style={{ ...S.badge("#1a1a1a"), color: "#22c55e", border: "1px solid #22c55e33" }}>
+                {positions.filter(p => p.latitude != null).length} AIS TRACKED
+              </span>
+              <span style={{ ...S.badge("#1a1a1a"), color: "#888", border: "1px solid #333" }}>
+                {positions.length} FLEET
               </span>
               <span style={{ ...S.badge("#1a1a1a"), color: "#888", border: "1px solid #333" }}>
                 {Object.keys(segments).length} SEGMENTS
@@ -602,17 +605,8 @@ export default function ShippingPage() {
               </button>
             ))}
             <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
-              <button
-                onClick={() => setAisOnly(!aisOnly)}
-                style={{
-                  padding: "2px 7px", borderRadius: 2, border: `1px solid ${aisOnly ? "#22c55e" : "#333"}`,
-                  background: aisOnly ? "rgba(34,197,94,0.15)" : "transparent",
-                  color: aisOnly ? "#22c55e" : "#666", fontFamily: "inherit", fontSize: 9, fontWeight: 700,
-                  cursor: "pointer", letterSpacing: "0.04em",
-                }}
-              >
-                {aisOnly ? "AIS VERIFIED" : "ALL VESSELS"}
-              </button>
+              <span style={{ fontSize: 8, color: "#444", letterSpacing: "0.06em" }}>AIS FEED</span>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: positions.filter(p => p.latitude != null).length > 0 ? "#22c55e" : "#ef4444", display: "inline-block" }} />
             </div>
           </div>
 

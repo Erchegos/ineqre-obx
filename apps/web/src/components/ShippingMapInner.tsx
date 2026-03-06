@@ -284,9 +284,20 @@ function renderVesselPopup(v: VesselMapItem) {
         )}
       </div>
 
-      {/* Company footer */}
+      {/* AIS data + Company footer */}
       <div style={{ borderTop: "1px solid #ddd", paddingTop: 4, marginTop: 4, fontSize: 10, color: "#888" }}>
-        {v.company_ticker} · {v.company_name}
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <span>{v.company_ticker} · {v.company_name}</span>
+        </div>
+        {v.reported_at && (
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 2 }}>
+            <span style={{ color: "#999" }}>AIS</span>
+            <span style={{ color: v.dataFreshness === "live" ? "#22c55e" : v.dataFreshness === "delayed" ? "#f59e0b" : "#ef4444" }}>
+              {new Date(v.reported_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+              {v.source ? ` · ${v.source}` : ""}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
