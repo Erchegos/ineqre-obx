@@ -1,8 +1,9 @@
 /**
  * Shipping Vessel Positions API
- * GET /api/shipping/positions?ticker=FRO&sector=tanker
+ * GET /api/shipping/positions?ticker=FRO&sector=tanker&verified=true
  *
- * Returns all active vessel positions for the fleet map.
+ * Returns vessel positions for the fleet map.
+ * ?verified=true filters to only AIS-verified positions (source = aisstream/digitraffic_ais).
  * Single optimized query with LATERAL joins.
  * Land/sea filter uses Natural Earth 110m coastline polygons.
  */
@@ -14,10 +15,13 @@ import { isOnWater } from "@/lib/landCheck";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const AIS_SOURCES = ["aisstream", "digitraffic_ais", "barentswatch"];
+
 export async function GET(request: NextRequest) {
   try {
     const ticker = request.nextUrl.searchParams.get("ticker");
     const sector = request.nextUrl.searchParams.get("sector");
+    const verified = request.nextUrl.searchParams.get("verified") === "true";
 
     const params: string[] = [];
     const conditions: string[] = ["v.status = 'active'"];
@@ -84,27 +88,33 @@ export async function GET(request: NextRequest) {
     `, params);
 
     // Filter out vessels on land and add data freshness indicator
-    const positions = result.rows.map((row) => {
-      if (row.latitude != null && row.longitude != null) {
-        const lat = Number(row.latitude);
-        const lon = Number(row.longitude);
-        if (!isOnWater(lat, lon)) {
-          return { ...row, latitude: null, longitude: null };
+    const positions = result.rows
+      .map((row) => {
+        if (row.latitude != null && row.longitude != null) {
+          const lat = Number(row.latitude);
+          const lon = Number(row.longitude);
+          if (!isOnWater(lat, lon)) {
+            return { ...row, latitude: null, longitude: null };
+          }
         }
-      }
 
-      // Data freshness classification
-      let dataFreshness = "unknown";
-      if (row.reported_at) {
-        const ageMs = Date.now() - new Date(row.reported_at).getTime();
-        const ageHours = ageMs / 3600000;
-        if (ageHours < 24) dataFreshness = "live";
-        else if (ageHours < 168) dataFreshness = "delayed"; // 7 days
-        else dataFreshness = "stale";
-      }
+        // Data freshness classification
+        let dataFreshness = "unknown";
+        if (row.reported_at) {
+          const ageMs = Date.now() - new Date(row.reported_at).getTime();
+          const ageHours = ageMs / 3600000;
+          if (ageHours < 24) dataFreshness = "live";
+          else if (ageHours < 168) dataFreshness = "delayed"; // 7 days
+          else dataFreshness = "stale";
+        }
 
-      return { ...row, dataFreshness };
-    });
+        return { ...row, dataFreshness };
+      })
+      .filter((row) => {
+        if (!verified) return true;
+        // Only keep vessels with real AIS positions
+        return row.source && AIS_SOURCES.includes(row.source) && row.latitude != null;
+      });
 
     return NextResponse.json({ positions });
   } catch (err) {

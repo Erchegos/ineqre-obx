@@ -24,6 +24,8 @@ export type VesselMapItem = {
   operational_status: string | null;
   current_region: string | null;
   reported_at: string | null;
+  source: string | null;
+  dataFreshness: string;
   contract_type: string | null;
   rate_usd_per_day: number | null;
   rate_worldscale: number | null;

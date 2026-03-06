@@ -56,7 +56,10 @@
     "ais:lookup-mmsi:dry": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/lookup-vessel-mmsi.ts --dry-run",
     "ais:snapshot": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-ais-positions.ts",
     "ais:snapshot:dry": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-ais-positions.ts --dry-run",
-    "ais:digitraffic": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-vessel-positions.ts"
+    "ais:digitraffic": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-vessel-positions.ts",
+    "ais:daily": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/ais-daily-update.ts",
+    "ais:daily:dry": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/ais-daily-update.ts --dry-run",
+    "ais:daily:quick": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/ais-daily-update.ts --duration=600"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
