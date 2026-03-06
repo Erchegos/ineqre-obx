@@ -57,6 +57,7 @@ export async function GET(request: NextRequest) {
         p.operational_status,
         p.current_region,
         p.reported_at,
+        p.source,
         c.contract_type,
         c.rate_usd_per_day::float,
         c.rate_worldscale::float,
@@ -82,7 +83,7 @@ export async function GET(request: NextRequest) {
       ORDER BY sc.company_name ASC, v.vessel_name ASC
     `, params);
 
-    // Filter out vessels on land using Natural Earth coastline polygons
+    // Filter out vessels on land and add data freshness indicator
     const positions = result.rows.map((row) => {
       if (row.latitude != null && row.longitude != null) {
         const lat = Number(row.latitude);
@@ -91,7 +92,18 @@ export async function GET(request: NextRequest) {
           return { ...row, latitude: null, longitude: null };
         }
       }
-      return row;
+
+      // Data freshness classification
+      let dataFreshness = "unknown";
+      if (row.reported_at) {
+        const ageMs = Date.now() - new Date(row.reported_at).getTime();
+        const ageHours = ageMs / 3600000;
+        if (ageHours < 24) dataFreshness = "live";
+        else if (ageHours < 168) dataFreshness = "delayed"; // 7 days
+        else dataFreshness = "stale";
+      }
+
+      return { ...row, dataFreshness };
     });
 
     return NextResponse.json({ positions });

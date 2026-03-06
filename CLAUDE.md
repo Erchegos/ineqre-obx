@@ -454,6 +454,9 @@ Run after market close alongside ML pipeline:
 | `fetch-dnb-carnegie-research.ts` | Scrape commissioned research from DNB Carnegie Access (sitemap + REST API, NO-country filter, PDF download) |
 | `fetch-dnb-markets-research.ts` | Scrape DNB Markets macro/FI research PDFs (public getreport.aspx, ID range scan, pdftotext metadata extraction) |
 | `fetch-shipping-rates.ts` | Fetch BDI market rate from Yahoo Finance (`^BDI`), store in `shipping_market_rates` |
+| `fetch-ais-positions.ts` | AISStream.io WebSocket snapshot: connects for 5min, collects real vessel positions |
+| `lookup-vessel-mmsi.ts` | Resolve vessel IMO→MMSI via Digitraffic + verified manual table |
+| `fetch-vessel-positions.ts` | Digitraffic AIS positions (Finnish coastal range) |
 | `parse-shipping-daily.ts` | Parse Pareto Shipping Daily PDFs from research portal for 16+ rate indices (tanker, drybulk, LPG, LNG, commodities) |
 
 ### scripts/
@@ -522,6 +525,11 @@ pnpm run shipping:rates     # Fetch BDI from Yahoo Finance
 pnpm run shipping:parse-daily     # Parse latest Pareto Shipping Daily PDF rates
 pnpm run shipping:parse-daily:all # Backfill all historical Pareto reports
 pnpm run shipping:parse-daily:dry # Dry run (parse only, no DB insert)
+pnpm run ais:lookup-mmsi          # Resolve & populate vessel MMSIs
+pnpm run ais:lookup-mmsi:dry      # Dry run (show matches, no DB changes)
+pnpm run ais:snapshot             # AISStream.io WebSocket position snapshot (5min)
+pnpm run ais:snapshot:dry         # Dry run (connect & collect, no DB write)
+pnpm run ais:digitraffic          # Digitraffic AIS positions (Finnish range)
 ```
 
 ---
@@ -840,7 +848,9 @@ FRO (Frontline), HAFNI (Hafnia), FLNG (Flex LNG), SOFF (Solstad Offshore), BORR 
 - **Seed data**: Static vessel fleet, positions, contracts, quarterly TCE rates (from company reports)
 - **Yahoo Finance**: BDI index (`^BDI`) via `fetch-shipping-rates.ts`
 - **Pareto Shipping Daily PDFs**: 16+ rate indices (VLCC, Suezmax, Aframax, LR2, MR, BDI, Capesize, Panamax, Ultramax, VLGC, LNG, Brent, WTI, Iron Ore, Henry Hub, TTF) via `parse-shipping-daily.ts`
-- **Future**: Kystverket AIS (free Norwegian government vessel tracking), Pareto daily shipping PDFs
+- **AISStream.io**: Real-time global AIS positions via WebSocket (`fetch-ais-positions.ts`, needs API key)
+- **Digitraffic**: Finnish AIS receiver range, free IMO→MMSI lookup (`fetch-vessel-positions.ts`)
+- **Future**: Kystverket AIS (free Norwegian government, Norwegian waters supplement)
 
 ### Map Implementation
 - `ShippingMap.tsx` wrapper (dynamic import, no SSR) with sector/company filter bars
