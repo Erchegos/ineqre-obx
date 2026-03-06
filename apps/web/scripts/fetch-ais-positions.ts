@@ -112,206 +112,212 @@ async function main() {
     mmsiList.push(v.mmsi);
   }
 
-  console.log(`Tracking ${mmsiList.length} vessels (max 50 per connection)`);
-  if (mmsiList.length > 50) {
-    console.warn(
-      `WARNING: ${mmsiList.length} MMSIs exceeds 50 limit. Truncating to first 50.`
-    );
-    mmsiList.length = 50;
+  // Split into batches of 50 (AISStream limit)
+  const BATCH_SIZE = 50;
+  const batches: string[][] = [];
+  for (let i = 0; i < mmsiList.length; i += BATCH_SIZE) {
+    batches.push(mmsiList.slice(i, i + BATCH_SIZE));
   }
 
-  // 2. Connect to AISStream WebSocket
-  console.log(`\nConnecting to AISStream.io...`);
-  console.log(`Duration: ${durationSec}s`);
-  if (dryRun) console.log("(DRY RUN mode)\n");
+  console.log(
+    `Tracking ${mmsiList.length} vessels in ${batches.length} batch(es) of max ${BATCH_SIZE}`
+  );
+  console.log(`Duration per batch: ${durationSec}s`);
+  if (dryRun) console.log("(DRY RUN mode)");
 
   const positions = new Map<string, PositionUpdate>();
-  let messageCount = 0;
-  let positionCount = 0;
+  let totalMessages = 0;
+  let totalUpdates = 0;
 
-  return new Promise<void>((resolve, reject) => {
-    const ws = new WebSocket(AISSTREAM_URL);
-    let timeoutHandle: NodeJS.Timeout;
+  // Process each batch sequentially
+  for (let b = 0; b < batches.length; b++) {
+    const batch = batches[b];
+    console.log(
+      `\n--- Batch ${b + 1}/${batches.length} (${batch.length} MMSIs) ---`
+    );
 
-    ws.on("open", () => {
-      console.log("Connected. Sending subscription...");
+    const batchResult = await new Promise<{
+      msgs: number;
+      updates: number;
+    }>((resolve) => {
+      let messageCount = 0;
+      let positionCount = 0;
+      const ws = new WebSocket(AISSTREAM_URL);
+      let timeoutHandle: NodeJS.Timeout;
 
-      // Subscribe with our MMSI list
-      const subscription = {
-        APIKey: API_KEY,
-        BoundingBoxes: [[[-90, -180], [90, 180]]], // Global (MMSI filter does the work)
-        FiltersShipMMSI: mmsiList,
-        FilterMessageTypes: ["PositionReport", "StandardClassBPositionReport"],
-      };
-
-      ws.send(JSON.stringify(subscription));
-      console.log(
-        `Subscribed. Listening for ${durationSec} seconds...\n`
-      );
-
-      // Auto-close after duration
-      timeoutHandle = setTimeout(() => {
-        console.log("\nDuration reached. Closing connection...");
-        ws.close();
-      }, durationSec * 1000);
-    });
-
-    ws.on("message", (data: Buffer) => {
-      messageCount++;
-      try {
-        const msg = JSON.parse(data.toString());
-        const meta = msg.MetaData;
-        if (!meta) return;
-
-        const mmsi = String(meta.MMSI);
-        const vessel = mmsiToVessel.get(mmsi);
-        if (!vessel) return;
-
-        // Extract position from the message body
-        const posReport =
-          msg.Message?.PositionReport ||
-          msg.Message?.StandardClassBPositionReport;
-        if (!posReport) return;
-
-        const lat = meta.latitude ?? posReport.Latitude;
-        const lon = meta.longitude ?? posReport.Longitude;
-        const sog = posReport.Sog ?? posReport.SpeedOverGround ?? 0;
-        const cog = posReport.Cog ?? posReport.CourseOverGround ?? 0;
-        const heading =
-          posReport.TrueHeading != null && posReport.TrueHeading !== 511
-            ? posReport.TrueHeading
-            : null;
-        const navCode = posReport.NavigationalStatus ?? 15;
-
-        // Validate coordinates
-        if (
-          lat == null ||
-          lon == null ||
-          lat === 0 ||
-          lon === 0 ||
-          Math.abs(lat) > 90 ||
-          Math.abs(lon) > 180
-        ) {
-          return;
-        }
-
-        const update: PositionUpdate = {
-          mmsi,
-          imo: vessel.imo,
-          vesselName: vessel.name,
-          lat,
-          lon,
-          speed: sog,
-          course: cog,
-          heading,
-          navStatus: NAV_STATUS[navCode] || "undefined",
-          opStatus: operationalStatus(navCode, sog),
-          timestamp: new Date(meta.time_utc || Date.now()),
+      ws.on("open", () => {
+        console.log("Connected. Sending subscription...");
+        const subscription = {
+          APIKey: API_KEY,
+          BoundingBoxes: [[[-90, -180], [90, 180]]],
+          FiltersShipMMSI: batch,
+          FilterMessageTypes: [
+            "PositionReport",
+            "StandardClassBPositionReport",
+          ],
         };
+        ws.send(JSON.stringify(subscription));
+        console.log(`Subscribed. Listening for ${durationSec} seconds...`);
 
-        positions.set(mmsi, update);
-        positionCount++;
+        timeoutHandle = setTimeout(() => {
+          console.log("\nDuration reached. Closing connection...");
+          ws.close();
+        }, durationSec * 1000);
+      });
 
-        // Log each new vessel position
-        const existing = positions.size;
-        process.stdout.write(
-          `\r  Positions: ${existing}/${mmsiList.length} vessels | Messages: ${messageCount} | Updates: ${positionCount}`
-        );
-      } catch {
-        // Skip malformed messages
-      }
-    });
+      ws.on("message", (data: Buffer) => {
+        messageCount++;
+        try {
+          const msg = JSON.parse(data.toString());
+          const meta = msg.MetaData;
+          if (!meta) return;
 
-    ws.on("error", (err: Error) => {
-      console.error("\nWebSocket error:", err.message);
-    });
+          const mmsi = String(meta.MMSI);
+          const vessel = mmsiToVessel.get(mmsi);
+          if (!vessel) return;
 
-    ws.on("close", async () => {
-      clearTimeout(timeoutHandle);
-      console.log(`\n\n--- Results ---`);
-      console.log(`Messages received: ${messageCount}`);
-      console.log(
-        `Vessels with positions: ${positions.size}/${mmsiList.length}`
-      );
-      console.log(`Total position updates: ${positionCount}`);
+          const posReport =
+            msg.Message?.PositionReport ||
+            msg.Message?.StandardClassBPositionReport;
+          if (!posReport) return;
 
-      if (positions.size === 0) {
-        console.log(
-          "\nNo positions received. Vessels may not be transmitting or MMSI mismatch."
-        );
-        await pool.end();
-        resolve();
-        return;
-      }
+          const lat = meta.latitude ?? posReport.Latitude;
+          const lon = meta.longitude ?? posReport.Longitude;
+          const sog = posReport.Sog ?? posReport.SpeedOverGround ?? 0;
+          const cog = posReport.Cog ?? posReport.CourseOverGround ?? 0;
+          const heading =
+            posReport.TrueHeading != null && posReport.TrueHeading !== 511
+              ? posReport.TrueHeading
+              : null;
+          const navCode = posReport.NavigationalStatus ?? 15;
 
-      // Print all received positions
-      console.log(
-        `\n${"Vessel".padEnd(25)} ${"Lat".padEnd(10)} ${"Lon".padEnd(10)} ${"Speed".padEnd(8)} Status`
-      );
-      console.log("-".repeat(70));
-      for (const [, pos] of positions) {
-        console.log(
-          `${pos.vesselName.padEnd(25)} ${pos.lat.toFixed(4).padEnd(10)} ${pos.lon.toFixed(4).padEnd(10)} ${(pos.speed.toFixed(1) + "kn").padEnd(8)} ${pos.opStatus}`
-        );
-      }
-
-      // Update DB
-      if (!dryRun) {
-        console.log("\nUpdating database...");
-        let dbUpdated = 0;
-        for (const [, pos] of positions) {
-          try {
-            // Delete old position(s) for this vessel
-            await pool.query("DELETE FROM shipping_positions WHERE imo = $1", [
-              pos.imo,
-            ]);
-
-            // Insert new real AIS position
-            await pool.query(
-              `INSERT INTO shipping_positions
-                (imo, latitude, longitude, speed_knots, heading, course,
-                 nav_status, operational_status, reported_at, source, created_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'aisstream', NOW())`,
-              [
-                pos.imo,
-                pos.lat,
-                pos.lon,
-                pos.speed,
-                pos.heading,
-                pos.course,
-                pos.navStatus,
-                pos.opStatus,
-                pos.timestamp,
-              ]
-            );
-            dbUpdated++;
-          } catch (err) {
-            console.error(`  Failed to update ${pos.vesselName}:`, err);
+          if (
+            lat == null ||
+            lon == null ||
+            lat === 0 ||
+            lon === 0 ||
+            Math.abs(lat) > 90 ||
+            Math.abs(lon) > 180
+          ) {
+            return;
           }
-        }
-        console.log(
-          `Database updated: ${dbUpdated}/${positions.size} vessels`
-        );
-      }
 
-      // Report missing vessels
-      const missing = mmsiList.filter((m) => !positions.has(m));
-      if (missing.length > 0) {
-        console.log(`\nVessels without position (${missing.length}):`);
-        for (const m of missing) {
-          const v = mmsiToVessel.get(m);
-          console.log(`  - ${v?.name || m} (MMSI: ${m})`);
-        }
-        console.log(
-          "These vessels may not have transmitted during the listen window."
-        );
-        console.log("Try increasing --duration or running again later.");
-      }
+          const update: PositionUpdate = {
+            mmsi,
+            imo: vessel.imo,
+            vesselName: vessel.name,
+            lat,
+            lon,
+            speed: sog,
+            course: cog,
+            heading,
+            navStatus: NAV_STATUS[navCode] || "undefined",
+            opStatus: operationalStatus(navCode, sog),
+            timestamp: new Date(meta.time_utc || Date.now()),
+          };
 
-      await pool.end();
-      resolve();
+          positions.set(mmsi, update);
+          positionCount++;
+
+          process.stdout.write(
+            `\r  Batch ${b + 1}: ${positions.size} vessels | Messages: ${messageCount} | Updates: ${positionCount}`
+          );
+        } catch {
+          // Skip malformed messages
+        }
+      });
+
+      ws.on("error", (err: Error) => {
+        console.error("\nWebSocket error:", err.message);
+      });
+
+      ws.on("close", () => {
+        clearTimeout(timeoutHandle);
+        console.log(
+          `\n  Batch ${b + 1} done: ${messageCount} messages, ${positionCount} position updates`
+        );
+        resolve({ msgs: messageCount, updates: positionCount });
+      });
     });
-  });
+
+    totalMessages += batchResult.msgs;
+    totalUpdates += batchResult.updates;
+  }
+
+  // Summary
+  console.log(`\n\n--- Final Results ---`);
+  console.log(`Total messages: ${totalMessages}`);
+  console.log(`Vessels with positions: ${positions.size}/${mmsiList.length}`);
+  console.log(`Total position updates: ${totalUpdates}`);
+
+  if (positions.size === 0) {
+    console.log(
+      "\nNo positions received. Vessels may not be transmitting or MMSI mismatch."
+    );
+    await pool.end();
+    return;
+  }
+
+  // Print all received positions
+  console.log(
+    `\n${"Vessel".padEnd(25)} ${"Lat".padEnd(10)} ${"Lon".padEnd(10)} ${"Speed".padEnd(8)} Status`
+  );
+  console.log("-".repeat(70));
+  for (const [, pos] of positions) {
+    console.log(
+      `${pos.vesselName.padEnd(25)} ${pos.lat.toFixed(4).padEnd(10)} ${pos.lon.toFixed(4).padEnd(10)} ${(pos.speed.toFixed(1) + "kn").padEnd(8)} ${pos.opStatus}`
+    );
+  }
+
+  // Update DB
+  if (!dryRun) {
+    console.log("\nUpdating database...");
+    let dbUpdated = 0;
+    for (const [, pos] of positions) {
+      try {
+        await pool.query("DELETE FROM shipping_positions WHERE imo = $1", [
+          pos.imo,
+        ]);
+        await pool.query(
+          `INSERT INTO shipping_positions
+            (imo, latitude, longitude, speed_knots, heading, course,
+             nav_status, operational_status, reported_at, source, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'aisstream', NOW())`,
+          [
+            pos.imo,
+            pos.lat,
+            pos.lon,
+            pos.speed,
+            pos.heading != null ? Math.round(pos.heading) : null,
+            Math.round(pos.course),
+            pos.navStatus,
+            pos.opStatus,
+            pos.timestamp,
+          ]
+        );
+        dbUpdated++;
+      } catch (err) {
+        console.error(`  Failed to update ${pos.vesselName}:`, err);
+      }
+    }
+    console.log(`Database updated: ${dbUpdated}/${positions.size} vessels`);
+  }
+
+  // Report missing vessels
+  const missing = mmsiList.filter((m) => !positions.has(m));
+  if (missing.length > 0) {
+    console.log(`\nVessels without position (${missing.length}):`);
+    for (const m of missing) {
+      const v = mmsiToVessel.get(m);
+      console.log(`  - ${v?.name || m} (MMSI: ${m})`);
+    }
+    console.log(
+      "These vessels may not have transmitted during the listen window."
+    );
+    console.log("Try increasing --duration or running again later.");
+  }
+
+  await pool.end();
 }
 
 main().catch((err) => {
