@@ -11,6 +11,7 @@ type PriceTarget = {
   rating: string | null;
   ratingColor: string | null;
   documentId: string;
+  targetPrice: number | null;
 };
 
 /**
@@ -103,6 +104,10 @@ function parsePriceTargets(
           )
           .trim();
 
+    // Extract numeric target price (e.g. "NOK 195" or "NOK 195 (190)")
+    const tpMatch = details.match(/(?:NOK|SEK|USD|EUR)\s+([\d,.]+)/i);
+    const targetPrice = tpMatch ? parseFloat(tpMatch[1].replace(",", "")) : null;
+
     results.push({
       date,
       company: company.trim(),
@@ -111,6 +116,7 @@ function parsePriceTargets(
       rating: ratingText,
       ratingColor,
       documentId,
+      targetPrice,
     });
   }
 
@@ -142,6 +148,14 @@ export async function GET(
     }
 
     const stock = stockResult.rows[0];
+
+    // Get latest close price for sanity filtering
+    const priceResult = await pool.query(
+      `SELECT close FROM prices_daily WHERE ticker = $1 ORDER BY date DESC LIMIT 1`,
+      [ticker]
+    );
+    const currentPrice = priceResult.rows.length > 0 ? parseFloat(priceResult.rows[0].close) : null;
+
     // Build match names: ticker, full name, and common short forms
     const matchNames: string[] = [stock.name];
 
@@ -180,10 +194,27 @@ export async function GET(
       allTargets.push(...targets);
     }
 
+    // Sanity filter: reject targets where the price is implausible vs current price
+    // This catches AI hallucinations (e.g. "Storebrand: NOK 90 Buy" when stock is at 173)
+    const saneTargets = currentPrice
+      ? allTargets.filter((t) => {
+          if (t.targetPrice == null) return true; // can't verify, keep it
+          const ratio = t.targetPrice / currentPrice;
+          // Basic range: target must be within [40%, 250%] of current price
+          if (ratio < 0.4 || ratio > 2.5) return false;
+          // Rating-aware: Buy/Kjøp target must be above 70% of current price
+          // (a Buy at 50% of current price is almost certainly wrong)
+          if (t.rating && /buy|kjøp/i.test(t.rating) && ratio < 0.7) return false;
+          // Sell target must be below 200% (a Sell at 3x current price is wrong)
+          if (t.rating && /sell|selg/i.test(t.rating) && ratio > 2.0) return false;
+          return true;
+        })
+      : allTargets;
+
     return NextResponse.json({
       ticker,
       companyName: stock.name,
-      targets: allTargets,
+      targets: saneTargets,
     });
   } catch (error) {
     console.error("[PRICE TARGETS API]", error);
