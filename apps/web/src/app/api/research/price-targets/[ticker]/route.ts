@@ -38,15 +38,24 @@ function parsePriceTargets(
 
     const [, company, details] = ptMatch;
 
-    // Check if this company matches any of the target names
+    // Check if this company matches — strict word-boundary matching to avoid
+    // "Aker" matching "Aker BP", "Aker Solutions" etc.
     const companyLower = company.toLowerCase().trim();
     const matched = matchNames.some((name) => {
       const nameLower = name.toLowerCase();
-      return (
-        companyLower === nameLower ||
-        companyLower.includes(nameLower) ||
-        nameLower.includes(companyLower)
-      );
+      // Exact match
+      if (companyLower === nameLower) return true;
+      // Word-boundary match: the name must appear as a complete word/phrase
+      // e.g. "Aker" matches "Aker" but NOT "Aker BP" or "Aker Solutions"
+      const escName = nameLower.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const escComp = companyLower.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      // Company name in summary equals or is contained as whole-word in match name
+      if (new RegExp(`^${escComp}$`, "i").test(nameLower)) return true;
+      // Match name equals or is contained as whole-word in company (but only if match is multi-word)
+      if (nameLower.includes(" ") && new RegExp(`\\b${escName}\\b`, "i").test(companyLower)) return true;
+      // Company is multi-word and fully contained as whole words in match name
+      if (companyLower.includes(" ") && new RegExp(`\\b${escComp}\\b`, "i").test(nameLower)) return true;
+      return false;
     });
     if (!matched) continue;
 
