@@ -30,6 +30,7 @@ type DocMeta = {
   tickers: string[];  // all tickers mentioned (for BørsXtra multi-company docs)
   rating: 'Buy' | 'Hold' | 'Sell' | null;
   category: 'company' | 'morning' | 'sector' | null;
+  commissioned: boolean;
 };
 
 export default function ResearchPortalPage() {
@@ -770,7 +771,7 @@ export default function ResearchPortalPage() {
         category = 'company';
       }
 
-      meta.set(doc.id, { ticker: ticker || (tickers[0] ?? null), tickers, rating, category });
+      meta.set(doc.id, { ticker: ticker || (tickers[0] ?? null), tickers, rating, category, commissioned: !!doc.source_url });
     }
     return meta;
   }, [documents, stocksList, nameToTicker]);
@@ -790,10 +791,11 @@ export default function ResearchPortalPage() {
 
   // Count documents by category and rating for chip badges
   const filterCounts = useMemo(() => {
-    const counts = { company: 0, morning: 0, sector: 0, Buy: 0, Hold: 0, Sell: 0 };
+    const counts = { company: 0, morning: 0, sector: 0, commissioned: 0, Buy: 0, Hold: 0, Sell: 0 };
     for (const [, m] of docMeta) {
       if (m.category) counts[m.category]++;
       if (m.rating) counts[m.rating]++;
+      if (m.commissioned) counts.commissioned++;
     }
     return counts;
   }, [docMeta]);
@@ -811,9 +813,11 @@ export default function ResearchPortalPage() {
       (meta?.ticker && meta.ticker.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (doc.body_text && doc.body_text.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    // Category filter: 'all', 'company', 'morning', 'sector', 'Buy', 'Hold', 'Sell'
+    // Category filter: 'all', 'company', 'morning', 'sector', 'commissioned', 'Buy', 'Hold', 'Sell'
     let matchesCategory = true;
-    if (selectedCategory === 'company' || selectedCategory === 'morning' || selectedCategory === 'sector') {
+    if (selectedCategory === 'commissioned') {
+      matchesCategory = meta?.commissioned === true;
+    } else if (selectedCategory === 'company' || selectedCategory === 'morning' || selectedCategory === 'sector') {
       matchesCategory = meta?.category === selectedCategory;
     } else if (selectedCategory === 'Buy' || selectedCategory === 'Hold' || selectedCategory === 'Sell') {
       matchesCategory = meta?.rating === selectedCategory;
@@ -1081,6 +1085,31 @@ export default function ResearchPortalPage() {
               </button>
             );
           })}
+
+          <span style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 4px' }} />
+
+          {(() => {
+            const isActive = selectedCategory === 'commissioned';
+            const count = filterCounts.commissioned || 0;
+            return (
+              <button
+                onClick={() => setSelectedCategory(isActive ? 'all' : 'commissioned')}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: 13,
+                  fontWeight: isActive ? 600 : 400,
+                  border: `1px solid ${isActive ? '#8B5CF6' : 'var(--border)'}`,
+                  borderRadius: 20,
+                  background: isActive ? 'rgba(139, 92, 246, 0.1)' : 'transparent',
+                  color: isActive ? '#8B5CF6' : 'var(--muted-foreground)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+              >
+                Commissioned <span style={{ opacity: 0.6, fontSize: 11 }}>{count}</span>
+              </button>
+            );
+          })()}
 
           <span style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 4px' }} />
 
