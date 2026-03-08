@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import PriceChart from "@/components/PriceChart";
+import TradingChart from "@/components/TradingChart";
 import ReturnDistributionChart from "@/components/ReturnDistributionChart";
 import ResidualSquaresChart from "@/components/ResidualSquaresChart";
 import TimeframeSelector from "@/components/TimeframeSelector";
@@ -31,7 +32,7 @@ type AnalyticsData = {
     adjusted: Stats;
     raw: Stats;
   };
-  prices: Array<{ date: string; close: number; adj_close?: number }>;
+  prices: Array<{ date: string; open: number; high: number; low: number; close: number; adj_close?: number; volume: number }>;
   returns: {
     adjusted: Array<{ date: string; return: number }>;
     raw: Array<{ date: string; return: number }>;
@@ -186,7 +187,7 @@ export default function StockTickerPage() {
   }, [params]);
 
   const initialLimit = useMemo(() => {
-    return clampInt(searchParams.get("limit"), 1260, 20, 15000); // Default to 5Y (1260 trading days), max 15000 (~60 years)
+    return clampInt(searchParams.get("limit"), 63, 20, 15000); // Default to 3M (63 trading days), max 15000 (~60 years)
   }, [searchParams]);
 
   const [limit, setLimit] = useState<number>(initialLimit);
@@ -200,7 +201,7 @@ export default function StockTickerPage() {
 
   // UI State: Toggle between historical analysis and STD channel
   const [viewMode, setViewMode] = useState<"historical" | "std_channel">("historical");
-  const [chartMode, setChartMode] = useState<"price" | "total_return" | "comparison">("comparison");
+  const [chartMode, setChartMode] = useState<"price" | "total_return" | "comparison">("price");
   const [isPanelOpen, setIsPanelOpen] = useState<boolean>(false);
 
   // Inline fundamentals (compact strip next to mode toggle)
@@ -301,7 +302,9 @@ export default function StockTickerPage() {
         return;
       }
 
-      setLoading(true);
+      // Only show loading spinner on initial load (no data yet)
+      // On timeframe changes, keep showing old data for smooth transition
+      if (!data) setLoading(true);
       setError(null);
 
       try {
@@ -312,8 +315,9 @@ export default function StockTickerPage() {
           // Use date range
           url += `&startDate=${encodeURIComponent(customDateRange.start)}&endDate=${encodeURIComponent(customDateRange.end)}`;
         } else {
-          // Use limit
-          url += `&limit=${encodeURIComponent(String(limit))}`;
+          // Fetch extra data for chart scrollback (4x the view, capped at 2500)
+          const fetchLimit = Math.min(limit * 4, 2500);
+          url += `&limit=${encodeURIComponent(String(fetchLimit))}`;
         }
 
         const res = await fetch(url, {
@@ -1300,7 +1304,22 @@ export default function StockTickerPage() {
                   {getModeLabel()}
                 </span>
               </div>
-              <PriceChart data={chartData} height={340} />
+              {chartMode === "price" ? (
+                <TradingChart
+                  data={data.prices.map(p => ({
+                    date: p.date,
+                    open: p.open,
+                    high: p.high,
+                    low: p.low,
+                    close: p.close,
+                    volume: p.volume,
+                  }))}
+                  height={500}
+                  initialBars={limit}
+                />
+              ) : (
+                <PriceChart data={chartData} height={340} />
+              )}
             </div>
 
             {/* News panel (right) */}

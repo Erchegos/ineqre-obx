@@ -12,8 +12,12 @@ export const dynamic = "force-dynamic";
 
 type PriceRow = {
   date: string;
+  open: number;
+  high: number;
+  low: number;
   close: number;
   adj_close: number;
+  volume: number;
 };
 
 // Helper to calculate all metrics for a given series of prices
@@ -83,7 +87,7 @@ async function fetchPrices(
   // If date range is provided, use that instead of limit
   if (startDate && endDate) {
     const q = `
-      SELECT TO_CHAR(date, 'YYYY-MM-DD') as date, close, adj_close
+      SELECT TO_CHAR(date, 'YYYY-MM-DD') as date, open, high, low, close, adj_close, volume
       FROM public.${tableName}
       WHERE upper(ticker) = upper($1)
         AND close IS NOT NULL
@@ -95,16 +99,20 @@ async function fetchPrices(
     `;
     const result = await pool.query(q, [ticker, startDate, endDate]);
     return result.rows.map(r => ({
-      date: String(r.date), // Already formatted as YYYY-MM-DD by TO_CHAR
+      date: String(r.date),
+      open: r.open ? Number(r.open) : Number(r.close),
+      high: r.high ? Number(r.high) : Number(r.close),
+      low: r.low ? Number(r.low) : Number(r.close),
       close: Number(r.close),
       adj_close: r.adj_close ? Number(r.adj_close) : Number(r.close),
+      volume: r.volume ? Number(r.volume) : 0,
     }));
   }
 
   // Otherwise use limit (fetching most recent N rows)
   // Exclude weekends (0=Sunday, 6=Saturday)
   const q = `
-    SELECT TO_CHAR(date, 'YYYY-MM-DD') as date, close, adj_close
+    SELECT TO_CHAR(date, 'YYYY-MM-DD') as date, open, high, low, close, adj_close, volume
     FROM public.${tableName}
     WHERE upper(ticker) = upper($1)
       AND close IS NOT NULL
@@ -115,9 +123,13 @@ async function fetchPrices(
   `;
   const result = await pool.query(q, [ticker, limit]);
   return result.rows.map(r => ({
-    date: String(r.date), // Already formatted as YYYY-MM-DD by TO_CHAR
+    date: String(r.date),
+    open: r.open ? Number(r.open) : Number(r.close),
+    high: r.high ? Number(r.high) : Number(r.close),
+    low: r.low ? Number(r.low) : Number(r.close),
     close: Number(r.close),
     adj_close: r.adj_close ? Number(r.adj_close) : Number(r.close),
+    volume: r.volume ? Number(r.volume) : 0,
   })).reverse();
 }
 
@@ -300,8 +312,12 @@ export async function GET(
         },
         prices: prices.map(p => ({
           date: p.date,
+          open: p.open,
+          high: p.high,
+          low: p.low,
           close: p.close,
-          adj_close: p.adj_close > 0 ? p.adj_close : p.close
+          adj_close: p.adj_close > 0 ? p.adj_close : p.close,
+          volume: p.volume,
         })),
         dateRange: {
           start: dates[0],

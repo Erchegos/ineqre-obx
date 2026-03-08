@@ -39,7 +39,8 @@ function createDensityData(returns: number[]) {
   const min = Math.min(...returns);
   const max = Math.max(...returns);
   const range = max - min;
-  const numBins = 100;
+  // Fewer bins for small datasets/tight ranges to prevent x-axis cramping
+  const numBins = range < 0.05 ? 40 : range < 0.15 ? 60 : 80;
   const binWidth = range / numBins;
 
   // Calculate adaptive bandwidth using Silverman's rule of thumb
@@ -84,14 +85,23 @@ function createDensityData(returns: number[]) {
 
 // Generate distributions for multiple timeframes
 function generateTimeframeDistributions(allReturns: Array<{ date: string; return: number }>) {
-  const timeframes = [
-    { label: "4 days", days: 4, color: "#ef4444" },
-    { label: "7 days", days: 7, color: "#f59e0b" },
-    { label: "14 days", days: 14, color: "#3b82f6" },
-    { label: "21 days", days: 21, color: "#10b981" },
-    { label: "28 days", days: 28, color: "#8b5cf6" },
+  const n = allReturns.length;
+
+  // Adaptive timeframes based on available data
+  // Each holding period needs at least 15 data points to produce a meaningful distribution
+  const allTimeframes = [
+    { label: "1 day", days: 1, color: "#f43f5e" },
+    { label: "3 days", days: 3, color: "#ef4444" },
+    { label: "5 days", days: 5, color: "#f59e0b" },
+    { label: "10 days", days: 10, color: "#3b82f6" },
+    { label: "14 days", days: 14, color: "#10b981" },
+    { label: "21 days", days: 21, color: "#8b5cf6" },
     { label: "42 days", days: 42, color: "#ec4899" },
+    { label: "63 days", days: 63, color: "#06b6d4" },
   ];
+
+  // Only include timeframes where we have at least 15 rolling windows
+  const timeframes = allTimeframes.filter(t => n - t.days >= 15);
 
   const result: Record<string, any> = {};
 
@@ -138,10 +148,11 @@ export default function ReturnDistributionChart({
     return generateTimeframeDistributions(returns);
   }, [returns]);
 
-  // State to track which timeframes are visible
-  const [visibleTimeframes, setVisibleTimeframes] = useState<Set<string>>(
-    new Set(["4 days", "7 days", "14 days", "21 days", "28 days", "42 days"])
-  );
+  // State to track which timeframes are visible — show all available by default
+  const [visibleTimeframes, setVisibleTimeframes] = useState<Set<string>>(() => {
+    // Will be populated on first render from distributionData
+    return new Set(["1 day", "3 days", "5 days", "10 days", "14 days", "21 days", "42 days", "63 days"]);
+  });
 
   // State to track guide visibility
   const [showGuide, setShowGuide] = useState<boolean>(false);
@@ -410,10 +421,23 @@ export default function ReturnDistributionChart({
           <XAxis
             dataKey="return"
             domain={["auto", "auto"]}
-            tickFormatter={(val) => `${(val * 100).toFixed(0)}%`}
+            type="number"
+            tickFormatter={(val: number) => {
+              const pct = val * 100;
+              // Use 1 decimal for tight ranges, 0 for wide
+              if (Math.abs(pct) < 10 && chartData.length > 0) {
+                const first = chartData[0]?.return ?? 0;
+                const last = chartData[chartData.length - 1]?.return ?? 0;
+                const span = Math.abs((last - first) * 100);
+                return span < 10 ? `${pct.toFixed(1)}%` : `${pct.toFixed(0)}%`;
+              }
+              return `${pct.toFixed(0)}%`;
+            }}
             stroke="var(--muted)"
             fontSize={11}
             tick={{ fill: "var(--muted)" }}
+            minTickGap={60}
+            tickCount={8}
           />
 
           <YAxis
