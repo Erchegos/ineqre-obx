@@ -199,12 +199,22 @@ export default function TradingChart({ data, height = 500, initialBars }: Tradin
   // ─── Enriched data (computed on full dataset for indicator lookback) ───────
   const enrichedAll = useMemo(() => {
     if (!data?.length) return [];
-    const c = data.map(d => d.close);
+    // Sanitize OHLC: clamp bad Yahoo data where low/high/open spike far from close
+    const sane = data.map(d => {
+      const cl = d.close;
+      return {
+        ...d,
+        open: (d.open > 0 && d.open > cl * 0.4 && d.open < cl * 2.5) ? d.open : cl,
+        high: (d.high > 0 && d.high >= cl && d.high < cl * 2.5) ? d.high : Math.max(cl, d.open || cl),
+        low: (d.low > 0 && d.low <= cl && d.low > cl * 0.4) ? d.low : Math.min(cl, d.open || cl),
+      };
+    });
+    const c = sane.map(d => d.close);
     const ema20 = calcEMA(c, 20), ema50 = calcEMA(c, 50), ema200 = calcEMA(c, 200);
-    const vwap = calcVWAP(data);
+    const vwap = calcVWAP(sane);
     const bb = calcBB(c);
     const rsi = calcRSI(c);
-    return data.map((d, i) => ({
+    return sane.map((d, i) => ({
       ...d,
       ema20: ema20[i], ema50: ema50[i], ema200: ema200[i],
       vwap: vwap[i],
