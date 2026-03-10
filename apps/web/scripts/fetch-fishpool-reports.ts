@@ -134,32 +134,37 @@ function parseSisalmonIndex(text: string, filename: string): SpotData | null {
   const prices: Record<string, number | null> = {};
   const volumes: Record<string, number | null> = {};
 
-  const weightClasses = [
-    { regex: /1-2kg\s+([\d]+[.,]\d+)([\d\s]+?)[\d]+[.,]\d+%/i, key: "1_2kg" },
-    { regex: /2-3kg\s+([\d]+[.,]\d+)([\d\s]+?)[\d]+[.,]\d+%/i, key: "2_3kg" },
-    { regex: /3-4kg\s+([\d]+[.,]\d+)([\d\s]+?)[\d]+[.,]\d+%/i, key: "3_4kg" },
-    { regex: /4-5kg\s+([\d]+[.,]\d+)([\d\s]+?)[\d]+[.,]\d+%/i, key: "4_5kg" },
-    { regex: /5-6kg\s+([\d]+[.,]\d+)([\d\s]+?)[\d]+[.,]\d+%/i, key: "5_6kg" },
-    { regex: /6-7kg\s+([\d]+[.,]\d+)([\d\s]+?)[\d]+[.,]\d+%/i, key: "6_7kg" },
-    { regex: /7-8kg\s+([\d]+[.,]\d+)([\d\s]+?)[\d]+[.,]\d+%/i, key: "7_8kg" },
-    { regex: /8-9kg\s+([\d]+[.,]\d+)([\d\s]+?)[\d]+[.,]\d+%/i, key: "8_9kg" },
-    { regex: /9\+kg\s+([\d]+[.,]\d+)([\d\s]+?)[\d]+[.,]\d+%/i, key: "9plus_kg" },
+  // PDF text format examples (columns concatenated, no separator):
+  //   "1-2kg 5,70320,71%0,61-0,41"  → price=5.70, vol=32, dist=0.71%
+  //   "4-5kg 7,021 35430,46%0,08-0,36" → price=7.02, vol=1354, dist=30.46%
+  // Price: exactly 2 decimal places. Volume: integer with optional space separators.
+  // Distribution: always 1-2 digits + comma + 2 digits + % (e.g., "0,71%" or "30,46%").
+  // Strategy: capture price(2dec) + everything up to the first %, then split vol from dist.
+  const wcKeys = [
+    ["1-2kg", "1_2kg"], ["2-3kg", "2_3kg"], ["3-4kg", "3_4kg"],
+    ["4-5kg", "4_5kg"], ["5-6kg", "5_6kg"], ["6-7kg", "6_7kg"],
+    ["7-8kg", "7_8kg"], ["8-9kg", "8_9kg"], ["9\\+kg", "9plus_kg"],
   ];
+  const weightClasses = wcKeys.map(([wc, key]) => ({
+    regex: new RegExp(`${wc}\\s+(\\d+[.,]\\d{2})([\\d ]+?)(\\d{1,2}[.,]\\d{2}%)`, "i"),
+    key,
+  }));
 
   for (const wc of weightClasses) {
     const m = text.match(wc.regex);
     if (m) {
       prices[wc.key] = parseNorwegianNumber(m[1]);
-      volumes[wc.key] = parseNorwegianNumber(m[2].replace(/\s/g, ""));
+      // Per-class volumes are unreliable due to concatenated text ambiguity — skip
+      volumes[wc.key] = null;
     }
   }
 
-  // Total: "Total: 78,424 444100%" — the price and volume are glued together
-  // Total volume is between the price decimal digits and "100%"
+  // Total volume from "Total:" row — unambiguous because distribution is always "100%"
+  // Text like: "Total: 6,974 444100%" → price=6.97, vol=4444
+  // After price (2 dec places), capture digits+spaces before "100%"
   let totalVolume: number | null = null;
-  const totalMatch = text.match(/Total:\s+[\d]+[.,]\d\d([\d\s]+?)100%/i);
+  const totalMatch = text.match(/Total:\s*\d+[.,]\d{2}([\d ]+?)100%/i);
   if (totalMatch) {
-    // Extract just the volume number (remove any leading price digits)
     const volStr = totalMatch[1].trim().replace(/\s/g, "");
     totalVolume = parseInt(volStr) || null;
   }
