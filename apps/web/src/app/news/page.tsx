@@ -738,12 +738,13 @@ export default function IntelligencePage() {
                         </div>
                         {expanded && sec.stocks.map((st: SectorData["stocks"][number]) => (
                           <Link key={st.ticker} href={`/stocks/${st.ticker}`} className="intel-row" style={{
-                            display: "grid", gridTemplateColumns: "60px 1fr 36px 56px",
+                            display: "grid", gridTemplateColumns: "60px 1fr auto 36px 56px",
                             padding: "3px 10px 3px 20px", textDecoration: "none", color: "inherit",
-                            borderBottom: "1px solid #111", background: "#0a0a0a",
+                            borderBottom: "1px solid #111", background: "#0a0a0a", gap: 6,
                           }}>
                             <span style={{ fontSize: 9, fontWeight: 600, color: "#ccc" }}>{st.ticker}</span>
                             <span style={{ fontSize: 9, color: "#555", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{st.name}</span>
+                            <span style={{ fontSize: 9, color: "#888", textAlign: "right" }}>{fmtPrice(st.lastClose)}</span>
                             <span style={{ fontSize: 7, color: "#444", textAlign: "right" }}>{fmtUpdatedAt(st.updatedAt)}</span>
                             <span style={{ textAlign: "right", fontSize: 10, fontWeight: 700, color: st.returnPct > 0 ? "#4ade80" : st.returnPct < 0 ? "#f97316" : "#666" }}>
                               {st.returnPct >= 0 ? "+" : ""}{st.returnPct.toFixed(2)}%
