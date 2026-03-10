@@ -64,7 +64,13 @@
     "ais:vesselfinder": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-vesselfinder-positions.ts",
     "ais:vesselfinder:dry": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-vesselfinder-positions.ts --dry-run",
     "ais:mst": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/_fetch-vf-mmsi-only.ts",
-    "ais:mst:dry": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/_fetch-vf-mmsi-only.ts --dry-run"
+    "ais:mst:dry": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/_fetch-vf-mmsi-only.ts --dry-run",
+    "fishpool:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-fishpool-reports.ts",
+    "fishpool:fetch:dry": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-fishpool-reports.ts --dry-run",
+    "fishpool:fetch:backfill": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-fishpool-reports.ts --backfill",
+    "pareto:seafood": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/parse-pareto-seafood.ts",
+    "pareto:seafood:dry": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/parse-pareto-seafood.ts --dry-run",
+    "pareto:seafood:all": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/parse-pareto-seafood.ts --all"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
