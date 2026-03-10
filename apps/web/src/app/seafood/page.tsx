@@ -305,149 +305,200 @@ export default function SeafoodPage() {
                     </div>
                   </div>
 
-                  {/* ─── Fish Pool + Pareto Price Intelligence ─── */}
+                  {/* ─── Price Intelligence ─── */}
                   <div style={{ borderBottom: "1px solid #222" }}>
                     <div style={S.section}>PRICE INTELLIGENCE</div>
+
+                    {/* Hero strip: 5 key prices */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", borderBottom: "1px solid #333" }}>
+                      {[
+                        { label: "PARETO SPOT", value: paretoData?.spot?.spot_nok, src: "Pareto" },
+                        { label: "FISH POOL AVG", value: fishPoolSpot?.latest?.sisalmon_avg, src: `W${fishPoolSpot?.latest?.week ?? ""}` },
+                        { label: "FISH POOL 3-6KG", value: fishPoolSpot?.latest?.sisalmon_3_6kg, src: "SISALMON" },
+                        { label: "QTD PRICE", value: paretoData?.spot?.qtd_price_nok, src: "Pareto" },
+                        { label: "CONSENSUS", value: paretoData?.spot?.consensus_nok != null && paretoData.spot.consensus_nok > 10 ? paretoData.spot.consensus_nok : null, src: "PAS" },
+                      ].map((m, i) => (
+                        <div key={m.label} style={{ padding: "12px 16px", borderRight: i < 4 ? "1px solid #222" : "none" }}>
+                          <div style={{ fontSize: 10, color: "#666", fontWeight: 700, letterSpacing: "0.08em", marginBottom: 4 }}>{m.label}</div>
+                          <div style={{ fontSize: 26, fontWeight: 700, color: m.value != null ? "#f97316" : "#333", lineHeight: 1 }}>
+                            {m.value != null ? m.value.toFixed(1) : "\u2014"}
+                          </div>
+                          <div style={{ fontSize: 10, color: "#555", marginTop: 4 }}>NOK/kg <span style={{ color: "#444" }}>{m.src}</span></div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* 1W / 4W change strip */}
+                    {fishPoolSpot?.latest && (
+                      <div style={{ display: "flex", gap: 20, padding: "6px 16px", borderBottom: "1px solid #222", fontSize: 11, alignItems: "center" }}>
+                        <span style={{ color: "#666", fontWeight: 700, letterSpacing: "0.06em", fontSize: 10 }}>SISALMON AVG</span>
+                        <span style={{ fontWeight: 600, color: (fishPoolSpot.latest.sisalmon_avg_1w_change ?? 0) >= 0 ? "#22c55e" : "#ef4444" }}>
+                          1W {fmtPct(fishPoolSpot.latest.sisalmon_avg_1w_change)}
+                        </span>
+                        <span style={{ fontWeight: 600, color: (fishPoolSpot.latest.sisalmon_avg_4w_change ?? 0) >= 0 ? "#22c55e" : "#ef4444" }}>
+                          4W {fmtPct(fishPoolSpot.latest.sisalmon_avg_4w_change)}
+                        </span>
+                        {fishPoolSpot.latest.total_volume != null && (
+                          <span style={{ color: "#555", marginLeft: "auto" }}>
+                            Vol: <span style={{ color: "#999" }}>{(fishPoolSpot.latest.total_volume / 1000).toFixed(1)}K t</span>
+                            {fishPoolSpot.latest.avg_weight_kg != null && (
+                              <> | Avg: <span style={{ color: "#999" }}>{fishPoolSpot.latest.avg_weight_kg.toFixed(2)} kg</span></>
+                            )}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* 3-column layout: Pareto Estimates | Forward Curve | Weight Classes */}
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 0 }}>
 
-                      {/* Fish Pool SISALMON Spot */}
-                      <div style={{ padding: "10px 12px", borderRight: "1px solid #222" }}>
-                        <div style={{ fontSize: 9, fontWeight: 700, color: "#666", letterSpacing: "0.06em", marginBottom: 6 }}>FISH POOL SISALMON INDEX</div>
-                        {fishPoolSpot?.latest ? (() => {
-                          const l = fishPoolSpot.latest;
+                      {/* Col 1: Pareto Quarterly Estimates */}
+                      <div style={{ padding: "14px 16px", borderRight: "1px solid #222" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+                          <span style={{ fontSize: 11, color: "#888", fontWeight: 700, letterSpacing: "0.06em" }}>PARETO ESTIMATES</span>
+                          {paretoData?.spot && <span style={{ fontSize: 10, color: "#555" }}>{paretoData.spot.report_date?.slice(0, 10)}</span>}
+                        </div>
+                        {paretoData?.quarterly && paretoData.quarterly.length > 0 ? (() => {
+                          const rows = paretoData.quarterly.filter(q => {
+                            const yr = q.period.match(/\d{2}$/)?.[0];
+                            return yr && parseInt(yr) >= 26;
+                          });
                           return (
                             <div>
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                                <span style={{ fontSize: 20, fontWeight: 700, color: "#f97316" }}>
-                                  {l.sisalmon_avg?.toFixed(2)}
-                                </span>
-                                <span style={{ fontSize: 9, color: "#555" }}>NOK/kg W{l.week}</span>
+                              <div style={{ display: "grid", gridTemplateColumns: "72px 1fr 1fr 1fr", gap: 0, padding: "5px 0", borderBottom: "1px solid #333", fontSize: 10, color: "#666", fontWeight: 700 }}>
+                                <span>PERIOD</span>
+                                <span style={{ textAlign: "right" }}>NOK</span>
+                                <span style={{ textAlign: "right" }}>EUR</span>
+                                <span style={{ textAlign: "right" }}>SUPPLY</span>
                               </div>
-                              <div style={{ display: "flex", gap: 10, fontSize: 10, marginTop: 4 }}>
-                                <span style={{ color: "#666" }}>1W</span>
-                                <span style={{ color: (l.sisalmon_avg_1w_change ?? 0) >= 0 ? "#22c55e" : "#ef4444", fontWeight: 600 }}>
-                                  {fmtPct(l.sisalmon_avg_1w_change)}
-                                </span>
-                                <span style={{ color: "#666" }}>4W</span>
-                                <span style={{ color: (l.sisalmon_avg_4w_change ?? 0) >= 0 ? "#22c55e" : "#ef4444", fontWeight: 600 }}>
-                                  {fmtPct(l.sisalmon_avg_4w_change)}
-                                </span>
-                              </div>
-                              <div style={{ fontSize: 10, color: "#555", marginTop: 4 }}>
-                                3-6kg: <span style={{ color: "#e5e5e5" }}>{l.sisalmon_3_6kg?.toFixed(2)}</span>
-                                {l.total_volume != null && <> | Vol: <span style={{ color: "#e5e5e5" }}>{(l.total_volume / 1000).toFixed(1)}K t</span></>}
-                              </div>
-                              {/* Mini weight class breakdown */}
-                              <div style={{ marginTop: 6, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "2px 8px", fontSize: 9, color: "#555" }}>
-                                {[
-                                  ["3-4", l.price_3_4kg], ["4-5", l.price_4_5kg], ["5-6", l.price_5_6kg],
-                                  ["6-7", l.price_6_7kg], ["7-8", l.price_7_8kg], ["8-9", l.price_8_9kg],
-                                ].map(([label, val]) => (
-                                  <div key={label as string} style={{ display: "flex", justifyContent: "space-between" }}>
-                                    <span>{label}kg</span>
-                                    <span style={{ color: "#999" }}>{(val as number | null)?.toFixed(1) ?? "\u2014"}</span>
-                                  </div>
-                                ))}
-                              </div>
-                              {/* Fish Pool spot sparkline */}
-                              {fishPoolSpot.spotPrices.length > 2 && (() => {
-                                const pts = fishPoolSpot.spotPrices;
-                                const vals = pts.map(p => p.sisalmon_avg ?? 0).filter(v => v > 0);
-                                if (vals.length < 2) return null;
-                                const mn = Math.min(...vals), mx = Math.max(...vals);
-                                return (
-                                  <svg viewBox="0 0 100 20" preserveAspectRatio="none" style={{ width: "100%", height: 30, marginTop: 6, display: "block" }}>
-                                    <path d={vals.map((v, i) => {
-                                      const x = (i / (vals.length - 1)) * 100;
-                                      const y = 18 - ((v - mn) / (mx - mn || 1)) * 16;
-                                      return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-                                    }).join(" ")} fill="none" stroke="#3b82f6" strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
-                                  </svg>
-                                );
-                              })()}
-                            </div>
-                          );
-                        })() : <div style={{ color: "#444", fontSize: 10 }}>No Fish Pool data</div>}
-                      </div>
-
-                      {/* Pareto Estimates */}
-                      <div style={{ padding: "10px 12px", borderRight: "1px solid #222" }}>
-                        <div style={{ fontSize: 9, fontWeight: 700, color: "#666", letterSpacing: "0.06em", marginBottom: 6 }}>PARETO PRICE ESTIMATES</div>
-                        {paretoData?.spot ? (
-                          <div>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                              <span style={{ fontSize: 20, fontWeight: 700, color: "#f97316" }}>
-                                {paretoData.spot.spot_nok?.toFixed(0)}
-                              </span>
-                              <span style={{ fontSize: 9, color: "#555" }}>NOK/kg SPOT</span>
-                            </div>
-                            {paretoData.spot.qtd_price_nok != null && (
-                              <div style={{ fontSize: 10, color: "#555", marginTop: 2 }}>
-                                QTD: <span style={{ color: "#e5e5e5" }}>{paretoData.spot.qtd_price_nok}</span>
-                                {paretoData.spot.consensus_nok != null && paretoData.spot.consensus_nok > 10 && (
-                                  <> | Consensus: <span style={{ color: "#e5e5e5" }}>{paretoData.spot.consensus_nok}</span></>
-                                )}
-                              </div>
-                            )}
-                            {/* Quarterly estimates */}
-                            <div style={{ marginTop: 8, fontSize: 9 }}>
-                              <div style={{ display: "grid", gridTemplateColumns: "50px 55px 45px 50px", gap: 2, color: "#555", fontWeight: 700, marginBottom: 3 }}>
-                                <span>PERIOD</span><span style={{ textAlign: "right" }}>NOK</span><span style={{ textAlign: "right" }}>EUR</span><span style={{ textAlign: "right" }}>SUPPLY</span>
-                              </div>
-                              {paretoData.quarterly.filter(q => q.is_estimate || q.period.includes("'25") || q.period.includes("'26")).slice(-8).map(q => (
-                                <div key={q.period} style={{ display: "grid", gridTemplateColumns: "50px 55px 45px 50px", gap: 2, color: q.is_estimate ? "#888" : "#ccc", lineHeight: "16px" }}>
-                                  <span>{q.period}{q.is_estimate ? "e" : ""}</span>
-                                  <span style={{ textAlign: "right", fontWeight: 600 }}>{q.price_nok_kg?.toFixed(1)}</span>
-                                  <span style={{ textAlign: "right" }}>{q.price_eur_kg?.toFixed(1)}</span>
-                                  <span style={{ textAlign: "right", color: (q.supply_growth_yoy ?? 0) >= 0 ? "#22c55e" : "#ef4444" }}>
+                              {rows.map(q => (
+                                <div key={q.period} style={{ display: "grid", gridTemplateColumns: "72px 1fr 1fr 1fr", gap: 0, padding: "4px 0", borderBottom: "1px solid #181818", fontSize: 12 }}>
+                                  <span style={{ color: q.is_estimate ? "#777" : "#aaa", fontWeight: 600, fontSize: 11 }}>
+                                    {q.period}{q.is_estimate ? "e" : ""}
+                                  </span>
+                                  <span style={{ textAlign: "right", color: "#e5e5e5", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                                    {q.price_nok_kg?.toFixed(1)}
+                                  </span>
+                                  <span style={{ textAlign: "right", color: "#777", fontVariantNumeric: "tabular-nums" }}>
+                                    {q.price_eur_kg?.toFixed(1)}
+                                  </span>
+                                  <span style={{ textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums", color: (q.supply_growth_yoy ?? 0) >= 0 ? "#22c55e" : "#ef4444" }}>
                                     {q.supply_growth_yoy != null ? `${q.supply_growth_yoy >= 0 ? "+" : ""}${q.supply_growth_yoy.toFixed(1)}%` : "\u2014"}
                                   </span>
                                 </div>
                               ))}
                             </div>
-                          </div>
-                        ) : <div style={{ color: "#444", fontSize: 10 }}>No Pareto data</div>}
+                          );
+                        })() : <div style={{ color: "#444", fontSize: 12, padding: "20px 0" }}>No estimate data</div>}
                       </div>
 
-                      {/* Forward Curve */}
-                      <div style={{ padding: "10px 12px" }}>
-                        <div style={{ fontSize: 9, fontWeight: 700, color: "#666", letterSpacing: "0.06em", marginBottom: 6 }}>FISH POOL FORWARD CURVE</div>
-                        {forwardPrices?.forwards && forwardPrices.forwards.length > 0 ? (
-                          <div>
-                            <div style={{ marginTop: 2, fontSize: 9 }}>
-                              <div style={{ display: "grid", gridTemplateColumns: "55px 55px 50px", gap: 2, color: "#555", fontWeight: 700, marginBottom: 3 }}>
-                                <span>PERIOD</span><span style={{ textAlign: "right" }}>EUR/t</span><span style={{ textAlign: "right" }}>W/W</span>
+                      {/* Col 2: Forward Curve */}
+                      <div style={{ padding: "14px 16px", borderRight: "1px solid #222" }}>
+                        {(() => {
+                          const EURNOK = paretoData?.spot?.spot_nok && paretoData?.spot?.spot_eur
+                            ? paretoData.spot.spot_nok / paretoData.spot.spot_eur
+                            : 11.7;
+                          return (
+                            <>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+                                <span style={{ fontSize: 11, color: "#888", fontWeight: 700, letterSpacing: "0.06em" }}>FORWARD CURVE</span>
+                                <span style={{ fontSize: 10, color: "#555" }}>EUR/NOK {EURNOK.toFixed(2)}</span>
                               </div>
-                              {forwardPrices.forwards.slice(0, 12).map(f => (
-                                <div key={f.period} style={{ display: "grid", gridTemplateColumns: "55px 55px 50px", gap: 2, color: "#ccc", lineHeight: "16px" }}>
-                                  <span style={{ color: "#888" }}>{f.period}</span>
-                                  <span style={{ textAlign: "right", fontWeight: 600 }}>{f.price_eur_tonne?.toLocaleString() ?? "\u2014"}</span>
-                                  <span style={{ textAlign: "right", color: (f.change_pct ?? 0) >= 0 ? "#22c55e" : "#ef4444" }}>
-                                    {f.change_pct != null ? `${f.change_pct >= 0 ? "+" : ""}${f.change_pct.toFixed(1)}%` : "\u2014"}
+                              {forwardPrices?.forwards && forwardPrices.forwards.length > 0 ? (() => {
+                                const fwds = forwardPrices.forwards.map(f => {
+                                  let label = f.period;
+                                  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+                                  // "01+02-27" → "Jan-Feb'27"
+                                  label = label.replace(/^(\d{2})\+(\d{2})-(\d{2})$/, (_m, m1, m2, y) =>
+                                    `${months[parseInt(m1)-1]}-${months[parseInt(m2)-1]}'${y}`);
+                                  // "Q1+Q2-27" → "H1'27"
+                                  label = label.replace(/^Q([1-2])\+Q([2-4])-(\d{2})$/, (_m, _q1, _q2, y) => {
+                                    const q1n = parseInt(_q1); return `H${q1n <= 2 ? 1 : 2}'${y}`;
+                                  });
+                                  // "Q3+Q4-27" → "H2'27"
+                                  label = label.replace(/^Q([3-4])\+Q([3-4])-(\d{2})$/, (_m, _q1, _q2, y) => `H2'${y}`);
+                                  // "Q1-27" → "Q1'27"
+                                  label = label.replace(/^Q([1-4])-(\d{2})$/, "Q$1'$2");
+                                  // "Apr-26" → "Apr'26", "Jun-26" → "Jun'26"
+                                  label = label.replace(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-(\d{2})$/, "$1'$2");
+                                  // "04-26" → "Apr'26"
+                                  label = label.replace(/^(0[1-9]|1[0-2])-(\d{2})$/, (_m, mo, y) =>
+                                    `${months[parseInt(mo)-1]}'${y}`);
+                                  const nokKg = f.price_eur_tonne ? (f.price_eur_tonne * EURNOK / 1000) : null;
+                                  return { ...f, label, nokKg };
+                                });
+                                return (
+                                  <div>
+                                    <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 1fr 60px", gap: 0, padding: "5px 0", borderBottom: "1px solid #333", fontSize: 10, color: "#666", fontWeight: 700 }}>
+                                      <span>CONTRACT</span>
+                                      <span style={{ textAlign: "right" }}>EUR/T</span>
+                                      <span style={{ textAlign: "right" }}>NOK/KG</span>
+                                      <span style={{ textAlign: "right" }}>W/W</span>
+                                    </div>
+                                    {fwds.slice(0, 12).map((f, i) => (
+                                      <div key={i} style={{ display: "grid", gridTemplateColumns: "80px 1fr 1fr 60px", gap: 0, padding: "4px 0", borderBottom: "1px solid #181818", fontSize: 12 }}>
+                                        <span style={{ color: "#999", fontWeight: 600, fontSize: 11 }}>{f.label}</span>
+                                        <span style={{ textAlign: "right", color: "#e5e5e5", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                                          {f.price_eur_tonne?.toLocaleString() ?? "\u2014"}
+                                        </span>
+                                        <span style={{ textAlign: "right", color: "#f97316", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                                          {f.nokKg != null ? f.nokKg.toFixed(1) : "\u2014"}
+                                        </span>
+                                        <span style={{ textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums", color: f.change_pct == null ? "#444" : (f.change_pct >= 0 ? "#22c55e" : "#ef4444") }}>
+                                          {f.change_pct != null ? `${f.change_pct >= 0 ? "+" : ""}${f.change_pct.toFixed(1)}%` : "\u2014"}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              })() : <div style={{ color: "#444", fontSize: 12, padding: "20px 0" }}>No forward data</div>}
+                            </>
+                          );
+                        })()}
+                      </div>
+
+                      {/* Col 3: Weight Class Breakdown */}
+                      <div style={{ padding: "14px 16px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+                          <span style={{ fontSize: 11, color: "#888", fontWeight: 700, letterSpacing: "0.06em" }}>SPOT BY WEIGHT</span>
+                          {fishPoolSpot?.latest && <span style={{ fontSize: 10, color: "#555" }}>Week {fishPoolSpot.latest.week}</span>}
+                        </div>
+                        {fishPoolSpot?.latest ? (
+                          <div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, padding: "5px 0", borderBottom: "1px solid #333", fontSize: 10, color: "#666", fontWeight: 700 }}>
+                              <span>CLASS</span>
+                              <span style={{ textAlign: "right" }}>NOK/KG</span>
+                            </div>
+                            {[
+                              ["1-2 kg", fishPoolSpot.latest.price_1_2kg],
+                              ["2-3 kg", fishPoolSpot.latest.price_2_3kg],
+                              ["3-4 kg", fishPoolSpot.latest.price_3_4kg],
+                              ["4-5 kg", fishPoolSpot.latest.price_4_5kg],
+                              ["5-6 kg", fishPoolSpot.latest.price_5_6kg],
+                              ["6-7 kg", fishPoolSpot.latest.price_6_7kg],
+                              ["7-8 kg", fishPoolSpot.latest.price_7_8kg],
+                              ["8-9 kg", fishPoolSpot.latest.price_8_9kg],
+                            ].map(([label, val]) => {
+                              const v = val as number | null;
+                              const avg = fishPoolSpot.latest?.sisalmon_avg ?? 0;
+                              const isPremium = v != null && avg > 0 && v > avg;
+                              return (
+                                <div key={label as string} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, padding: "4px 0", borderBottom: "1px solid #181818", fontSize: 12 }}>
+                                  <span style={{ color: "#888" }}>{label}</span>
+                                  <span style={{ textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums", color: isPremium ? "#22c55e" : "#e5e5e5" }}>
+                                    {v?.toFixed(1) ?? "\u2014"}
                                   </span>
                                 </div>
-                              ))}
+                              );
+                            })}
+                            <div style={{ marginTop: 8, padding: "6px 0", borderTop: "1px solid #333", display: "grid", gridTemplateColumns: "1fr 1fr", fontSize: 12, fontWeight: 700 }}>
+                              <span style={{ color: "#999" }}>AVG</span>
+                              <span style={{ textAlign: "right", color: "#f97316", fontVariantNumeric: "tabular-nums" }}>
+                                {fishPoolSpot.latest.sisalmon_avg?.toFixed(1) ?? "\u2014"}
+                              </span>
                             </div>
-                            {/* Pareto annual outlook */}
-                            {paretoData?.annual && paretoData.annual.length > 0 && (
-                              <div style={{ marginTop: 8, borderTop: "1px solid #222", paddingTop: 6 }}>
-                                <div style={{ fontSize: 9, fontWeight: 700, color: "#555", marginBottom: 3 }}>PARETO ANNUAL OUTLOOK</div>
-                                {paretoData.annual.map(a => (
-                                  <div key={a.period} style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: a.is_estimate ? "#888" : "#ccc", lineHeight: "16px" }}>
-                                    <span>{a.period}{a.is_estimate ? "e" : ""}</span>
-                                    <span>
-                                      <span style={{ fontWeight: 600 }}>{a.price_nok_kg?.toFixed(1)}</span>
-                                      <span style={{ color: "#555", margin: "0 4px" }}>NOK</span>
-                                      <span style={{ color: (a.supply_growth_yoy ?? 0) >= 0 ? "#22c55e" : "#ef4444" }}>
-                                        {a.supply_growth_yoy != null ? `${a.supply_growth_yoy >= 0 ? "+" : ""}${a.supply_growth_yoy.toFixed(1)}%` : ""}
-                                      </span>
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
                           </div>
-                        ) : <div style={{ color: "#444", fontSize: 10 }}>No forward data</div>}
+                        ) : <div style={{ color: "#444", fontSize: 12, padding: "20px 0" }}>No spot data</div>}
                       </div>
 
                     </div>
