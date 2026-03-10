@@ -302,19 +302,10 @@ export default function IntelligencePage() {
     safeFetch("/api/intelligence/sectors").then(async res => {
       if (!res) return;
       const d = await res.json();
-      const latestDate = d.tradeDate;
-      // Filter out stocks with stale trade dates
-      const filtered = (d.sectors || []).map((sec: SectorData) => {
-        const freshStocks = latestDate
-          ? sec.stocks.filter(st => st.tradeDate && new Date(st.tradeDate).toISOString().slice(0, 10) === new Date(latestDate).toISOString().slice(0, 10))
-          : sec.stocks;
-        const upCount = freshStocks.filter(s => s.returnPct > 0).length;
-        const downCount = freshStocks.filter(s => s.returnPct < 0).length;
-        const avgReturn = freshStocks.length > 0 ? freshStocks.reduce((s, st) => s + st.returnPct, 0) / freshStocks.length : 0;
-        return { ...sec, stocks: freshStocks, stockCount: freshStocks.length, upCount, downCount, avgReturn };
-      }).filter((sec: SectorData) => sec.stockCount > 0);
-      setSectors(filtered);
-      setSectorTradeDate(latestDate || null);
+      // Show all stocks — API already limits to 10-day window
+      const sectors = (d.sectors || []).filter((sec: SectorData) => sec.stockCount > 0);
+      setSectors(sectors);
+      setSectorTradeDate(d.tradeDate || null);
     });
 
     safeFetch("/api/intelligence/movers").then(async res => {
