@@ -996,13 +996,17 @@ export default function StockTickerPage() {
               </span>
             )}
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
-            <Link href="/" style={{ fontSize: 10, color: "var(--muted-foreground)", textDecoration: "none" }}>← Home</Link>
-            <Link href="/stocks" style={{ fontSize: 10, color: "var(--muted-foreground)", textDecoration: "none" }}>→ Stocks</Link>
-            <Link href="/news" style={{ fontSize: 10, color: "var(--muted-foreground)", textDecoration: "none" }}>News</Link>
+          <nav style={{ display: "flex", gap: 0, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <Link href="/" style={{ fontSize: 10, color: "var(--muted-foreground)", textDecoration: "none", padding: "2px 6px", borderRadius: 3 }}>Home</Link>
+            <span style={{ color: "var(--border)", fontSize: 9 }}>/</span>
+            <Link href="/stocks" style={{ fontSize: 10, color: "var(--muted-foreground)", textDecoration: "none", padding: "2px 6px", borderRadius: 3 }}>Stocks</Link>
+            <span style={{ color: "var(--border)", fontSize: 9 }}>/</span>
+            <span style={{ fontSize: 10, color: "var(--foreground)", fontWeight: 600, padding: "2px 6px", fontFamily: "'Geist Mono', monospace" }}>{ticker}</span>
+            <span style={{ color: "var(--border)", fontSize: 10, margin: "0 4px" }}>|</span>
+            <Link href="/news" style={{ fontSize: 10, color: "var(--muted-foreground)", textDecoration: "none", padding: "2px 6px", borderRadius: 3 }}>News</Link>
             {sectorPeers.length > 0 && (
               <>
-                <span style={{ color: "var(--border)", fontSize: 10 }}>|</span>
+                <span style={{ color: "var(--border)", fontSize: 10, margin: "0 4px" }}>|</span>
                 <span style={{ fontSize: 9, color: "var(--muted-foreground)", opacity: 0.6, textTransform: "uppercase", letterSpacing: "0.05em" }}>PEERS</span>
                 {sectorPeers.map((p) => (
                   <Link
@@ -1013,6 +1017,7 @@ export default function StockTickerPage() {
                       color: "var(--accent)",
                       textDecoration: "none",
                       fontWeight: 600,
+                      padding: "2px 5px",
                       fontFamily: "'Geist Mono', monospace",
                     }}
                     title={p.name}
@@ -1022,7 +1027,7 @@ export default function StockTickerPage() {
                 ))}
               </>
             )}
-          </div>
+          </nav>
         </div>
 
         {/* Row 2: Price + Change + Key Metrics Strip */}
