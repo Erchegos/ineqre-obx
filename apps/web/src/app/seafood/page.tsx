@@ -312,7 +312,7 @@ export default function SeafoodPage() {
                     {/* Hero strip: 5 key prices */}
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", borderBottom: "1px solid #333" }}>
                       {[
-                        { label: "PARETO SPOT EST.", value: paretoData?.spot?.spot_nok, src: "Pareto W/W" },
+                        { label: "PARETO SPOT EST.", value: paretoData?.spot?.spot_nok, src: (() => { if (!paretoData?.spot?.report_date) return "Pareto W/W"; const d = new Date(paretoData.spot.report_date); const jan4 = new Date(d.getFullYear(), 0, 4); const wk = Math.ceil(((d.getTime() - jan4.getTime()) / 86400000 + jan4.getDay() + 1) / 7); return `Est. W${wk}`; })() },
                         { label: "FISH POOL AVG", value: fishPoolSpot?.latest?.sisalmon_avg, src: `SISALMON W${fishPoolSpot?.latest?.week ?? ""}` },
                         { label: "FISH POOL 3-6KG", value: fishPoolSpot?.latest?.sisalmon_3_6kg, src: `SISALMON W${fishPoolSpot?.latest?.week ?? ""}` },
                         { label: "QTD PRICE", value: paretoData?.spot?.qtd_price_nok, src: "Pareto QTD" },
