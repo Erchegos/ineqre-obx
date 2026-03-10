@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   try {
     const limit = parseInt(req.nextUrl.searchParams.get("limit") || "10");
 
-    // Look at last 10 days, exclude weekends, use each stock's own latest 2 prices
+    // Only show stocks with the latest trade date (today's prices)
     const result = await pool.query(`
       WITH recent AS (
         SELECT
@@ -30,6 +30,9 @@ export async function GET(req: NextRequest) {
         JOIN stocks s ON s.ticker = pd.ticker AND s.asset_type = 'equity'
         WHERE pd.date >= CURRENT_DATE - INTERVAL '10 days'
           AND EXTRACT(DOW FROM pd.date) NOT IN (0, 6)
+      ),
+      latest_date AS (
+        SELECT MAX(date) AS max_date FROM recent WHERE rn = 1
       )
       SELECT
         t1.ticker,
@@ -44,7 +47,9 @@ export async function GET(req: NextRequest) {
       FROM recent t1
       JOIN recent t2 ON t2.ticker = t1.ticker AND t2.rn = 2
       JOIN stocks s ON s.ticker = t1.ticker
+      CROSS JOIN latest_date ld
       WHERE t1.rn = 1 AND t2.close > 0
+        AND t1.date = ld.max_date
       ORDER BY abs((t1.close - t2.close) / t2.close) DESC
     `);
 

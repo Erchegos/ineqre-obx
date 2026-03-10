@@ -302,10 +302,19 @@ export default function IntelligencePage() {
     safeFetch("/api/intelligence/sectors").then(async res => {
       if (!res) return;
       const d = await res.json();
-      // Show all stocks — API already limits to 10-day window
-      const sectors = (d.sectors || []).filter((sec: SectorData) => sec.stockCount > 0);
-      setSectors(sectors);
-      setSectorTradeDate(d.tradeDate || null);
+      const latestDate = d.tradeDate;
+      // Filter to only stocks with the latest trade date
+      const filtered = (d.sectors || []).map((sec: SectorData) => {
+        const freshStocks = latestDate
+          ? sec.stocks.filter(st => st.tradeDate && new Date(st.tradeDate).toISOString().slice(0, 10) === new Date(latestDate).toISOString().slice(0, 10))
+          : sec.stocks;
+        const upCount = freshStocks.filter(s => s.returnPct > 0).length;
+        const downCount = freshStocks.filter(s => s.returnPct < 0).length;
+        const avgReturn = freshStocks.length > 0 ? freshStocks.reduce((s, st) => s + st.returnPct, 0) / freshStocks.length : 0;
+        return { ...sec, stocks: freshStocks, stockCount: freshStocks.length, upCount, downCount, avgReturn };
+      }).filter((sec: SectorData) => sec.stockCount > 0);
+      setSectors(filtered);
+      setSectorTradeDate(latestDate || null);
     });
 
     safeFetch("/api/intelligence/movers").then(async res => {
@@ -754,10 +763,11 @@ export default function IntelligencePage() {
                     <div style={{ fontSize: 8, fontWeight: 700, color: "#22c55e", padding: "3px 10px", background: "#22c55e08", letterSpacing: "0.06em" }}>GAINERS</div>
                     {movers.gainers.slice(0, 10).map(m => (
                       <Link key={m.ticker} href={`/stocks/${m.ticker}`} className="intel-row" style={{
-                        display: "grid", gridTemplateColumns: "1fr auto auto", gap: 6, padding: "3px 10px",
+                        display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: 6, padding: "3px 10px",
                         textDecoration: "none", color: "inherit", borderBottom: "1px solid #111",
                       }}>
                         <span style={{ fontSize: 10, fontWeight: 700, color: "#e5e5e5" }}>{m.ticker}</span>
+                        <span style={{ fontSize: 9, color: "#888", alignSelf: "center" }}>{fmtPrice(m.lastClose)}</span>
                         <span style={{ fontSize: 7, color: "#444", alignSelf: "center" }}>{fmtUpdatedAt(m.updatedAt)}</span>
                         <span style={{ fontSize: 10, fontWeight: 700, color: "#22c55e" }}>{fmtPctRaw(m.returnPct * 100, 1)}</span>
                       </Link>
@@ -768,10 +778,11 @@ export default function IntelligencePage() {
                     <div style={{ fontSize: 8, fontWeight: 700, color: "#ef4444", padding: "3px 10px", background: "#ef444408", letterSpacing: "0.06em" }}>LOSERS</div>
                     {movers.losers.slice(0, 10).map(m => (
                       <Link key={m.ticker} href={`/stocks/${m.ticker}`} className="intel-row" style={{
-                        display: "grid", gridTemplateColumns: "1fr auto auto", gap: 6, padding: "3px 10px",
+                        display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: 6, padding: "3px 10px",
                         textDecoration: "none", color: "inherit", borderBottom: "1px solid #111",
                       }}>
                         <span style={{ fontSize: 10, fontWeight: 700, color: "#e5e5e5" }}>{m.ticker}</span>
+                        <span style={{ fontSize: 9, color: "#888", alignSelf: "center" }}>{fmtPrice(m.lastClose)}</span>
                         <span style={{ fontSize: 7, color: "#444", alignSelf: "center" }}>{fmtUpdatedAt(m.updatedAt)}</span>
                         <span style={{ fontSize: 10, fontWeight: 700, color: "#ef4444" }}>{fmtPctRaw(m.returnPct * 100, 1)}</span>
                       </Link>
