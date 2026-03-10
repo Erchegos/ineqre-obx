@@ -139,7 +139,7 @@ export default function HomePage() {
               transform: heroVisible ? "translateY(0)" : "translateY(12px)",
               transition: "all 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
             }}>
-              Ola Slettebak / InEqRe v2.3 / Oslo Børs
+              Ola Slettebak / InEqRe v3.0 / Oslo Børs
             </div>
             <h1 style={{
               fontSize: 42,
@@ -163,8 +163,8 @@ export default function HomePage() {
               transform: heroVisible ? "translateY(0)" : "translateY(16px)",
               transition: "all 0.7s cubic-bezier(0.4, 0, 0.2, 1) 0.25s",
             }}>
-              A quantitative equity research platform for Oslo Børs.
-              Automated research aggregation with AI summarization, machine learning price predictions, factor-based backtesting, volatility modeling, and correlation analysis.
+              Quantitative equity research platform covering 225+ securities on Oslo Børs.
+              ML price predictions with 19-factor ensemble models, GARCH/MSGARCH volatility regime detection, Monte Carlo simulations, mean-reversion channels, options analytics, portfolio optimization, and AI-summarized broker research from 6 sources.
             </p>
           </header>
 
@@ -207,7 +207,7 @@ export default function HomePage() {
               <FeatureCard
                 href="/stocks"
                 title="Stock Screener & Analytics"
-                description="Browse 131 OSE securities with interactive price charts, candlestick patterns, and deep per-stock analytics including volatility models, Monte Carlo simulations, ML predictions, and mean-reversion channels."
+                description="Browse 225+ OSE securities with interactive price charts, candlestick patterns, and deep per-stock analytics including volatility models, Monte Carlo simulations, ML predictions, and mean-reversion channels."
                 tags={[
                   { label: "Charts", color: "var(--accent)" },
                   { label: "ML", color: "var(--success)" },
@@ -219,11 +219,11 @@ export default function HomePage() {
               <FeatureCard
                 href="/research"
                 title="Research Portal"
-                description="AI-summarized broker research from Pareto Securities, DNB Carnegie, and Xtrainvestor. Full-text search across 1,500+ reports with PDF viewer. Automated email ingestion, web scraping, and Claude-powered English summaries."
+                description="AI-summarized broker research from Pareto Securities, DNB Carnegie, DNB Markets, Redeye, and Xtrainvestor. Full-text search across 1,500+ reports with PDF viewer. Automated email ingestion, web scraping, and Claude-powered English summaries."
                 tags={[
                   { label: "AI Summaries", color: "var(--success)" },
                   { label: "PDF", color: "var(--warning)" },
-                  { label: "3 Sources", color: "var(--info)" },
+                  { label: "6 Sources", color: "var(--info)" },
                 ]}
                 visible={modulesReveal.visible}
                 delay={1}
@@ -340,10 +340,10 @@ export default function HomePage() {
                 { title: "Monte Carlo Simulation", accent: "var(--info)", text: "10,000-path GBM with configurable drift and volatility. Percentile bands (5th–95th), probability cones, and statistical scenario testing." },
                 { title: "Risk Metrics", accent: "var(--danger)", text: "Max drawdown with recovery tracking, Sharpe ratio, market beta vs OBX, expected daily/weekly moves (1σ), and rolling benchmark correlation." },
                 { title: "Std Deviation Channels", accent: "var(--success)", text: "Linear regression channels with ±1σ/±2σ bands. Auto-optimized windows (255–1530 bars) by R². Position classification and mean-reversion signals." },
-                { title: "ML Price Predictions", accent: "var(--warning)", text: "Ridge regression on 17 factors (momentum, volatility, fundamentals). Walk-forward validation, daily signals (-1 to +1), probability-weighted forecasts." },
+                { title: "ML Price Predictions", accent: "var(--warning)", text: "GB/RF ensemble on 19 factors (momentum, volatility, fundamentals). Walk-forward validation across 200+ stocks, confidence scoring, and probability-weighted return forecasts." },
                 { title: "Factor Backtesting", accent: "var(--accent)", text: "Strategy backtesting with signal thresholds and holding periods. Factor attribution, cumulative returns, hit rates, and per-ticker trade detail." },
                 { title: "Time Series Analysis", accent: "var(--info)", text: "Log-return decomposition, ACF diagnostics, monthly seasonality patterns, and 30-day rolling volatility correlation with OBX index." },
-                { title: "Research Aggregation", accent: "var(--success)", text: "Claude AI summarization via Anthropic API. IMAP ingestion from Pareto & Xtrainvestor, web scraping from DNB Carnegie. PDF text extraction, document deduplication, and full-text search." },
+                { title: "Research Aggregation", accent: "var(--success)", text: "Claude AI summarization via Anthropic API. IMAP ingestion from 6 brokers, web scraping from DNB Carnegie, DNB Markets & Redeye. PDF text extraction, document deduplication, and full-text search." },
                 { title: "Options Analytics", accent: "var(--warning)", text: "Black-Scholes pricing, IV solver, multi-leg P&L with time decay. Max pain, put/call ratios, IV term structure. Editable positions with strike stepping." },
               ].map((cap, i) => (
                 <CapabilityCard
@@ -413,10 +413,10 @@ export default function HomePage() {
               <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Architecture:</strong> Server-side compute · Connection pooling · Transaction pooler (Supabase) · JWT authentication · Vercel edge deployment
             </p>
             <p style={{ marginBottom: 8, lineHeight: 1.6 }}>
-              <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Data:</strong> Real-time OHLCV ingestion via IBKR · 160K+ daily data points · Supabase storage for PDF attachments
+              <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Data:</strong> Real-time OHLCV ingestion via IBKR · 225+ securities · 300K+ daily data points · Supabase storage for PDF attachments
             </p>
             <p style={{ lineHeight: 1.6 }}>
-              <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Sources:</strong> Interactive Brokers TWS API · Yahoo Finance · Norges Bank (FX rates) · Pareto Securities · DNB Markets · Carnegie · Baltic Exchange · Oslo Stock Exchange
+              <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Sources:</strong> Interactive Brokers TWS API · Yahoo Finance · Norges Bank (FX rates) · Pareto Securities · DNB Markets · DNB Carnegie · Redeye · Xtrainvestor · Finanstilsynet · BarentsWatch · Oslo Stock Exchange
             </p>
           </footer>
 

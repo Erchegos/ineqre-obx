@@ -120,7 +120,7 @@ async function main() {
   const SKIP = new Set([
     'OBX','OSEBX','OSEAX','SPX','SPY','QQQ','IWM','NDX','VIX','DAX','ESTX50','HEX',
     'GLD','SLV','DBC','DBB','EFA','VGK','EWD','EWN','XLE','XOP','USO','COPX','NORW',
-    '2020','KCC','BORR.US','BWLP.US','ECO.US','EQNR.US','FLNG.US','FRO.US','HAFN.US',
+    'BORR.US','BWLP.US','ECO.US','EQNR.US','FLNG.US','FRO.US','HAFN.US',
   ]);
 
   let tickers: string[];

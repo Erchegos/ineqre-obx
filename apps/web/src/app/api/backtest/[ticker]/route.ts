@@ -42,8 +42,19 @@ export async function GET(
     );
 
     if (predResult.rows.length === 0) {
+      // Return list of tickers that DO have backtest data
+      const availableResult = await pool.query(
+        `SELECT DISTINCT ticker FROM backtest_predictions
+         WHERE backtest_run_id = $1
+         ORDER BY ticker`,
+        [runId]
+      );
       return NextResponse.json(
-        { success: false, error: `No backtest data for ${ticker}` },
+        {
+          success: false,
+          error: `No backtest data for ${ticker}`,
+          availableTickers: availableResult.rows.map((r: any) => r.ticker),
+        },
         { status: 404 }
       );
     }

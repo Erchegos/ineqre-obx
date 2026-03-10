@@ -40,7 +40,7 @@ async function getMLReadyTickers(): Promise<string[]> {
     INNER JOIN LATERAL (
       SELECT 1 FROM factor_fundamentals ff
       WHERE ff.ticker = ft_agg.ticker AND ff.bm IS NOT NULL AND ff.mktcap IS NOT NULL AND ff.nokvol IS NOT NULL
-      ORDER BY ff.date DESC LIMIT 1
+      LIMIT 1
     ) fund_check ON true
     ORDER BY ft_agg.ticker
   `);
@@ -67,7 +67,7 @@ async function fetchRawFactors(ticker: string): Promise<RawFactors | null> {
   const fundResult = await pool.query(
     `SELECT bm, ep, dy, sp, sg, mktcap, nokvol
     FROM factor_fundamentals
-    WHERE ticker = $1 AND date <= $2
+    WHERE ticker = $1 AND date <= $2 AND bm IS NOT NULL AND mktcap IS NOT NULL AND nokvol IS NOT NULL
     ORDER BY date DESC LIMIT 1`,
     [ticker, tech.date]
   );

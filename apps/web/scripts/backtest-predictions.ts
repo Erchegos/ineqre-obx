@@ -629,7 +629,7 @@ async function storeResults(
         p05, p25, p50, p75, p95, confidence_score,
         size_regime, turnover_regime, quintile, direction_correct
       ) VALUES ${placeholders.join(',')}
-      ON CONFLICT (backtest_run_id, ticker, prediction_date) DO NOTHING
+      ON CONFLICT (backtest_run_id, ticker, prediction_date, model_type) DO NOTHING
     `, values);
     process.stdout.write(`  predictions: ${Math.min(i + batchSize, outcomes.length)}/${outcomes.length}\r`);
   }

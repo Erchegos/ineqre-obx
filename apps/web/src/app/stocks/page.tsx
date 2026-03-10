@@ -45,6 +45,7 @@ export default function StocksPage() {
   const [tierFilter, setTierFilter] = useState<'all' | 'tierA' | 'tierAB' | 'ml' | 'options'>('tierAB');
   const [tickersWithFactors, setTickersWithFactors] = useState<Set<string>>(new Set());
   const [tickersWithOptimizer, setTickersWithOptimizer] = useState<Set<string>>(new Set());
+  const [tickersWithBacktest, setTickersWithBacktest] = useState<Set<string>>(new Set());
   const [tickersWithOptions, setTickersWithOptions] = useState<Set<string>>(new Set());
 
   const fetchStocks = useCallback(async (assetTypes: Set<AssetType>) => {
@@ -99,7 +100,7 @@ export default function StocksPage() {
 
       try {
         // Fetch all in parallel
-        const [factorRes, optimizerRes, optionsRes] = await Promise.all([
+        const [factorRes, optimizerRes, optionsRes, backtestRes] = await Promise.all([
           fetch("/api/factors/tickers", {
             method: "GET",
             headers: { accept: "application/json" },
@@ -109,6 +110,10 @@ export default function StocksPage() {
             headers: { accept: "application/json" },
               }),
           fetch("/api/options", {
+            method: "GET",
+            headers: { accept: "application/json" },
+              }),
+          fetch("/api/backtest/tickers", {
             method: "GET",
             headers: { accept: "application/json" },
               }),
@@ -132,6 +137,13 @@ export default function StocksPage() {
           const data = await optionsRes.json();
           if (data.stocks) {
             setTickersWithOptions(new Set(data.stocks.map((s: { ticker: string }) => s.ticker)));
+          }
+        }
+
+        if (backtestRes.ok) {
+          const data = await backtestRes.json();
+          if (data.success && data.tickers) {
+            setTickersWithBacktest(new Set(data.tickers));
           }
         }
       } catch (e) {
@@ -239,6 +251,10 @@ export default function StocksPage() {
   const optCount = useMemo(() => {
     return tickersWithOptimizer.size;
   }, [tickersWithOptimizer]);
+
+  const btCount = useMemo(() => {
+    return tickersWithBacktest.size;
+  }, [tickersWithBacktest]);
 
   const optionsCount = useMemo(() => {
     return stocks.filter(s => hasOptions(s.ticker)).length;
@@ -407,7 +423,7 @@ export default function StocksPage() {
           </div>
         </div>
         <p style={{ color: "var(--muted)", marginBottom: 16, fontSize: 14 }}>
-          Universe: {stocks.length} assets | Tier A: {tierCounts.A} | Tier B: {tierCounts.B} | Tier C: {tierCounts.C} | Tier F: {tierCounts.F} | <span style={{ color: '#10b981', fontWeight: 600 }}>ML Ready: {mlCount}</span> | <span style={{ color: '#8b5cf6', fontWeight: 600 }}>Optimized: {optCount}</span> | <span style={{ color: '#f59e0b', fontWeight: 600 }}>Options: {optionsCount}</span>
+          Universe: {stocks.length} assets | Tier A: {tierCounts.A} | Tier B: {tierCounts.B} | Tier C: {tierCounts.C} | Tier F: {tierCounts.F} | <span style={{ color: '#10b981', fontWeight: 600 }}>ML Ready: {mlCount}</span> | <span style={{ color: '#60a5fa', fontWeight: 600 }}>Backtested: {btCount}</span> | <span style={{ color: '#8b5cf6', fontWeight: 600 }}>Optimized: {optCount}</span> | <span style={{ color: '#f59e0b', fontWeight: 600 }}>Options: {optionsCount}</span>
           <span style={{ marginLeft: 16, fontSize: 13 }}>Source: Interactive Brokers</span>
         </p>
 
@@ -938,6 +954,19 @@ export default function StocksPage() {
                           fontFamily: "monospace",
                           letterSpacing: "0.04em",
                         }}>ML</span>
+                      )}
+                      {tickersWithBacktest.has(stock.ticker) && (
+                        <span style={{
+                          fontSize: 9.5,
+                          fontWeight: 600,
+                          padding: "3px 8px",
+                          borderRadius: 10,
+                          background: "rgba(59, 130, 246, 0.12)",
+                          color: "#60a5fa",
+                          border: "1px solid rgba(59, 130, 246, 0.3)",
+                          fontFamily: "monospace",
+                          letterSpacing: "0.04em",
+                        }}>BT</span>
                       )}
                       {tickersWithOptimizer.has(stock.ticker) && (
                         <span style={{

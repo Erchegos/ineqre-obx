@@ -267,6 +267,35 @@ export default function ReturnDistributionChart({
     return sigmas.reduce((a, b) => a + b, 0) / sigmas.length;
   }, [distributionData, timeframeKeys]);
 
+  // Compute symmetric domain around 0 so the mean is always centered
+  const symmetricDomain = useMemo((): [number, number] => {
+    if (chartData.length === 0 || timeframeKeys.length === 0) return [-0.1, 0.1];
+    // Find peak density per timeframe
+    const peaks: Record<string, number> = {};
+    for (const key of timeframeKeys) {
+      let max = 0;
+      for (const point of chartData) {
+        const d = (point[key] as number) || 0;
+        if (d > max) max = d;
+      }
+      peaks[key] = max;
+    }
+    // Find outermost return where density > 2% of that timeframe's peak
+    let maxAbsReturn = 0.01;
+    for (const point of chartData) {
+      const ret = Math.abs(point.return as number);
+      for (const key of timeframeKeys) {
+        const density = (point[key] as number) || 0;
+        if (peaks[key] > 0 && density > peaks[key] * 0.02) {
+          maxAbsReturn = Math.max(maxAbsReturn, ret);
+        }
+      }
+    }
+    // Symmetric + padding
+    const padded = maxAbsReturn * 1.1;
+    return [-padded, padded];
+  }, [chartData, timeframeKeys]);
+
   return (
     <div style={{ width: "100%" }}>
       {/* Control Bar */}
@@ -420,7 +449,7 @@ export default function ReturnDistributionChart({
 
           <XAxis
             dataKey="return"
-            domain={["auto", "auto"]}
+            domain={symmetricDomain}
             type="number"
             tickFormatter={(val: number) => {
               const pct = val * 100;

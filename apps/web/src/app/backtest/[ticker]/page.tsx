@@ -159,6 +159,7 @@ export default function TickerBacktestPage() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [availableTickers, setAvailableTickers] = useState<string[]>([]);
   const [mode, setMode] = useState<"default" | "optimized">("default");
   const [optimizerData, setOptimizerData] = useState<OptimizerData | null>(null);
   const [strategy, setStrategy] = useState<"long-short" | "long-only">("long-only");
@@ -187,9 +188,11 @@ export default function TickerBacktestPage() {
         // Pass model_type to get optimized predictions when in optimized mode
         const modelType = mode === "optimized" ? "optimized" : "default";
         const res = await fetch(`/api/backtest/${ticker}?model_type=${modelType}`);
-        if (!res.ok) throw new Error("Failed to fetch backtest data");
         const data = await res.json();
-        if (!data.success) throw new Error(data.error || "No data");
+        if (!res.ok || !data.success) {
+          if (data.availableTickers) setAvailableTickers(data.availableTickers);
+          throw new Error(data.error || "Failed to fetch backtest data");
+        }
         setSummary(data.summary);
         setPredictions(data.predictions);
       } catch (err: any) {
@@ -222,18 +225,158 @@ export default function TickerBacktestPage() {
   }
 
   if (error || !summary) {
+    const hasAvailable = availableTickers.length > 0;
     return (
       <div
         style={{
-          maxWidth: 1600,
+          maxWidth: 1200,
           margin: "0 auto",
-          padding: "100px 16px 16px",
+          padding: "60px 16px 16px",
           fontFamily: "monospace",
-          color: "var(--danger)",
-          textAlign: "center",
         }}
       >
-        {error || `No backtest data for ${ticker}`}
+        {/* Processing banner */}
+        <div
+          style={{
+            padding: "24px 32px",
+            background: "var(--terminal-bg)",
+            border: "1px solid var(--warning)",
+            borderRadius: 2,
+            marginBottom: 24,
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              color: "var(--warning)",
+              marginBottom: 8,
+            }}
+          >
+            BACKTEST NOT YET AVAILABLE FOR {ticker}
+          </div>
+          <div
+            style={{
+              fontSize: 11,
+              color: "var(--muted)",
+              lineHeight: 1.6,
+              maxWidth: 600,
+              margin: "0 auto",
+            }}
+          >
+            The machines are working on generating walk-forward backtest data for
+            newly added stocks. This process replays every monthly rebalance date
+            and compares predictions against realized returns — it takes a while.
+          </div>
+          <div
+            style={{
+              marginTop: 16,
+              display: "flex",
+              justifyContent: "center",
+              gap: 12,
+            }}
+          >
+            <Link
+              href={`/predictions/${ticker}`}
+              style={{
+                fontSize: 10,
+                color: "var(--accent)",
+                textDecoration: "none",
+                fontWeight: 600,
+                padding: "6px 14px",
+                border: "1px solid var(--accent)",
+                borderRadius: 2,
+                background: "var(--input-bg)",
+              }}
+            >
+              VIEW {ticker} PREDICTIONS
+            </Link>
+            <Link
+              href="/backtest"
+              style={{
+                fontSize: 10,
+                color: "var(--success)",
+                textDecoration: "none",
+                fontWeight: 600,
+                padding: "6px 14px",
+                border: "1px solid var(--success)",
+                borderRadius: 2,
+                background: "var(--input-bg)",
+              }}
+            >
+              AGGREGATE BACKTEST
+            </Link>
+          </div>
+        </div>
+
+        {/* Available stocks grid */}
+        {hasAvailable && (
+          <div
+            style={{
+              padding: 16,
+              background: "var(--terminal-bg)",
+              border: "1px solid var(--terminal-border)",
+              borderRadius: 2,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: "var(--foreground)",
+                marginBottom: 4,
+              }}
+            >
+              STOCKS WITH BACKTEST DATA ({availableTickers.length})
+            </div>
+            <div
+              style={{
+                fontSize: 9,
+                color: "var(--muted)",
+                marginBottom: 12,
+              }}
+            >
+              Click any ticker to view its walk-forward backtest results
+            </div>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 4,
+              }}
+            >
+              {availableTickers.map((t) => (
+                <Link
+                  key={t}
+                  href={`/backtest/${t}`}
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 600,
+                    padding: "3px 8px",
+                    borderRadius: 2,
+                    textDecoration: "none",
+                    background:
+                      t === ticker
+                        ? "var(--danger)"
+                        : "var(--card-bg)",
+                    color:
+                      t === ticker
+                        ? "#fff"
+                        : "var(--accent)",
+                    border: `1px solid ${
+                      t === ticker
+                        ? "var(--danger)"
+                        : "var(--terminal-border)"
+                    }`,
+                  }}
+                >
+                  {t}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
