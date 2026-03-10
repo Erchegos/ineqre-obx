@@ -312,11 +312,11 @@ export default function SeafoodPage() {
                     {/* Hero strip: 5 key prices */}
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", borderBottom: "1px solid #333" }}>
                       {[
-                        { label: "PARETO SPOT", value: paretoData?.spot?.spot_nok, src: "Pareto" },
-                        { label: "FISH POOL AVG", value: fishPoolSpot?.latest?.sisalmon_avg, src: `W${fishPoolSpot?.latest?.week ?? ""}` },
-                        { label: "FISH POOL 3-6KG", value: fishPoolSpot?.latest?.sisalmon_3_6kg, src: "SISALMON" },
-                        { label: "QTD PRICE", value: paretoData?.spot?.qtd_price_nok, src: "Pareto" },
-                        { label: "CONSENSUS", value: paretoData?.spot?.consensus_nok != null && paretoData.spot.consensus_nok > 10 ? paretoData.spot.consensus_nok : null, src: "PAS" },
+                        { label: "PARETO SPOT EST.", value: paretoData?.spot?.spot_nok, src: "Pareto W/W" },
+                        { label: "FISH POOL AVG", value: fishPoolSpot?.latest?.sisalmon_avg, src: `SISALMON W${fishPoolSpot?.latest?.week ?? ""}` },
+                        { label: "FISH POOL 3-6KG", value: fishPoolSpot?.latest?.sisalmon_3_6kg, src: `SISALMON W${fishPoolSpot?.latest?.week ?? ""}` },
+                        { label: "QTD PRICE", value: paretoData?.spot?.qtd_price_nok, src: "Pareto QTD" },
+                        { label: "CONSENSUS", value: paretoData?.spot?.consensus_nok != null && paretoData.spot.consensus_nok > 10 ? paretoData.spot.consensus_nok : null, src: "PAS FCA Oslo" },
                       ].map((m, i) => (
                         <div key={m.label} style={{ padding: "12px 16px", borderRight: i < 4 ? "1px solid #222" : "none" }}>
                           <div style={{ fontSize: 10, color: "#666", fontWeight: 700, letterSpacing: "0.08em", marginBottom: 4 }}>{m.label}</div>
@@ -340,7 +340,7 @@ export default function SeafoodPage() {
                         </span>
                         {fishPoolSpot.latest.total_volume != null && (
                           <span style={{ color: "#555", marginLeft: "auto" }}>
-                            Vol: <span style={{ color: "#999" }}>{(fishPoolSpot.latest.total_volume / 1000).toFixed(1)}K t</span>
+                            Fish Pool Vol: <span style={{ color: "#999" }}>{fishPoolSpot.latest.total_volume >= 1000 ? `${(fishPoolSpot.latest.total_volume / 1000).toFixed(1)}K` : fishPoolSpot.latest.total_volume.toFixed(0)} tonnes</span>
                             {fishPoolSpot.latest.avg_weight_kg != null && (
                               <> | Avg: <span style={{ color: "#999" }}>{fishPoolSpot.latest.avg_weight_kg.toFixed(2)} kg</span></>
                             )}
