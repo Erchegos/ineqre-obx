@@ -178,6 +178,9 @@ All endpoints in `apps/web/src/app/api/`
 | `GET /api/seafood/export` | SSB salmon export price + volume (weekly) |
 | `GET /api/seafood/ocean` | Sea temperature by production area (weekly) |
 | `GET /api/seafood/quarterly-ops` | Quarterly company ops (EBIT/kg, harvest, cost/kg) from earnings reports |
+| `GET /api/seafood/spot-prices` | Fish Pool SISALMON weekly spot prices by weight class (NOK/EUR) |
+| `GET /api/seafood/forward-prices` | Fish Pool forward curve (EUR/tonne) with w/w change |
+| `GET /api/seafood/price-estimates` | Pareto quarterly/annual salmon price estimates + spot history |
 
 ### Shipping APIs
 | Endpoint | Purpose |
@@ -368,6 +371,10 @@ Schema files in `packages/db/src/schema/`
 | `seafood_export_weekly` | Weekly salmon export price+volume (SSB table 03024) |
 | `seafood_ocean_conditions` | Sea temperature aggregated per area per week |
 | `salmon_quarterly_ops` | Company quarterly ops data from earnings reports (EBIT/kg, harvest, cost/kg) |
+| `salmon_spot_weekly` | Fish Pool SISALMON weekly spot by weight class (NOK + EUR) |
+| `salmon_forward_prices` | Fish Pool forward curve (EUR/tonne per period) |
+| `salmon_export_volumes` | Fish Pool weekly export volumes (this year vs last) |
+| `salmon_price_estimates` | Pareto quarterly price estimates (NOK/EUR, supply growth, spot) |
 
 ### Shipping Tables
 | Table | Purpose |
@@ -458,6 +465,8 @@ Run after market close alongside ML pipeline:
 | `lookup-vessel-mmsi.ts` | Resolve vessel IMO→MMSI via Digitraffic + verified manual table |
 | `fetch-vessel-positions.ts` | Digitraffic AIS positions (Finnish coastal range) |
 | `parse-shipping-daily.ts` | Parse Pareto Shipping Daily PDFs from research portal for 16+ rate indices (tanker, drybulk, LPG, LNG, commodities) |
+| `fetch-fishpool-reports.ts` | Fetch Fish Pool SISALMON + Price Status PDFs from IMAP, parse spot prices by weight class, forward curve, export volumes |
+| `parse-pareto-seafood.ts` | Parse Pareto Seafood Weekly PDFs from research portal for quarterly salmon price estimates (NOK/EUR/supply growth) |
 
 ### scripts/
 | Script | Purpose |
@@ -525,6 +534,12 @@ pnpm run shipping:rates     # Fetch BDI from Yahoo Finance
 pnpm run shipping:parse-daily     # Parse latest Pareto Shipping Daily PDF rates
 pnpm run shipping:parse-daily:all # Backfill all historical Pareto reports
 pnpm run shipping:parse-daily:dry # Dry run (parse only, no DB insert)
+pnpm run fishpool:fetch            # Fetch Fish Pool SISALMON + forward prices from IMAP
+pnpm run fishpool:fetch:dry        # Dry run
+pnpm run fishpool:fetch:backfill   # Backfill historical reports
+pnpm run pareto:seafood            # Parse Pareto Seafood Weekly price estimates
+pnpm run pareto:seafood:dry        # Dry run
+pnpm run pareto:seafood:all        # Process all historical reports
 pnpm run ais:lookup-mmsi          # Resolve & populate vessel MMSIs
 pnpm run ais:lookup-mmsi:dry      # Dry run (show matches, no DB changes)
 pnpm run ais:snapshot             # AISStream.io WebSocket position snapshot (5min)
