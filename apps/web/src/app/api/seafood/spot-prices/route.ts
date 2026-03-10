@@ -37,10 +37,10 @@ export async function GET(req: NextRequest) {
       [currency, weeks]
     );
 
-    const rows = tsResult.rows.reverse(); // oldest first for charts
-
-    // Latest row for summary
+    // Latest is the first row (most recent week) before reversing
     const latest = tsResult.rows[0] || null;
+
+    const rows = tsResult.rows.slice().reverse(); // oldest first for charts (don't mutate original)
 
     return NextResponse.json({
       spotPrices: rows,
