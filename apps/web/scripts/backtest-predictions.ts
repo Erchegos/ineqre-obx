@@ -20,7 +20,32 @@ import { writeFileSync } from 'fs';
 
 config({ path: resolve(__dirname, '../.env.local') });
 
-import { pool } from '../src/lib/db';
+import { Pool } from 'pg';
+
+// Lazy pool — created after dotenv has loaded
+let _pool: InstanceType<typeof Pool> | null = null;
+function getPool() {
+  if (!_pool) {
+    const dbUrl = process.env.DATABASE_URL?.trim().replace(/^["']|["']$/g, '').replace(/[?&]sslmode=\w+/g, '') || '';
+    _pool = new Pool({
+      connectionString: dbUrl,
+      max: 3,
+      idleTimeoutMillis: 60000,
+      connectionTimeoutMillis: 10000,
+      ssl: { rejectUnauthorized: false },
+      query_timeout: 120000,
+      statement_timeout: 120000,
+    });
+  }
+  return _pool;
+}
+const pool = new Proxy({} as InstanceType<typeof Pool>, {
+  get(_, prop) {
+    const p = getPool();
+    const value = (p as any)[prop];
+    return typeof value === 'function' ? value.bind(p) : value;
+  }
+});
 import {
   RawFactors,
   fetchCrossSectionalStats,

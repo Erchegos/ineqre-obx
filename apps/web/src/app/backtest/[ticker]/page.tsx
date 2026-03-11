@@ -191,7 +191,7 @@ export default function TickerBacktestPage() {
         const data = await res.json();
         if (!res.ok || !data.success) {
           if (data.availableTickers) setAvailableTickers(data.availableTickers);
-          throw new Error(data.error || "Failed to fetch backtest data");
+          throw new Error(data.message || data.error || "Failed to fetch backtest data");
         }
         setSummary(data.summary);
         setPredictions(data.predictions);
@@ -254,7 +254,7 @@ export default function TickerBacktestPage() {
               marginBottom: 8,
             }}
           >
-            BACKTEST NOT YET AVAILABLE FOR {ticker}
+            INSUFFICIENT BACKTEST DATA FOR {ticker}
           </div>
           <div
             style={{
@@ -265,9 +265,7 @@ export default function TickerBacktestPage() {
               margin: "0 auto",
             }}
           >
-            The machines are working on generating walk-forward backtest data for
-            newly added stocks. This process replays every monthly rebalance date
-            and compares predictions against realized returns — it takes a while.
+            {error || "This stock does not have enough realized predictions for a meaningful backtest. At least 3 monthly predictions with actual returns are needed."}
           </div>
           <div
             style={{

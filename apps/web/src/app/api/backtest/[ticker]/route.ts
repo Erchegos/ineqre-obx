@@ -3,6 +3,9 @@ import { pool } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
+// Minimum realized predictions needed for meaningful backtest
+const MIN_REALIZED_PREDICTIONS = 3;
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ ticker: string }> }
@@ -82,6 +85,19 @@ export async function GET(
     const withActual = predictions.filter(
       (p: any) => p.actual_return !== null
     );
+
+    // Not enough realized predictions for meaningful backtest
+    if (withActual.length < MIN_REALIZED_PREDICTIONS) {
+      return NextResponse.json({
+        success: false,
+        error: "insufficient_data",
+        ticker,
+        message: `${ticker} has ${predictions.length} prediction(s) but only ${withActual.length} realized — need at least ${MIN_REALIZED_PREDICTIONS} for a meaningful backtest.`,
+        n_total: predictions.length,
+        n_realized: withActual.length,
+      }, { status: 404 });
+    }
+
     const dirChecks = withActual.filter(
       (p: any) => p.ensemble_prediction !== 0 && p.actual_return !== 0
     );
