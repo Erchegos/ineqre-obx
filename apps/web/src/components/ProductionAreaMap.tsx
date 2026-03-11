@@ -68,7 +68,7 @@ const MapInner = dynamic(() => import("./ProductionAreaMapInner"), {
 });
 
 export default function ProductionAreaMap({ areas, localities, selectedTicker, onTickerSelect, focusLocation, biomassData }: Props) {
-  const [hideNoData, setHideNoData] = useState(false);
+  const [hideNoData, setHideNoData] = useState(true);
   const [tempOnly, setTempOnly] = useState(false);
 
   // Collect unique tickers from localities
@@ -187,7 +187,7 @@ export default function ProductionAreaMap({ areas, localities, selectedTicker, o
               fontSize: 9, fontWeight: 600, cursor: "pointer", letterSpacing: "0.04em",
             }}
           >
-            HAS TEMP
+            TEMP DATA
           </button>
         </>}
       </div>
