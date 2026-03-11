@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
 import type { Locality } from "./ProductionAreaMapInner";
 
@@ -67,6 +68,9 @@ const MapInner = dynamic(() => import("./ProductionAreaMapInner"), {
 });
 
 export default function ProductionAreaMap({ areas, localities, selectedTicker, onTickerSelect, focusLocation, biomassData }: Props) {
+  const [hideNoData, setHideNoData] = useState(false);
+  const [tempOnly, setTempOnly] = useState(false);
+
   // Collect unique tickers from localities
   const tickers: string[] = [];
   const tickerCounts: Record<string, number> = {};
@@ -78,12 +82,23 @@ export default function ProductionAreaMap({ areas, localities, selectedTicker, o
   }
   tickers.sort();
 
+  // Apply visibility filters
+  const filteredLocalities = useMemo(() => {
+    let result = localities;
+    if (hideNoData) result = result.filter(l => l.latestLice != null);
+    if (tempOnly) result = result.filter(l => l.latestTemp != null);
+    return result;
+  }, [localities, hideNoData, tempOnly]);
+
+  const hiddenCount = localities.length - filteredLocalities.length;
+
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       {/* Header bar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 10px", background: "#0d0d0d", borderBottom: "1px solid #1a1a1a" }}>
         <div style={{ fontSize: 10, color: "#888", fontFamily: "'Geist Mono','SF Mono','Consolas',monospace" }}>
-          {areas.length} production areas | {localities.length} active localities
+          {areas.length} production areas | {filteredLocalities.length} active localities
+          {hiddenCount > 0 && <span style={{ color: "#555" }}> ({hiddenCount} hidden)</span>}
           {selectedTicker && (
             <span style={{ color: TICKER_COLORS[selectedTicker] || "#58a6ff", marginLeft: 8 }}>
               | {selectedTicker}: {tickerCounts[selectedTicker] || 0} sites
@@ -144,10 +159,41 @@ export default function ProductionAreaMap({ areas, localities, selectedTicker, o
             </button>
           );
         })}
+
+        {/* Separator + visibility filters */}
+        {localities.length > 0 && <>
+          <span style={{ color: "#333", margin: "0 4px" }}>|</span>
+          <button
+            onClick={() => setHideNoData(v => !v)}
+            style={{
+              padding: "1px 6px", borderRadius: 2,
+              border: `1px solid ${hideNoData ? "#f59e0b" : "#333"}`,
+              background: hideNoData ? "rgba(245,158,11,0.15)" : "transparent",
+              color: hideNoData ? "#f59e0b" : "#666",
+              fontFamily: "'Geist Mono','SF Mono','Consolas',monospace",
+              fontSize: 9, fontWeight: 600, cursor: "pointer", letterSpacing: "0.04em",
+            }}
+          >
+            HIDE NO-DATA
+          </button>
+          <button
+            onClick={() => setTempOnly(v => !v)}
+            style={{
+              padding: "1px 6px", borderRadius: 2,
+              border: `1px solid ${tempOnly ? "#2563eb" : "#333"}`,
+              background: tempOnly ? "rgba(37,99,235,0.15)" : "transparent",
+              color: tempOnly ? "#58a6ff" : "#666",
+              fontFamily: "'Geist Mono','SF Mono','Consolas',monospace",
+              fontSize: 9, fontWeight: 600, cursor: "pointer", letterSpacing: "0.04em",
+            }}
+          >
+            HAS TEMP
+          </button>
+        </>}
       </div>
 
       <div style={{ flex: 1, minHeight: 0 }}>
-        <MapInner areas={areas} localities={localities} selectedTicker={selectedTicker} focusLocation={focusLocation} biomassData={biomassData} />
+        <MapInner areas={areas} localities={filteredLocalities} selectedTicker={selectedTicker} focusLocation={focusLocation} biomassData={biomassData} />
       </div>
     </div>
   );
