@@ -36,9 +36,16 @@ function calculateDistributionStats(returns: number[]) {
 function createDensityData(returns: number[]) {
   if (returns.length === 0) return [];
 
-  const min = Math.min(...returns);
-  const max = Math.max(...returns);
+  const rawMin = Math.min(...returns);
+  const rawMax = Math.max(...returns);
+  const rawRange = rawMax - rawMin;
+
+  // Extend beyond data bounds so KDE tails taper to zero (no hard cutoff)
+  const padding = rawRange * 0.3;
+  const min = rawMin - padding;
+  const max = rawMax + padding;
   const range = max - min;
+
   // Fewer bins for small datasets/tight ranges to prevent x-axis cramping
   const numBins = range < 0.05 ? 40 : range < 0.15 ? 60 : 80;
   const binWidth = range / numBins;
@@ -127,8 +134,15 @@ function generateTimeframeDistributions(allReturns: Array<{ date: string; return
       const stats = calculateDistributionStats(returns);
       const densityData = createDensityData(returns);
 
+      // Normalize density to peak = 1 so all timeframes are visually comparable
+      const peakDensity = Math.max(...densityData.map(d => d.density), 1e-10);
+      const normalizedDensityData = densityData.map(d => ({
+        ...d,
+        density: d.density / peakDensity,
+      }));
+
       result[label] = {
-        densityData,
+        densityData: normalizedDensityData,
         stats,
         color,
         days,
@@ -474,7 +488,7 @@ export default function ReturnDistributionChart({
             fontSize={11}
             tick={{ fill: "var(--muted)" }}
             label={{
-              value: "Probability Density",
+              value: "Relative Density",
               angle: -90,
               position: "insideLeft",
               style: { fill: "var(--muted)", fontSize: 11 },
@@ -512,7 +526,7 @@ export default function ReturnDistributionChart({
                   </div>
                   {payload.map((entry: any, index: number) => (
                     <div key={index} style={{ color: entry.color, marginBottom: 1, fontSize: 10 }}>
-                      <strong>{entry.name}:</strong> {Number(entry.value).toFixed(4)}
+                      <strong>{entry.name}:</strong> {(Number(entry.value) * 100).toFixed(1)}%
                     </div>
                   ))}
                 </div>
