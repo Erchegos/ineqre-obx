@@ -134,15 +134,8 @@ function generateTimeframeDistributions(allReturns: Array<{ date: string; return
       const stats = calculateDistributionStats(returns);
       const densityData = createDensityData(returns);
 
-      // Normalize density to peak = 1 so all timeframes are visually comparable
-      const peakDensity = Math.max(...densityData.map(d => d.density), 1e-10);
-      const normalizedDensityData = densityData.map(d => ({
-        ...d,
-        density: d.density / peakDensity,
-      }));
-
       result[label] = {
-        densityData: normalizedDensityData,
+        densityData,
         stats,
         color,
         days,
@@ -488,7 +481,7 @@ export default function ReturnDistributionChart({
             fontSize={11}
             tick={{ fill: "var(--muted)" }}
             label={{
-              value: "Relative Density",
+              value: "Probability Density",
               angle: -90,
               position: "insideLeft",
               style: { fill: "var(--muted)", fontSize: 11 },
@@ -526,7 +519,7 @@ export default function ReturnDistributionChart({
                   </div>
                   {payload.map((entry: any, index: number) => (
                     <div key={index} style={{ color: entry.color, marginBottom: 1, fontSize: 10 }}>
-                      <strong>{entry.name}:</strong> {(Number(entry.value) * 100).toFixed(1)}%
+                      <strong>{entry.name}:</strong> {Number(entry.value).toFixed(4)}
                     </div>
                   ))}
                 </div>
