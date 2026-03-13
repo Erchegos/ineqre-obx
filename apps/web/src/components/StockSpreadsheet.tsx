@@ -26,6 +26,7 @@ export default function StockSpreadsheet({ ticker, token, profileName, onNeedLog
   const [isDragOver, setIsDragOver] = useState(false);
   const [hasServerFile, setHasServerFile] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const workbookRef = useRef<WorkbookInstance>(null);
   const baseSheets = useRef<Sheet[] | null>(null);
 
@@ -583,7 +584,14 @@ export default function StockSpreadsheet({ ticker, token, profileName, onNeedLog
       )}
 
       {/* Spreadsheet — blurred teaser when locked */}
-      <div ref={sheetWrapperRef} className="stock-sheet-wrapper" style={{
+      <div ref={sheetWrapperRef} className="stock-sheet-wrapper" onContextMenu={(e) => {
+        if (isLocked) return;
+        e.preventDefault();
+        e.stopPropagation();
+        // Position relative to viewport for fixed positioning
+        setCtxMenu({ x: e.clientX, y: e.clientY });
+        setShowSettings(false);
+      }} style={{
         width: "100%", height: 600,
         border: "1px solid #30363d", borderRadius: "0 0 4px 4px",
         position: "relative",
@@ -624,80 +632,76 @@ export default function StockSpreadsheet({ ticker, token, profileName, onNeedLog
         />
       </div>
 
-      {/* Settings/Options panel */}
-      {showSettings && !isLocked && (
-        <div style={{
-          position: "absolute", top: 34, right: 10, zIndex: 200,
-          background: "#1e1e1e", border: "1px solid #444", borderRadius: 6,
-          boxShadow: "0 8px 32px rgba(0,0,0,0.6)", padding: "8px 0", minWidth: 200,
-          fontFamily: "'Calibri', 'Segoe UI', sans-serif", fontSize: 13,
-        }}>
-          <div style={{ padding: "4px 12px 6px", color: "#888", fontSize: 10, fontFamily: "'Geist Mono', monospace", textTransform: "uppercase", letterSpacing: 1 }}>
-            Insert
-          </div>
-          {[
-            { label: "Insert Row Above", action: () => { try { (workbookRef.current as any)?.insertRowOrColumn?.("row", 0); } catch {} if (!hasChanges) setHasChanges(true); } },
-            { label: "Insert Row Below", action: () => { try { (workbookRef.current as any)?.insertRowOrColumn?.("row", 1); } catch {} if (!hasChanges) setHasChanges(true); } },
-            { label: "Insert Column Left", action: () => { try { (workbookRef.current as any)?.insertRowOrColumn?.("column", 0); } catch {} if (!hasChanges) setHasChanges(true); } },
-            { label: "Insert Column Right", action: () => { try { (workbookRef.current as any)?.insertRowOrColumn?.("column", 1); } catch {} if (!hasChanges) setHasChanges(true); } },
-          ].map((item) => (
-            <button key={item.label} onClick={() => { item.action(); setShowSettings(false); }}
-              style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 16px", background: "transparent", border: "none", color: "#d4d4d4", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
-              onMouseEnter={e => { e.currentTarget.style.background = "#264f78"; e.currentTarget.style.color = "#fff"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#d4d4d4"; }}>
-              {item.label}
-            </button>
-          ))}
-          <div style={{ borderTop: "1px solid #333", margin: "4px 8px" }} />
-          <div style={{ padding: "4px 12px 6px", color: "#888", fontSize: 10, fontFamily: "'Geist Mono', monospace", textTransform: "uppercase", letterSpacing: 1 }}>
-            Delete
-          </div>
-          {[
-            { label: "Delete Selected Row(s)", action: () => { try { (workbookRef.current as any)?.deleteRowOrColumn?.("row"); } catch {} if (!hasChanges) setHasChanges(true); } },
-            { label: "Delete Selected Column(s)", action: () => { try { (workbookRef.current as any)?.deleteRowOrColumn?.("column"); } catch {} if (!hasChanges) setHasChanges(true); } },
-          ].map((item) => (
-            <button key={item.label} onClick={() => { item.action(); setShowSettings(false); }}
-              style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 16px", background: "transparent", border: "none", color: "#d4d4d4", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
-              onMouseEnter={e => { e.currentTarget.style.background = "#264f78"; e.currentTarget.style.color = "#fff"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#d4d4d4"; }}>
-              {item.label}
-            </button>
-          ))}
-          <div style={{ borderTop: "1px solid #333", margin: "4px 8px" }} />
-          <div style={{ padding: "4px 12px 6px", color: "#888", fontSize: 10, fontFamily: "'Geist Mono', monospace", textTransform: "uppercase", letterSpacing: 1 }}>
-            Format
-          </div>
-          {[
-            { label: "Bold (Ctrl+B)", action: () => { try { (workbookRef.current as any)?.setCellFormat?.("bl", 1); } catch {} } },
-            { label: "Italic (Ctrl+I)", action: () => { try { (workbookRef.current as any)?.setCellFormat?.("it", 1); } catch {} } },
-            { label: "Number: 0.00", action: () => { try { (workbookRef.current as any)?.setCellFormat?.("ct", { fa: "0.00", t: "n" }); } catch {} } },
-            { label: "Number: #,##0", action: () => { try { (workbookRef.current as any)?.setCellFormat?.("ct", { fa: "#,##0", t: "n" }); } catch {} } },
-            { label: "Number: 0.0%", action: () => { try { (workbookRef.current as any)?.setCellFormat?.("ct", { fa: "0.0%", t: "n" }); } catch {} } },
-            { label: "Number: 0.00x", action: () => { try { (workbookRef.current as any)?.setCellFormat?.("ct", { fa: '0.00"x"', t: "n" }); } catch {} } },
-          ].map((item) => (
-            <button key={item.label} onClick={() => { item.action(); }}
-              style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 16px", background: "transparent", border: "none", color: "#d4d4d4", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
-              onMouseEnter={e => { e.currentTarget.style.background = "#264f78"; e.currentTarget.style.color = "#fff"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#d4d4d4"; }}>
-              {item.label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Click-away to close settings */}
-      {showSettings && (
-        <div onClick={() => setShowSettings(false)} style={{
-          position: "fixed", inset: 0, zIndex: 199, background: "transparent",
-        }} />
-      )}
+      {/* Context menu (right-click OR OPTIONS button) */}
+      {(() => {
+        const menuOpen = (showSettings || ctxMenu) && !isLocked;
+        if (!menuOpen) return null;
+        const menuStyle: React.CSSProperties = ctxMenu
+          ? { position: "fixed", top: ctxMenu.y, left: ctxMenu.x, zIndex: 10000 }
+          : { position: "absolute", top: 34, right: 10, zIndex: 10000 };
+        const close = () => { setShowSettings(false); setCtxMenu(null); };
+        const wb = workbookRef.current as any;
+        const menuItems: { label: string; section?: string; action: () => void }[] = [
+          { label: "Insert Row Above", section: "INSERT", action: () => { try { wb?.insertRowOrColumn?.("row", 0); } catch {} if (!hasChanges) setHasChanges(true); } },
+          { label: "Insert Row Below", action: () => { try { wb?.insertRowOrColumn?.("row", 1); } catch {} if (!hasChanges) setHasChanges(true); } },
+          { label: "Insert Column Left", action: () => { try { wb?.insertRowOrColumn?.("column", 0); } catch {} if (!hasChanges) setHasChanges(true); } },
+          { label: "Insert Column Right", action: () => { try { wb?.insertRowOrColumn?.("column", 1); } catch {} if (!hasChanges) setHasChanges(true); } },
+          { label: "Delete Selected Row(s)", section: "DELETE", action: () => { try { wb?.deleteRowOrColumn?.("row"); } catch {} if (!hasChanges) setHasChanges(true); } },
+          { label: "Delete Selected Column(s)", action: () => { try { wb?.deleteRowOrColumn?.("column"); } catch {} if (!hasChanges) setHasChanges(true); } },
+          { label: "Bold", section: "FORMAT", action: () => { try { wb?.setCellFormat?.("bl", 1); } catch {} } },
+          { label: "Italic", action: () => { try { wb?.setCellFormat?.("it", 1); } catch {} } },
+          { label: "Format: #,##0", action: () => { try { wb?.setCellFormat?.("ct", { fa: "#,##0", t: "n" }); } catch {} } },
+          { label: "Format: 0.00", action: () => { try { wb?.setCellFormat?.("ct", { fa: "0.00", t: "n" }); } catch {} } },
+          { label: "Format: 0.0%", action: () => { try { wb?.setCellFormat?.("ct", { fa: "0.0%", t: "n" }); } catch {} } },
+          { label: "Format: 0.00x", action: () => { try { wb?.setCellFormat?.("ct", { fa: '0.00"x"', t: "n" }); } catch {} } },
+          { label: "Copy  (Ctrl+C)", section: "EDIT", action: () => { try { wb?.copy?.(); } catch {} } },
+          { label: "Paste (Ctrl+V)", action: () => { try { wb?.paste?.(); } catch {} } },
+        ];
+        return (
+          <>
+            {/* Click-away overlay */}
+            <div onClick={close} onContextMenu={(e) => { e.preventDefault(); close(); }}
+              style={{ position: "fixed", inset: 0, zIndex: 9999, background: "transparent" }} />
+            {/* Menu */}
+            <div style={{
+              ...menuStyle,
+              background: "#1e1e1e", border: "1px solid #555", borderRadius: 6,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.7)", padding: "4px 0", minWidth: 210,
+              fontFamily: "'Calibri', 'Segoe UI', sans-serif", fontSize: 13,
+              maxHeight: "80vh", overflowY: "auto",
+            }}>
+              {menuItems.map((item, i) => (
+                <div key={i}>
+                  {item.section && (
+                    <>
+                      {i > 0 && <div style={{ borderTop: "1px solid #333", margin: "4px 8px" }} />}
+                      <div style={{ padding: "4px 12px 2px", color: "#666", fontSize: 9, fontFamily: "'Geist Mono', monospace", textTransform: "uppercase", letterSpacing: 1 }}>
+                        {item.section}
+                      </div>
+                    </>
+                  )}
+                  <button onClick={() => { item.action(); close(); }}
+                    style={{ display: "block", width: "100%", textAlign: "left", padding: "5px 16px", background: "transparent", border: "none", color: "#d4d4d4", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
+                    onMouseEnter={e => { e.currentTarget.style.background = "#264f78"; e.currentTarget.style.color = "#fff"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#d4d4d4"; }}>
+                    {item.label}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        );
+      })()}
 
       <style>{`
         /* Let the spreadsheet look like real Excel — white cells, original colors */
         /* Only dark-theme the chrome (formula bar, tabs, scrollbars) */
 
-        .stock-sheet-wrapper .fortune-sheet-container { background: #e8e8e8 !important; overflow: visible !important; }
-        .stock-sheet-wrapper { overflow: visible !important; }
+        .stock-sheet-wrapper .fortune-sheet-container { background: #e8e8e8 !important; }
+
+        /* Hide Fortune-Sheet's broken built-in menus — we use our own */
+        .luckysheet-rightclick-menu, .luckysheet-cols-menu, .luckysheet-cols-menu-sub,
+        .luckysheet-sheet-list-menu { display: none !important; }
 
         /* Formula bar */
         .stock-sheet-wrapper .luckysheet-wa-editor { background: #f0f0f0 !important; border-color: #d0d0d0 !important; }
@@ -802,50 +806,6 @@ export default function StockSpreadsheet({ ticker, token, profileName, onNeedLog
         .stock-sheet-wrapper .luckysheet-stat-area { display: none !important; }
         .stock-sheet-wrapper .fortune-sheet-container { border-bottom: none !important; }
         .stock-sheet-wrapper .luckysheet-sheet-area + div { display: none !important; }
-
-        /* === Context menus — dark theme, high z-index, no clipping === */
-        .luckysheet-rightclick-menu, .luckysheet-cols-menu {
-          background: #1e1e1e !important; border: 1px solid #555 !important;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.7) !important; color: #d4d4d4 !important;
-          z-index: 10000 !important; font-size: 13px !important;
-          border-radius: 6px !important; padding: 4px 0 !important;
-          min-width: 200px !important;
-          font-family: 'Calibri', 'Segoe UI', sans-serif !important;
-        }
-        .luckysheet-rightclick-menu ul, .luckysheet-cols-menu ul {
-          background: #1e1e1e !important; border: none !important;
-          box-shadow: none !important; color: #d4d4d4 !important;
-          list-style: none !important; padding: 0 !important; margin: 0 !important;
-        }
-        .luckysheet-rightclick-menu .luckysheet-cols-menuitem,
-        .luckysheet-cols-menu .luckysheet-cols-menuitem {
-          color: #d4d4d4 !important; padding: 6px 16px !important;
-          cursor: pointer !important; display: flex !important; align-items: center !important;
-        }
-        .luckysheet-rightclick-menu .luckysheet-cols-menuitem *,
-        .luckysheet-cols-menu .luckysheet-cols-menuitem * { color: #d4d4d4 !important; font-size: 13px !important; }
-        .luckysheet-rightclick-menu .luckysheet-cols-menuitem:hover,
-        .luckysheet-cols-menu .luckysheet-cols-menuitem:hover { background: #264f78 !important; }
-        .luckysheet-rightclick-menu .luckysheet-cols-menuitem:hover *,
-        .luckysheet-cols-menu .luckysheet-cols-menuitem:hover * { color: #fff !important; }
-        .luckysheet-rightclick-menu .luckysheet-menuseparator,
-        .luckysheet-cols-menu .luckysheet-menuseparator {
-          border-color: #333 !important; margin: 4px 8px !important;
-        }
-        .luckysheet-rightclick-menu input, .luckysheet-cols-menu input {
-          background: #0d1117 !important; color: #d4d4d4 !important; border: 1px solid #555 !important; border-radius: 3px !important;
-        }
-        .luckysheet-rightclick-menu label, .luckysheet-cols-menu label,
-        .luckysheet-rightclick-menu span, .luckysheet-cols-menu span { color: #d4d4d4 !important; }
-        /* Submenu arrows */
-        .luckysheet-cols-menuitem-sub::after { color: #888 !important; }
-        /* Submenu popups */
-        .luckysheet-rightclick-menu .luckysheet-cols-menu-sub,
-        .luckysheet-cols-menu-sub {
-          background: #1e1e1e !important; border: 1px solid #555 !important;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.7) !important; z-index: 10001 !important;
-          border-radius: 6px !important;
-        }
 
         /* Modal dialogs (Fortune-Sheet confirm/alert popups) */
         .luckysheet-modal-dialog {
