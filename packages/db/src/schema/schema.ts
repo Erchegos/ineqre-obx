@@ -90,3 +90,19 @@ export {
   type ShippingPort,
   type NewShippingPort,
 } from "./shipping";
+
+// Harvest tracker (wellboat trip tracking)
+export {
+  harvestVessels,
+  harvestSlaughterhouses,
+  harvestTrips,
+  harvestQuarterlyEstimates,
+  type HarvestVessel,
+  type NewHarvestVessel,
+  type HarvestSlaughterhouse,
+  type NewHarvestSlaughterhouse,
+  type HarvestTrip,
+  type NewHarvestTrip,
+  type HarvestQuarterlyEstimate,
+  type NewHarvestQuarterlyEstimate,
+} from "./harvestTracker";

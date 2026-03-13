@@ -181,6 +181,13 @@ All endpoints in `apps/web/src/app/api/`
 | `GET /api/seafood/spot-prices` | Fish Pool SISALMON weekly spot prices by weight class (NOK/EUR) |
 | `GET /api/seafood/forward-prices` | Fish Pool forward curve (EUR/tonne) with w/w change |
 | `GET /api/seafood/price-estimates` | Pareto quarterly/annual salmon price estimates + spot history |
+| `GET /api/seafood/harvest-tracker/live` | Live wellboat positions (join harvest_vessels + shipping_positions) |
+| `GET /api/seafood/harvest-tracker/vessels` | Harvest vessel registry |
+| `GET /api/seafood/harvest-tracker/slaughterhouses` | Slaughterhouse locations with production area |
+| `GET /api/seafood/harvest-tracker/trips` | Detected farm→slaughterhouse trips with price matching |
+| `GET /api/seafood/harvest-tracker/estimates` | Quarterly harvest estimates vs actuals per company |
+| `GET /api/seafood/harvest-tracker/activity` | Daily harvest activity for charts + spot price overlay |
+| `GET /api/seafood/harvest-tracker/vessel-history` | Vessel detail: specs, position history, trip log, 12-month stats |
 
 ### Shipping APIs
 | Endpoint | Purpose |
@@ -288,6 +295,10 @@ All in `apps/web/src/components/`
 - `MethodologySection.tsx` - Expandable methodology explanations
 - `MarketCorrelation.tsx` - Market-level correlation
 
+### Harvest Tracker
+- `HarvestMap.tsx` - Map wrapper with company filter bar, vessel status counts (dynamic import, no SSR)
+- `HarvestMapInner.tsx` - react-leaflet Norway map with farms, slaughterhouses, vessel positions, trip lines, route trails, vessel click interaction
+
 ### Shipping
 - `ShippingMap.tsx` - Map wrapper with sector/company filter bars (dynamic import, no SSR)
 - `ShippingMapInner.tsx` - react-leaflet global vessel map, dark theme, vessel/port markers with rich popups
@@ -375,6 +386,15 @@ Schema files in `packages/db/src/schema/`
 | `salmon_forward_prices` | Fish Pool forward curve (EUR/tonne per period) |
 | `salmon_export_volumes` | Fish Pool weekly export volumes (this year vs last) |
 | `salmon_price_estimates` | Pareto quarterly price estimates (NOK/EUR, supply growth, spot) |
+
+### Harvest Tracker Tables
+| Table | Purpose |
+|-------|---------|
+| `harvest_vessels` | Wellboat registry (name, IMO, MMSI, owner, capacity, vessel_type) |
+| `harvest_slaughterhouses` | Processing plants (name, ticker, lat/lng, capacity_tonnes_day) |
+| `harvest_trips` | Detected farm→slaughterhouse trips (vessel, origin, destination, times, volume, spot price) |
+| `harvest_vessel_positions` | AIS position history for route visualization and trip detection |
+| `harvest_quarterly_estimates` | Per-company per-quarter aggregates (est. harvest, trip count, VWAP, vs actuals) |
 
 ### Shipping Tables
 | Table | Purpose |
@@ -467,6 +487,10 @@ Run after market close alongside ML pipeline:
 | `parse-shipping-daily.ts` | Parse Pareto Shipping Daily PDFs from research portal for 16+ rate indices (tanker, drybulk, LPG, LNG, commodities) |
 | `fetch-fishpool-reports.ts` | Fetch Fish Pool SISALMON + Price Status PDFs from IMAP, parse spot prices by weight class, forward curve, export volumes |
 | `parse-pareto-seafood.ts` | Parse Pareto Seafood Weekly PDFs from research portal for quarterly salmon price estimates (NOK/EUR/supply growth) |
+| `seed-harvest-data.ts` | Seed wellboat fleet (~30 vessels) and slaughterhouse locations (~18 plants) |
+| `lookup-harvest-mmsi.ts` | Resolve wellboat names → MMSI via Digitraffic + manual lookup |
+| `fetch-harvest-positions.ts` | AIS-based trip detection: proximity state machine (farm→slaughterhouse) with spot price matching |
+| `aggregate-harvest-estimates.ts` | Quarterly aggregation: trip volumes → per-company estimates vs actuals |
 
 ### scripts/
 | Script | Purpose |
@@ -545,6 +569,10 @@ pnpm run ais:lookup-mmsi:dry      # Dry run (show matches, no DB changes)
 pnpm run ais:snapshot             # AISStream.io WebSocket position snapshot (5min)
 pnpm run ais:snapshot:dry         # Dry run (connect & collect, no DB write)
 pnpm run ais:digitraffic          # Digitraffic AIS positions (Finnish range)
+pnpm run harvest:seed             # Seed wellboats + slaughterhouses
+pnpm run harvest:lookup-mmsi      # Resolve wellboat MMSIs
+pnpm run harvest:track            # Run AIS trip detection (long-running)
+pnpm run harvest:aggregate        # Aggregate quarterly harvest estimates
 ```
 
 ---

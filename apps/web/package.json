@@ -72,7 +72,11 @@
     "fishpool:fetch:backfill": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-fishpool-reports.ts --backfill",
     "pareto:seafood": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/parse-pareto-seafood.ts",
     "pareto:seafood:dry": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/parse-pareto-seafood.ts --dry-run",
-    "pareto:seafood:all": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/parse-pareto-seafood.ts --all"
+    "pareto:seafood:all": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/parse-pareto-seafood.ts --all",
+    "harvest:seed": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/seed-harvest-data.ts",
+    "harvest:lookup-mmsi": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/lookup-harvest-mmsi.ts",
+    "harvest:track": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-harvest-positions.ts",
+    "harvest:aggregate": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/aggregate-harvest-estimates.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

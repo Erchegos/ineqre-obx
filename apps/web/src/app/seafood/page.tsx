@@ -5,6 +5,8 @@ import Link from "next/link";
 import SalmonPriceChart from "@/components/SalmonPriceChart";
 import LiceChart from "@/components/LiceChart";
 import ProductionAreaMap from "@/components/ProductionAreaMap";
+import HarvestMap from "@/components/HarvestMap";
+import type { HarvestVesselPosition, SlaughterhouseMarker, FarmMarker, RoutePoint, SelectedTrip } from "@/components/HarvestMapInner";
 import "leaflet/dist/leaflet.css";
 
 /* ─── Types ────────────────────────────────────────────────────── */
@@ -93,6 +95,43 @@ type ParetoData = {
   annual: PriceEstimate[];
 };
 
+type HarvestTrackerLive = {
+  vessels: HarvestVesselPosition[];
+  total: number;
+  withPosition: number;
+  atFarm: number;
+  inTransit: number;
+  atSlaughterhouse: number;
+};
+
+type HarvestTrip = {
+  id: number; vessel_name: string; origin_name: string | null; origin_ticker: string | null;
+  destination_name: string | null;
+  departure_time: string; arrival_time: string | null; status: string;
+  estimated_volume_tonnes: number | null; spot_price_at_harvest: number | null;
+  duration_hours: number | null;
+  origin_lat: number | null; origin_lng: number | null;
+  dest_lat: number | null; dest_lng: number | null;
+};
+
+type HarvestEstimate = {
+  ticker: string; company_name: string; year: number; quarter: number;
+  estimated_harvest_tonnes: number | null; trip_count: number;
+  estimated_avg_price_nok: number | null;
+  actual_harvest_tonnes: number | null; actual_price_realization: number | null;
+  estimation_accuracy_pct: number | null; updated_at: string;
+};
+
+type HarvestCurrentQ = {
+  ticker: string; trip_count: number; est_volume: number; vwap_price: number | null;
+};
+
+type HarvestActivity = {
+  daily: Array<{ date: string; trips: number; volume: number | null; avg_spot_price: number | null }>;
+  byCompany: Array<{ ticker: string; date: string; trips: number; volume: number | null }>;
+  spotPrices: Array<{ report_date: string; sisalmon_avg: number | null }>;
+};
+
 /* ─── Helpers ──────────────────────────────────────────────────── */
 
 function fmtPct(v: number | null | undefined): string {
@@ -138,9 +177,31 @@ export default function SeafoodPage() {
   const [fishPoolSpot, setFishPoolSpot] = useState<{ spotPrices: SpotWeekly[]; latest: SpotWeekly | null } | null>(null);
   const [forwardPrices, setForwardPrices] = useState<{ forwards: ForwardPrice[] } | null>(null);
   const [paretoData, setParetoData] = useState<ParetoData | null>(null);
+  const [htLive, setHtLive] = useState<HarvestTrackerLive | null>(null);
+  const [htTrips, setHtTrips] = useState<HarvestTrip[]>([]);
+  const [htEstimates, setHtEstimates] = useState<HarvestEstimate[]>([]);
+  const [htCurrentQ, setHtCurrentQ] = useState<HarvestCurrentQ[]>([]);
+  const [htActivity, setHtActivity] = useState<HarvestActivity | null>(null);
+  const [htSlaughterhouses, setHtSlaughterhouses] = useState<SlaughterhouseMarker[]>([]);
+  const [htFarms, setHtFarms] = useState<FarmMarker[]>([]);
+  const [htSelectedTicker, setHtSelectedTicker] = useState<string | null>(null);
+  const [htFocusVessel, setHtFocusVessel] = useState<{ lat: number; lng: number; name: string } | null>(null);
+  const [htTripDays, setHtTripDays] = useState(90);
+  const [htSelectedVessel, setHtSelectedVessel] = useState<number | null>(null);
+  const [htVesselDetail, setHtVesselDetail] = useState<{
+    vessel: { id: number; vessel_name: string; imo: string | null; mmsi: string | null; owner_company: string | null; operator_ticker: string | null; capacity_tonnes: number | null; vessel_type: string; built_year: number | null };
+    positions: RoutePoint[];
+    visits: Array<{ type: "farm" | "slaughterhouse"; name: string; ticker: string | null; arrivalTime: string; departureTime: string; durationMinutes: number; positionCount: number }>;
+    trips: Array<{ id: number; origin_name: string | null; origin_ticker: string | null; destination_name: string | null; departure_time: string; arrival_time: string | null; duration_hours: number | null; estimated_volume_tonnes: number | null; spot_price_at_harvest: number | null; status: string }>;
+    stats: { total_trips: number; total_volume: number | null; avg_duration_hours: number | null; avg_spot_price: number | null };
+    positionCount: number;
+    currentSpotPrice: number | null;
+  } | null>(null);
+  const [htSelectedTrip, setHtSelectedTrip] = useState<SelectedTrip | null>(null);
+  const [htVesselLoading, setHtVesselLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"overview" | "map" | "areas" | "biomass">("overview");
+  const [tab, setTab] = useState<"overview" | "map" | "areas" | "biomass" | "harvest">("overview");
   const [mapLayer, setMapLayer] = useState<"localities" | "biomass">("localities");
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [focusLocation, setFocusLocation] = useState<{ lat: number; lng: number; name: string } | null>(null);
@@ -190,6 +251,25 @@ export default function SeafoodPage() {
         if (fp) setFishPoolSpot(fp);
         if (fwd) setForwardPrices(fwd);
         if (par) setParetoData(par);
+        // Harvest tracker data (non-blocking)
+        const [htL, htT, htE, htAct, htSH] = await Promise.all([
+          sf("/api/seafood/harvest-tracker/live"),
+          sf("/api/seafood/harvest-tracker/trips?days=90"),
+          sf("/api/seafood/harvest-tracker/estimates?quarters=4"),
+          sf("/api/seafood/harvest-tracker/activity?days=90"),
+          sf("/api/seafood/harvest-tracker/slaughterhouses"),
+        ]);
+        if (htL) setHtLive(htL);
+        if (htT) setHtTrips(htT.trips || []);
+        if (htE) { setHtEstimates(htE.estimates || []); setHtCurrentQ(htE.currentQuarter || []); }
+        if (htAct) setHtActivity(htAct);
+        if (htSH) setHtSlaughterhouses(htSH.slaughterhouses || []);
+        // Use localities as farms on the map
+        if (loc?.localities) {
+          setHtFarms(loc.localities.filter((l: Locality) => l.lat && l.lng).map((l: Locality) => ({
+            localityId: l.localityId, name: l.name, ticker: l.ticker, lat: l.lat, lng: l.lng,
+          })));
+        }
       } catch (err) {
         console.error("Seafood load error:", err);
         setError(String(err));
@@ -199,6 +279,42 @@ export default function SeafoodPage() {
     }
     load();
   }, []);
+
+  // Re-fetch trips & activity when period changes
+  useEffect(() => {
+    const sf = async (url: string) => {
+      try { const r = await fetch(url); return r.ok ? r.json() : null; }
+      catch { return null; }
+    };
+    (async () => {
+      const [htT, htAct] = await Promise.all([
+        sf(`/api/seafood/harvest-tracker/trips?days=${htTripDays}`),
+        sf(`/api/seafood/harvest-tracker/activity?days=${htTripDays}`),
+      ]);
+      if (htT) setHtTrips(htT.trips || []);
+      if (htAct) setHtActivity(htAct);
+    })();
+  }, [htTripDays]);
+
+  // Vessel click handler — fetch route + trip history
+  const handleVesselClick = async (vesselId: number) => {
+    setHtSelectedVessel(vesselId);
+    setHtVesselLoading(true);
+    try {
+      const r = await fetch(`/api/seafood/harvest-tracker/vessel-history?vesselId=${vesselId}&days=90`);
+      if (r.ok) {
+        const data = await r.json();
+        setHtVesselDetail(data);
+        // Fly to vessel if it has a position
+        const v = (htLive?.vessels || []).find(v => v.vessel_id === vesselId);
+        if (v?.lat && v?.lng) setHtFocusVessel({ lat: v.lat, lng: v.lng, name: v.vessel_name });
+      }
+    } catch (err) {
+      console.error("Failed to load vessel history:", err);
+    } finally {
+      setHtVesselLoading(false);
+    }
+  };
 
   const trafficLights: Record<number, string> = {};
   for (const a of areas) trafficLights[a.areaNumber] = a.trafficLight;
@@ -279,7 +395,7 @@ export default function SeafoodPage() {
 
           {/* ─── Tab Bar ────────────────────────────────────── */}
           <div style={{ display: "flex", gap: 6, padding: "6px 8px", background: "#111", borderBottom: "1px solid #222", alignItems: "center" }}>
-            {(["overview", "map", "areas", "biomass"] as const).map(t => (
+            {(["overview", "map", "areas", "biomass", "harvest"] as const).map(t => (
               <button key={t} style={S.tabBtn(tab === t)} onClick={() => setTab(t)}>
                 {t.toUpperCase()}
               </button>
@@ -1723,6 +1839,425 @@ export default function SeafoodPage() {
                   ) : (
                     <div style={{ padding: "16px 10px", color: "#555", fontSize: 11 }}>No harvest data available.</div>
                   )}
+                </div>
+              )}
+
+              {/* ════════════════════════════════════════════════════════════ */}
+              {/*  HARVEST TRACKER TAB                                        */}
+              {/* ════════════════════════════════════════════════════════════ */}
+              {tab === "harvest" && (
+                <div>
+                  {/* ─── LIVE TRACKER ─────────────────────────────── */}
+                  <div style={S.section}>LIVE HARVEST TRACKER</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", borderBottom: "1px solid #222" }}>
+                    <div style={{ height: 420 }}>
+                      <HarvestMap
+                        farms={htFarms}
+                        slaughterhouses={htSlaughterhouses}
+                        vessels={htLive?.vessels || []}
+                        selectedTicker={htSelectedTicker}
+                        onTickerSelect={setHtSelectedTicker}
+                        focusVessel={htFocusVessel}
+                        vesselRoute={htVesselDetail?.positions}
+                        selectedVesselId={htSelectedVessel}
+                        onVesselClick={handleVesselClick}
+                        selectedTrip={htSelectedTrip}
+                      />
+                    </div>
+                    {/* Vessel sidebar */}
+                    <div style={{ borderLeft: "1px solid #222", overflow: "auto", maxHeight: 420 }}>
+                      {/* Vessel detail panel (when a vessel is selected) */}
+                      {htSelectedVessel && htVesselDetail ? (
+                        <div>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 10px", borderBottom: "1px solid #222", background: "#111" }}>
+                            <span style={{ fontWeight: 700, fontSize: 11, color: "#60a5fa" }}>{htVesselDetail.vessel.vessel_name}</span>
+                            <button onClick={() => { setHtSelectedVessel(null); setHtVesselDetail(null); }} style={{
+                              background: "transparent", border: "1px solid #333", color: "#888", fontSize: 9,
+                              padding: "1px 6px", borderRadius: 2, cursor: "pointer", fontFamily: "inherit",
+                            }}>CLOSE</button>
+                          </div>
+                          <div style={{ padding: "6px 10px", borderBottom: "1px solid #1a1a1a" }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 8px", fontSize: 10 }}>
+                              <span style={{ color: "#555" }}>Owner</span>
+                              <span style={{ color: "#ccc", textAlign: "right" }}>{htVesselDetail.vessel.owner_company || "—"}</span>
+                              <span style={{ color: "#555" }}>Type</span>
+                              <span style={{ color: "#ccc", textAlign: "right" }}>{htVesselDetail.vessel.vessel_type}</span>
+                              <span style={{ color: "#555" }}>Capacity</span>
+                              <span style={{ color: "#ccc", textAlign: "right" }}>{htVesselDetail.vessel.capacity_tonnes ? `${htVesselDetail.vessel.capacity_tonnes}t` : "—"}</span>
+                              <span style={{ color: "#555" }}>Built</span>
+                              <span style={{ color: "#ccc", textAlign: "right" }}>{htVesselDetail.vessel.built_year || "—"}</span>
+                              <span style={{ color: "#555" }}>MMSI</span>
+                              <span style={{ color: "#888", textAlign: "right", fontSize: 9 }}>{htVesselDetail.vessel.mmsi || "—"}</span>
+                              <span style={{ color: "#555" }}>IMO</span>
+                              <span style={{ color: "#888", textAlign: "right", fontSize: 9 }}>{htVesselDetail.vessel.imo || "—"}</span>
+                            </div>
+                          </div>
+                          {/* Stats */}
+                          <div style={{ padding: "4px 10px", borderBottom: "1px solid #1a1a1a" }}>
+                            <div style={{ fontSize: 8, color: "#555", fontWeight: 700, marginBottom: 2 }}>12-MONTH STATS</div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 8px", fontSize: 10 }}>
+                              <span style={{ color: "#555" }}>Trips</span>
+                              <span style={{ color: "#f97316", textAlign: "right", fontWeight: 600 }}>{htVesselDetail.stats.total_trips}</span>
+                              <span style={{ color: "#555" }}>Volume</span>
+                              <span style={{ color: "#ccc", textAlign: "right" }}>{htVesselDetail.stats.total_volume ? `${(htVesselDetail.stats.total_volume / 1000).toFixed(1)}kt` : "—"}</span>
+                              <span style={{ color: "#555" }}>Avg Duration</span>
+                              <span style={{ color: "#ccc", textAlign: "right" }}>{htVesselDetail.stats.avg_duration_hours ? `${htVesselDetail.stats.avg_duration_hours.toFixed(1)}h` : "—"}</span>
+                              <span style={{ color: "#555" }}>Avg Spot</span>
+                              <span style={{ color: "#ccc", textAlign: "right" }}>{htVesselDetail.stats.avg_spot_price ? `${htVesselDetail.stats.avg_spot_price.toFixed(1)} NOK` : "—"}</span>
+                            </div>
+                          </div>
+                          {/* Route info + spot price */}
+                          <div style={{ padding: "4px 10px", borderBottom: "1px solid #1a1a1a" }}>
+                            <div style={{ fontSize: 8, color: "#555", fontWeight: 700, marginBottom: 2 }}>TRACKING</div>
+                            <div style={{ fontSize: 10, color: htVesselDetail.positionCount > 0 ? "#60a5fa" : "#444" }}>
+                              {htVesselDetail.positionCount > 0
+                                ? `${htVesselDetail.positionCount} AIS positions (shown on map)`
+                                : "No AIS positions collected yet. Run harvest:track to start."}
+                            </div>
+                            {htVesselDetail.currentSpotPrice && (
+                              <div style={{ fontSize: 9, color: "#f59e0b", marginTop: 2 }}>
+                                Current spot: {htVesselDetail.currentSpotPrice.toFixed(1)} NOK/kg
+                              </div>
+                            )}
+                          </div>
+                          {/* Detected visits (farm + slaughterhouse proximity events) */}
+                          <div style={{ padding: "4px 10px", borderBottom: "1px solid #1a1a1a" }}>
+                            <div style={{ fontSize: 8, color: "#555", fontWeight: 700, marginBottom: 2 }}>
+                              DETECTED VISITS ({htVesselDetail.visits?.length || 0})
+                            </div>
+                            {(htVesselDetail.visits || []).length > 0 ? htVesselDetail.visits.slice(0, 30).map((vis, i) => {
+                              const isFarm = vis.type === "farm";
+                              const icon = isFarm ? "\u25CF" : "\u25A0"; // circle for farm, square for slaughterhouse
+                              const color = isFarm ? "#22c55e" : "#f97316";
+                              const dateStr = new Date(vis.arrivalTime).toLocaleDateString("no-NO", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+                              return (
+                                <div key={i} style={{ padding: "3px 0", borderBottom: "1px solid #111", fontSize: 9 }}>
+                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                    <span>
+                                      <span style={{ color, marginRight: 4 }}>{icon}</span>
+                                      <span style={{ color: "#ccc" }}>{vis.name}</span>
+                                    </span>
+                                    <span style={{ color: "#555", fontSize: 8 }}>{vis.durationMinutes > 0 ? `${vis.durationMinutes}m` : ""}</span>
+                                  </div>
+                                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#666", paddingLeft: 12 }}>
+                                    <span>{dateStr}</span>
+                                    <span>
+                                      {vis.ticker && <span style={{ color: "#58a6ff" }}>[{vis.ticker}] </span>}
+                                      <span style={{ color: "#555" }}>{isFarm ? "FARM" : "SLAUGHTER"}</span>
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            }) : (
+                              <div style={{ fontSize: 9, color: "#444" }}>
+                                {htVesselDetail.positionCount > 0
+                                  ? "No farm/slaughterhouse visits detected in range"
+                                  : "Visits detected from AIS proximity analysis"}
+                              </div>
+                            )}
+                          </div>
+                          {/* Completed trips (farm → slaughterhouse) */}
+                          <div style={{ padding: "4px 10px" }}>
+                            <div style={{ fontSize: 8, color: "#555", fontWeight: 700, marginBottom: 2 }}>COMPLETED TRIPS ({htVesselDetail.trips.length})</div>
+                            {htVesselDetail.trips.length > 0 ? htVesselDetail.trips.slice(0, 20).map(t => (
+                              <div key={t.id} style={{ padding: "3px 0", borderBottom: "1px solid #111", fontSize: 9 }}>
+                                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                  <span style={{ color: "#888" }}>{new Date(t.departure_time).toLocaleDateString("no-NO", { month: "short", day: "numeric" })}</span>
+                                  <span style={{ color: "#f59e0b", fontWeight: 600 }}>{t.estimated_volume_tonnes ? `${t.estimated_volume_tonnes.toFixed(0)}t` : ""}</span>
+                                </div>
+                                <div style={{ color: "#666", fontSize: 8 }}>
+                                  {t.origin_name || "?"} → {t.destination_name || "?"}
+                                  {t.origin_ticker && <span style={{ color: "#58a6ff" }}> [{t.origin_ticker}]</span>}
+                                  {t.spot_price_at_harvest && <span style={{ color: "#f59e0b" }}> @ {t.spot_price_at_harvest.toFixed(1)}</span>}
+                                  {t.duration_hours && <span> | {t.duration_hours.toFixed(1)}h</span>}
+                                </div>
+                              </div>
+                            )) : (
+                              <div style={{ fontSize: 9, color: "#444" }}>No completed farm→slaughterhouse trips yet</div>
+                            )}
+                          </div>
+                        </div>
+                      ) : htVesselLoading ? (
+                        <div style={{ padding: "20px 10px", textAlign: "center", color: "#555", fontSize: 10 }}>Loading vessel data...</div>
+                      ) : (
+                        /* Default: vessel list */
+                        <div>
+                          <div style={{ ...S.section, fontSize: 9 }}>FLEET ({htLive?.total || 0} VESSELS) — CLICK TO VIEW</div>
+                          {(htLive?.vessels || []).map(v => {
+                            const sc: Record<string, string> = { at_farm: "#22c55e", in_transit: "#f59e0b", at_slaughterhouse: "#ef4444" };
+                            return (
+                              <div
+                                key={v.vessel_id}
+                                onClick={() => handleVesselClick(v.vessel_id)}
+                                style={{
+                                  padding: "4px 10px", borderBottom: "1px solid #1a1a1a", cursor: "pointer",
+                                  background: htFocusVessel?.name === v.vessel_name ? "#1a1a2a" : "transparent",
+                                }}
+                              >
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                  <span style={{ fontWeight: 600, fontSize: 10, color: "#ccc" }}>{v.vessel_name}</span>
+                                  {v.hasPosition && (
+                                    <span style={{
+                                      fontSize: 8, padding: "1px 4px", borderRadius: 2,
+                                      background: (sc[v.status] || "#444") + "22", color: sc[v.status] || "#888",
+                                      fontWeight: 700, letterSpacing: "0.04em",
+                                    }}>
+                                      {v.status.toUpperCase().replace(/_/g, " ")}
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: 9, color: "#666", marginTop: 1 }}>
+                                  {v.owner_company || "Unknown"} {v.capacity_tonnes ? `| ${v.capacity_tonnes}t` : ""}
+                                  {v.speed_knots != null ? ` | ${v.speed_knots.toFixed(1)}kn` : ""}
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {(htLive?.vessels || []).length === 0 && (
+                            <div style={{ padding: "12px 10px", color: "#555", fontSize: 10 }}>
+                              No vessels in fleet. Run harvest:seed to populate.
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ─── TRIP LOG ──────────────────────────────────── */}
+                  <div style={S.section}>TRIP LOG</div>
+                  <div style={{ padding: "4px 10px", borderBottom: "1px solid #222", display: "flex", gap: 6, alignItems: "center" }}>
+                    <span style={{ fontSize: 9, color: "#555" }}>PERIOD:</span>
+                    {[7, 30, 90].map(d => (
+                      <button key={d} onClick={() => setHtTripDays(d)} style={{
+                        padding: "1px 6px", borderRadius: 2, fontSize: 9, fontWeight: 600, cursor: "pointer",
+                        border: `1px solid ${htTripDays === d ? "#666" : "#333"}`,
+                        background: htTripDays === d ? "#222" : "transparent",
+                        color: htTripDays === d ? "#ccc" : "#666",
+                        fontFamily: "'Geist Mono','SF Mono','Consolas',monospace",
+                      }}>
+                        {`${d}D`}
+                      </button>
+                    ))}
+                    <span style={{ marginLeft: "auto", fontSize: 9, color: "#555" }}>
+                      {htTrips.length} trips
+                    </span>
+                  </div>
+
+                  {/* Activity chart */}
+                  {htActivity && htActivity.daily.length > 0 && (
+                    <div style={{ padding: "8px 10px", borderBottom: "1px solid #222" }}>
+                      <div style={{ fontSize: 9, color: "#555", marginBottom: 4 }}>DAILY TRIPS & SPOT PRICE ({`${htTripDays}D`})</div>
+                      <svg viewBox={`0 0 ${Math.max(htActivity.daily.length * 8, 200)} 80`} style={{ width: "100%", height: 70 }}>
+                        {(() => {
+                          const d = htActivity.daily;
+                          const maxTrips = Math.max(...d.map(r => r.trips), 1);
+                          const w = Math.max(d.length * 8, 200);
+                          const bw = w / d.length;
+                          // Date range from trip data
+                          const dateMin = new Date(d[0].date).getTime();
+                          const dateMax = new Date(d[d.length - 1].date).getTime();
+                          const dateRange = dateMax - dateMin || 1;
+                          // Filter spot prices to trip date range (with 7-day buffer on each side)
+                          const allPrices = (htActivity.spotPrices as Array<{ report_date: string; sisalmon_avg: number | null }>)
+                            .filter(p => p.sisalmon_avg != null && p.sisalmon_avg > 20) as Array<{ report_date: string; sisalmon_avg: number }>;
+                          const bufMs = 7 * 86400000;
+                          const prices = allPrices.filter(p => {
+                            const t = new Date(p.report_date).getTime();
+                            return t >= dateMin - bufMs && t <= dateMax + bufMs;
+                          });
+                          return (
+                            <>
+                              {d.map((r, i) => (
+                                <rect key={i} x={i * bw} y={70 - (r.trips / maxTrips) * 60} width={bw * 0.7}
+                                  height={(r.trips / maxTrips) * 60} fill="#f59e0b" opacity={0.6} rx={1} />
+                              ))}
+                              {prices.length > 1 && (() => {
+                                const minP = Math.min(...prices.map(p => p.sisalmon_avg));
+                                const maxP = Math.max(...prices.map(p => p.sisalmon_avg));
+                                const range = maxP - minP || 1;
+                                // Convert to xy + source tag
+                                const pts = prices.map((p, idx) => {
+                                  const t = new Date(p.report_date).getTime();
+                                  const x = Math.max(0, Math.min(w, ((t - dateMin) / dateRange) * w));
+                                  const y = 70 - ((p.sisalmon_avg - minP) / range) * 55 - 5;
+                                  const src = (p as { source?: string }).source || "actual";
+                                  return { x, y, src, idx };
+                                });
+                                // Helper: Catmull-Rom spline path from points array
+                                const makePath = (arr: typeof pts) => {
+                                  if (arr.length < 2) return "";
+                                  let d = `M ${arr[0].x},${arr[0].y}`;
+                                  for (let i = 0; i < arr.length - 1; i++) {
+                                    const p0 = arr[Math.max(0, i - 1)];
+                                    const p1 = arr[i];
+                                    const p2 = arr[i + 1];
+                                    const p3 = arr[Math.min(arr.length - 1, i + 2)];
+                                    d += ` C ${p1.x + (p2.x - p0.x) / 6},${p1.y + (p2.y - p0.y) / 6} ${p2.x - (p3.x - p1.x) / 6},${p2.y - (p3.y - p1.y) / 6} ${p2.x},${p2.y}`;
+                                  }
+                                  return d;
+                                };
+                                // Split: actual points + estimate points (overlap last actual for continuity)
+                                const lastActualIdx = pts.reduce((acc, p, i) => p.src === "actual" ? i : acc, 0);
+                                const actualPts = pts.filter(p => p.src === "actual");
+                                const estPts = lastActualIdx < pts.length - 1 ? pts.slice(lastActualIdx) : [];
+                                return (
+                                  <>
+                                    {actualPts.length > 1 && <path d={makePath(actualPts)} fill="none" stroke="#22c55e" strokeWidth="1.5" opacity={0.85} />}
+                                    {estPts.length > 1 && <path d={makePath(estPts)} fill="none" stroke="#22c55e" strokeWidth="1.5" opacity={0.7} strokeDasharray="4 3" />}
+                                  </>
+                                );
+                              })()}
+                            </>
+                          );
+                        })()}
+                      </svg>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#555" }}>
+                        <div style={{ display: "flex", gap: 12 }}>
+                          <span><span style={{ color: "#f59e0b" }}>■</span> Daily Trips</span>
+                          <span><span style={{ color: "#22c55e" }}>—</span> Spot Price (NOK/kg)</span>
+                        </div>
+                        {htActivity.spotPrices.filter((p: { sisalmon_avg: number | null }) => p.sisalmon_avg != null && p.sisalmon_avg > 20).length > 0 && (
+                          <span style={{ color: "#22c55e" }}>
+                            {htActivity.spotPrices.filter((p: { sisalmon_avg: number | null }) => p.sisalmon_avg != null && p.sisalmon_avg > 20).slice(-1)[0]?.sisalmon_avg?.toFixed(1)} NOK
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Trip table */}
+                  <div style={{ overflow: "auto", maxHeight: 300 }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
+                      <thead>
+                        <tr style={{ background: "#111", position: "sticky", top: 0 }}>
+                          {["DATE", "VESSEL", "FARM", "SLAUGHTERHOUSE", "COMPANY", "EST.VOL", "SPOT"].map(h => (
+                            <th key={h} style={{ padding: "4px 6px", textAlign: "left", color: "#555", fontWeight: 600, fontSize: 9, borderBottom: "1px solid #222" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {htTrips.slice(0, 100).map(t => {
+                          const hasCoords = t.origin_lat != null && t.dest_lat != null;
+                          const isSelected = htSelectedTrip?.id === t.id;
+                          return (
+                          <tr key={t.id}
+                            onClick={() => {
+                              if (!hasCoords) return;
+                              if (isSelected) { setHtSelectedTrip(null); return; }
+                              setHtSelectedTrip({
+                                id: t.id, vessel_name: t.vessel_name,
+                                origin_name: t.origin_name, origin_ticker: t.origin_ticker,
+                                destination_name: t.destination_name,
+                                origin_lat: t.origin_lat!, origin_lng: t.origin_lng!,
+                                dest_lat: t.dest_lat!, dest_lng: t.dest_lng!,
+                                departure_time: t.departure_time, arrival_time: t.arrival_time,
+                                duration_hours: t.duration_hours,
+                                estimated_volume_tonnes: t.estimated_volume_tonnes,
+                                spot_price_at_harvest: t.spot_price_at_harvest,
+                              });
+                            }}
+                            style={{
+                              borderBottom: "1px solid #1a1a1a",
+                              cursor: hasCoords ? "pointer" : "default",
+                              background: isSelected ? "#1a1a2a" : "transparent",
+                              borderLeft: isSelected ? "2px solid #f59e0b" : "2px solid transparent",
+                            }}
+                          >
+                            <td style={{ padding: "3px 6px", color: "#888" }}>{new Date(t.departure_time).toLocaleDateString("no-NO", { month: "short", day: "numeric" })}</td>
+                            <td style={{ padding: "3px 6px", color: "#ccc", fontWeight: 600 }}>{t.vessel_name}</td>
+                            <td style={{ padding: "3px 6px", color: "#888" }}>{t.origin_name || "—"}</td>
+                            <td style={{ padding: "3px 6px", color: "#888" }}>{t.destination_name || "—"}</td>
+                            <td style={{ padding: "3px 6px", color: t.origin_ticker ? ({MOWI:"#2563eb",SALM:"#16a34a",LSG:"#9333ea",GSF:"#ea580c",BAKKA:"#0891b2",AUSS:"#dc2626"} as Record<string,string>)[t.origin_ticker] || "#888" : "#555" }}>
+                              {t.origin_ticker || "—"}
+                            </td>
+                            <td style={{ padding: "3px 6px", color: "#ccc" }}>{t.estimated_volume_tonnes ? `${t.estimated_volume_tonnes.toFixed(0)}t` : "—"}</td>
+                            <td style={{ padding: "3px 6px", color: "#f97316" }}>{t.spot_price_at_harvest ? `${t.spot_price_at_harvest.toFixed(1)}` : "—"}</td>
+                          </tr>
+                          );
+                        })}
+                        {htTrips.length === 0 && (
+                          <tr><td colSpan={7} style={{ padding: "12px 6px", color: "#555", textAlign: "center" }}>No trips recorded yet. Run the harvest tracker to detect wellboat movements.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* ─── PRICE ESTIMATES ───────────────────────────── */}
+                  <div style={S.section}>QUARTERLY HARVEST ESTIMATES</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, padding: "1px", borderBottom: "1px solid #222" }}>
+                    {(["MOWI", "SALM", "LSG", "GSF", "BAKKA", "AUSS"] as const).map(tk => {
+                      const cq = htCurrentQ.find(c => c.ticker === tk);
+                      const tc: Record<string, string> = { MOWI: "#2563eb", SALM: "#16a34a", LSG: "#9333ea", GSF: "#ea580c", BAKKA: "#0891b2", AUSS: "#dc2626" };
+                      const now = new Date();
+                      const qLabel = `Q${Math.ceil((now.getMonth() + 1) / 3)} ${now.getFullYear()}`;
+                      return (
+                        <div key={tk} style={{ background: "#0d0d0d", padding: "8px 10px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                            <span style={{ fontWeight: 700, color: tc[tk], fontSize: 11 }}>{tk}</span>
+                            <span style={{ fontSize: 8, color: "#555" }}>{qLabel}</span>
+                          </div>
+                          {cq ? (
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 8px", fontSize: 10 }}>
+                              <span style={{ color: "#666" }}>TRIPS</span>
+                              <span style={{ textAlign: "right", color: "#ccc" }}>{cq.trip_count}</span>
+                              <span style={{ color: "#666" }}>EST. VOL</span>
+                              <span style={{ textAlign: "right", color: "#ccc" }}>{cq.est_volume > 0 ? `${(cq.est_volume / 1000).toFixed(1)}kt` : "—"}</span>
+                              <span style={{ color: "#666" }}>VWAP</span>
+                              <span style={{ textAlign: "right", color: "#f97316" }}>{cq.vwap_price ? `${cq.vwap_price.toFixed(1)}` : "—"}</span>
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: 9, color: "#444" }}>No data yet</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Historical estimates vs actuals */}
+                  {htEstimates.length > 0 && (
+                    <div style={{ padding: "0" }}>
+                      <div style={{ ...S.section, fontSize: 9 }}>HISTORICAL: ESTIMATES VS ACTUALS</div>
+                      <div style={{ overflow: "auto", maxHeight: 250 }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
+                          <thead>
+                            <tr style={{ background: "#111", position: "sticky", top: 0 }}>
+                              {["COMPANY", "QTR", "EST.VOL", "ACT.VOL", "EST.PRICE", "ACT.PRICE", "ACC."].map(h => (
+                                <th key={h} style={{ padding: "4px 6px", textAlign: "left", color: "#555", fontWeight: 600, fontSize: 9, borderBottom: "1px solid #222" }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {htEstimates.map((e, i) => {
+                              const accColor = e.estimation_accuracy_pct == null ? "#555"
+                                : Math.abs(e.estimation_accuracy_pct) <= 10 ? "#22c55e"
+                                : Math.abs(e.estimation_accuracy_pct) <= 20 ? "#f59e0b" : "#ef4444";
+                              return (
+                                <tr key={i} style={{ borderBottom: "1px solid #1a1a1a" }}>
+                                  <td style={{ padding: "3px 6px", color: "#ccc", fontWeight: 600 }}>{e.ticker}</td>
+                                  <td style={{ padding: "3px 6px", color: "#888" }}>Q{e.quarter} {e.year}</td>
+                                  <td style={{ padding: "3px 6px", color: "#888" }}>{e.estimated_harvest_tonnes ? `${(e.estimated_harvest_tonnes / 1000).toFixed(1)}kt` : "—"}</td>
+                                  <td style={{ padding: "3px 6px", color: "#ccc" }}>{e.actual_harvest_tonnes ? `${(e.actual_harvest_tonnes / 1000).toFixed(1)}kt` : "—"}</td>
+                                  <td style={{ padding: "3px 6px", color: "#888" }}>{e.estimated_avg_price_nok ? e.estimated_avg_price_nok.toFixed(1) : "—"}</td>
+                                  <td style={{ padding: "3px 6px", color: "#f97316" }}>{e.actual_price_realization ? e.actual_price_realization.toFixed(1) : "—"}</td>
+                                  <td style={{ padding: "3px 6px", color: accColor, fontWeight: 600 }}>
+                                    {e.estimation_accuracy_pct != null ? `${e.estimation_accuracy_pct > 0 ? "+" : ""}${e.estimation_accuracy_pct.toFixed(0)}%` : "—"}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ─── METHODOLOGY ──────────────────────────────── */}
+                  <div style={{ padding: "8px 10px", borderTop: "1px solid #222", fontSize: 9, color: "#444", lineHeight: 1.6 }}>
+                    <div style={{ fontWeight: 700, color: "#555", marginBottom: 4 }}>METHODOLOGY</div>
+                    <div>Harvest volumes estimated from wellboat AIS tracking: vessel capacity × 0.80 load factor per farm→slaughterhouse trip.</div>
+                    <div>Price matched to weekly SISALMON spot (Fish Pool) at departure date. Volume-weighted average price per company per quarter.</div>
+                    <div>Accuracy measured against reported quarterly harvest volumes and price realizations from company earnings reports.</div>
+                  </div>
                 </div>
               )}
             </div>
