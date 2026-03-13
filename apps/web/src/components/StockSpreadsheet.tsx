@@ -738,14 +738,32 @@ export default function StockSpreadsheet({ ticker, token, profileName, onNeedLog
         .stock-sheet-wrapper .fortune-sheet-toolbar [class*="text"] {
           color: #c9d1d9 !important;
         }
-        /* Toolbar dropdown menus */
-        .fortune-sheet-toolbar-menu, .fortune-sheet-toolbar-select-menu {
+        /* Toolbar dropdown menus — rendered as portals outside .stock-sheet-wrapper */
+        .fortune-toolbar-select {
           background: #1e1e1e !important; border: 1px solid #444 !important;
-          box-shadow: 0 4px 16px rgba(0,0,0,0.5) !important;
+          box-shadow: 0 8px 32px rgba(0,0,0,0.7) !important;
+          color: #c9d1d9 !important;
         }
-        .fortune-sheet-toolbar-menu *, .fortune-sheet-toolbar-select-menu * { color: #c9d1d9 !important; }
-        .fortune-sheet-toolbar-menu-item:hover, .fortune-sheet-toolbar-select-menu-item:hover {
-          background: #30363d !important;
+        .fortune-toolbar-select-option {
+          color: #c9d1d9 !important; background: transparent !important;
+        }
+        .fortune-toolbar-select-option:hover {
+          background: #30363d !important; color: #fff !important;
+        }
+        .fortune-toolbar-combo-text { color: #c9d1d9 !important; }
+        .fortune-toolbar-more-container {
+          background: #1e1e1e !important; border: 1px solid #444 !important;
+          box-shadow: 0 8px 32px rgba(0,0,0,0.7) !important;
+        }
+        .fortune-toolbar-more-container * { color: #c9d1d9 !important; }
+        .fortune-toolbar-more-container button:hover { background: #30363d !important; }
+        .fortune-toolbar-subtext { color: #999 !important; }
+        /* Color picker dropdown */
+        .fortune-toolbar-color-picker-row { background: transparent !important; }
+        /* Generic toolbar popup container (parent of .fortune-toolbar-select) */
+        div[style*="z-index"]:has(.fortune-toolbar-select) {
+          background: #1e1e1e !important; border: 1px solid #444 !important;
+          border-radius: 6px !important;
         }
 
         /* Hide Fortune-Sheet's broken built-in menus — we use our own */
