@@ -204,14 +204,15 @@ export default function HomePage() {
               gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
               gap: 16
             }}>
+              {/* — Active Stock Research — */}
               <FeatureCard
                 href="/stocks"
                 title="Stock Screener & Analytics"
-                description="Browse 225+ OSE securities with interactive price charts, candlestick patterns, and deep per-stock analytics including volatility models, Monte Carlo simulations, ML predictions, and mean-reversion channels."
+                description="Browse 225+ OSE securities with interactive price charts, candlestick patterns, and deep per-stock analytics. Upload Excel financial models for full-screen editing with persistent cloud storage and team sharing."
                 tags={[
                   { label: "Charts", color: "var(--accent)" },
-                  { label: "ML", color: "var(--success)" },
-                  { label: "Monte Carlo", color: "var(--info)" },
+                  { label: "Excel Models", color: "var(--success)" },
+                  { label: "ML", color: "var(--info)" },
                 ]}
                 visible={modulesReveal.visible}
                 delay={0}
@@ -229,16 +230,19 @@ export default function HomePage() {
                 delay={1}
               />
               <FeatureCard
-                href="/correlation"
-                title="Correlation Matrix"
-                description="Interactive cross-sectional heatmap with configurable lookback windows (30d–2y). Rolling correlation time series and sector-level co-movement analysis."
+                href="/news"
+                title="Intelligence Terminal"
+                description="Real-time market intelligence hub. AI-classified NewsWeb filings with sentiment analysis, Finanstilsynet short positions with sparklines, commodity prices (Brent, gas, metals) with stock sensitivity betas."
                 tags={[
-                  { label: "Heatmap", color: "var(--info)" },
-                  { label: "Rolling", color: "var(--accent)" },
+                  { label: "Shorts", color: "var(--danger)" },
+                  { label: "Commodities", color: "var(--warning)" },
+                  { label: "Live", color: "var(--success)" },
                 ]}
                 visible={modulesReveal.visible}
                 delay={2}
               />
+
+              {/* — Statistics & Backtesting — */}
               <FeatureCard
                 href="/volatility/obx"
                 title="OBX Volatility Dashboard"
@@ -252,6 +256,17 @@ export default function HomePage() {
                 delay={3}
               />
               <FeatureCard
+                href="/correlation"
+                title="Correlation Matrix"
+                description="Interactive cross-sectional heatmap with configurable lookback windows (30d–2y). Rolling correlation time series and sector-level co-movement analysis."
+                tags={[
+                  { label: "Heatmap", color: "var(--info)" },
+                  { label: "Rolling", color: "var(--accent)" },
+                ]}
+                visible={modulesReveal.visible}
+                delay={4}
+              />
+              <FeatureCard
                 href="/options"
                 title="Options Analytics"
                 description="Black-Scholes pricing with full Greeks chain for US-listed OSE stocks. IV skew visualization, open interest distribution, max pain, put/call ratios, and a multi-leg P&L strategy builder with preset strategies."
@@ -261,7 +276,7 @@ export default function HomePage() {
                   { label: "IV Skew", color: "var(--warning)" },
                 ]}
                 visible={modulesReveal.visible}
-                delay={4}
+                delay={5}
               />
               <FeatureCard
                 href="/portfolio"
@@ -273,20 +288,10 @@ export default function HomePage() {
                   { label: "Risk", color: "var(--warning)" },
                 ]}
                 visible={modulesReveal.visible}
-                delay={5}
-              />
-              <FeatureCard
-                href="/news"
-                title="Intelligence Terminal"
-                description="Real-time market intelligence hub. AI-classified NewsWeb filings with sentiment analysis, Finanstilsynet short positions with sparklines, commodity prices (Brent, gas, metals) with stock sensitivity betas."
-                tags={[
-                  { label: "Shorts", color: "var(--danger)" },
-                  { label: "Commodities", color: "var(--warning)" },
-                  { label: "Live", color: "var(--success)" },
-                ]}
-                visible={modulesReveal.visible}
                 delay={6}
               />
+
+              {/* — Sector Intelligence — */}
               <FeatureCard
                 href="/seafood"
                 title="Seafood Intelligence"
@@ -310,18 +315,6 @@ export default function HomePage() {
                 ]}
                 visible={modulesReveal.visible}
                 delay={8}
-              />
-              <FeatureCard
-                href="/valuation"
-                title="Valuation Comps"
-                description="Interactive peer comparison spreadsheet. P/E, P/B, EV/EBITDA, DY%, P/S across all OSE equities. Edit target prices and custom EPS estimates with auto-calculated implied upside."
-                tags={[
-                  { label: "Spreadsheet", color: "var(--success)" },
-                  { label: "Editable", color: "var(--accent)" },
-                  { label: "Multiples", color: "var(--warning)" },
-                ]}
-                visible={modulesReveal.visible}
-                delay={9}
               />
             </div>
           </section>
