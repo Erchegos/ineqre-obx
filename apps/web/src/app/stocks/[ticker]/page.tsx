@@ -206,7 +206,7 @@ export default function StockTickerPage() {
   const [viewMode, setViewMode] = useState<"historical" | "std_channel" | "model">("historical");
 
   // Auth state — shared across all pages via localStorage
-  const { token: modelToken, profile: modelProfile, login: authLogin, logout: authLogout } = useAuth();
+  const { token: modelToken, profile: modelProfile, ready: authReady, login: authLogin, logout: authLogout } = useAuth();
   const [showModelLogin, setShowModelLogin] = useState(false);
   const [modelUsername, setModelUsername] = useState("");
   const [modelPassword, setModelPassword] = useState("");
@@ -2428,6 +2428,7 @@ export default function StockTickerPage() {
           ticker={ticker}
           token={modelToken}
           profileName={modelProfile}
+          authReady={authReady}
           onNeedLogin={() => setShowModelLogin(true)}
           onLogout={handleModelLogout}
         />

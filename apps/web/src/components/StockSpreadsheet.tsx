@@ -9,11 +9,12 @@ type Props = {
   ticker: string;
   token: string | null;
   profileName: string;
+  authReady?: boolean;
   onNeedLogin: () => void;
   onLogout?: () => void;
 };
 
-export default function StockSpreadsheet({ ticker, token, profileName, onNeedLogin, onLogout }: Props) {
+export default function StockSpreadsheet({ ticker, token, profileName, authReady = true, onNeedLogin, onLogout }: Props) {
   const [sheets, setSheets] = useState<Sheet[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +68,9 @@ export default function StockSpreadsheet({ ticker, token, profileName, onNeedLog
 
   // Load spreadsheet data
   useEffect(() => {
+    // Wait for auth to hydrate from localStorage before loading
+    if (!authReady) return;
+
     // On logout (token went from value → null), keep sheets visible but locked.
     // Only reload when token appears (login) or ticker changes.
     const wasLoggedIn = prevToken.current != null;
@@ -174,7 +178,7 @@ export default function StockSpreadsheet({ ticker, token, profileName, onNeedLog
       }
     }
     load();
-  }, [ticker, token, applySheets]);
+  }, [ticker, token, authReady, applySheets]);
 
   // Handle file upload (drag-drop or click)
   const handleFileUpload = useCallback(async (file: File) => {
