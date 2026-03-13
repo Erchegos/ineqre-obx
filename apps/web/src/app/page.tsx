@@ -183,8 +183,8 @@ export default function HomePage() {
             <StatBox label="Last Updated" value={lastUpdate} suffix="" live />
           </div>
 
-          {/* Core Modules */}
-          <section ref={modulesReveal.ref} style={{ marginBottom: 56 }}>
+          {/* Active Stock Research */}
+          <section ref={modulesReveal.ref} style={{ marginBottom: 48 }}>
             <h2 style={{
               fontWeight: 700,
               marginBottom: 24,
@@ -196,7 +196,7 @@ export default function HomePage() {
               opacity: modulesReveal.visible ? 1 : 0,
               transition: "opacity 0.5s ease",
             }}>
-              // Explore
+              // Active Stock Research
             </h2>
 
             <div style={{
@@ -204,11 +204,10 @@ export default function HomePage() {
               gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
               gap: 16
             }}>
-              {/* — Active Stock Research — */}
               <FeatureCard
                 href="/stocks"
                 title="Stock Screener & Analytics"
-                description="Browse 225+ OSE securities with interactive price charts, candlestick patterns, and deep per-stock analytics. Upload Excel financial models for full-screen editing with persistent cloud storage and team sharing."
+                description="Browse 225+ OSE securities with interactive price charts, candlestick patterns, volatility models, Monte Carlo simulations, and ML predictions. Upload Excel financial models for full-screen editing with persistent cloud storage."
                 tags={[
                   { label: "Charts", color: "var(--accent)" },
                   { label: "Excel Models", color: "var(--success)" },
@@ -241,8 +240,30 @@ export default function HomePage() {
                 visible={modulesReveal.visible}
                 delay={2}
               />
+            </div>
+          </section>
 
-              {/* — Statistics & Backtesting — */}
+          {/* Quantitative Analytics */}
+          <section style={{ marginBottom: 48 }}>
+            <h2 style={{
+              fontWeight: 700,
+              marginBottom: 24,
+              color: "var(--foreground)",
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              fontSize: 12,
+              fontFamily: "monospace",
+              opacity: modulesReveal.visible ? 1 : 0,
+              transition: "opacity 0.5s ease",
+            }}>
+              // Quantitative Analytics & Portfolio Tools
+            </h2>
+
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+              gap: 16
+            }}>
               <FeatureCard
                 href="/volatility/obx"
                 title="OBX Volatility Dashboard"
@@ -258,7 +279,7 @@ export default function HomePage() {
               <FeatureCard
                 href="/correlation"
                 title="Correlation Matrix"
-                description="Interactive cross-sectional heatmap with configurable lookback windows (30d–2y). Rolling correlation time series and sector-level co-movement analysis."
+                description="Interactive cross-sectional heatmap with configurable lookback windows (30d-2y). Rolling correlation time series, sector-level co-movement analysis, and pairwise regime-conditional correlations."
                 tags={[
                   { label: "Heatmap", color: "var(--info)" },
                   { label: "Rolling", color: "var(--accent)" },
@@ -281,7 +302,7 @@ export default function HomePage() {
               <FeatureCard
                 href="/portfolio"
                 title="Portfolio Optimizer"
-                description="Markowitz mean-variance optimization with 5 modes (EW, MinVar, MaxSharpe, RiskParity, MaxDiv). Efficient frontier visualization, Ledoit-Wolf covariance, risk decomposition, stress scenarios, and FX exposure analysis."
+                description="Markowitz mean-variance optimization with 5 modes (EW, MinVar, MaxSharpe, RiskParity, MaxDiv). Efficient frontier, Ledoit-Wolf covariance, risk decomposition, 6-source alpha signals, and regime-aware stress scenarios."
                 tags={[
                   { label: "Optimization", color: "var(--success)" },
                   { label: "ML Signals", color: "var(--accent)" },
@@ -290,12 +311,34 @@ export default function HomePage() {
                 visible={modulesReveal.visible}
                 delay={6}
               />
+            </div>
+          </section>
 
-              {/* — Sector Intelligence — */}
+          {/* Sector Intelligence */}
+          <section style={{ marginBottom: 48 }}>
+            <h2 style={{
+              fontWeight: 700,
+              marginBottom: 24,
+              color: "var(--foreground)",
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              fontSize: 12,
+              fontFamily: "monospace",
+              opacity: modulesReveal.visible ? 1 : 0,
+              transition: "opacity 0.5s ease",
+            }}>
+              // Sector Intelligence
+            </h2>
+
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+              gap: 16
+            }}>
               <FeatureCard
                 href="/seafood"
                 title="Seafood Intelligence"
-                description="Norwegian aquaculture dashboard. Salmon spot prices, sea lice monitoring, production area traffic lights, disease outbreaks, company risk matrix, and live wellboat harvest tracking."
+                description="Norwegian aquaculture dashboard. Salmon spot/forward prices, sea lice monitoring, production area traffic lights, disease outbreaks, company risk matrix, biomass tracking, and live wellboat harvest detection via AIS."
                 tags={[
                   { label: "Salmon", color: "var(--warning)" },
                   { label: "Lice", color: "var(--danger)" },
