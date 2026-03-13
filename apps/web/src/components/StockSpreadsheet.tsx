@@ -726,6 +726,18 @@ export default function StockSpreadsheet({ ticker, token, profileName, onNeedLog
         }
         .stock-sheet-wrapper .fortune-sheet-toolbar .fortune-sheet-icon { filter: invert(0.8) !important; }
         .stock-sheet-wrapper .fortune-sheet-toolbar-divider { background: #333 !important; }
+        /* Font family/size chooser text — force light color on all inner elements */
+        .stock-sheet-wrapper .fortune-sheet-toolbar .fortune-sheet-toolbar-combo-button-text,
+        .stock-sheet-wrapper .fortune-sheet-toolbar .fortune-sheet-toolbar-button-text,
+        .stock-sheet-wrapper .fortune-sheet-toolbar .fortune-sheet-toolbar-text-container,
+        .stock-sheet-wrapper .fortune-sheet-toolbar span,
+        .stock-sheet-wrapper .fortune-sheet-toolbar .fortune-sheet-font-family,
+        .stock-sheet-wrapper .fortune-sheet-toolbar .fortune-sheet-font-size,
+        .stock-sheet-wrapper .fortune-sheet-toolbar [class*="combo"] span,
+        .stock-sheet-wrapper .fortune-sheet-toolbar [class*="select"] span,
+        .stock-sheet-wrapper .fortune-sheet-toolbar [class*="text"] {
+          color: #c9d1d9 !important;
+        }
         /* Toolbar dropdown menus */
         .fortune-sheet-toolbar-menu, .fortune-sheet-toolbar-select-menu {
           background: #1e1e1e !important; border: 1px solid #444 !important;
