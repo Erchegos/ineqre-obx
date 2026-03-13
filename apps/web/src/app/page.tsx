@@ -290,7 +290,7 @@ export default function HomePage() {
               <FeatureCard
                 href="/seafood"
                 title="Seafood Intelligence"
-                description="Norwegian aquaculture dashboard. Salmon spot prices, sea lice monitoring, production area traffic lights, disease outbreaks, and company biological risk exposure matrix."
+                description="Norwegian aquaculture dashboard. Salmon spot prices, sea lice monitoring, production area traffic lights, disease outbreaks, company risk matrix, and live wellboat harvest tracking."
                 tags={[
                   { label: "Salmon", color: "var(--warning)" },
                   { label: "Lice", color: "var(--danger)" },
@@ -298,45 +298,7 @@ export default function HomePage() {
                 ]}
                 visible={modulesReveal.visible}
                 delay={7}
-              >
-                {/* Harvest Tracker teaser */}
-                <div style={{
-                  marginTop: 14,
-                  padding: "10px 12px",
-                  background: "rgba(34,197,94,0.06)",
-                  border: "1px solid rgba(34,197,94,0.15)",
-                  borderRadius: 5,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                }}>
-                  <svg width="48" height="32" viewBox="0 0 48 32" fill="none" style={{ flexShrink: 0 }}>
-                    {/* Water */}
-                    <path d="M0 24 Q6 21 12 24 Q18 27 24 24 Q30 21 36 24 Q42 27 48 24 V32 H0Z" fill="rgba(34,197,94,0.12)" />
-                    <path d="M0 26 Q8 23 16 26 Q24 29 32 26 Q40 23 48 26" stroke="rgba(34,197,94,0.3)" strokeWidth="0.8" fill="none" />
-                    {/* Wellboat hull */}
-                    <path d="M8 22 L12 18 H32 L36 22 Z" fill="rgba(34,197,94,0.25)" stroke="rgba(34,197,94,0.5)" strokeWidth="0.8" />
-                    {/* Cabin */}
-                    <rect x="14" y="14" width="8" height="4" rx="1" fill="rgba(34,197,94,0.2)" stroke="rgba(34,197,94,0.4)" strokeWidth="0.6" />
-                    {/* Fish hold tanks */}
-                    <circle cx="27" cy="18" r="2.5" fill="rgba(34,197,94,0.15)" stroke="rgba(34,197,94,0.35)" strokeWidth="0.6" />
-                    <circle cx="32" cy="18" r="2" fill="rgba(34,197,94,0.15)" stroke="rgba(34,197,94,0.35)" strokeWidth="0.6" />
-                    {/* Mast */}
-                    <line x1="16" y1="14" x2="16" y2="8" stroke="rgba(34,197,94,0.4)" strokeWidth="0.6" />
-                    {/* Wake trail */}
-                    <path d="M8 22 Q4 23 2 22" stroke="rgba(34,197,94,0.2)" strokeWidth="0.5" strokeDasharray="1 1.5" />
-                    <path d="M8 23 Q3 24 0 23" stroke="rgba(34,197,94,0.15)" strokeWidth="0.4" strokeDasharray="1 2" />
-                  </svg>
-                  <div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "rgb(34,197,94)", letterSpacing: "0.04em", marginBottom: 2 }}>
-                      NEW: HARVEST TRACKER
-                    </div>
-                    <div style={{ fontSize: 11, color: "var(--muted-foreground)", lineHeight: 1.5 }}>
-                      Live wellboat AIS tracking. Farm-to-slaughterhouse trip detection with volume-weighted price estimates per company per quarter.
-                    </div>
-                  </div>
-                </div>
-              </FeatureCard>
+              />
               <FeatureCard
                 href="/shipping"
                 title="Shipping Intelligence"

@@ -398,9 +398,61 @@ export default function SeafoodPage() {
             {(["overview", "map", "areas", "biomass", "harvest"] as const).map(t => (
               <button key={t} style={S.tabBtn(tab === t)} onClick={() => setTab(t)}>
                 {t.toUpperCase()}
+                {t === "harvest" && <span style={{ marginLeft: 4, fontSize: 8, fontWeight: 700, background: "#22c55e", color: "#000", padding: "1px 4px", borderRadius: 3, letterSpacing: "0.05em", verticalAlign: "super" }}>NEW</span>}
               </button>
             ))}
           </div>
+
+          {/* ─── Harvest Tracker Teaser Banner ───────────────── */}
+          {tab === "overview" && (
+            <button
+              onClick={() => setTab("harvest")}
+              style={{
+                display: "flex", alignItems: "center", gap: 14,
+                width: "100%", padding: "10px 16px",
+                background: "linear-gradient(90deg, rgba(34,197,94,0.08) 0%, rgba(34,197,94,0.03) 60%, transparent 100%)",
+                borderBottom: "1px solid #222", border: "none", borderLeft: "2px solid #22c55e",
+                cursor: "pointer", textAlign: "left",
+              }}
+            >
+              <svg width="56" height="28" viewBox="0 0 56 28" fill="none" style={{ flexShrink: 0 }}>
+                {/* Water */}
+                <path d="M0 21 Q7 18 14 21 Q21 24 28 21 Q35 18 42 21 Q49 24 56 21 V28 H0Z" fill="rgba(34,197,94,0.1)" />
+                <path d="M0 23 Q9 20 18 23 Q27 26 36 23 Q45 20 56 23" stroke="rgba(34,197,94,0.25)" strokeWidth="0.7" fill="none" />
+                {/* Wellboat hull */}
+                <path d="M10 19 L14 15 H36 L40 19 Z" fill="rgba(34,197,94,0.2)" stroke="rgba(34,197,94,0.45)" strokeWidth="0.7" />
+                {/* Cabin */}
+                <rect x="16" y="11" width="7" height="4" rx="1" fill="rgba(34,197,94,0.15)" stroke="rgba(34,197,94,0.35)" strokeWidth="0.5" />
+                {/* Fish hold tanks */}
+                <circle cx="29" cy="15" r="2.2" fill="rgba(34,197,94,0.12)" stroke="rgba(34,197,94,0.3)" strokeWidth="0.5" />
+                <circle cx="34" cy="15" r="1.8" fill="rgba(34,197,94,0.12)" stroke="rgba(34,197,94,0.3)" strokeWidth="0.5" />
+                {/* Mast */}
+                <line x1="18" y1="11" x2="18" y2="6" stroke="rgba(34,197,94,0.35)" strokeWidth="0.5" />
+                {/* Signal pulse */}
+                <circle cx="18" cy="6" r="1" fill="rgba(34,197,94,0.5)">
+                  <animate attributeName="r" values="1;3;1" dur="2s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" values="0.5;0;0.5" dur="2s" repeatCount="indefinite" />
+                </circle>
+                {/* Wake */}
+                <path d="M10 19 Q6 20 3 19" stroke="rgba(34,197,94,0.15)" strokeWidth="0.4" strokeDasharray="1 1.5" />
+                {/* Route dots: farm → slaughterhouse */}
+                <circle cx="4" cy="8" r="1.5" fill="none" stroke="rgba(34,197,94,0.3)" strokeWidth="0.5" strokeDasharray="1 1" />
+                <circle cx="50" cy="10" r="2" fill="none" stroke="rgba(239,68,68,0.3)" strokeWidth="0.5" />
+                <rect x="49" y="9" width="2" height="2" fill="rgba(239,68,68,0.2)" />
+                <path d="M6 8 Q28 4 48 10" stroke="rgba(34,197,94,0.15)" strokeWidth="0.4" strokeDasharray="2 2" />
+              </svg>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#22c55e", letterSpacing: "0.05em" }}>HARVEST TRACKER</span>
+                  <span style={{ fontSize: 8, fontWeight: 700, background: "#22c55e", color: "#000", padding: "1px 5px", borderRadius: 3 }}>NEW</span>
+                </div>
+                <span style={{ fontSize: 11, color: "#888", lineHeight: 1.4 }}>
+                  Live wellboat AIS tracking &middot; Farm-to-slaughterhouse trip detection &middot; Volume-weighted price estimates per company per quarter
+                </span>
+              </div>
+              <span style={{ fontSize: 11, color: "#555", flexShrink: 0 }}>VIEW &rarr;</span>
+            </button>
+          )}
 
           {/* ─── Main Grid ──────────────────────────────────── */}
           <div className="sf-grid" style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 0, marginTop: 1 }}>
