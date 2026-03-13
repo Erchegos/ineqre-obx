@@ -92,83 +92,57 @@ export default function StockSpreadsheet({ ticker, token, profileName, authReady
       setUsingSavedEdits(false);
       setHasServerFile(false);
 
+      // Helper: check if edits have real cell data
+      const editsHaveData = (edits: any[]) => edits.some((s: any) => {
+        if (s.celldata && Array.isArray(s.celldata) && s.celldata.length > 0) return true;
+        if (s.data && Array.isArray(s.data)) {
+          return s.data.some((row: any) => Array.isArray(row) && row.some((cell: any) => cell != null));
+        }
+        return false;
+      });
+
       try {
-        // 1. Fetch base Excel data from server
+        // 1. Always check for saved edits in DB (works with or without auth)
+        // With auth: returns user's own model. Without auth: returns most recent for ticker.
+        let savedEdits: any[] | null = null;
+        let savedUpdatedAt: string | null = null;
+        try {
+          const headers: Record<string, string> = {};
+          if (token) headers.Authorization = `Bearer ${token}`;
+          const editsRes = await fetch(`/api/valuation/excel/edits?ticker=${ticker}`, { headers });
+          if (editsRes.ok) {
+            const editsJson = await editsRes.json();
+            if (editsJson.edits && Array.isArray(editsJson.edits) && editsJson.edits.length > 0 && editsHaveData(editsJson.edits)) {
+              savedEdits = editsJson.edits;
+              savedUpdatedAt = editsJson.updatedAt || null;
+            }
+          }
+        } catch { /* ignore */ }
+
+        // 2. Check for server-side Excel file
         const res = await fetch(`/api/valuation/excel?ticker=${ticker}`);
         const json = await res.json();
+        const hasServer = json.success;
 
-        if (json.success) {
+        if (hasServer) {
           baseSheets.current = json.sheets;
           setFileName(json.fileName || "");
           setHasServerFile(true);
+        }
 
-          let finalSheets = json.sheets;
-
-          // 2. If authenticated, check for saved edits
-          if (token) {
-            try {
-              const editsRes = await fetch(`/api/valuation/excel/edits?ticker=${ticker}`, {
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              if (editsRes.ok) {
-                const editsJson = await editsRes.json();
-                // Only use saved edits if they actually have real cell data
-                if (editsJson.edits && Array.isArray(editsJson.edits) && editsJson.edits.length > 0) {
-                  const hasData = editsJson.edits.some((s: any) => {
-                    // celldata format: array of {r, c, v} — non-empty means real data
-                    if (s.celldata && Array.isArray(s.celldata) && s.celldata.length > 0) return true;
-                    // data format: 2D array — check for at least one non-null cell
-                    if (s.data && Array.isArray(s.data)) {
-                      return s.data.some((row: any) =>
-                        Array.isArray(row) && row.some((cell: any) => cell != null)
-                      );
-                    }
-                    return false;
-                  });
-                  if (hasData) {
-                    finalSheets = editsJson.edits;
-                    setUsingSavedEdits(true);
-                    setLastSaved(editsJson.updatedAt || null);
-                  }
-                }
-              }
-            } catch {
-              // Ignore — fall back to base
-            }
-          }
-
-          applySheets(finalSheets);
+        // 3. Decide what to show
+        if (savedEdits) {
+          // Saved edits exist in DB — use them (either user's own or public preview)
+          if (!hasServer) baseSheets.current = savedEdits;
+          setFileName(hasServer ? (json.fileName || "") : "Uploaded model");
+          setUsingSavedEdits(true);
+          setLastSaved(savedUpdatedAt ? new Date(savedUpdatedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : null);
+          applySheets(savedEdits);
+        } else if (hasServer) {
+          // No saved edits but server file exists — show base Excel
+          applySheets(json.sheets);
         } else {
-          // No server file — check for user-uploaded edits
-          if (token) {
-            try {
-              const editsRes = await fetch(`/api/valuation/excel/edits?ticker=${ticker}`, {
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              if (editsRes.ok) {
-                const editsJson = await editsRes.json();
-                if (editsJson.edits && Array.isArray(editsJson.edits) && editsJson.edits.length > 0) {
-                  const hasData = editsJson.edits.some((s: any) => {
-                    if (s.celldata && Array.isArray(s.celldata) && s.celldata.length > 0) return true;
-                    if (s.data && Array.isArray(s.data)) {
-                      return s.data.some((row: any) =>
-                        Array.isArray(row) && row.some((cell: any) => cell != null)
-                      );
-                    }
-                    return false;
-                  });
-                  if (hasData) {
-                    baseSheets.current = editsJson.edits;
-                    setFileName("Uploaded file");
-                    setUsingSavedEdits(true);
-                    applySheets(editsJson.edits);
-                    return;
-                  }
-                }
-              }
-            } catch { /* ignore */ }
-          }
-          // Show empty state for file upload
+          // No server file, no saved edits — show upload zone
           setError("no-file");
         }
       } catch (e: any) {
@@ -180,10 +154,14 @@ export default function StockSpreadsheet({ ticker, token, profileName, authReady
     load();
   }, [ticker, token, authReady, applySheets]);
 
-  // Handle file upload (drag-drop or click)
+  // Handle file upload (drag-drop or click) — auto-saves to DB immediately
   const handleFileUpload = useCallback(async (file: File) => {
     if (!file.name.endsWith(".xlsx") && !file.name.endsWith(".xls")) {
       alert("Only .xlsx files are supported");
+      return;
+    }
+    if (!token) {
+      onNeedLogin();
       return;
     }
 
@@ -203,14 +181,41 @@ export default function StockSpreadsheet({ ticker, token, profileName, authReady
 
       baseSheets.current = json.sheets;
       setFileName(json.fileName || file.name);
-      setHasChanges(true);
+
+      // Convert to celldata format for reliable storage
+      const sheetsToSave = ensureCelldata(json.sheets);
+
+      // Auto-save to database immediately
+      setSaveStatus("saving");
+      const saveRes = await fetch("/api/valuation/excel/edits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ticker, sheetData: sheetsToSave }),
+      });
+
+      if (saveRes.ok) {
+        const saveJson = await saveRes.json();
+        console.log("[StockSpreadsheet] Auto-saved uploaded file, version:", saveJson.version);
+        setSaveStatus("saved");
+        setHasChanges(false);
+        setUsingSavedEdits(true);
+        const now = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+        setLastSaved(now);
+        setTimeout(() => setSaveStatus("idle"), 3000);
+      } else {
+        console.error("[StockSpreadsheet] Auto-save failed:", saveRes.status);
+        setSaveStatus("error");
+        setHasChanges(true); // Mark as unsaved so user can retry manually
+        setTimeout(() => setSaveStatus("idle"), 3000);
+      }
+
       applySheets(json.sheets);
     } catch (e: any) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  }, [applySheets]);
+  }, [applySheets, token, ticker, onNeedLogin, ensureCelldata]);
 
   // Save handler
   const handleSave = useCallback(async () => {
@@ -277,7 +282,7 @@ export default function StockSpreadsheet({ ticker, token, profileName, authReady
     }
   }, [token, ticker, onNeedLogin, ensureCelldata]);
 
-  // Revert to original
+  // Revert to original server file (keeps DB edits deleted, shows base Excel)
   const handleRevert = useCallback(async () => {
     if (baseSheets.current) {
       applySheets(baseSheets.current);
@@ -294,6 +299,50 @@ export default function StockSpreadsheet({ ticker, token, profileName, authReady
       } catch { /* best-effort */ }
     }
   }, [token, ticker, applySheets]);
+
+  // Delete uploaded model entirely — removes from DB and shows empty upload zone
+  const handleDelete = useCallback(async () => {
+    if (!token) return;
+    if (!confirm("Delete this financial model? This cannot be undone.")) return;
+
+    try {
+      await fetch(`/api/valuation/excel/edits?ticker=${ticker}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch { /* best-effort */ }
+
+    // Reset to empty state
+    setSheets(null);
+    baseSheets.current = null;
+    setFileName("");
+    setHasChanges(false);
+    setSaveStatus("idle");
+    setUsingSavedEdits(false);
+    setLastSaved(null);
+    // If there's no server file, show upload zone
+    if (!hasServerFile) {
+      setError("no-file");
+    } else {
+      // Has server file — reload from server
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/valuation/excel?ticker=${ticker}`);
+        const json = await res.json();
+        if (json.success) {
+          baseSheets.current = json.sheets;
+          setFileName(json.fileName || "");
+          applySheets(json.sheets);
+        } else {
+          setError("no-file");
+        }
+      } catch {
+        setError("no-file");
+      } finally {
+        setLoading(false);
+      }
+    }
+  }, [token, ticker, hasServerFile, applySheets]);
 
   // Export to .xlsx with formatting preserved
   const handleExport = useCallback(async () => {
@@ -567,10 +616,18 @@ export default function StockSpreadsheet({ ticker, token, profileName, authReady
                 style={{ padding: "2px 6px", fontSize: 10, fontFamily: "'Geist Mono', monospace", background: showSettings ? "#30363d" : "#21262d", color: showSettings ? "#fff" : "#8b949e", border: "1px solid #30363d", borderRadius: 3, cursor: "pointer" }}>
                 OPTIONS
               </button>
-              {usingSavedEdits && (
+              {usingSavedEdits && hasServerFile && (
                 <button onClick={handleRevert}
-                  style={{ padding: "2px 6px", fontSize: 10, fontFamily: "'Geist Mono', monospace", background: "transparent", color: "#f85149", border: "1px solid #f8514933", borderRadius: 3, cursor: "pointer" }}>
+                  style={{ padding: "2px 6px", fontSize: 10, fontFamily: "'Geist Mono', monospace", background: "transparent", color: "#d29922", border: "1px solid #d2992233", borderRadius: 3, cursor: "pointer" }}
+                  title="Revert to original server Excel file">
                   REVERT
+                </button>
+              )}
+              {usingSavedEdits && (
+                <button onClick={handleDelete}
+                  style={{ padding: "2px 6px", fontSize: 10, fontFamily: "'Geist Mono', monospace", background: "transparent", color: "#f85149", border: "1px solid #f8514933", borderRadius: 3, cursor: "pointer" }}
+                  title="Delete this financial model permanently">
+                  DELETE
                 </button>
               )}
               <span style={{ padding: "1px 5px", fontSize: 9, color: "#8b949e", background: "#0d1117", border: "1px solid #21262d", borderRadius: 2 }}>{profileName}</span>

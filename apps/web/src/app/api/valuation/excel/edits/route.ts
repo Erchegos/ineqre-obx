@@ -6,27 +6,41 @@ export const dynamic = "force-dynamic";
 
 /**
  * GET /api/valuation/excel/edits?ticker=STB
- * Load saved spreadsheet edits for a ticker (auth required, scoped by profile)
+ * Load saved spreadsheet edits for a ticker.
+ * - With auth: returns the user's own saved model (scoped by profile)
+ * - Without auth: returns the most recently updated model for this ticker (any profile)
+ *   so that logged-out users can see a blurred preview
  */
 export async function GET(req: NextRequest) {
-  const authError = requireAuth(req);
-  if (authError) return authError;
-
-  const user = getAuthUser(req);
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const ticker = req.nextUrl.searchParams.get("ticker")?.toUpperCase();
   if (!ticker || !/^[A-Z0-9.]{1,20}$/.test(ticker)) {
     return NextResponse.json({ error: "Invalid ticker" }, { status: 400 });
   }
 
   try {
-    const result = await pool.query(
-      `SELECT sheet_data, version, updated_at
-       FROM spreadsheet_edits
-       WHERE ticker = $1 AND profile = $2`,
-      [ticker, user.profile]
-    );
+    // Check if user is authenticated (don't require it)
+    const user = getAuthUser(req);
+
+    let result;
+    if (user) {
+      // Authenticated: return user's own model
+      result = await pool.query(
+        `SELECT sheet_data, version, updated_at, profile
+         FROM spreadsheet_edits
+         WHERE ticker = $1 AND profile = $2`,
+        [ticker, user.profile]
+      );
+    } else {
+      // Public: return most recently updated model for this ticker (any profile)
+      result = await pool.query(
+        `SELECT sheet_data, version, updated_at, profile
+         FROM spreadsheet_edits
+         WHERE ticker = $1
+         ORDER BY updated_at DESC
+         LIMIT 1`,
+        [ticker]
+      );
+    }
 
     if (result.rows.length === 0) {
       return secureJsonResponse({ edits: null });
