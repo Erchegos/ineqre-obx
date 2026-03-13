@@ -624,7 +624,7 @@ export default function StockSpreadsheet({ ticker, token, profileName, onNeedLog
           key={`${ticker}_${mountKey}`}
           ref={workbookRef}
           data={sheets}
-          showToolbar={false}
+          showToolbar={!isLocked}
           showFormulaBar={!isLocked}
           showSheetTabs={true}
           allowEdit={!isLocked}
@@ -697,7 +697,44 @@ export default function StockSpreadsheet({ ticker, token, profileName, onNeedLog
         /* Let the spreadsheet look like real Excel — white cells, original colors */
         /* Only dark-theme the chrome (formula bar, tabs, scrollbars) */
 
-        .stock-sheet-wrapper .fortune-sheet-container { background: #e8e8e8 !important; }
+        .stock-sheet-wrapper .fortune-sheet-container { background: #e8e8e8 !important; border-bottom: none !important; }
+
+        /* Fortune-Sheet toolbar — dark Excel-style ribbon */
+        .stock-sheet-wrapper .fortune-sheet-toolbar {
+          background: #1e1e1e !important; border-bottom: 1px solid #333 !important;
+          min-height: 30px !important;
+        }
+        .stock-sheet-wrapper .fortune-sheet-toolbar * { color: #c9d1d9 !important; }
+        .stock-sheet-wrapper .fortune-sheet-toolbar button,
+        .stock-sheet-wrapper .fortune-sheet-toolbar .fortune-sheet-toolbar-button {
+          background: transparent !important; border: none !important;
+        }
+        .stock-sheet-wrapper .fortune-sheet-toolbar button:hover,
+        .stock-sheet-wrapper .fortune-sheet-toolbar .fortune-sheet-toolbar-button:hover {
+          background: #30363d !important; border-radius: 3px !important;
+        }
+        .stock-sheet-wrapper .fortune-sheet-toolbar select,
+        .stock-sheet-wrapper .fortune-sheet-toolbar input {
+          background: #0d1117 !important; color: #c9d1d9 !important; border: 1px solid #30363d !important;
+          border-radius: 3px !important;
+        }
+        .stock-sheet-wrapper .fortune-sheet-toolbar .fortune-sheet-toolbar-combo-button {
+          background: transparent !important;
+        }
+        .stock-sheet-wrapper .fortune-sheet-toolbar .fortune-sheet-toolbar-combo-button:hover {
+          background: #30363d !important;
+        }
+        .stock-sheet-wrapper .fortune-sheet-toolbar .fortune-sheet-icon { filter: invert(0.8) !important; }
+        .stock-sheet-wrapper .fortune-sheet-toolbar-divider { background: #333 !important; }
+        /* Toolbar dropdown menus */
+        .fortune-sheet-toolbar-menu, .fortune-sheet-toolbar-select-menu {
+          background: #1e1e1e !important; border: 1px solid #444 !important;
+          box-shadow: 0 4px 16px rgba(0,0,0,0.5) !important;
+        }
+        .fortune-sheet-toolbar-menu *, .fortune-sheet-toolbar-select-menu * { color: #c9d1d9 !important; }
+        .fortune-sheet-toolbar-menu-item:hover, .fortune-sheet-toolbar-select-menu-item:hover {
+          background: #30363d !important;
+        }
 
         /* Hide Fortune-Sheet's broken built-in menus — we use our own */
         .luckysheet-rightclick-menu, .luckysheet-cols-menu, .luckysheet-cols-menu-sub,
@@ -802,10 +839,32 @@ export default function StockSpreadsheet({ ticker, token, profileName, onNeedLog
 
         /* Hide "Add rows" footer bar and any white line below tabs */
         .stock-sheet-wrapper .luckysheet-bottom-controll-row { display: none !important; }
-        .stock-sheet-wrapper .luckysheet-sheet-area { border-bottom: none !important; }
+        .stock-sheet-wrapper .luckysheet-sheet-area { border-bottom: none !important; border-bottom-color: #252526 !important; }
         .stock-sheet-wrapper .luckysheet-stat-area { display: none !important; }
-        .stock-sheet-wrapper .fortune-sheet-container { border-bottom: none !important; }
         .stock-sheet-wrapper .luckysheet-sheet-area + div { display: none !important; }
+        /* Kill ALL white lines at the very bottom of the container */
+        .stock-sheet-wrapper > div { border-bottom: none !important; }
+        .stock-sheet-wrapper .fortune-sheet-container > div:last-child {
+          background: #252526 !important; border: none !important;
+        }
+        .stock-sheet-wrapper .luckysheet-sheet-area ~ * {
+          display: none !important;
+        }
+        /* Catch any remaining bottom elements with white/light backgrounds */
+        .stock-sheet-wrapper .luckysheet-bottom-area,
+        .stock-sheet-wrapper .luckysheet-data-count,
+        .stock-sheet-wrapper .luckysheet-bottom-controll,
+        .stock-sheet-wrapper .luckysheet-bottom-statistic {
+          display: none !important;
+        }
+        /* Force the wrapper and container bottom to match dark theme */
+        .stock-sheet-wrapper, .stock-sheet-wrapper .fortune-sheet-container {
+          border-bottom-color: #30363d !important;
+        }
+        /* Make sure no child div at the bottom has a light background */
+        .stock-sheet-wrapper .fortune-sheet-container > div {
+          border-bottom-color: #252526 !important;
+        }
 
         /* Modal dialogs (Fortune-Sheet confirm/alert popups) */
         .luckysheet-modal-dialog {
