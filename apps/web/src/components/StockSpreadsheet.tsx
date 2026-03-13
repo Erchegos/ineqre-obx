@@ -543,6 +543,25 @@ export default function StockSpreadsheet({ ticker, token, profileName, onNeedLog
                 style={{ padding: "2px 6px", fontSize: 10, fontFamily: "'Geist Mono', monospace", background: "#21262d", color: "#8b949e", border: "1px solid #30363d", borderRadius: 3, cursor: "pointer" }}>
                 EXPORT
               </button>
+              <span style={{ width: 1, height: 14, background: "#30363d", margin: "0 2px" }} />
+              <button onClick={() => {
+                const wb = workbookRef.current;
+                if (!wb) return;
+                try { (wb as any).insertRowOrColumn?.("row", 1); } catch { /* Fortune-Sheet may not expose this */ }
+                if (!hasChanges) setHasChanges(true);
+              }} title="Insert row below selection"
+                style={{ padding: "2px 6px", fontSize: 10, fontFamily: "'Geist Mono', monospace", background: "#21262d", color: "#8b949e", border: "1px solid #30363d", borderRadius: 3, cursor: "pointer" }}>
+                + ROW
+              </button>
+              <button onClick={() => {
+                const wb = workbookRef.current;
+                if (!wb) return;
+                try { (wb as any).insertRowOrColumn?.("column", 1); } catch { /* Fortune-Sheet may not expose this */ }
+                if (!hasChanges) setHasChanges(true);
+              }} title="Insert column to the right of selection"
+                style={{ padding: "2px 6px", fontSize: 10, fontFamily: "'Geist Mono', monospace", background: "#21262d", color: "#8b949e", border: "1px solid #30363d", borderRadius: 3, cursor: "pointer" }}>
+                + COL
+              </button>
               {usingSavedEdits && (
                 <button onClick={handleRevert}
                   style={{ padding: "2px 6px", fontSize: 10, fontFamily: "'Geist Mono', monospace", background: "transparent", color: "#f85149", border: "1px solid #f8514933", borderRadius: 3, cursor: "pointer" }}>
@@ -610,7 +629,7 @@ export default function StockSpreadsheet({ ticker, token, profileName, onNeedLog
           key={`${ticker}_${mountKey}`}
           ref={workbookRef}
           data={sheets}
-          showToolbar={false}
+          showToolbar={!isLocked}
           showFormulaBar={!isLocked}
           showSheetTabs={true}
           allowEdit={!isLocked}
@@ -623,6 +642,30 @@ export default function StockSpreadsheet({ ticker, token, profileName, onNeedLog
         /* Only dark-theme the chrome (formula bar, tabs, scrollbars) */
 
         .stock-sheet-wrapper .fortune-sheet-container { background: #e8e8e8 !important; }
+
+        /* Toolbar — dark theme */
+        .stock-sheet-wrapper .luckysheet-wa-calculate-size { background: #252526 !important; }
+        .stock-sheet-wrapper .fortune-sheet-toolbar {
+          background: #1e1e1e !important; border-bottom: 1px solid #333 !important;
+        }
+        .stock-sheet-wrapper .fortune-sheet-toolbar * { color: #c9d1d9 !important; }
+        .stock-sheet-wrapper .fortune-sheet-toolbar button,
+        .stock-sheet-wrapper .fortune-sheet-toolbar .luckysheet-toolbar-button {
+          background: transparent !important; border-color: transparent !important;
+        }
+        .stock-sheet-wrapper .fortune-sheet-toolbar button:hover,
+        .stock-sheet-wrapper .fortune-sheet-toolbar .luckysheet-toolbar-button:hover {
+          background: #30363d !important; border-radius: 3px !important;
+        }
+        .stock-sheet-wrapper .fortune-sheet-toolbar select {
+          background: #0d1117 !important; color: #c9d1d9 !important; border: 1px solid #30363d !important; border-radius: 3px !important;
+        }
+        .stock-sheet-wrapper .fortune-sheet-toolbar input {
+          background: #0d1117 !important; color: #c9d1d9 !important; border: 1px solid #30363d !important;
+        }
+        .stock-sheet-wrapper .fortune-sheet-toolbar .luckysheet-toolbar-separator {
+          border-color: #333 !important;
+        }
 
         /* Formula bar */
         .stock-sheet-wrapper .luckysheet-wa-editor { background: #f0f0f0 !important; border-color: #d0d0d0 !important; }
@@ -728,27 +771,49 @@ export default function StockSpreadsheet({ ticker, token, profileName, onNeedLog
         .stock-sheet-wrapper .fortune-sheet-container { border-bottom: none !important; }
         .stock-sheet-wrapper .luckysheet-sheet-area + div { display: none !important; }
 
-        /* === Popups/menus stay dark === */
-        .luckysheet-rightclick-menu, .luckysheet-cols-menu,
+        /* === Context menus — dark theme, high z-index, no clipping === */
+        .luckysheet-rightclick-menu, .luckysheet-cols-menu {
+          background: #1e1e1e !important; border: 1px solid #555 !important;
+          box-shadow: 0 8px 32px rgba(0,0,0,0.7) !important; color: #d4d4d4 !important;
+          z-index: 10000 !important; font-size: 13px !important;
+          border-radius: 6px !important; padding: 4px 0 !important;
+          min-width: 200px !important;
+          font-family: 'Calibri', 'Segoe UI', sans-serif !important;
+        }
         .luckysheet-rightclick-menu ul, .luckysheet-cols-menu ul {
-          background: #161b22 !important; border: 1px solid #30363d !important;
-          box-shadow: 0 8px 24px rgba(0,0,0,0.5) !important; color: #c9d1d9 !important;
+          background: #1e1e1e !important; border: none !important;
+          box-shadow: none !important; color: #d4d4d4 !important;
+          list-style: none !important; padding: 0 !important; margin: 0 !important;
         }
         .luckysheet-rightclick-menu .luckysheet-cols-menuitem,
-        .luckysheet-cols-menu .luckysheet-cols-menuitem { color: #c9d1d9 !important; }
+        .luckysheet-cols-menu .luckysheet-cols-menuitem {
+          color: #d4d4d4 !important; padding: 6px 16px !important;
+          cursor: pointer !important; display: flex !important; align-items: center !important;
+        }
         .luckysheet-rightclick-menu .luckysheet-cols-menuitem *,
-        .luckysheet-cols-menu .luckysheet-cols-menuitem * { color: #c9d1d9 !important; }
+        .luckysheet-cols-menu .luckysheet-cols-menuitem * { color: #d4d4d4 !important; font-size: 13px !important; }
         .luckysheet-rightclick-menu .luckysheet-cols-menuitem:hover,
-        .luckysheet-cols-menu .luckysheet-cols-menuitem:hover { background: #21262d !important; }
+        .luckysheet-cols-menu .luckysheet-cols-menuitem:hover { background: #264f78 !important; }
         .luckysheet-rightclick-menu .luckysheet-cols-menuitem:hover *,
         .luckysheet-cols-menu .luckysheet-cols-menuitem:hover * { color: #fff !important; }
         .luckysheet-rightclick-menu .luckysheet-menuseparator,
-        .luckysheet-cols-menu .luckysheet-menuseparator { border-color: #21262d !important; }
+        .luckysheet-cols-menu .luckysheet-menuseparator {
+          border-color: #333 !important; margin: 4px 8px !important;
+        }
         .luckysheet-rightclick-menu input, .luckysheet-cols-menu input {
-          background: #0d1117 !important; color: #c9d1d9 !important; border: 1px solid #30363d !important; border-radius: 3px !important;
+          background: #0d1117 !important; color: #d4d4d4 !important; border: 1px solid #555 !important; border-radius: 3px !important;
         }
         .luckysheet-rightclick-menu label, .luckysheet-cols-menu label,
-        .luckysheet-rightclick-menu span, .luckysheet-cols-menu span { color: #c9d1d9 !important; }
+        .luckysheet-rightclick-menu span, .luckysheet-cols-menu span { color: #d4d4d4 !important; }
+        /* Submenu arrows */
+        .luckysheet-cols-menuitem-sub::after { color: #888 !important; }
+        /* Submenu popups */
+        .luckysheet-rightclick-menu .luckysheet-cols-menu-sub,
+        .luckysheet-cols-menu-sub {
+          background: #1e1e1e !important; border: 1px solid #555 !important;
+          box-shadow: 0 8px 32px rgba(0,0,0,0.7) !important; z-index: 10001 !important;
+          border-radius: 6px !important;
+        }
 
         /* Modal dialogs (Fortune-Sheet confirm/alert popups) */
         .luckysheet-modal-dialog {
