@@ -641,21 +641,21 @@ export default function StockSpreadsheet({ ticker, token, profileName, onNeedLog
           : { position: "absolute", top: 34, right: 10, zIndex: 10000 };
         const close = () => { setShowSettings(false); setCtxMenu(null); };
         const wb = workbookRef.current as any;
+        // Get current selection to determine row/col indices
+        const sel = (() => { try { return wb?.getSelection?.(); } catch { return undefined; } })();
+        const selRow = sel?.[0]?.row?.[0] ?? 0;
+        const selRowEnd = sel?.[0]?.row?.[1] ?? selRow;
+        const selCol = sel?.[0]?.column?.[0] ?? 0;
+        const selColEnd = sel?.[0]?.column?.[1] ?? selCol;
         const menuItems: { label: string; section?: string; action: () => void }[] = [
-          { label: "Insert Row Above", section: "INSERT", action: () => { try { wb?.insertRowOrColumn?.("row", 0); } catch {} if (!hasChanges) setHasChanges(true); } },
-          { label: "Insert Row Below", action: () => { try { wb?.insertRowOrColumn?.("row", 1); } catch {} if (!hasChanges) setHasChanges(true); } },
-          { label: "Insert Column Left", action: () => { try { wb?.insertRowOrColumn?.("column", 0); } catch {} if (!hasChanges) setHasChanges(true); } },
-          { label: "Insert Column Right", action: () => { try { wb?.insertRowOrColumn?.("column", 1); } catch {} if (!hasChanges) setHasChanges(true); } },
-          { label: "Delete Selected Row(s)", section: "DELETE", action: () => { try { wb?.deleteRowOrColumn?.("row"); } catch {} if (!hasChanges) setHasChanges(true); } },
-          { label: "Delete Selected Column(s)", action: () => { try { wb?.deleteRowOrColumn?.("column"); } catch {} if (!hasChanges) setHasChanges(true); } },
-          { label: "Bold", section: "FORMAT", action: () => { try { wb?.setCellFormat?.("bl", 1); } catch {} } },
-          { label: "Italic", action: () => { try { wb?.setCellFormat?.("it", 1); } catch {} } },
-          { label: "Format: #,##0", action: () => { try { wb?.setCellFormat?.("ct", { fa: "#,##0", t: "n" }); } catch {} } },
-          { label: "Format: 0.00", action: () => { try { wb?.setCellFormat?.("ct", { fa: "0.00", t: "n" }); } catch {} } },
-          { label: "Format: 0.0%", action: () => { try { wb?.setCellFormat?.("ct", { fa: "0.0%", t: "n" }); } catch {} } },
-          { label: "Format: 0.00x", action: () => { try { wb?.setCellFormat?.("ct", { fa: '0.00"x"', t: "n" }); } catch {} } },
-          { label: "Copy  (Ctrl+C)", section: "EDIT", action: () => { try { wb?.copy?.(); } catch {} } },
-          { label: "Paste (Ctrl+V)", action: () => { try { wb?.paste?.(); } catch {} } },
+          { label: "Insert Row Above", section: "INSERT", action: () => { try { wb?.insertRowOrColumn?.("row", selRow, 1, "lefttop"); } catch(e) { console.error(e); } if (!hasChanges) setHasChanges(true); } },
+          { label: "Insert Row Below", action: () => { try { wb?.insertRowOrColumn?.("row", selRowEnd, 1, "rightbottom"); } catch(e) { console.error(e); } if (!hasChanges) setHasChanges(true); } },
+          { label: "Insert Column Left", action: () => { try { wb?.insertRowOrColumn?.("column", selCol, 1, "lefttop"); } catch(e) { console.error(e); } if (!hasChanges) setHasChanges(true); } },
+          { label: "Insert Column Right", action: () => { try { wb?.insertRowOrColumn?.("column", selColEnd, 1, "rightbottom"); } catch(e) { console.error(e); } if (!hasChanges) setHasChanges(true); } },
+          { label: "Delete Selected Row(s)", section: "DELETE", action: () => { try { wb?.deleteRowOrColumn?.("row", selRow, selRowEnd); } catch(e) { console.error(e); } if (!hasChanges) setHasChanges(true); } },
+          { label: "Delete Selected Column(s)", action: () => { try { wb?.deleteRowOrColumn?.("column", selCol, selColEnd); } catch(e) { console.error(e); } if (!hasChanges) setHasChanges(true); } },
+          { label: "Undo", section: "EDIT", action: () => { try { wb?.handleUndo?.(); } catch {} } },
+          { label: "Redo", action: () => { try { wb?.handleRedo?.(); } catch {} } },
         ];
         return (
           <>
