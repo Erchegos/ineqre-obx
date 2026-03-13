@@ -311,6 +311,18 @@ export default function HomePage() {
                 visible={modulesReveal.visible}
                 delay={8}
               />
+              <FeatureCard
+                href="/valuation"
+                title="Valuation Comps"
+                description="Interactive peer comparison spreadsheet. P/E, P/B, EV/EBITDA, DY%, P/S across all OSE equities. Edit target prices and custom EPS estimates with auto-calculated implied upside."
+                tags={[
+                  { label: "Spreadsheet", color: "var(--success)" },
+                  { label: "Editable", color: "var(--accent)" },
+                  { label: "Multiples", color: "var(--warning)" },
+                ]}
+                visible={modulesReveal.visible}
+                delay={9}
+              />
             </div>
           </section>
 

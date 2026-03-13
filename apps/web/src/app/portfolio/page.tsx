@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
+import { useAuth } from "@/lib/useAuth";
 import {
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, Bar, Cell, PieChart, Pie,
@@ -327,9 +328,8 @@ const btnStyle = (active: boolean): React.CSSProperties => ({
 // ============================================================================
 
 export default function PortfolioPage() {
-  // Auth state — no persistence, require login each page load
-  const [token, setToken] = useState<string | null>(null);
-  const [profileName, setProfileName] = useState<string>("");
+  // Auth state — shared across all pages via localStorage
+  const { token, profile: profileName, login: authLogin, logout: authLogout } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
@@ -411,7 +411,7 @@ export default function PortfolioPage() {
       const res = await fetch("/api/portfolio/configs", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.status === 401) { setToken(null); setProfileName(""); return; }
+      if (res.status === 401) { authLogout(); return; }
       if (res.ok) {
         const data = await res.json();
         setConfigs(data.configs || []);
@@ -435,8 +435,7 @@ export default function PortfolioPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        setToken(data.token);
-        setProfileName(data.profile || "");
+        authLogin(data.token, data.profile || "");
         setShowLoginModal(false);
       } else {
         setAuthError("Invalid username or password");
@@ -451,8 +450,7 @@ export default function PortfolioPage() {
   // Auto-logout on 401 from any API call
   const handleAuthError = (res: Response) => {
     if (res.status === 401) {
-      setToken(null);
-      setProfileName("");
+      authLogout();
       setError("Session expired. Please sign in again.");
       return true;
     }
@@ -736,7 +734,7 @@ export default function PortfolioPage() {
         </div>
         {token ? (
           <button
-            onClick={() => { setToken(null); setProfileName(""); setUsername(""); setPassword(""); setConfigs([]); }}
+            onClick={() => { authLogout(); setUsername(""); setPassword(""); setConfigs([]); }}
             style={{ ...btnStyle(false), fontSize: 10 }}
           >
             Sign Out

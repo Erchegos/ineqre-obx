@@ -420,6 +420,21 @@ export default function StocksPage() {
             >
               Correlation
             </Link>
+            <Link
+              href="/valuation"
+              style={{
+                color: "var(--accent)",
+                textDecoration: "none",
+                fontSize: 14,
+                fontWeight: 500,
+                padding: "8px 16px",
+                borderRadius: 4,
+                border: "1px solid var(--accent)",
+                transition: "all 0.15s",
+              }}
+            >
+              Valuation
+            </Link>
           </div>
         </div>
         <p style={{ color: "var(--muted)", marginBottom: 16, fontSize: 14 }}>

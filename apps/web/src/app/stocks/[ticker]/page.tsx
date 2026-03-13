@@ -13,6 +13,9 @@ import CandlestickChart from "@/components/CandlestickChart";
 import { LiquidityBadge } from "@/components/LiquidityBadge";
 import NewsFeed from "@/components/NewsFeed";
 import WhyDidItMove from "@/components/WhyDidItMove";
+import dynamic from "next/dynamic";
+import { useAuth } from "@/lib/useAuth";
+const StockSpreadsheet = dynamic(() => import("@/components/StockSpreadsheet"), { ssr: false });
 
 type Stats = {
   totalReturn: number;
@@ -200,7 +203,45 @@ export default function StockTickerPage() {
   const [error, setError] = useState<string | null>(null);
 
   // UI State: Toggle between historical analysis and STD channel
-  const [viewMode, setViewMode] = useState<"historical" | "std_channel">("historical");
+  const [viewMode, setViewMode] = useState<"historical" | "std_channel" | "model">("historical");
+
+  // Auth state — shared across all pages via localStorage
+  const { token: modelToken, profile: modelProfile, login: authLogin, logout: authLogout } = useAuth();
+  const [showModelLogin, setShowModelLogin] = useState(false);
+  const [modelUsername, setModelUsername] = useState("");
+  const [modelPassword, setModelPassword] = useState("");
+  const [modelAuthError, setModelAuthError] = useState("");
+  const [modelAuthLoading, setModelAuthLoading] = useState(false);
+
+  const handleModelLogin = async () => {
+    setModelAuthLoading(true);
+    setModelAuthError("");
+    try {
+      const res = await fetch("/api/portfolio/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: modelUsername, password: modelPassword }),
+      });
+      const json = await res.json();
+      if (res.ok && json.token) {
+        authLogin(json.token, json.profile);
+        setShowModelLogin(false);
+        setModelPassword("");
+      } else {
+        setModelAuthError(json.error || "Invalid credentials");
+      }
+    } catch {
+      setModelAuthError("Connection error");
+    } finally {
+      setModelAuthLoading(false);
+    }
+  };
+
+  const handleModelLogout = () => {
+    authLogout();
+    setModelUsername("");
+    setModelPassword("");
+  };
   const [chartMode, setChartMode] = useState<"price" | "total_return" | "comparison">("price");
   const [isPanelOpen, setIsPanelOpen] = useState<boolean>(false);
 
@@ -1149,6 +1190,29 @@ export default function StockTickerPage() {
             <span>STD Channel Analysis</span>
             <span style={{ fontSize: 10, opacity: 0.7, fontWeight: 400 }}>
               Regression • Bands • Mean reversion
+            </span>
+          </button>
+          <button
+            onClick={() => setViewMode("model")}
+            style={{
+              padding: "9px 16px",
+              borderRadius: 4,
+              border: "none",
+              background: viewMode === "model" ? "#00897B" : "transparent",
+              color: viewMode === "model" ? "white" : "var(--foreground)",
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: "pointer",
+              transition: "all 0.2s",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: 3,
+            }}
+          >
+            <span>Financial Model</span>
+            <span style={{ fontSize: 10, opacity: 0.7, fontWeight: 400 }}>
+              P&L • Balance Sheet • Valuation
             </span>
           </button>
         </div>
@@ -2358,7 +2422,72 @@ export default function StockTickerPage() {
         </>
       )}
 
-      {/* SHARED ANALYSIS SECTIONS - Visible in both modes */}
+      {/* FINANCIAL MODEL SPREADSHEET */}
+      {viewMode === "model" && (
+        <StockSpreadsheet
+          ticker={ticker}
+          token={modelToken}
+          profileName={modelProfile}
+          onNeedLogin={() => setShowModelLogin(true)}
+          onLogout={handleModelLogout}
+        />
+      )}
+
+      {/* Financial Model Login Modal */}
+      {showModelLogin && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setShowModelLogin(false)}
+        >
+          <form
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => { e.preventDefault(); handleModelLogin(); }}
+            style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 24, width: 340 }}
+          >
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#e0e0e0", marginBottom: 4, fontFamily: "'Geist Mono', monospace" }}>Sign In</div>
+            <div style={{ fontSize: 11, color: "#8b949e", marginBottom: 16, fontFamily: "'Geist Mono', monospace" }}>Sign in to save & load model edits</div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 9, fontWeight: 700, color: "#8b949e", marginBottom: 4, letterSpacing: "0.06em", fontFamily: "'Geist Mono', monospace" }}>USERNAME</label>
+              <input
+                value={modelUsername}
+                onChange={(e) => setModelUsername(e.target.value)}
+                placeholder="Enter username"
+                autoFocus
+                autoComplete="username"
+                style={{ width: "100%", padding: "8px 10px", fontSize: 13, background: "#0d1117", border: "1px solid #30363d", borderRadius: 4, color: "#fff", fontFamily: "'Geist Mono', monospace", boxSizing: "border-box" }}
+              />
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", fontSize: 9, fontWeight: 700, color: "#8b949e", marginBottom: 4, letterSpacing: "0.06em", fontFamily: "'Geist Mono', monospace" }}>PASSWORD</label>
+              <input
+                type="password"
+                value={modelPassword}
+                onChange={(e) => setModelPassword(e.target.value)}
+                placeholder="Enter password"
+                autoComplete="current-password"
+                style={{ width: "100%", padding: "8px 10px", fontSize: 13, background: "#0d1117", border: "1px solid #30363d", borderRadius: 4, color: "#fff", fontFamily: "'Geist Mono', monospace", boxSizing: "border-box" }}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={modelAuthLoading || !modelPassword || !modelUsername}
+              style={{
+                width: "100%", padding: "8px 0", fontSize: 13, fontWeight: 600, fontFamily: "'Geist Mono', monospace",
+                background: (modelAuthLoading || !modelPassword || !modelUsername) ? "#30363d" : "#3b82f6",
+                color: "#fff", border: "none", borderRadius: 4, cursor: (modelAuthLoading || !modelPassword || !modelUsername) ? "default" : "pointer",
+                opacity: (modelAuthLoading || !modelPassword || !modelUsername) ? 0.5 : 1,
+              }}
+            >
+              {modelAuthLoading ? "Signing in..." : "Sign In"}
+            </button>
+            {modelAuthError && (
+              <div style={{ marginTop: 8, fontSize: 11, color: "#ef4444", fontFamily: "'Geist Mono', monospace" }}>{modelAuthError}</div>
+            )}
+          </form>
+        </div>
+      )}
+
+      {/* SHARED ANALYSIS SECTIONS */}
       {!loading && data && activeReturns && (
         <>
           <div style={{ marginBottom: 24, padding: 20, borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)" }}>
@@ -2834,8 +2963,8 @@ export default function StockTickerPage() {
         onClose={() => setIsPanelOpen(false)}
       />
 
-      {/* Data Sources */}
-      <div style={{ borderTop: "1px solid #1a1a1a", marginTop: 16, padding: "12px 16px", fontSize: 9, color: "#444", fontFamily: "'Geist Mono', monospace", lineHeight: 1.8 }}>
+      {/* Data Sources — hidden in model mode */}
+      {viewMode !== "model" && <div style={{ borderTop: "1px solid #1a1a1a", marginTop: 16, padding: "12px 16px", fontSize: 9, color: "#444", fontFamily: "'Geist Mono', monospace", lineHeight: 1.8 }}>
         <span style={{ fontWeight: 700, color: "#555", letterSpacing: "0.06em" }}>DATA SOURCES</span>
         <div style={{ marginTop: 4 }}>
           <span style={{ color: "#666" }}>Prices:</span> Interactive Brokers TWS API (primary), Yahoo Finance (fallback) &middot;{" "}
@@ -2843,7 +2972,7 @@ export default function StockTickerPage() {
           <span style={{ color: "#666" }}>Volatility:</span> Calculated from daily returns (Yang-Zhang, EWMA) &middot;{" "}
           <span style={{ color: "#666" }}>Research:</span> Pareto Securities, DNB Markets, Carnegie
         </div>
-      </div>
+      </div>}
     </main>
   );
 }
