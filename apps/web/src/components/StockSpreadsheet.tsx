@@ -551,8 +551,8 @@ export default function StockSpreadsheet({ ticker, token, profileName, onNeedLog
               )}
               <span style={{ padding: "1px 5px", fontSize: 9, color: "#8b949e", background: "#0d1117", border: "1px solid #21262d", borderRadius: 2 }}>{profileName}</span>
               <button onClick={onLogout} title="Sign out"
-                style={{ padding: "2px 5px", fontSize: 10, fontFamily: "'Geist Mono', monospace", background: "transparent", color: "#8b949e", border: "1px solid #30363d", borderRadius: 3, cursor: "pointer" }}>
-                ✕
+                style={{ padding: "2px 6px", fontSize: 10, fontFamily: "'Geist Mono', monospace", background: "transparent", color: "#f85149", border: "1px solid #f8514933", borderRadius: 3, cursor: "pointer" }}>
+                LOG OUT
               </button>
             </>
           ) : (
@@ -656,42 +656,60 @@ export default function StockSpreadsheet({ ticker, token, profileName, onNeedLog
 
         /* Sheet tabs — Excel-style bottom bar */
         .stock-sheet-wrapper .luckysheet-sheet-area {
-          background: #1e1e1e !important; border-top: 1px solid #444 !important;
-          height: 28px !important; display: flex !important; align-items: flex-end !important;
+          background: #252526 !important; border-top: 1px solid #444 !important;
+          height: 30px !important; display: flex !important; align-items: flex-end !important;
         }
-        /* Hide only the add-sheet (+) button */
+        /* Hide add-sheet (+) button and zoom controls to maximize tab space */
         .stock-sheet-wrapper .luckysheet-sheets-add { display: none !important; }
+        .stock-sheet-wrapper .luckysheet-zoom-control,
+        .stock-sheet-wrapper .luckysheet-sheet-area > div:last-child:not(.luckysheet-sheet-content):not([class*="luckysheet-sheets"]) {
+          display: none !important;
+        }
         /* Make tabs scroll area take full width */
         .stock-sheet-wrapper .luckysheet-sheet-area .luckysheet-sheets-scroll,
         .stock-sheet-wrapper .luckysheet-sheet-area .luckysheet-sheet-content {
           width: 100% !important; flex: 1 !important; max-width: 100% !important;
         }
-        /* Individual tabs — Excel-like flat style */
+        /* Individual tabs — high contrast Excel-like flat style */
         .stock-sheet-wrapper .luckysheet-sheets-item {
-          background: #2d2d2d !important; color: #aaa !important;
-          border: 1px solid #444 !important; border-bottom: 1px solid #444 !important;
-          font-size: 11px !important; padding: 3px 10px !important;
+          background: #2d2d2d !important; color: #d4d4d4 !important;
+          border: 1px solid #555 !important; border-bottom: 1px solid #555 !important;
+          font-size: 11px !important; padding: 4px 12px !important;
           max-width: none !important; white-space: nowrap !important;
-          line-height: 18px !important; height: 24px !important;
+          line-height: 18px !important; height: 26px !important;
           margin: 0 -1px 0 0 !important; border-radius: 0 !important;
           font-family: 'Calibri', 'Segoe UI', sans-serif !important;
           cursor: pointer !important;
         }
+        .stock-sheet-wrapper .luckysheet-sheets-item * {
+          color: #d4d4d4 !important;
+        }
         .stock-sheet-wrapper .luckysheet-sheets-item:hover {
-          color: #e0e0e0 !important; background: #383838 !important;
+          color: #fff !important; background: #3c3c3c !important;
         }
-        /* Active tab — white/bright like Excel, connected to content */
-        .stock-sheet-wrapper .luckysheet-sheets-item-active {
+        .stock-sheet-wrapper .luckysheet-sheets-item:hover * {
+          color: #fff !important;
+        }
+        /* Active tab — bright white text, green accent top border */
+        .stock-sheet-wrapper .luckysheet-sheets-item-active,
+        .stock-sheet-wrapper .luckysheet-sheets-item-active * {
           background: #1e1e1e !important; color: #fff !important;
-          border-bottom-color: #1e1e1e !important; font-weight: 600 !important;
-          border-top: 2px solid #4CAF50 !important;
+          font-weight: 600 !important;
         }
-        .stock-sheet-wrapper .luckysheet-sheets-scroll { background: #1e1e1e !important; }
-        /* Scroll arrows — small nav buttons */
+        .stock-sheet-wrapper .luckysheet-sheets-item-active {
+          border-bottom-color: #1e1e1e !important;
+          border-top: 2px solid #4EC9B0 !important;
+        }
+        .stock-sheet-wrapper .luckysheet-sheets-scroll { background: #252526 !important; }
+        /* Scroll arrows — high contrast nav buttons */
         .stock-sheet-wrapper .luckysheet-sheets-scroll-left,
         .stock-sheet-wrapper .luckysheet-sheets-scroll-right {
-          color: #aaa !important; background: #2d2d2d !important; border-color: #444 !important;
-          width: 20px !important; min-width: 20px !important; padding: 0 !important; font-size: 11px !important;
+          color: #d4d4d4 !important; background: #333 !important; border-color: #555 !important;
+          width: 22px !important; min-width: 22px !important; padding: 0 !important; font-size: 12px !important;
+        }
+        .stock-sheet-wrapper .luckysheet-sheets-scroll-left:hover,
+        .stock-sheet-wrapper .luckysheet-sheets-scroll-right:hover {
+          color: #fff !important; background: #444 !important;
         }
 
         /* Scrollbars */
@@ -703,8 +721,12 @@ export default function StockSpreadsheet({ ticker, token, profileName, onNeedLog
         /* Cell input */
         .stock-sheet-wrapper .luckysheet-cell-input { color: #333 !important; }
 
-        /* Hide "Add rows" footer bar */
+        /* Hide "Add rows" footer bar and any white line below tabs */
         .stock-sheet-wrapper .luckysheet-bottom-controll-row { display: none !important; }
+        .stock-sheet-wrapper .luckysheet-sheet-area { border-bottom: none !important; }
+        .stock-sheet-wrapper .luckysheet-stat-area { display: none !important; }
+        .stock-sheet-wrapper .fortune-sheet-container { border-bottom: none !important; }
+        .stock-sheet-wrapper .luckysheet-sheet-area + div { display: none !important; }
 
         /* === Popups/menus stay dark === */
         .luckysheet-rightclick-menu, .luckysheet-cols-menu,
