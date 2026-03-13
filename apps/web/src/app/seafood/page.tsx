@@ -2306,9 +2306,9 @@ export default function SeafoodPage() {
                   {/* ─── METHODOLOGY ──────────────────────────────── */}
                   <div style={{ padding: "8px 10px", borderTop: "1px solid #222", fontSize: 9, color: "#444", lineHeight: 1.6 }}>
                     <div style={{ fontWeight: 700, color: "#555", marginBottom: 4 }}>METHODOLOGY</div>
-                    <div>Harvest volumes estimated from wellboat AIS tracking: vessel capacity × 0.80 load factor per farm→slaughterhouse trip.</div>
-                    <div>Price matched to weekly SISALMON spot (Fish Pool) at departure date. Volume-weighted average price per company per quarter.</div>
-                    <div>Accuracy measured against reported quarterly harvest volumes and price realizations from company earnings reports.</div>
+                    <div>Volume estimates use historical same-quarter averages with YoY trend adjustment from reported company earnings (salmon_quarterly_ops).</div>
+                    <div>Price estimates from Fish Pool SISALMON weekly spot (NOK/kg), volume-weighted by AIS-tracked trip departures.</div>
+                    <div>AIS tracking (wellboat positions) provides supplementary trip count data. Accuracy measured against reported quarterly earnings.</div>
                   </div>
                 </div>
               )}

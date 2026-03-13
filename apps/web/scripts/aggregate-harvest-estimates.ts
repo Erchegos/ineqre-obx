@@ -1,10 +1,13 @@
 /**
- * Aggregate Harvest Trip Data into Quarterly Estimates
+ * Aggregate Harvest Quarterly Estimates
  *
- * Groups harvest_trips by company/quarter, computes:
- * - Trip count, total estimated volume
- * - Volume-weighted average spot price
- * - Comparison with actual quarterly ops (when available)
+ * Two estimation methods combined:
+ * 1. Model-based: Historical same-quarter average with YoY trend
+ * 2. AIS-tracked: Raw wellboat trip volumes (supplementary)
+ *
+ * For each company/quarter:
+ *   EST.VOL = avg of same-quarter actuals from prior years × (1 + YoY growth)
+ *   AIS.VOL = sum of tracked trip volumes (for coverage monitoring)
  *
  * Run: npx tsx scripts/aggregate-harvest-estimates.ts [--dry-run]
  */
@@ -31,70 +34,134 @@ const COMPANY_NAMES: Record<string, string> = {
   AUSS: "Austevoll Seafood ASA",
 };
 
+const TICKERS = Object.keys(COMPANY_NAMES);
+
 async function main() {
   console.log("═══════════════════════════════════════════════════");
-  console.log("  Aggregate Harvest Quarterly Estimates");
+  console.log("  Aggregate Harvest Quarterly Estimates (v2)");
   console.log("═══════════════════════════════════════════════════\n");
   if (DRY_RUN) console.log("(DRY RUN)\n");
 
-  // 1. Aggregate trips by company/quarter
-  const { rows: aggregates } = await pool.query(`
-    SELECT
-      origin_ticker AS ticker,
-      EXTRACT(YEAR FROM departure_time)::int AS year,
-      EXTRACT(QUARTER FROM departure_time)::int AS quarter,
-      COUNT(*)::int AS trip_count,
-      SUM(estimated_volume_tonnes)::float AS total_volume,
-      CASE
-        WHEN SUM(CASE WHEN spot_price_at_harvest IS NOT NULL THEN estimated_volume_tonnes ELSE 0 END) > 0
-        THEN SUM(COALESCE(spot_price_at_harvest, 0) * estimated_volume_tonnes) /
-             NULLIF(SUM(CASE WHEN spot_price_at_harvest IS NOT NULL THEN estimated_volume_tonnes ELSE 0 END), 0)
-        ELSE NULL
-      END::float AS vwap_price
+  // 1. Load all historical actuals from salmon_quarterly_ops
+  const { rows: allOps } = await pool.query(`
+    SELECT ticker, year, quarter,
+           harvest_tonnes_gwt::float AS harvest,
+           price_realization_per_kg::float AS price
+    FROM salmon_quarterly_ops
+    ORDER BY ticker, year, quarter
+  `);
+
+  // Build lookup: ticker → { quarter → [{ year, harvest, price }] }
+  const opsMap: Record<string, Record<number, { year: number; harvest: number | null; price: number | null }[]>> = {};
+  for (const r of allOps) {
+    if (!opsMap[r.ticker]) opsMap[r.ticker] = {};
+    if (!opsMap[r.ticker][r.quarter]) opsMap[r.ticker][r.quarter] = [];
+    opsMap[r.ticker][r.quarter].push({ year: r.year, harvest: r.harvest, price: r.price });
+  }
+
+  // 2. Load AIS trip aggregates
+  const { rows: aisAggs } = await pool.query(`
+    SELECT origin_ticker AS ticker,
+           EXTRACT(YEAR FROM departure_time)::int AS year,
+           EXTRACT(QUARTER FROM departure_time)::int AS quarter,
+           COUNT(*)::int AS trip_count,
+           SUM(estimated_volume_tonnes)::float AS ais_volume,
+           CASE
+             WHEN SUM(CASE WHEN spot_price_at_harvest IS NOT NULL THEN estimated_volume_tonnes ELSE 0 END) > 0
+             THEN SUM(COALESCE(spot_price_at_harvest, 0) * estimated_volume_tonnes) /
+                  NULLIF(SUM(CASE WHEN spot_price_at_harvest IS NOT NULL THEN estimated_volume_tonnes ELSE 0 END), 0)
+             ELSE NULL
+           END::float AS vwap_price
     FROM harvest_trips
     WHERE origin_ticker IS NOT NULL
     GROUP BY origin_ticker, EXTRACT(YEAR FROM departure_time), EXTRACT(QUARTER FROM departure_time)
     ORDER BY year DESC, quarter DESC, ticker
   `);
 
-  if (aggregates.length === 0) {
-    console.log("No harvest trips found. Run fetch-harvest-positions.ts first.");
-    await pool.end();
-    return;
+  // Build AIS lookup: ticker-year-quarter → { trip_count, ais_volume, vwap_price }
+  const aisMap: Record<string, { trip_count: number; ais_volume: number; vwap_price: number | null }> = {};
+  for (const r of aisAggs) {
+    aisMap[`${r.ticker}-${r.year}-${r.quarter}`] = {
+      trip_count: r.trip_count,
+      ais_volume: r.ais_volume,
+      vwap_price: r.vwap_price,
+    };
   }
 
-  console.log(`Found ${aggregates.length} company/quarter combinations\n`);
+  // 3. Determine which quarters to estimate
+  //    All quarters with AIS data + current quarter for all tickers
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const curQuarter = Math.ceil((now.getMonth() + 1) / 3);
 
-  // 2. For each aggregate, get actual data from salmon_quarterly_ops
-  for (const agg of aggregates) {
-    const companyName = COMPANY_NAMES[agg.ticker] || agg.ticker;
+  // Collect all unique (ticker, year, quarter) combinations we need
+  const combos = new Set<string>();
+  for (const r of aisAggs) combos.add(`${r.ticker}-${r.year}-${r.quarter}`);
+  for (const tk of TICKERS) combos.add(`${tk}-${curYear}-${curQuarter}`);
+  // Also add recent quarters from actuals for historical comparison
+  for (const r of allOps) {
+    if (r.year >= curYear - 1) combos.add(`${r.ticker}-${r.year}-${r.quarter}`);
+  }
 
-    // Get actuals
-    const { rows: actuals } = await pool.query(
-      `SELECT harvest_tonnes_gwt::float, price_realization_per_kg::float
-       FROM salmon_quarterly_ops
-       WHERE ticker = $1 AND year = $2 AND quarter = $3`,
-      [agg.ticker, agg.year, agg.quarter]
-    );
+  console.log(`Processing ${combos.size} company/quarter combinations\n`);
+  console.log(`${"TICKER".padEnd(7)} ${"QTR".padEnd(8)} ${"MODEL EST".padEnd(12)} ${"AIS TRACK".padEnd(12)} ${"ACTUAL".padEnd(12)} ${"ACC".padEnd(8)}`);
+  console.log("─".repeat(65));
 
-    const actual = actuals[0];
-    const actualVolume = actual?.harvest_tonnes_gwt || null;
-    const actualPrice = actual?.price_realization_per_kg || null;
+  for (const combo of Array.from(combos).sort()) {
+    const [ticker, yearStr, quarterStr] = combo.split("-");
+    const year = parseInt(yearStr);
+    const quarter = parseInt(quarterStr);
+    const companyName = COMPANY_NAMES[ticker] || ticker;
 
-    // Calculate accuracy
-    let accuracyPct: number | null = null;
-    if (actualVolume && agg.total_volume) {
-      accuracyPct = ((agg.total_volume - actualVolume) / actualVolume) * 100;
+    // Get historical same-quarter data for this company
+    const sameQHistory = (opsMap[ticker]?.[quarter] || [])
+      .filter(h => h.harvest != null && h.harvest > 0 && h.year < year)
+      .sort((a, b) => b.year - a.year); // most recent first
+
+    // Calculate model-based estimate
+    let modelEstimate: number | null = null;
+    let estPrice: number | null = null;
+
+    if (sameQHistory.length >= 2) {
+      // Use last 2 years same-quarter average with YoY trend
+      const recent = sameQHistory[0].harvest!;
+      const prior = sameQHistory[1].harvest!;
+      const yoyGrowth = (recent - prior) / prior;
+      // Cap growth at ±30% to avoid extreme extrapolation
+      const cappedGrowth = Math.max(-0.3, Math.min(0.3, yoyGrowth));
+      modelEstimate = Math.round(recent * (1 + cappedGrowth));
+    } else if (sameQHistory.length === 1) {
+      // Only one prior year — use it directly
+      modelEstimate = Math.round(sameQHistory[0].harvest!);
     }
 
-    const label = `${agg.ticker.padEnd(6)} Q${agg.quarter} ${agg.year}`;
-    const estVol = agg.total_volume ? `${Math.round(agg.total_volume)}t` : "N/A";
-    const estPrice = agg.vwap_price ? `${agg.vwap_price.toFixed(2)} NOK` : "N/A";
-    const actVol = actualVolume ? `${Math.round(actualVolume)}t` : "—";
-    const actPrice = actualPrice ? `${actualPrice.toFixed(2)} NOK` : "—";
+    // Price estimate: use Fish Pool VWAP from AIS tracking if available,
+    // otherwise use average of same-quarter historical prices
+    const aisData = aisMap[combo];
+    estPrice = aisData?.vwap_price ?? null;
+    if (!estPrice && sameQHistory.length > 0) {
+      const prices = sameQHistory.filter(h => h.price != null && h.price > 10).map(h => h.price!);
+      if (prices.length > 0) estPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
+    }
+
+    // Get actual data
+    const actualRow = allOps.find(r => r.ticker === ticker && r.year === year && r.quarter === quarter);
+    const actualVolume = actualRow?.harvest || null;
+    const actualPrice = actualRow?.price || null;
+
+    // Calculate accuracy (model estimate vs actual)
+    let accuracyPct: number | null = null;
+    if (actualVolume && actualVolume > 0 && modelEstimate && modelEstimate > 0) {
+      accuracyPct = ((modelEstimate - actualVolume) / actualVolume) * 100;
+    }
+
+    const label = `${ticker.padEnd(7)} Q${quarter} ${year}`;
+    const mEst = modelEstimate ? `${(modelEstimate / 1000).toFixed(1)}kt` : "—";
+    const aVol = aisData ? `${(aisData.ais_volume / 1000).toFixed(1)}kt` : "—";
+    const actVol = actualVolume ? `${(actualVolume / 1000).toFixed(1)}kt` : "—";
     const accStr = accuracyPct != null ? `${accuracyPct > 0 ? "+" : ""}${accuracyPct.toFixed(1)}%` : "—";
 
-    console.log(`  ${label}  Est: ${estVol.padEnd(8)} @ ${estPrice.padEnd(10)}  Act: ${actVol.padEnd(8)} @ ${actPrice.padEnd(10)}  Acc: ${accStr}`);
+    console.log(`  ${label}  ${mEst.padEnd(12)} ${aVol.padEnd(12)} ${actVol.padEnd(12)} ${accStr}`);
 
     if (!DRY_RUN) {
       await pool.query(
@@ -112,13 +179,13 @@ async function main() {
            estimation_accuracy_pct = EXCLUDED.estimation_accuracy_pct,
            updated_at = NOW()`,
         [
-          agg.ticker, companyName, agg.year, agg.quarter,
-          agg.total_volume ? Math.round(agg.total_volume) : null,
-          agg.trip_count,
-          agg.vwap_price ? agg.vwap_price.toFixed(2) : null,
+          ticker, companyName, year, quarter,
+          modelEstimate,
+          aisData?.trip_count || 0,
+          estPrice ? parseFloat(estPrice.toFixed(2)) : null,
           actualVolume ? Math.round(actualVolume) : null,
-          actualPrice ? actualPrice.toFixed(2) : null,
-          accuracyPct ? accuracyPct.toFixed(2) : null,
+          actualPrice ? parseFloat(actualPrice.toFixed(2)) : null,
+          accuracyPct != null ? parseFloat(accuracyPct.toFixed(2)) : null,
         ]
       );
     }
