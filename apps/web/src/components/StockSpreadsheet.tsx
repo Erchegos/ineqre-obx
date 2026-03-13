@@ -29,6 +29,7 @@ export default function StockSpreadsheet({ ticker, token, profileName, onNeedLog
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const workbookRef = useRef<WorkbookInstance>(null);
   const baseSheets = useRef<Sheet[] | null>(null);
+  const prevToken = useRef<string | null>(token);
 
   // Convert sheets to celldata format (Fortune-Sheet needs this on mount).
   // IMPORTANT: Always prefer `data` (2D array with live edits) over `celldata`
@@ -66,6 +67,18 @@ export default function StockSpreadsheet({ ticker, token, profileName, onNeedLog
 
   // Load spreadsheet data
   useEffect(() => {
+    // On logout (token went from value → null), keep sheets visible but locked.
+    // Only reload when token appears (login) or ticker changes.
+    const wasLoggedIn = prevToken.current != null;
+    const isLoggedIn = token != null;
+    prevToken.current = token;
+    if (wasLoggedIn && !isLoggedIn) {
+      // Logout: just lock the view, don't reload — keep existing sheets visible but blurred
+      setHasChanges(false);
+      setSaveStatus("idle");
+      return;
+    }
+
     async function load() {
       setLoading(true);
       setError(null);
