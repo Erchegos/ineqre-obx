@@ -10,6 +10,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, Bar, Cell, PieChart, Pie,
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  LineChart, Line,
 } from "recharts";
 
 // ============================================================================
@@ -374,6 +375,12 @@ export default function PortfolioPage() {
   const [manualResult, setManualResult] = useState<any>(null);
   const [manualLoading, setManualLoading] = useState(false);
 
+  // ML Backtest tab state
+  const [manualTab, setManualTab] = useState<"analysis" | "backtest">("analysis");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [backtestResult, setBacktestResult] = useState<any>(null);
+  const [backtestLoading, setBacktestLoading] = useState(false);
+
   // Apply suggested weights (all or individual) and re-run analysis
   const handleApplySuggestedWeights = useCallback((weights: Record<string, number>) => {
     // Merge: only override tickers present in the weights map
@@ -641,6 +648,36 @@ export default function PortfolioPage() {
       setError(e instanceof Error ? e.message : "Analysis failed");
     } finally {
       setManualLoading(false);
+    }
+  };
+
+  // Fetch ML backtest for current portfolio
+  const runBacktest = async () => {
+    if (selectedTickers.length < 2 || manualWeights.length === 0) return;
+    setBacktestLoading(true);
+    try {
+      const res = await fetch("/api/portfolio/backtest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tickers: selectedTickers,
+          weights: selectedTickers.map(t => {
+            const w = manualWeights.find(mw => mw.ticker === t);
+            return w ? w.weight : 0;
+          }),
+        }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: "Request failed" }));
+        setBacktestResult({ error: errData.error || `Error ${res.status}` });
+        return;
+      }
+      const data = await res.json();
+      setBacktestResult(data);
+    } catch (e: unknown) {
+      setBacktestResult({ error: e instanceof Error ? e.message : "Backtest failed" });
+    } finally {
+      setBacktestLoading(false);
     }
   };
 
@@ -2291,6 +2328,42 @@ export default function PortfolioPage() {
       {/* === MANUAL PORTFOLIO DETAILED RESULTS === */}
       {portfolioMode === "manual" && manualResult && (
         <div style={{ opacity: manualLoading ? 0.4 : 1, transition: "opacity 0.3s ease" }}>
+
+          {/* Tab Bar */}
+          <div style={{
+            display: "flex", gap: 0, marginBottom: 16,
+            borderBottom: "1px solid #30363d",
+          }}>
+            {(["analysis", "backtest"] as const).map(tab => (
+              <button
+                key={tab}
+                onClick={() => {
+                  setManualTab(tab);
+                  if (tab === "backtest" && !backtestResult && !backtestLoading) {
+                    runBacktest();
+                  }
+                }}
+                style={{
+                  padding: "10px 20px",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  fontFamily: "monospace",
+                  letterSpacing: "0.08em",
+                  background: "none",
+                  border: "none",
+                  borderBottom: manualTab === tab ? "2px solid #3b82f6" : "2px solid transparent",
+                  color: manualTab === tab ? "#fff" : "rgba(255,255,255,0.4)",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                {tab === "analysis" ? "ANALYSIS" : "ML BACKTEST"}
+              </button>
+            ))}
+          </div>
+
+          {/* Analysis Tab Content */}
+          {manualTab === "analysis" && (<>
           {/* Historical Performance Chart */}
           <div style={{ ...cardStyle, marginBottom: 20 }}>
             <div style={sectionTitle}>HISTORICAL PERFORMANCE</div>
@@ -2500,6 +2573,364 @@ export default function PortfolioPage() {
               </div>
             </div>
           )}
+          </>)}
+
+          {/* ML Backtest Tab Content */}
+          {manualTab === "backtest" && (
+            <div>
+              {backtestLoading && (
+                <div style={{ padding: 40, textAlign: "center" }}>
+                  <div style={{ fontSize: 13, fontFamily: "monospace", color: "rgba(255,255,255,0.5)", letterSpacing: "0.05em" }}>
+                    Running ML backtest...
+                  </div>
+                  <div style={{ marginTop: 12, height: 3, width: 200, margin: "12px auto 0", background: "#21262d", borderRadius: 2, overflow: "hidden" }}>
+                    <div style={{
+                      height: "100%", width: "40%", background: "linear-gradient(90deg, #3b82f6, #8b5cf6)",
+                      borderRadius: 2, animation: "pulse 1.5s ease-in-out infinite",
+                    }} />
+                  </div>
+                </div>
+              )}
+
+              {backtestResult?.error && (
+                <div style={{
+                  ...cardStyle, padding: 24, textAlign: "center",
+                  borderLeft: "3px solid #ef4444",
+                }}>
+                  <div style={{ fontSize: 12, fontFamily: "monospace", color: "#ef4444", marginBottom: 4 }}>
+                    Backtest Error
+                  </div>
+                  <div style={{ fontSize: 11, fontFamily: "monospace", color: "rgba(255,255,255,0.5)" }}>
+                    {backtestResult.error}
+                  </div>
+                </div>
+              )}
+
+              {backtestResult && !backtestResult.error && !backtestLoading && (() => {
+                const bt = backtestResult;
+                const STRAT_COLORS: Record<string, string> = {
+                  static: "#9e9e9e",
+                  mlTilted: "#8b5cf6",
+                  mlLongOnly: "#10b981",
+                  obx: "#f59e0b",
+                };
+                const STRAT_LABELS: Record<string, string> = {
+                  static: "Static Weights",
+                  mlTilted: "ML-Tilted",
+                  mlLongOnly: "ML Long-Only",
+                  obx: "OBX Benchmark",
+                };
+
+                return (
+                  <>
+                    {/* Backtest Summary Strip */}
+                    <div style={{
+                      display: "flex", gap: 12, marginBottom: 16, padding: "10px 14px",
+                      background: "#0d1117", borderRadius: 6, border: "1px solid #21262d",
+                      flexWrap: "wrap", alignItems: "center",
+                    }}>
+                      <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em" }}>
+                        WALK-FORWARD BACKTEST
+                      </span>
+                      <span style={{ fontSize: 11, fontFamily: "monospace", color: "#fff", fontWeight: 700 }}>
+                        {bt.nMonths} months
+                      </span>
+                      <span style={{ color: "#30363d" }}>|</span>
+                      <span style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.5)" }}>
+                        {bt.tickersCovered}/{bt.nTickers} tickers with data
+                      </span>
+                      <span style={{ color: "#30363d" }}>|</span>
+                      <span style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.5)" }}>
+                        Direction accuracy: <span style={{ color: bt.overallHitRate >= 0.55 ? "#10b981" : bt.overallHitRate >= 0.45 ? "#f59e0b" : "#ef4444", fontWeight: 700 }}>
+                          {(bt.overallHitRate * 100).toFixed(0)}%
+                        </span>
+                      </span>
+                      <span style={{ color: "#30363d" }}>|</span>
+                      <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.25)" }}>
+                        {bt.run.modelVersion}
+                      </span>
+                    </div>
+
+                    {/* Strategy Stats Cards */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 20 }}>
+                      {(Object.entries(bt.strategyStats) as [string, { totalReturn: number; annualizedReturn: number; volatility: number; sharpe: number; maxDrawdown: number; winRate: number }][]).map(([key, stats]) => {
+                        const color = STRAT_COLORS[key] || "#fff";
+                        const isActive = key === "mlTilted"; // highlight best ML strategy
+                        return (
+                          <div key={key} style={{
+                            ...cardStyle,
+                            borderLeft: `3px solid ${color}`,
+                            background: isActive ? `linear-gradient(135deg, ${color}08, #161b22)` : "#161b22",
+                          }}>
+                            <div style={{ fontSize: 9, fontFamily: "monospace", color, letterSpacing: "0.08em", marginBottom: 8, fontWeight: 700 }}>
+                              {STRAT_LABELS[key] || key}
+                            </div>
+                            <div style={{
+                              fontSize: 24, fontWeight: 800, fontFamily: "monospace",
+                              color: stats.totalReturn >= 0 ? "#10b981" : "#ef4444",
+                              marginBottom: 8,
+                            }}>
+                              {stats.totalReturn >= 0 ? "+" : ""}{(stats.totalReturn * 100).toFixed(1)}%
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 9, fontFamily: "monospace" }}>
+                              <div>
+                                <span style={{ color: "rgba(255,255,255,0.3)" }}>Ann. </span>
+                                <span style={{ color: stats.annualizedReturn >= 0 ? "#10b981" : "#ef4444", fontWeight: 600 }}>
+                                  {(stats.annualizedReturn * 100).toFixed(1)}%
+                                </span>
+                              </div>
+                              <div>
+                                <span style={{ color: "rgba(255,255,255,0.3)" }}>Vol </span>
+                                <span style={{ color: "rgba(255,255,255,0.6)", fontWeight: 600 }}>
+                                  {(stats.volatility * 100).toFixed(1)}%
+                                </span>
+                              </div>
+                              <div>
+                                <span style={{ color: "rgba(255,255,255,0.3)" }}>Sharpe </span>
+                                <span style={{ color: stats.sharpe >= 1 ? "#10b981" : stats.sharpe >= 0 ? "#f59e0b" : "#ef4444", fontWeight: 600 }}>
+                                  {stats.sharpe.toFixed(2)}
+                                </span>
+                              </div>
+                              <div>
+                                <span style={{ color: "rgba(255,255,255,0.3)" }}>MaxDD </span>
+                                <span style={{ color: "#ef4444", fontWeight: 600 }}>
+                                  {(stats.maxDrawdown * 100).toFixed(1)}%
+                                </span>
+                              </div>
+                              <div style={{ gridColumn: "1 / -1" }}>
+                                <span style={{ color: "rgba(255,255,255,0.3)" }}>Win Rate </span>
+                                <span style={{ color: stats.winRate >= 0.55 ? "#10b981" : "#f59e0b", fontWeight: 600 }}>
+                                  {(stats.winRate * 100).toFixed(0)}%
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Cumulative Returns Chart */}
+                    <div style={{ ...cardStyle, marginBottom: 20 }}>
+                      <div style={sectionTitle}>CUMULATIVE RETURNS BY STRATEGY</div>
+                      <ResponsiveContainer width="100%" height={350}>
+                        <LineChart data={bt.cumulativeSeries}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#21262d" />
+                          <XAxis
+                            dataKey="month"
+                            tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 9, fontFamily: "monospace" }}
+                            tickFormatter={(v: string) => v.slice(5, 7) + "/" + v.slice(2, 4)}
+                          />
+                          <YAxis
+                            tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 9, fontFamily: "monospace" }}
+                            tickFormatter={(v: number) => `${v.toFixed(0)}%`}
+                          />
+                          <Tooltip
+                            content={({ active, payload, label }) => {
+                              if (!active || !payload || payload.length === 0) return null;
+                              const sorted = [...payload].sort((a, b) => ((b.value as number) ?? 0) - ((a.value as number) ?? 0));
+                              return (
+                                <div style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 4, padding: "8px 10px", fontFamily: "monospace", fontSize: 11 }}>
+                                  <div style={{ marginBottom: 4, color: "rgba(255,255,255,0.7)" }}>{label}</div>
+                                  {sorted.map(entry => {
+                                    const key = entry.dataKey as string;
+                                    const val = (entry.value as number) ?? 0;
+                                    return (
+                                      <div key={key} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                                        <span style={{ color: entry.color }}>{STRAT_LABELS[key] || key}</span>
+                                        <span style={{ color: entry.color, fontWeight: 700 }}>
+                                          {val >= 0 ? "+" : ""}{val.toFixed(2)}%
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            }}
+                          />
+                          <Line type="monotone" dataKey="static" stroke={STRAT_COLORS.static} strokeWidth={1.5} dot={false} name="Static" />
+                          <Line type="monotone" dataKey="mlTilted" stroke={STRAT_COLORS.mlTilted} strokeWidth={2.5} dot={false} name="ML-Tilted" />
+                          <Line type="monotone" dataKey="mlLongOnly" stroke={STRAT_COLORS.mlLongOnly} strokeWidth={2} dot={false} name="ML Long-Only" />
+                          <Line type="monotone" dataKey="obx" stroke={STRAT_COLORS.obx} strokeWidth={1.5} dot={false} strokeDasharray="6 3" name="OBX" />
+                        </LineChart>
+                      </ResponsiveContainer>
+                      {/* Legend */}
+                      <div style={{ display: "flex", gap: 16, justifyContent: "center", marginTop: 8 }}>
+                        {Object.entries(STRAT_LABELS).map(([key, label]) => (
+                          <div key={key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <div style={{
+                              width: key === "obx" ? 16 : 12, height: 2,
+                              background: STRAT_COLORS[key],
+                              borderTop: key === "obx" ? `2px dashed ${STRAT_COLORS[key]}` : "none",
+                            }} />
+                            <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.5)" }}>
+                              {label}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Strategy Explanations */}
+                      <div style={{
+                        display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14,
+                        padding: "12px 14px", background: "#0d1117", borderRadius: 6, border: "1px solid #21262d",
+                      }}>
+                        {[
+                          { key: "static", desc: "Holds your manual weights unchanged every month. Baseline for measuring ML value-add." },
+                          { key: "mlTilted", desc: "Overweights tickers the ML model predicts will rise, underweights predicted decliners (5x tilt factor). Weights are re-normalized monthly." },
+                          { key: "mlLongOnly", desc: "Removes tickers with negative ML predictions each month and redistributes their weight among remaining holdings. Goes to cash if all signals are negative." },
+                          { key: "obx", desc: "OBX Total Return Index over the same monthly periods. Your benchmark to beat." },
+                        ].map(({ key, desc }) => (
+                          <div key={key} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                            <div style={{
+                              width: 10, height: 10, borderRadius: 2, flexShrink: 0, marginTop: 2,
+                              background: STRAT_COLORS[key],
+                            }} />
+                            <div>
+                              <div style={{ fontSize: 10, fontFamily: "monospace", fontWeight: 700, color: STRAT_COLORS[key], marginBottom: 2 }}>
+                                {STRAT_LABELS[key]}
+                              </div>
+                              <div style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.4)", lineHeight: 1.5 }}>
+                                {desc}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Monthly Breakdown Table */}
+                    <div style={{ ...cardStyle, marginBottom: 20 }}>
+                      <div style={sectionTitle}>MONTHLY BREAKDOWN</div>
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                          <thead>
+                            <tr style={{ borderBottom: "1px solid #30363d" }}>
+                              {["MONTH", "STATIC", "ML-TILTED", "ML L/O", "OBX", "HIT RATE", "COV."].map(h => (
+                                <th key={h} style={{
+                                  padding: "6px 8px", textAlign: h === "MONTH" ? "left" : "right",
+                                  fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.35)",
+                                  letterSpacing: "0.05em",
+                                }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {bt.monthlyResults.map((m: { month: string; staticReturn: number; mlTiltedReturn: number; mlLongOnlyReturn: number; obxReturn: number; hitRate: number; tickersCovered: number; tickersTotal: number }) => (
+                              <tr key={m.month} style={{ borderBottom: "1px solid #21262d" }}>
+                                <td style={{ padding: "5px 8px", fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.6)" }}>
+                                  {m.month.slice(0, 7)}
+                                </td>
+                                {[
+                                  { val: m.staticReturn, color: STRAT_COLORS.static },
+                                  { val: m.mlTiltedReturn, color: STRAT_COLORS.mlTilted },
+                                  { val: m.mlLongOnlyReturn, color: STRAT_COLORS.mlLongOnly },
+                                  { val: m.obxReturn, color: STRAT_COLORS.obx },
+                                ].map(({ val, color }, i) => (
+                                  <td key={i} style={{
+                                    padding: "5px 8px", textAlign: "right", fontSize: 10,
+                                    fontFamily: "monospace", fontWeight: 600,
+                                    color: val >= 0 ? "#10b981" : "#ef4444",
+                                  }}>
+                                    {val >= 0 ? "+" : ""}{(val * 100).toFixed(2)}%
+                                  </td>
+                                ))}
+                                <td style={{
+                                  padding: "5px 8px", textAlign: "right", fontSize: 10,
+                                  fontFamily: "monospace", fontWeight: 700,
+                                  color: m.hitRate >= 0.6 ? "#10b981" : m.hitRate >= 0.45 ? "#f59e0b" : "#ef4444",
+                                }}>
+                                  {(m.hitRate * 100).toFixed(0)}%
+                                </td>
+                                <td style={{
+                                  padding: "5px 8px", textAlign: "right", fontSize: 9,
+                                  fontFamily: "monospace", color: "rgba(255,255,255,0.3)",
+                                }}>
+                                  {m.tickersCovered}/{m.tickersTotal}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Per-Ticker Accuracy */}
+                    <div style={{ ...cardStyle, marginBottom: 20 }}>
+                      <div style={sectionTitle}>PER-TICKER PREDICTION ACCURACY</div>
+                      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <thead>
+                          <tr style={{ borderBottom: "1px solid #30363d" }}>
+                            {["TICKER", "WEIGHT", "MONTHS", "HIT RATE", "MAE", "AVG PRED", "AVG ACTUAL", "BEST", "WORST"].map(h => (
+                              <th key={h} style={{
+                                padding: "6px 6px", textAlign: h === "TICKER" ? "left" : "right",
+                                fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.35)",
+                              }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {bt.tickerAccuracy.map((t: { ticker: string; weight: number; nPredictions: number; hitRate: number; mae: number; avgPrediction: number; avgActual: number; bestMonth: number; worstMonth: number }) => (
+                            <tr key={t.ticker} style={{ borderBottom: "1px solid #21262d" }}>
+                              <td style={{ padding: "5px 6px", fontSize: 11, fontFamily: "monospace", fontWeight: 700, color: "#fff" }}>
+                                {t.ticker}
+                              </td>
+                              <td style={{ padding: "5px 6px", textAlign: "right", fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.5)" }}>
+                                {(t.weight * 100).toFixed(1)}%
+                              </td>
+                              <td style={{ padding: "5px 6px", textAlign: "right", fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.4)" }}>
+                                {t.nPredictions}
+                              </td>
+                              <td style={{
+                                padding: "5px 6px", textAlign: "right", fontSize: 10, fontFamily: "monospace", fontWeight: 700,
+                                color: t.hitRate >= 0.6 ? "#10b981" : t.hitRate >= 0.45 ? "#f59e0b" : "#ef4444",
+                              }}>
+                                {(t.hitRate * 100).toFixed(0)}%
+                              </td>
+                              <td style={{ padding: "5px 6px", textAlign: "right", fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.5)" }}>
+                                {(t.mae * 100).toFixed(2)}%
+                              </td>
+                              <td style={{
+                                padding: "5px 6px", textAlign: "right", fontSize: 10, fontFamily: "monospace",
+                                color: t.avgPrediction >= 0 ? "#10b981" : "#ef4444",
+                              }}>
+                                {t.avgPrediction >= 0 ? "+" : ""}{(t.avgPrediction * 100).toFixed(2)}%
+                              </td>
+                              <td style={{
+                                padding: "5px 6px", textAlign: "right", fontSize: 10, fontFamily: "monospace",
+                                color: t.avgActual >= 0 ? "#10b981" : "#ef4444",
+                              }}>
+                                {t.avgActual >= 0 ? "+" : ""}{(t.avgActual * 100).toFixed(2)}%
+                              </td>
+                              <td style={{ padding: "5px 6px", textAlign: "right", fontSize: 10, fontFamily: "monospace", color: "#10b981" }}>
+                                +{(t.bestMonth * 100).toFixed(1)}%
+                              </td>
+                              <td style={{ padding: "5px 6px", textAlign: "right", fontSize: 10, fontFamily: "monospace", color: "#ef4444" }}>
+                                {(t.worstMonth * 100).toFixed(1)}%
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Methodology Note */}
+                    <div style={{
+                      padding: "10px 14px", background: "#0d1117", borderRadius: 4,
+                      border: "1px solid #21262d", fontSize: 9, fontFamily: "monospace",
+                      color: "rgba(255,255,255,0.3)", lineHeight: 1.6,
+                    }}>
+                      <strong style={{ color: "rgba(255,255,255,0.5)" }}>Methodology:</strong>{" "}
+                      Walk-forward backtest using historical ML predictions (21-day forward returns).
+                      <strong> Static</strong> = hold user weights. <strong>ML-Tilted</strong> = adjust weights by ML prediction signal (5x tilt).
+                      <strong> ML Long-Only</strong> = exclude tickers with negative predictions and redistribute.
+                      Monthly rebalancing. Past performance does not indicate future results.
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          )}
+
         </div>
       )}
 
