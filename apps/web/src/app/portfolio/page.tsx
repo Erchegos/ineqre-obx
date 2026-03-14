@@ -2108,8 +2108,8 @@ export default function PortfolioPage() {
         </div>
       )}
 
-      {/* === MODE COMPARISON === */}
-      {result && result.modeComparison && (() => {
+      {/* === MODE COMPARISON (optimizer tab only) === */}
+      {portfolioMode === "optimizer" && result && result.modeComparison && (() => {
         const MODE_COLORS: Record<string, string> = {
           equal: "#9e9e9e", min_variance: "#3b82f6", max_sharpe: "#10b981",
           risk_parity: "#f59e0b", max_diversification: "#8b5cf6",

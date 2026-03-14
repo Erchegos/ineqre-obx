@@ -143,14 +143,14 @@ export async function POST(req: NextRequest) {
       cumulativePortfolio.push((cumPort - 1) * 100); // as percentage
     }
 
-    // Per-stock weighted cumulative returns
+    // Per-stock actual cumulative returns (unweighted — shows real stock performance)
     const cumulativeStocks: Record<string, number[]> = {};
     for (let i = 0; i < tickers.length; i++) {
       const rets = returns[i];
       let cum = 1;
       const cumArr: number[] = [];
       for (const r of rets) {
-        cum *= (1 + r * weights[i]); // weighted contribution
+        cum *= (1 + r);
         cumArr.push((cum - 1) * 100);
       }
       cumulativeStocks[tickers[i]] = cumArr;
