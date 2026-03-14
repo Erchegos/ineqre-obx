@@ -20,6 +20,7 @@ interface ManualWeightEditorProps {
   stockInfo: Record<string, StockInfo>;
   portfolioValueNOK: number;
   onWeightsChange: (weights: { ticker: string; weight: number }[]) => void;
+  externalWeights?: { ticker: string; weight: number }[];
 }
 
 const SECTOR_COLORS: Record<string, string> = {
@@ -44,6 +45,7 @@ export default function ManualWeightEditor({
   stockInfo,
   portfolioValueNOK,
   onWeightsChange,
+  externalWeights,
 }: ManualWeightEditorProps) {
   const [rows, setRows] = useState<ManualWeight[]>([]);
   // Track editing state per cell — when editing, show raw string; when not, show formatted value
@@ -85,6 +87,23 @@ export default function ManualWeightEditor({
       }));
     }
   }, [portfolioValueNOK, stockInfo, rows.length]);
+
+  // Sync from external weights (e.g. when APPLY ALL is clicked)
+  const prevExternalRef = useRef<string>("");
+  useEffect(() => {
+    if (!externalWeights || externalWeights.length === 0) return;
+    const key = externalWeights.map(w => `${w.ticker}:${w.weight.toFixed(6)}`).join(",");
+    if (key === prevExternalRef.current) return;
+    prevExternalRef.current = key;
+    const wMap = new Map(externalWeights.map(w => [w.ticker, w.weight]));
+    setRows(prev => prev.map(r => {
+      const newWeight = wMap.get(r.ticker);
+      if (newWeight === undefined || Math.abs(newWeight - r.weight) < 0.0001) return r;
+      const price = stockInfo[r.ticker]?.lastPrice || 0;
+      const amount = newWeight * portfolioValueNOK;
+      return { ...r, weight: newWeight, amount, shares: price > 0 ? Math.floor(amount / price) : 0 };
+    }));
+  }, [externalWeights, stockInfo, portfolioValueNOK]);
 
   // Notify parent on change
   useEffect(() => {

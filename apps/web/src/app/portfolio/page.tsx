@@ -1373,6 +1373,7 @@ export default function PortfolioPage() {
                   stockInfo={stockInfoMap}
                   portfolioValueNOK={portfolioValueNOK}
                   onWeightsChange={setManualWeights}
+                  externalWeights={manualWeights}
                 />
               </>
             ) : (
@@ -2798,10 +2799,27 @@ export default function PortfolioPage() {
                       </div>
                     </div>
 
-                    {/* Monthly Breakdown Table */}
+                    {/* Monthly Breakdown Table (collapsible) */}
                     <div style={{ ...cardStyle, marginBottom: 20 }}>
-                      <div style={sectionTitle}>MONTHLY BREAKDOWN</div>
-                      <div style={{ overflowX: "auto" }}>
+                      <button
+                        onClick={(e) => {
+                          const content = (e.currentTarget.parentElement as HTMLElement)?.querySelector('[data-collapse="monthly"]') as HTMLElement;
+                          if (content) content.style.display = content.style.display === "none" ? "block" : "none";
+                          e.currentTarget.querySelector('span[data-arrow]')!.textContent =
+                            (e.currentTarget.parentElement as HTMLElement)?.querySelector('[data-collapse="monthly"]')?.getAttribute('style')?.includes('none') ? '\u25B6' : '\u25BC';
+                        }}
+                        style={{
+                          ...sectionTitle, marginBottom: 8, cursor: "pointer", background: "none", border: "none",
+                          display: "flex", alignItems: "center", gap: 8, padding: 0, width: "100%", textAlign: "left",
+                        }}
+                      >
+                        <span data-arrow style={{ fontSize: 9, color: "rgba(255,255,255,0.3)" }}>{'\u25B6'}</span>
+                        MONTHLY BREAKDOWN
+                        <span style={{ fontSize: 9, fontWeight: 400, color: "rgba(255,255,255,0.25)", marginLeft: "auto" }}>
+                          {bt.nMonths} months
+                        </span>
+                      </button>
+                      <div data-collapse="monthly" style={{ display: "none", overflowX: "auto" }}>
                         <table style={{ width: "100%", borderCollapse: "collapse" }}>
                           <thead>
                             <tr style={{ borderBottom: "1px solid #30363d" }}>
@@ -2854,9 +2872,27 @@ export default function PortfolioPage() {
                       </div>
                     </div>
 
-                    {/* Per-Ticker Accuracy */}
+                    {/* Per-Ticker Accuracy (collapsible) */}
                     <div style={{ ...cardStyle, marginBottom: 20 }}>
-                      <div style={sectionTitle}>PER-TICKER PREDICTION ACCURACY</div>
+                      <button
+                        onClick={(e) => {
+                          const content = (e.currentTarget.parentElement as HTMLElement)?.querySelector('[data-collapse="ticker-acc"]') as HTMLElement;
+                          if (content) content.style.display = content.style.display === "none" ? "block" : "none";
+                          e.currentTarget.querySelector('span[data-arrow]')!.textContent =
+                            (e.currentTarget.parentElement as HTMLElement)?.querySelector('[data-collapse="ticker-acc"]')?.getAttribute('style')?.includes('none') ? '\u25B6' : '\u25BC';
+                        }}
+                        style={{
+                          ...sectionTitle, marginBottom: 8, cursor: "pointer", background: "none", border: "none",
+                          display: "flex", alignItems: "center", gap: 8, padding: 0, width: "100%", textAlign: "left",
+                        }}
+                      >
+                        <span data-arrow style={{ fontSize: 9, color: "rgba(255,255,255,0.3)" }}>{'\u25B6'}</span>
+                        PER-TICKER PREDICTION ACCURACY
+                        <span style={{ fontSize: 9, fontWeight: 400, color: "rgba(255,255,255,0.25)", marginLeft: "auto" }}>
+                          {bt.tickerAccuracy.length} tickers
+                        </span>
+                      </button>
+                      <div data-collapse="ticker-acc" style={{ display: "none" }}>
                       <table style={{ width: "100%", borderCollapse: "collapse" }}>
                         <thead>
                           <tr style={{ borderBottom: "1px solid #30363d" }}>
@@ -2911,6 +2947,7 @@ export default function PortfolioPage() {
                           ))}
                         </tbody>
                       </table>
+                      </div>
                     </div>
 
                     {/* Methodology Note */}
