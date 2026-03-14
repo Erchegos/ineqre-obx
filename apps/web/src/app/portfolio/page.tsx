@@ -1640,6 +1640,220 @@ export default function PortfolioPage() {
                   ))}
                 </div>
               )}
+
+              {/* Strategy Comparison — linked to manual portfolio */}
+              {manualResult.modeComparison && (() => {
+                const MC_COLORS: Record<string, string> = {
+                  equal: "#9e9e9e", min_variance: "#3b82f6", max_sharpe: "#10b981",
+                  risk_parity: "#f59e0b", max_diversification: "#8b5cf6",
+                };
+                const mcEntries = Object.entries(manualResult.modeComparison) as [string, { metrics: ModeMetrics; weights: number[] }][];
+                const hlMode = hoveredMode || "risk_parity";
+                // Build radar data from mode comparison metrics
+                const mcSharpes = mcEntries.map(([, mc]) => mc.metrics.sharpeRatio);
+                const mcReturns = mcEntries.map(([, mc]) => mc.metrics.expectedReturn * 100);
+                const mcStability = mcEntries.map(([, mc]) => (1 - mc.metrics.maxDrawdown) * 100);
+                const mcDiv = mcEntries.map(([, mc]) => mc.metrics.diversificationRatio);
+                const mcPos = mcEntries.map(([, mc]) => mc.metrics.effectivePositions);
+                const mnorm = (v: number, arr: number[]) => {
+                  const mn = Math.min(...arr); const mx = Math.max(...arr);
+                  return mx > mn ? ((v - mn) / (mx - mn)) * 80 + 20 : 50;
+                };
+
+                // Add "manual" as the current user portfolio for radar comparison
+                const manualPt = {
+                  manual: {
+                    Return: mnorm(mm.expectedReturn * 100, [...mcReturns, mm.expectedReturn * 100]),
+                    Sharpe: mnorm(mm.sharpeRatio, [...mcSharpes, mm.sharpeRatio]),
+                    Stability: mnorm((1 - mm.maxDrawdown) * 100, [...mcStability, (1 - mm.maxDrawdown) * 100]),
+                    Diversification: mnorm(mm.diversificationRatio, [...mcDiv, mm.diversificationRatio]),
+                    Breadth: mnorm(mm.effectivePositions, [...mcPos, mm.effectivePositions]),
+                  },
+                };
+
+                const mcRadar = [
+                  { metric: "Return", ...Object.fromEntries(mcEntries.map(([k, mc]) => [k, mnorm(mc.metrics.expectedReturn * 100, [...mcReturns, mm.expectedReturn * 100])])), manual: manualPt.manual.Return },
+                  { metric: "Sharpe", ...Object.fromEntries(mcEntries.map(([k, mc]) => [k, mnorm(mc.metrics.sharpeRatio, [...mcSharpes, mm.sharpeRatio])])), manual: manualPt.manual.Sharpe },
+                  { metric: "Stability", ...Object.fromEntries(mcEntries.map(([k, mc]) => [k, mnorm((1 - mc.metrics.maxDrawdown) * 100, [...mcStability, (1 - mm.maxDrawdown) * 100])])), manual: manualPt.manual.Stability },
+                  { metric: "Diversification", ...Object.fromEntries(mcEntries.map(([k, mc]) => [k, mnorm(mc.metrics.diversificationRatio, [...mcDiv, mm.diversificationRatio])])), manual: manualPt.manual.Diversification },
+                  { metric: "Breadth", ...Object.fromEntries(mcEntries.map(([k, mc]) => [k, mnorm(mc.metrics.effectivePositions, [...mcPos, mm.effectivePositions])])), manual: manualPt.manual.Breadth },
+                ];
+                const mcHlColor = hlMode === "manual" ? "#ffffff" : (MC_COLORS[hlMode] || "#fff");
+                const mcHlMetrics = hlMode === "manual" ? mm : (manualResult.modeComparison[hlMode]?.metrics || mm);
+
+                return (
+                  <div style={{ ...cardStyle, marginBottom: 16 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                      <div style={sectionTitle}>Strategy Comparison — All Optimization Modes</div>
+                      <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", fontFamily: "monospace" }}>
+                        Hover to preview · Click to apply weights
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", marginBottom: 12 }}>
+                      Compare your manual portfolio against all optimizer modes. Click APPLY to use those weights.
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 16 }}>
+                      {/* Radar */}
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                        <ResponsiveContainer width="100%" height={260}>
+                          <RadarChart data={mcRadar} cx="50%" cy="50%" outerRadius="75%">
+                            <PolarGrid stroke="#30363d" />
+                            <PolarAngleAxis dataKey="metric" tick={{ fontSize: 9, fill: "rgba(255,255,255,0.5)", fontFamily: "monospace" }} />
+                            <PolarRadiusAxis tick={false} domain={[0, 100]} axisLine={false} />
+                            {/* User's portfolio always shown */}
+                            <Radar name="Your Portfolio" dataKey="manual"
+                              stroke="#ffffff" fill="#ffffff"
+                              fillOpacity={hlMode === "manual" ? 0.2 : 0.05}
+                              strokeWidth={hlMode === "manual" ? 2.5 : 1.5}
+                              strokeDasharray={hlMode === "manual" ? undefined : "6 3"}
+                            />
+                            {/* Non-highlighted modes */}
+                            {mcEntries.filter(([key]) => key !== hlMode).map(([key]) => (
+                              <Radar key={key} name={MODE_LABELS[key] || key} dataKey={key}
+                                stroke={MC_COLORS[key] || "#fff"} fill={MC_COLORS[key] || "#fff"}
+                                fillOpacity={0.02} strokeWidth={0.8} strokeDasharray="4 3" strokeOpacity={0.4}
+                              />
+                            ))}
+                            {/* Highlighted mode */}
+                            {hlMode !== "manual" && (
+                              <Radar name={MODE_LABELS[hlMode] || hlMode} dataKey={hlMode}
+                                stroke={mcHlColor} fill={mcHlColor}
+                                fillOpacity={0.25} strokeWidth={2.5}
+                              />
+                            )}
+                          </RadarChart>
+                        </ResponsiveContainer>
+                        <div style={{ textAlign: "center", marginTop: 4, minHeight: 36 }}>
+                          <div style={{ fontSize: 12, fontWeight: 800, fontFamily: "monospace", color: mcHlColor }}>
+                            {hlMode === "manual" ? "Your Portfolio" : (MODE_LABELS[hlMode] || hlMode)}
+                            {hlMode === "manual" && <span style={{ fontSize: 8, marginLeft: 4, opacity: 0.7 }}>CURRENT</span>}
+                          </div>
+                          <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 2, fontSize: 9, fontFamily: "monospace" }}>
+                            <span style={{ color: mcHlMetrics.expectedReturn >= 0 ? "#10b981" : "#ef4444" }}>
+                              Ret {(mcHlMetrics.expectedReturn * 100).toFixed(1)}%
+                            </span>
+                            <span style={{ color: "rgba(255,255,255,0.5)" }}>
+                              Vol {(mcHlMetrics.volatility * 100).toFixed(1)}%
+                            </span>
+                            <span style={{ color: mcHlMetrics.sharpeRatio >= 1 ? "#10b981" : "#f59e0b" }}>
+                              SR {mcHlMetrics.sharpeRatio.toFixed(2)}
+                            </span>
+                            <span style={{ color: "#ef4444" }}>
+                              DD {(mcHlMetrics.maxDrawdown * 100).toFixed(1)}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Table */}
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: "monospace" }}>
+                          <thead>
+                            <tr>
+                              {["Mode", "Return", "Vol", "Sharpe", "Sortino", "VaR 95%", "Max DD", "Eff. Pos", ""].map(h => (
+                                <th key={h} style={{
+                                  padding: "8px 6px", textAlign: h === "Mode" || h === "" ? "left" : "right",
+                                  borderBottom: "1px solid #30363d", color: "rgba(255,255,255,0.5)", fontSize: 9,
+                                  fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap",
+                                }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {/* User's current portfolio row */}
+                            <tr
+                              onMouseEnter={() => setHoveredMode("manual")}
+                              onMouseLeave={() => setHoveredMode(null)}
+                              style={{
+                                borderBottom: "2px solid #30363d",
+                                background: hoveredMode === "manual" ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)",
+                              }}
+                            >
+                              <td style={{ padding: "6px 6px", fontWeight: 700 }}>
+                                <span style={{ display: "inline-block", width: 4, height: 14, background: "#fff", borderRadius: 2, marginRight: 6, verticalAlign: "middle" }} />
+                                <span style={{ color: "#fff" }}>Your Portfolio</span>
+                                <span style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", marginLeft: 4, fontWeight: 800 }}>CURRENT</span>
+                              </td>
+                              <td style={{ padding: "6px 6px", textAlign: "right", color: mm.expectedReturn >= 0 ? "#10b981" : "#ef4444" }}>{(mm.expectedReturn * 100).toFixed(1)}%</td>
+                              <td style={{ padding: "6px 6px", textAlign: "right" }}>{(mm.volatility * 100).toFixed(1)}%</td>
+                              <td style={{ padding: "6px 6px", textAlign: "right", color: mm.sharpeRatio >= 1 ? "#10b981" : mm.sharpeRatio >= 0.5 ? "#f59e0b" : "#ef4444" }}>{mm.sharpeRatio.toFixed(2)}</td>
+                              <td style={{ padding: "6px 6px", textAlign: "right" }}>{mm.sortinoRatio.toFixed(2)}</td>
+                              <td style={{ padding: "6px 6px", textAlign: "right", color: "#ef4444" }}>{(mm.var95 * 100).toFixed(1)}%</td>
+                              <td style={{ padding: "6px 6px", textAlign: "right", color: "#ef4444" }}>{(mm.maxDrawdown * 100).toFixed(1)}%</td>
+                              <td style={{ padding: "6px 6px", textAlign: "right" }}>{mm.effectivePositions.toFixed(1)}</td>
+                              <td style={{ padding: "6px 6px" }} />
+                            </tr>
+                            {/* Optimizer modes */}
+                            {mcEntries.map(([modeKey, mc]) => {
+                              const isHov = modeKey === hoveredMode;
+                              const mColor = MC_COLORS[modeKey] || "#fff";
+                              const mcm = mc.metrics;
+                              return (
+                                <tr
+                                  key={modeKey}
+                                  onMouseEnter={() => setHoveredMode(modeKey)}
+                                  onMouseLeave={() => setHoveredMode(null)}
+                                  style={{
+                                    borderBottom: "1px solid #30363d",
+                                    background: isHov ? `${mColor}15` : "transparent",
+                                    cursor: "pointer",
+                                    transition: "background 0.1s ease",
+                                  }}
+                                  onClick={() => {
+                                    const weightsMap: Record<string, number> = {};
+                                    selectedTickers.forEach((t, i) => { weightsMap[t] = mc.weights[i] ?? 0; });
+                                    handleApplySuggestedWeights(weightsMap);
+                                  }}
+                                >
+                                  <td style={{ padding: "6px 6px", fontWeight: 700 }}>
+                                    <span style={{
+                                      display: "inline-block", width: 4, height: 14,
+                                      background: mColor, borderRadius: 2, marginRight: 6, verticalAlign: "middle",
+                                      boxShadow: isHov ? `0 0 8px ${mColor}60` : "none",
+                                    }} />
+                                    <span style={{ color: isHov ? mColor : "#fff" }}>{MODE_LABELS[modeKey] || modeKey}</span>
+                                  </td>
+                                  <td style={{ padding: "6px 6px", textAlign: "right", color: mcm.expectedReturn >= 0 ? "#10b981" : "#ef4444" }}>{(mcm.expectedReturn * 100).toFixed(1)}%</td>
+                                  <td style={{ padding: "6px 6px", textAlign: "right" }}>{(mcm.volatility * 100).toFixed(1)}%</td>
+                                  <td style={{ padding: "6px 6px", textAlign: "right", color: mcm.sharpeRatio >= 1 ? "#10b981" : mcm.sharpeRatio >= 0.5 ? "#f59e0b" : "#ef4444" }}>{mcm.sharpeRatio.toFixed(2)}</td>
+                                  <td style={{ padding: "6px 6px", textAlign: "right" }}>{mcm.sortinoRatio.toFixed(2)}</td>
+                                  <td style={{ padding: "6px 6px", textAlign: "right", color: "#ef4444" }}>{(mcm.var95 * 100).toFixed(1)}%</td>
+                                  <td style={{ padding: "6px 6px", textAlign: "right", color: "#ef4444" }}>{(mcm.maxDrawdown * 100).toFixed(1)}%</td>
+                                  <td style={{ padding: "6px 6px", textAlign: "right" }}>{mcm.effectivePositions.toFixed(1)}</td>
+                                  <td style={{ padding: "6px 6px", textAlign: "center" }}>
+                                    <button
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        const weightsMap: Record<string, number> = {};
+                                        selectedTickers.forEach((t, i) => { weightsMap[t] = mc.weights[i] ?? 0; });
+                                        handleApplySuggestedWeights(weightsMap);
+                                      }}
+                                      style={{
+                                        padding: "3px 10px", background: "#21262d", border: "1px solid #30363d",
+                                        borderRadius: 3, color: "#fff", fontSize: 9, fontFamily: "monospace",
+                                        fontWeight: 700, cursor: "pointer", letterSpacing: "0.05em",
+                                      }}
+                                      onMouseEnter={e => { (e.target as HTMLButtonElement).style.background = mColor; (e.target as HTMLButtonElement).style.borderColor = mColor; }}
+                                      onMouseLeave={e => { (e.target as HTMLButtonElement).style.background = "#21262d"; (e.target as HTMLButtonElement).style.borderColor = "#30363d"; }}
+                                    >
+                                      APPLY
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                        {manualLoading && (
+                          <div style={{ padding: "8px 0", textAlign: "center", fontSize: 10, fontFamily: "monospace", color: "#3b82f6", letterSpacing: "0.1em" }}>
+                            Re-analyzing with new weights...
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           );
         })()}
