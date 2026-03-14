@@ -141,6 +141,7 @@ All endpoints in `apps/web/src/app/api/`
 |----------|---------|
 | `POST /api/portfolio/optimize` | Mean-variance optimization — **public, no auth required** |
 | `POST /api/portfolio/analyze` | Manual portfolio analysis: risk metrics, historical series, mode comparison, ML forecast |
+| `POST /api/portfolio/backtest` | Walk-forward ML backtest for portfolio: 4 strategies (Static, ML-Tilted, ML Long-Only, OBX), monthly breakdown, per-ticker accuracy |
 | `POST /api/portfolio/auth` | Optional login for save/load (JWT 8h) |
 | `GET /api/portfolio/configs` | List saved portfolios (auth required) |
 | `POST /api/portfolio/configs` | Save portfolio (auth required) |
@@ -297,9 +298,9 @@ All in `apps/web/src/components/`
 - `MarketCorrelation.tsx` - Market-level correlation
 
 ### Portfolio
-- `ManualWeightEditor.tsx` - Spreadsheet editor for manual portfolio weights/amounts/shares with auto-calculation
-- `PortfolioPerformanceChart.tsx` - Multi-line cumulative returns chart (per-stock + portfolio + OBX benchmark)
-- `PortfolioComparisonPanel.tsx` - Side-by-side metrics comparison with APPLY ALL / per-stock APPLY buttons
+- `ManualWeightEditor.tsx` - Spreadsheet editor for manual portfolio weights/amounts/shares with auto-calculation. Accepts `externalWeights` prop to sync from APPLY buttons.
+- `PortfolioPerformanceChart.tsx` - Multi-line cumulative returns chart (per-stock + portfolio + OBX benchmark), sorted tooltip (highest return first)
+- `PortfolioComparisonPanel.tsx` - Side-by-side metrics comparison with APPLY ALL / per-stock APPLY buttons (syncs to weight editor)
 
 ### Harvest Tracker
 - `HarvestMap.tsx` - Map wrapper with company filter bar, vessel status counts (dynamic import, no SSR)
@@ -843,13 +844,25 @@ The optimize API (`POST /api/portfolio/optimize`) enriches results with:
 - High portfolio beta (>1.3)
 
 ### Manual Portfolio Mode
-Toggle between OPTIMIZER and MANUAL PORTFOLIO at the top. Manual mode provides:
-- **Weight Editor**: Spreadsheet-style table — edit Weight %, Amount (NOK), or Shares per holding; other two auto-calculate. Text-based inputs allow clearing zeros. Normalize/Equal Weight buttons.
-- **Historical Performance**: Multi-line Recharts chart with per-stock weighted returns + portfolio total + OBX benchmark. Timeframe buttons (3M/6M/1Y/2Y/ALL).
+Toggle between OPTIMIZER and MANUAL PORTFOLIO at the top. Manual mode provides two tabs:
+
+**ANALYSIS Tab:**
+- **Weight Editor**: Spreadsheet-style table — edit Weight %, Amount (NOK), or Shares per holding; other two auto-calculate. Text-based inputs allow clearing zeros. Normalize/Equal Weight buttons. APPLY buttons sync weights back to editor.
+- **Historical Performance**: Multi-line Recharts chart with per-stock actual returns (unweighted) + portfolio total + OBX benchmark. Tooltip sorted by return value. Timeframe buttons (3M/6M/1Y/2Y/ALL).
 - **Optimal Adjustment Suggestions**: Side-by-side YOUR PORTFOLIO vs suggested (EW/MV/MS/RP/MD). APPLY ALL button replaces all weights; per-stock APPLY buttons for selective changes. Auto-re-analyzes after applying.
 - **ML Forecast**: Aggregate weighted portfolio forecast + per-holding table.
 - **Risk Decomposition, Correlation, Sector Allocation**: Same as optimizer mode.
 - **API**: `POST /api/portfolio/analyze` — computes metrics, historical series, mode comparison, ML forecast for user-supplied weights.
+
+**ML BACKTEST Tab:**
+- **Walk-Forward Backtest**: Uses `backtest_predictions` table (monthly prediction/actual pairs) to simulate portfolio strategies.
+- **4 Strategies Compared**: Static Weights (hold user weights), ML-Tilted (5x tilt by prediction signal), ML Long-Only (exclude negative predictions), OBX Benchmark.
+- **Strategy Stats Cards**: Total return, annualized return, volatility, Sharpe, max drawdown, win rate per strategy.
+- **Cumulative Returns Chart**: LineChart with all 4 strategies, sorted tooltip.
+- **Strategy Explanations**: Color-coded 2x2 grid explaining each strategy below the chart.
+- **Monthly Breakdown**: Collapsible table with per-month returns for each strategy, hit rate, ticker coverage.
+- **Per-Ticker Accuracy**: Collapsible table with hit rate, MAE, avg prediction vs actual, best/worst month per holding.
+- **API**: `POST /api/portfolio/backtest` — accepts tickers + weights, returns cumulative series, strategy stats, monthly breakdown, per-ticker accuracy.
 
 ### Dashboard Layout (3-step workflow)
 1. **Select Assets**: Ticker search with sector badges, chips with sector-colored borders, clear all
