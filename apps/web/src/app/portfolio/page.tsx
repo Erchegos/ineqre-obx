@@ -377,21 +377,15 @@ export default function PortfolioPage() {
   // Apply suggested weights (all or individual) and re-run analysis
   const handleApplySuggestedWeights = useCallback((weights: Record<string, number>) => {
     // Merge: only override tickers present in the weights map
-    setManualWeights(prev => {
-      const updated = prev.map(w => ({
-        ticker: w.ticker,
-        weight: weights[w.ticker] !== undefined ? weights[w.ticker] : w.weight,
-      }));
-      // Trigger re-analysis after state update
-      setTimeout(() => {
-        // The runManualAnalysis will pick up the new manualWeights via closure
-        // We need to trigger it after state settles
-        const analyzeBtn = document.querySelector('[data-manual-analyze]') as HTMLButtonElement | null;
-        if (analyzeBtn) analyzeBtn.click();
-      }, 100);
-      return updated;
-    });
-  }, []);
+    const updated = manualWeights.map(w => ({
+      ticker: w.ticker,
+      weight: weights[w.ticker] !== undefined ? weights[w.ticker] : w.weight,
+    }));
+    setManualWeights(updated);
+    // Pass explicit weights directly to avoid stale closure
+    runManualAnalysis(updated);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [manualWeights, selectedTickers, lookbackDays, portfolioValueNOK, covMethod]);
 
   // UI state
   const [riskSortKey, setRiskSortKey] = useState<keyof RiskDecomp>("percentOfRisk");
@@ -607,13 +601,14 @@ export default function PortfolioPage() {
     }
   };
 
-  // Manual analysis function
-  const runManualAnalysis = async () => {
+  // Manual analysis function — accepts optional explicit weights (for apply-suggested flow)
+  const runManualAnalysis = async (explicitWeights?: { ticker: string; weight: number }[]) => {
+    const weightsToUse = explicitWeights || manualWeights;
     if (selectedTickers.length < 2) {
       setError("Select at least 2 tickers");
       return;
     }
-    if (manualWeights.length === 0) {
+    if (weightsToUse.length === 0) {
       setError("Enter weights for your portfolio");
       return;
     }
@@ -626,7 +621,7 @@ export default function PortfolioPage() {
         body: JSON.stringify({
           tickers: selectedTickers,
           weights: selectedTickers.map(t => {
-            const w = manualWeights.find(mw => mw.ticker === t);
+            const w = weightsToUse.find(mw => mw.ticker === t);
             return w ? w.weight : 0;
           }),
           lookbackDays,
@@ -1316,7 +1311,6 @@ export default function PortfolioPage() {
                   </div>
                   <div style={{ flex: 1 }} />
                   <button
-                    data-manual-analyze
                     onClick={() => runManualAnalysis()}
                     disabled={manualLoading || selectedTickers.length < 2}
                     style={{
