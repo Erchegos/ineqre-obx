@@ -1,0 +1,1992 @@
+"use client";
+
+import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import Link from "next/link";
+import { useAuth } from "@/lib/useAuth";
+
+/* ------------------------------------------------------------------ */
+/* Types                                                               */
+/* ------------------------------------------------------------------ */
+
+type Tab = "dashboard" | "sensitivity" | "company" | "portfolio" | "forwards";
+
+type RateCard = {
+  pair: string;
+  spot: number | null;
+  date: string | null;
+  change1d: number | null;
+  change1w: number | null;
+  change1m: number | null;
+  changeYtd: number | null;
+  vol20d: number | null;
+  vol63d: number | null;
+  sparkline: { date: string; rate: number }[];
+};
+
+type NokIndexPoint = { date: string; index: number; change1d: number };
+
+type ExposureHeatmapRow = {
+  ticker: string;
+  usd: number;
+  eur: number;
+  gbp: number;
+  sek: number;
+};
+
+type SensitivityRow = {
+  ticker: string;
+  betaMarket: number;
+  betaUsd: number;
+  betaEur: number;
+  betaGbp: number;
+  betaSek: number;
+  tstatUsd: number;
+  tstatEur: number;
+  tstatGbp: number;
+  tstatSek: number;
+  rSquared: number;
+  rSquaredFxOnly: number;
+};
+
+type ForwardTenor = {
+  tenor: string;
+  days: number;
+  spot: number;
+  forward: number;
+  forwardPoints: number;
+  forwardPointsBps: number;
+  annualizedCarryPct: number;
+  hedgeCostBps: number;
+  nokRate: number;
+  foreignRate: number;
+};
+
+type PortfolioConfig = {
+  id: string;
+  name: string;
+  tickers: string[];
+  weights: number[];
+  mode?: string;
+};
+
+/* ------------------------------------------------------------------ */
+/* Constants                                                           */
+/* ------------------------------------------------------------------ */
+
+const CCY_COLORS: Record<string, string> = {
+  USD: "#4CAF50",
+  EUR: "#2196F3",
+  GBP: "#9C27B0",
+  SEK: "#FF9800",
+  NOK: "#F44336",
+  DKK: "#00BCD4",
+};
+
+const PAIR_LABELS: Record<string, string> = {
+  NOKUSD: "USD/NOK",
+  NOKEUR: "EUR/NOK",
+  NOKGBP: "GBP/NOK",
+  NOKSEK: "SEK/NOK",
+  NOKDKK: "DKK/NOK",
+};
+
+const S: Record<string, React.CSSProperties> = {
+  page: { background: "#0a0a0a", color: "#e5e5e5", minHeight: "100vh", fontFamily: "'Geist Mono', monospace", fontSize: 13 },
+  header: { padding: "20px 24px 12px", borderBottom: "1px solid #222" },
+  title: { fontSize: 20, fontWeight: 700, color: "#fff", letterSpacing: 2 },
+  subtitle: { fontSize: 12, color: "#888", marginTop: 2 },
+  tabs: { display: "flex", gap: 0, borderBottom: "1px solid #222", padding: "0 24px" },
+  tab: { padding: "10px 20px", cursor: "pointer", fontSize: 12, letterSpacing: 1, fontWeight: 600, color: "#888", borderBottom: "2px solid transparent", transition: "all 0.2s" },
+  tabActive: { color: "#f97316", borderBottomColor: "#f97316" },
+  content: { padding: "20px 24px" },
+  card: { background: "#111", border: "1px solid #222", borderRadius: 6, padding: 16, marginBottom: 12 },
+  cardTitle: { fontSize: 11, fontWeight: 600, color: "#888", letterSpacing: 1, textTransform: "uppercase" as const, marginBottom: 8 },
+  grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
+  grid3: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 },
+  grid5: { display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 },
+  accent: { color: "#f97316" },
+  green: { color: "#4CAF50" },
+  red: { color: "#ef4444" },
+  dim: { color: "#666" },
+  badge: { display: "inline-block", padding: "2px 8px", borderRadius: 3, fontSize: 10, fontWeight: 700, letterSpacing: 0.5 },
+  table: { width: "100%", borderCollapse: "collapse" as const, fontSize: 12 },
+  th: { textAlign: "left" as const, padding: "8px 10px", borderBottom: "1px solid #333", color: "#888", fontWeight: 600, fontSize: 10, letterSpacing: 1, cursor: "pointer", userSelect: "none" as const },
+  td: { padding: "6px 10px", borderBottom: "1px solid #1a1a1a" },
+  input: { background: "#1a1a1a", border: "1px solid #333", borderRadius: 4, color: "#e5e5e5", padding: "6px 10px", fontSize: 12, fontFamily: "'Geist Mono', monospace" },
+  select: { background: "#1a1a1a", border: "1px solid #333", borderRadius: 4, color: "#e5e5e5", padding: "6px 10px", fontSize: 12, fontFamily: "'Geist Mono', monospace" },
+  button: { background: "#f97316", color: "#000", border: "none", borderRadius: 4, padding: "6px 14px", fontSize: 11, fontWeight: 700, cursor: "pointer", letterSpacing: 0.5 },
+  slider: { width: "100%", accentColor: "#f97316" },
+};
+
+/* ------------------------------------------------------------------ */
+/* Helpers                                                             */
+/* ------------------------------------------------------------------ */
+
+function fmtRate(v: number | null, dec = 4): string {
+  if (v == null) return "\u2014";
+  return v.toFixed(dec);
+}
+
+function fmtPct(v: number | null, dec = 2): string {
+  if (v == null) return "\u2014";
+  return `${v >= 0 ? "+" : ""}${v.toFixed(dec)}%`;
+}
+
+function fmtBps(v: number | null): string {
+  if (v == null) return "\u2014";
+  return `${v.toFixed(1)} bps`;
+}
+
+function changeColor(v: number | null): string {
+  if (v == null) return "#666";
+  return v > 0 ? "#4CAF50" : v < 0 ? "#ef4444" : "#888";
+}
+
+function sigStar(t: number): string {
+  const at = Math.abs(t);
+  if (at > 2.576) return " \u2605\u2605\u2605";
+  if (at > 1.96) return " \u2605\u2605";
+  if (at > 1.645) return " \u2605";
+  return "";
+}
+
+function exposureColor(v: number): string {
+  const abs = Math.abs(v);
+  if (abs < 0.05) return "transparent";
+  const intensity = Math.min(abs * 2, 1);
+  return v > 0 ? `rgba(76,175,80,${intensity * 0.4})` : `rgba(239,68,68,${intensity * 0.4})`;
+}
+
+/* Mini SVG sparkline */
+function Sparkline({ data, width = 120, height = 32, color = "#f97316" }: { data: number[]; width?: number; height?: number; color?: string }) {
+  if (data.length < 2) return null;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const points = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * width;
+    const y = height - ((v - min) / range) * (height - 4) - 2;
+    return `${x},${y}`;
+  }).join(" ");
+  return (
+    <svg width={width} height={height} style={{ display: "block" }}>
+      <polyline points={points} fill="none" stroke={color} strokeWidth={1.5} />
+    </svg>
+  );
+}
+
+/* Area sparkline with fill */
+function AreaSparkline({ data, width = 500, height = 140, color = "#f97316", currentValue }: { data: number[]; width?: number; height?: number; color?: string; currentValue?: number }) {
+  if (data.length < 2) return null;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * width;
+    const y = height - ((v - min) / range) * (height - 8) - 4;
+    return { x, y };
+  });
+  const linePoints = pts.map(p => `${p.x},${p.y}`).join(" ");
+  const areaPoints = `0,${height} ${linePoints} ${width},${height}`;
+  const lastPt = pts[pts.length - 1];
+  return (
+    <svg width={width} height={height} style={{ display: "block" }}>
+      <defs>
+        <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity={0.3} />
+          <stop offset="100%" stopColor={color} stopOpacity={0.02} />
+        </linearGradient>
+      </defs>
+      <polygon points={areaPoints} fill="url(#areaGrad)" />
+      <polyline points={linePoints} fill="none" stroke={color} strokeWidth={2} />
+      {lastPt && (
+        <>
+          <circle cx={lastPt.x} cy={lastPt.y} r={4} fill={color} />
+          {currentValue != null && (
+            <text x={lastPt.x - 8} y={lastPt.y - 10} fill={color} fontSize={11} fontWeight={700} fontFamily="'Geist Mono', monospace" textAnchor="end">
+              {currentValue.toFixed(2)}
+            </text>
+          )}
+        </>
+      )}
+    </svg>
+  );
+}
+
+/* SortHeader */
+function SortHeader({ label, col, sort, onSort }: { label: string; col: string; sort: { col: string; asc: boolean }; onSort: (col: string) => void }) {
+  const active = sort.col === col;
+  return (
+    <th style={{ ...S.th, color: active ? "#f97316" : "#888" }} onClick={() => onSort(col)}>
+      {label} {active ? (sort.asc ? "\u25B2" : "\u25BC") : ""}
+    </th>
+  );
+}
+
+function HelpToggle({ id, label, children, showHelp, setShowHelp }: {
+  id: string; label?: string; children: React.ReactNode;
+  showHelp: Record<string, boolean>; setShowHelp: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+}) {
+  const open = !!showHelp[id];
+  return (
+    <div style={{ marginTop: 4, marginBottom: open ? 10 : 4 }}>
+      <span
+        onClick={() => setShowHelp(p => ({ ...p, [id]: !p[id] }))}
+        style={{ fontSize: 10, color: "#555", cursor: "pointer", userSelect: "none" as const, display: "inline-flex", alignItems: "center", gap: 4 }}
+      >
+        <span style={{ fontSize: 8, color: open ? "#f97316" : "#555", transition: "transform 0.15s", display: "inline-block", transform: open ? "rotate(90deg)" : "rotate(0deg)" }}>{"\u25B6"}</span>
+        {label || "What do these numbers mean?"}
+      </span>
+      {open && (
+        <div style={{ marginTop: 6, padding: 10, background: "#111", borderRadius: 4, border: "1px solid #222", fontSize: 11, color: "#666", lineHeight: 1.6 }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Page Component                                                      */
+/* ------------------------------------------------------------------ */
+
+export default function FXTerminalPage() {
+  /* Auth */
+  const { token, profile, ready: _authReady, login: authLogin, logout: authLogout } = useAuth();
+
+  /* State */
+  const [tab, setTab] = useState<Tab>("dashboard");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  /* Dashboard state */
+  const [rateCards, setRateCards] = useState<RateCard[]>([]);
+  const [nokIndex, setNokIndex] = useState<NokIndexPoint[]>([]);
+  const [nokIndexCurrent, setNokIndexCurrent] = useState<NokIndexPoint | null>(null);
+  const [_regimes, setRegimes] = useState<Record<string, { regime: string; confidence: number }>>({});
+  const [correlationMatrix, setCorrelationMatrix] = useState<Record<string, Record<string, number>>>({});
+  const [exposureHeatmap, setExposureHeatmap] = useState<ExposureHeatmapRow[]>([]);
+
+  /* Sensitivity state */
+  const [allSensitivity, setAllSensitivity] = useState<SensitivityRow[]>([]);
+  const [selectedSensTicker, setSelectedSensTicker] = useState<string | null>(null);
+  const [sensDetail, setSensDetail] = useState<any>(null);
+  const [sensSort, setSensSort] = useState<{ col: string; asc: boolean }>({ col: "betaFxTotal", asc: false });
+
+  /* Company state */
+  const [companyTicker, setCompanyTicker] = useState("EQNR");
+  const [companyData, setCompanyData] = useState<any>(null);
+  const [forwardData, setForwardData] = useState<{ pair: string; forwards: ForwardTenor[] } | null>(null);
+  const [hedgeResult, setHedgeResult] = useState<any>(null);
+  const [hedgeNotional, setHedgeNotional] = useState(500000);
+  const [hedgeRatio, setHedgeRatio] = useState(50);
+  const [hedgeTenor, setHedgeTenor] = useState("3M");
+  const [hedgeCurrency, setHedgeCurrency] = useState("USD");
+
+  /* Portfolio state */
+  const [pfTickers, setPfTickers] = useState("EQNR,MOWI,FRO,DNB");
+  const [pfWeights, setPfWeights] = useState("0.3,0.25,0.25,0.2");
+  const [pfResult, setPfResult] = useState<any>(null);
+  const [pfLoading, setPfLoading] = useState(false);
+  const [savedConfigs, setSavedConfigs] = useState<PortfolioConfig[]>([]);
+  const [configsLoading, setConfigsLoading] = useState(false);
+  const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null);
+
+  /* Portfolio auth state (for login modal) */
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [authUser, setAuthUser] = useState("");
+  const [authPass, setAuthPass] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+
+  /* Forwards state */
+  const [fwdPair, setFwdPair] = useState("NOKUSD");
+  const [fwdForwards, setFwdForwards] = useState<ForwardTenor[]>([]);
+  const [interestRates, setInterestRates] = useState<Record<string, any[]>>({});
+  const [carryData, setCarryData] = useState<any>(null);
+
+  const [expSort, setExpSort] = useState<{ col: string; asc: boolean }>({ col: "ticker", asc: true });
+  const [showHelp, setShowHelp] = useState<Record<string, boolean>>({});
+
+  /* Ref to track whether hedge calc has been auto-run for the current company load */
+  const hedgeAutoRanRef = useRef<string>("");
+
+  /* ─── Data Loading ──────────────────────────────────────────── */
+
+  useEffect(() => {
+    const sf = async (url: string) => {
+      try {
+        const r = await fetch(url);
+        return r.ok ? r.json() : null;
+      } catch { return null; }
+    };
+    async function load() {
+      try {
+        const dash = await sf("/api/fx/dashboard");
+        if (dash) {
+          setRateCards(dash.rateCards || []);
+          setNokIndex(dash.nokIndex || []);
+          setNokIndexCurrent(dash.nokIndexCurrent || null);
+          setRegimes(dash.regimes || {});
+          setCorrelationMatrix(dash.correlationMatrix || {});
+          setExposureHeatmap(dash.exposureHeatmap || []);
+        }
+        setLoading(false);
+
+        // Load supplementary: all tickers' regression data for sensitivity table
+        if (dash?.exposureHeatmap) {
+          const sensTickers = dash.exposureHeatmap.map((r: ExposureHeatmapRow) => r.ticker);
+          const sensRows: SensitivityRow[] = [];
+          // Fetch regression for each ticker (batch)
+          for (const t of sensTickers) {
+            const d = await sf(`/api/fx/sensitivity/${t}`);
+            if (d?.statistical) {
+              sensRows.push({
+                ticker: t,
+                betaMarket: d.statistical.betaMarket,
+                betaUsd: d.statistical.betaUsd,
+                betaEur: d.statistical.betaEur,
+                betaGbp: d.statistical.betaGbp,
+                betaSek: d.statistical.betaSek,
+                tstatUsd: d.statistical.tstatUsd,
+                tstatEur: d.statistical.tstatEur,
+                tstatGbp: d.statistical.tstatGbp,
+                tstatSek: d.statistical.tstatSek,
+                rSquared: d.statistical.rSquared,
+                rSquaredFxOnly: d.statistical.rSquaredFxOnly,
+              });
+            }
+          }
+          setAllSensitivity(sensRows);
+        }
+
+        // Load interest rates
+        const irData = await sf("/api/fx/interest-rates");
+        if (irData?.currencies) setInterestRates(irData.currencies);
+
+      } catch (err: any) {
+        setError(err.message);
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  /* Load company detail when ticker changes — auto-run hedge calc */
+  useEffect(() => {
+    if (tab !== "company" || !companyTicker) return;
+    const sf = async (url: string) => {
+      try { const r = await fetch(url); return r.ok ? r.json() : null; } catch { return null; }
+    };
+    async function loadCompany() {
+      const [sens, exp, fwd] = await Promise.all([
+        sf(`/api/fx/sensitivity/${companyTicker}`),
+        sf(`/api/fx/exposure/${companyTicker}`),
+        sf(`/api/fx/rates/forward?pair=NOK${hedgeCurrency}`),
+      ]);
+      setCompanyData({ sensitivity: sens, exposure: exp });
+      if (fwd) setForwardData(fwd);
+      // Auto-run hedge calculator after loading data
+      hedgeAutoRanRef.current = `${companyTicker}-${hedgeCurrency}`;
+      try {
+        const r = await fetch("/api/fx/hedge-calculator", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ticker: companyTicker,
+            notional: hedgeNotional,
+            hedgeRatio: hedgeRatio / 100,
+            tenor: hedgeTenor,
+            currency: hedgeCurrency,
+          }),
+        });
+        if (r.ok) setHedgeResult(await r.json());
+      } catch {}
+    }
+    loadCompany();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, companyTicker, hedgeCurrency]);
+
+  /* Load sensitivity detail */
+  useEffect(() => {
+    if (!selectedSensTicker) return;
+    const sf = async (url: string) => {
+      try { const r = await fetch(url); return r.ok ? r.json() : null; } catch { return null; }
+    };
+    sf(`/api/fx/sensitivity/${selectedSensTicker}`).then(setSensDetail);
+  }, [selectedSensTicker]);
+
+  /* Load forwards tab data */
+  useEffect(() => {
+    if (tab !== "forwards") return;
+    const sf = async (url: string) => {
+      try { const r = await fetch(url); return r.ok ? r.json() : null; } catch { return null; }
+    };
+    async function loadForwards() {
+      const [fwd, carry] = await Promise.all([
+        sf(`/api/fx/rates/forward?pair=${fwdPair}`),
+        sf(`/api/fx/carry?pair=${fwdPair}&days=252`),
+      ]);
+      if (fwd) setFwdForwards(fwd.forwards || []);
+      if (carry) setCarryData(carry);
+    }
+    loadForwards();
+  }, [tab, fwdPair]);
+
+  /* Load saved portfolio configs when logged in and on portfolio tab */
+  useEffect(() => {
+    if (tab !== "portfolio" || !token) return;
+    setConfigsLoading(true);
+    fetch("/api/portfolio/configs", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => {
+        if (r.status === 401) { authLogout(); return null; }
+        return r.ok ? r.json() : null;
+      })
+      .then(data => {
+        if (data?.configs) setSavedConfigs(data.configs);
+        setConfigsLoading(false);
+      })
+      .catch(() => setConfigsLoading(false));
+  }, [tab, token, authLogout]);
+
+  /* Hedge calculator */
+  const runHedge = useCallback(async () => {
+    try {
+      const r = await fetch("/api/fx/hedge-calculator", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ticker: companyTicker,
+          notional: hedgeNotional,
+          hedgeRatio: hedgeRatio / 100,
+          tenor: hedgeTenor,
+          currency: hedgeCurrency,
+        }),
+      });
+      if (r.ok) setHedgeResult(await r.json());
+    } catch {}
+  }, [companyTicker, hedgeNotional, hedgeRatio, hedgeTenor, hedgeCurrency]);
+
+  /* Portfolio analysis */
+  const runPortfolio = useCallback(async () => {
+    setPfLoading(true);
+    try {
+      const tickers = pfTickers.split(",").map(t => t.trim()).filter(Boolean);
+      const weights = pfWeights.split(",").map(w => parseFloat(w.trim())).filter(w => !isNaN(w));
+      const r = await fetch("/api/fx/portfolio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tickers, weights }),
+      });
+      if (r.ok) setPfResult(await r.json());
+    } catch {}
+    setPfLoading(false);
+  }, [pfTickers, pfWeights]);
+
+  /* Portfolio login */
+  async function handlePortfolioLogin() {
+    setAuthLoading(true);
+    setAuthError("");
+    try {
+      const res = await fetch("/api/portfolio/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: authUser, password: authPass }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        authLogin(data.token, data.profile);
+        setShowLoginModal(false);
+        setAuthUser("");
+        setAuthPass("");
+      } else {
+        setAuthError("Invalid credentials");
+      }
+    } catch {
+      setAuthError("Connection error");
+    }
+    setAuthLoading(false);
+  }
+
+  /* Select a saved portfolio config */
+  function selectConfig(cfg: PortfolioConfig) {
+    setSelectedConfigId(cfg.id);
+    const tStr = cfg.tickers.join(",");
+    const wStr = cfg.weights.map(w => w.toFixed(4)).join(",");
+    setPfTickers(tStr);
+    setPfWeights(wStr);
+    // auto-run analysis
+    setPfLoading(true);
+    fetch("/api/fx/portfolio", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tickers: cfg.tickers, weights: cfg.weights }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setPfResult(data); setPfLoading(false); })
+      .catch(() => setPfLoading(false));
+  }
+
+  /* Sorted sensitivity */
+  const sortedSensitivity = useMemo(() => {
+    const arr = [...allSensitivity];
+    const { col, asc } = sensSort;
+    return arr.sort((a, b) => {
+      let va: number, vb: number;
+      if (col === "betaFxTotal") {
+        va = Math.abs(a.betaUsd) + Math.abs(a.betaEur) + Math.abs(a.betaGbp) + Math.abs(a.betaSek);
+        vb = Math.abs(b.betaUsd) + Math.abs(b.betaEur) + Math.abs(b.betaGbp) + Math.abs(b.betaSek);
+      } else {
+        va = (a as any)[col] ?? 0;
+        vb = (b as any)[col] ?? 0;
+      }
+      return asc ? va - vb : vb - va;
+    });
+  }, [allSensitivity, sensSort]);
+
+  /* Sorted exposure heatmap */
+  const sortedExposure = useMemo(() => {
+    const arr = [...exposureHeatmap];
+    const { col, asc } = expSort;
+    return arr.sort((a, b) => {
+      const va = col === "ticker" ? a.ticker : (a as any)[col] ?? 0;
+      const vb = col === "ticker" ? b.ticker : (b as any)[col] ?? 0;
+      if (typeof va === "string") return asc ? va.localeCompare(vb as string) : (vb as string).localeCompare(va);
+      return asc ? (va as number) - (vb as number) : (vb as number) - (va as number);
+    });
+  }, [exposureHeatmap, expSort]);
+
+  /* Dashboard insights generation */
+  const dashboardInsights = useMemo(() => {
+    const insights: { label: string; detail: string; color: string }[] = [];
+
+    // NOK trend vs EUR (most important for OSE)
+    const eurCard = rateCards.find(r => r.pair === "NOKEUR");
+    if (eurCard?.change1m != null) {
+      const dir = eurCard.change1m > 0 ? "strengthening" : "weakening";
+      insights.push({
+        label: `NOK ${dir} vs EUR`,
+        detail: `${fmtPct(eurCard.change1m, 1)} over 1M`,
+        color: eurCard.change1m > 0 ? "#4CAF50" : "#ef4444",
+      });
+    }
+
+    // USD vol
+    const usdCard = rateCards.find(r => r.pair === "NOKUSD");
+    if (usdCard?.vol20d != null && usdCard.vol63d != null) {
+      const elevated = usdCard.vol20d > usdCard.vol63d * 1.2;
+      if (elevated) {
+        insights.push({ label: "USD vol elevated", detail: `20D: ${usdCard.vol20d.toFixed(1)}% vs 63D: ${usdCard.vol63d.toFixed(1)}%`, color: "#FF9800" });
+      } else {
+        insights.push({ label: "USD vol subdued", detail: `20D: ${usdCard.vol20d.toFixed(1)}% vs 63D: ${usdCard.vol63d.toFixed(1)}%`, color: "#2196F3" });
+      }
+    }
+
+    // Biggest mover (1D)
+    const sorted1d = [...rateCards].filter(r => r.change1d != null).sort((a, b) => Math.abs(b.change1d!) - Math.abs(a.change1d!));
+    if (sorted1d.length > 0) {
+      const top = sorted1d[0];
+      const ccy = top.pair.replace("NOK", "");
+      insights.push({
+        label: `${ccy} biggest 1D move`,
+        detail: fmtPct(top.change1d, 2),
+        color: changeColor(top.change1d),
+      });
+    }
+
+    // Rate differential hint
+    if (usdCard?.spot != null && eurCard?.spot != null) {
+      insights.push({
+        label: "Carry advantage",
+        detail: "NOK rates above USD/EUR - positive carry on FX hedges",
+        color: "#4CAF50",
+      });
+    }
+
+    return insights;
+  }, [rateCards]);
+
+  /* Key metrics for dashboard */
+  const keyMetrics = useMemo(() => {
+    const validCards = rateCards.filter(r => r.change1m != null);
+    if (validCards.length === 0) return null;
+
+    const strongest = [...validCards].sort((a, b) => (b.change1m ?? 0) - (a.change1m ?? 0))[0];
+    const weakest = [...validCards].sort((a, b) => (a.change1m ?? 0) - (b.change1m ?? 0))[0];
+    const highVol = [...rateCards].filter(r => r.vol20d != null).sort((a, b) => (b.vol20d ?? 0) - (a.vol20d ?? 0))[0];
+    const lowVol = [...rateCards].filter(r => r.vol20d != null).sort((a, b) => (a.vol20d ?? 0) - (b.vol20d ?? 0))[0];
+
+    return { strongest, weakest, highVol, lowVol };
+  }, [rateCards]);
+
+  /* "What to Watch" insights from data */
+  const whatToWatch = useMemo(() => {
+    const items: string[] = [];
+
+    // Highest net USD exposure
+    const usdSorted = [...exposureHeatmap].sort((a, b) => Math.abs(b.usd) - Math.abs(a.usd));
+    if (usdSorted.length > 0) {
+      const top = usdSorted[0];
+      items.push(`Highest net USD exposure: ${top.ticker} (${(top.usd * 100).toFixed(0)}%) -- most sensitive to NOK/USD moves`);
+    }
+
+    // Most FX-sensitive stock
+    if (allSensitivity.length > 0) {
+      const fxSorted = [...allSensitivity].sort((a, b) => {
+        const totA = Math.abs(a.betaUsd) + Math.abs(a.betaEur) + Math.abs(a.betaGbp) + Math.abs(a.betaSek);
+        const totB = Math.abs(b.betaUsd) + Math.abs(b.betaEur) + Math.abs(b.betaGbp) + Math.abs(b.betaSek);
+        return totB - totA;
+      });
+      const top = fxSorted[0];
+      const total = (Math.abs(top.betaUsd) + Math.abs(top.betaEur) + Math.abs(top.betaGbp) + Math.abs(top.betaSek)).toFixed(3);
+      items.push(`Most FX-sensitive stock: ${top.ticker} (|FX beta| = ${total}) -- significant currency risk in returns`);
+    }
+
+    // NOK TWI trend
+    if (nokIndex.length > 20) {
+      const recent = nokIndex.slice(-20);
+      const first = recent[0].index;
+      const last = recent[recent.length - 1].index;
+      const change = ((last - first) / first) * 100;
+      const dir = change > 0 ? "appreciating" : "depreciating";
+      items.push(`NOK TWI ${dir} over 20D (${change >= 0 ? "+" : ""}${change.toFixed(2)}%) -- monitor for trend reversal or continuation`);
+    }
+
+    // EUR exposure concentration
+    const eurSorted = [...exposureHeatmap].filter(r => Math.abs(r.eur) > 0.1);
+    if (eurSorted.length >= 3) {
+      items.push(`${eurSorted.length} stocks have >10% EUR exposure -- sector-wide risk if EUR/NOK moves sharply`);
+    }
+
+    return items;
+  }, [exposureHeatmap, allSensitivity, nokIndex]);
+
+  /* ─── Loading / Error ──────────────────────────────────────── */
+
+  if (loading) {
+    return (
+      <div style={S.page}>
+        <div style={{ ...S.header, textAlign: "center", paddingTop: 80 }}>
+          <div style={{ ...S.title, color: "#f97316" }}>FX TERMINAL</div>
+          <div style={{ ...S.subtitle, marginTop: 20 }}>Loading currency data...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={S.page}>
+        <div style={{ ...S.header, textAlign: "center", paddingTop: 80 }}>
+          <div style={{ ...S.title, color: "#ef4444" }}>Error</div>
+          <div style={{ ...S.subtitle, marginTop: 10 }}>{error}</div>
+          <Link href="/" style={{ color: "#f97316", marginTop: 20, display: "inline-block" }}>&larr; Back to Dashboard</Link>
+        </div>
+      </div>
+    );
+  }
+
+  /* ─── TABS ─────────────────────────────────────────────────── */
+
+  const TABS: { key: Tab; label: string }[] = [
+    { key: "dashboard", label: "DASHBOARD" },
+    { key: "sensitivity", label: "SENSITIVITY" },
+    { key: "company", label: "COMPANY" },
+    { key: "portfolio", label: "PORTFOLIO" },
+    { key: "forwards", label: "FORWARDS" },
+  ];
+
+  return (
+    <div style={S.page}>
+      {/* Header */}
+      <div style={S.header}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <Link href="/" style={{ color: "#888", textDecoration: "none", fontSize: 12 }}>&larr; HOME</Link>
+          <span style={S.title}>FX TERMINAL</span>
+          {nokIndexCurrent && (
+            <span style={{ ...S.badge, background: "rgba(249,115,22,0.15)", color: "#f97316" }}>
+              NOK TWI: {nokIndexCurrent.index.toFixed(2)} ({fmtPct(nokIndexCurrent.change1d)})
+            </span>
+          )}
+          {profile && (
+            <span style={{ ...S.badge, background: "rgba(76,175,80,0.15)", color: "#4CAF50", marginLeft: "auto" }}>
+              {profile}
+            </span>
+          )}
+        </div>
+        <div style={S.subtitle}>Multi-currency risk analytics for NOK portfolios</div>
+      </div>
+
+      {/* Tab bar */}
+      <div style={S.tabs}>
+        {TABS.map(t => (
+          <div
+            key={t.key}
+            style={{ ...S.tab, ...(tab === t.key ? S.tabActive : {}) }}
+            onClick={() => setTab(t.key)}
+          >
+            {t.label}
+          </div>
+        ))}
+      </div>
+
+      {/* Content */}
+      <div style={S.content}>
+        {tab === "dashboard" && renderDashboard()}
+        {tab === "sensitivity" && renderSensitivity()}
+        {tab === "company" && renderCompany()}
+        {tab === "portfolio" && renderPortfolio()}
+        {tab === "forwards" && renderForwards()}
+      </div>
+    </div>
+  );
+
+  /* ================================================================ */
+  /* TAB 1: DASHBOARD                                                  */
+  /* ================================================================ */
+
+  function renderDashboard() {
+    return (
+      <>
+        {/* Market Summary */}
+        {dashboardInsights.length > 0 && (
+          <div style={{ ...S.card, background: "#0d0d0d", border: "1px solid #1a1a1a", marginBottom: 16 }}>
+            <div style={{ ...S.cardTitle, color: "#f97316", fontSize: 12, marginBottom: 10 }}>MARKET SUMMARY</div>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+              {dashboardInsights.map((ins, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", background: "#111", borderRadius: 4, border: "1px solid #222" }}>
+                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: ins.color, flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#e5e5e5" }}>{ins.label}</div>
+                    <div style={{ fontSize: 10, color: "#888" }}>{ins.detail}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Rate strip */}
+        <div style={S.grid5}>
+          {rateCards.map((rc) => (
+            <div key={rc.pair} style={S.card}>
+              <div style={{ fontSize: 10, color: "#888", letterSpacing: 1, marginBottom: 4 }}>
+                {PAIR_LABELS[rc.pair] || rc.pair}
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "#fff" }}>
+                {fmtRate(rc.spot)}
+              </div>
+              <div style={{ fontSize: 11, color: changeColor(rc.change1d), marginTop: 2 }}>
+                {fmtPct(rc.change1d)} <span style={{ color: "#555" }}>1D</span>
+              </div>
+              <div style={{ display: "flex", gap: 8, fontSize: 10, color: "#666", marginTop: 4, flexWrap: "wrap" }}>
+                <span>1W: <span style={{ color: changeColor(rc.change1w) }}>{fmtPct(rc.change1w, 1)}</span></span>
+                <span>1M: <span style={{ color: changeColor(rc.change1m) }}>{fmtPct(rc.change1m, 1)}</span></span>
+                <span>YTD: <span style={{ color: changeColor(rc.changeYtd) }}>{fmtPct(rc.changeYtd, 1)}</span></span>
+              </div>
+              <div style={{ marginTop: 6 }}>
+                <Sparkline
+                  data={rc.sparkline.map(s => s.rate)}
+                  color={CCY_COLORS[rc.pair.replace("NOK", "")] || "#f97316"}
+                  width={120}
+                  height={28}
+                />
+              </div>
+              <div style={{ display: "flex", gap: 8, fontSize: 9, color: "#555", marginTop: 4 }}>
+                <span>&sigma;20D: {rc.vol20d != null ? `${rc.vol20d.toFixed(1)}%` : "\u2014"}</span>
+                <span>&sigma;63D: {rc.vol63d != null ? `${rc.vol63d.toFixed(1)}%` : "\u2014"}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Key Metrics row */}
+        {keyMetrics && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 12 }}>
+            {[
+              { label: "STRONGEST (1M)", pair: keyMetrics.strongest?.pair, value: keyMetrics.strongest?.change1m, color: "#4CAF50" },
+              { label: "WEAKEST (1M)", pair: keyMetrics.weakest?.pair, value: keyMetrics.weakest?.change1m, color: "#ef4444" },
+              { label: "HIGHEST VOL", pair: keyMetrics.highVol?.pair, value: keyMetrics.highVol?.vol20d, color: "#FF9800", suffix: "%" },
+              { label: "LOWEST VOL", pair: keyMetrics.lowVol?.pair, value: keyMetrics.lowVol?.vol20d, color: "#2196F3", suffix: "%" },
+            ].map((m) => (
+              <div key={m.label} style={{ ...S.card, padding: 12 }}>
+                <div style={{ fontSize: 9, color: "#666", letterSpacing: 1 }}>{m.label}</div>
+                <div style={{ fontSize: 11, color: m.color, fontWeight: 600, marginTop: 2 }}>
+                  {m.pair ? (PAIR_LABELS[m.pair] || m.pair.replace("NOK", "")) : "\u2014"}
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#fff", marginTop: 2 }}>
+                  {m.value != null ? (m.suffix ? `${m.value.toFixed(1)}${m.suffix}` : fmtPct(m.value, 2)) : "\u2014"}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={S.grid2}>
+          {/* NOK TWI Chart — enhanced area chart */}
+          <div style={S.card}>
+            <div style={S.cardTitle}>NOK TRADE-WEIGHTED INDEX (90D)</div>
+            {nokIndex.length > 2 ? (
+              <AreaSparkline
+                data={nokIndex.map(p => p.index)}
+                width={500}
+                height={140}
+                color="#f97316"
+                currentValue={nokIndexCurrent?.index}
+              />
+            ) : (
+              <div style={S.dim}>No TWI data available</div>
+            )}
+          </div>
+
+          {/* Cross-pair correlation matrix */}
+          <div style={S.card}>
+            <div style={S.cardTitle}>63-DAY CORRELATION MATRIX</div>
+            {Object.keys(correlationMatrix).length > 0 ? (
+              <table style={S.table}>
+                <thead>
+                  <tr>
+                    <th style={S.th}></th>
+                    {Object.keys(correlationMatrix).map(p => (
+                      <th key={p} style={{ ...S.th, textAlign: "center", color: CCY_COLORS[p.replace("NOK", "")] || "#888" }}>
+                        {p.replace("NOK", "")}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(correlationMatrix).map(([p1, row]) => (
+                    <tr key={p1}>
+                      <td style={{ ...S.td, fontWeight: 600, color: CCY_COLORS[p1.replace("NOK", "")] || "#888" }}>
+                        {p1.replace("NOK", "")}
+                      </td>
+                      {Object.values(row).map((v, i) => (
+                        <td
+                          key={i}
+                          style={{
+                            ...S.td,
+                            textAlign: "center",
+                            background: `rgba(249,115,22,${Math.abs(v as number) * 0.3})`,
+                            color: "#fff",
+                          }}
+                        >
+                          {(v as number).toFixed(2)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div style={S.dim}>No correlation data</div>
+            )}
+          </div>
+        </div>
+
+        {/* What to Watch */}
+        {whatToWatch.length > 0 && (
+          <div style={{ ...S.card, border: "1px solid rgba(249,115,22,0.2)", background: "rgba(249,115,22,0.03)" }}>
+            <div style={{ ...S.cardTitle, color: "#f97316" }}>WHAT TO WATCH</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {whatToWatch.map((item, i) => (
+                <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                  <span style={{ color: "#f97316", fontWeight: 700, fontSize: 12, flexShrink: 0, marginTop: 1 }}>{i + 1}.</span>
+                  <span style={{ fontSize: 11, color: "#ccc", lineHeight: 1.5 }}>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Exposure heatmap */}
+        <div style={S.card}>
+          <div style={S.cardTitle}>OSE FX EXPOSURE HEATMAP (NET REVENUE - COST)</div>
+          {sortedExposure.length > 0 ? (
+            <table style={S.table}>
+              <thead>
+                <tr>
+                  <SortHeader label="TICKER" col="ticker" sort={expSort} onSort={(c) => setExpSort(p => ({ col: c, asc: p.col === c ? !p.asc : true }))} />
+                  <SortHeader label="USD" col="usd" sort={expSort} onSort={(c) => setExpSort(p => ({ col: c, asc: p.col === c ? !p.asc : false }))} />
+                  <SortHeader label="EUR" col="eur" sort={expSort} onSort={(c) => setExpSort(p => ({ col: c, asc: p.col === c ? !p.asc : false }))} />
+                  <SortHeader label="GBP" col="gbp" sort={expSort} onSort={(c) => setExpSort(p => ({ col: c, asc: p.col === c ? !p.asc : false }))} />
+                  <SortHeader label="SEK" col="sek" sort={expSort} onSort={(c) => setExpSort(p => ({ col: c, asc: p.col === c ? !p.asc : false }))} />
+                </tr>
+              </thead>
+              <tbody>
+                {sortedExposure.map((row) => (
+                  <tr
+                    key={row.ticker}
+                    style={{ cursor: "pointer" }}
+                    onClick={() => { setCompanyTicker(row.ticker); setTab("company"); }}
+                  >
+                    <td style={{ ...S.td, fontWeight: 600, color: "#f97316" }}>{row.ticker}</td>
+                    {(["usd", "eur", "gbp", "sek"] as const).map((ccy) => (
+                      <td
+                        key={ccy}
+                        style={{
+                          ...S.td,
+                          textAlign: "center",
+                          background: exposureColor(row[ccy]),
+                          color: row[ccy] > 0 ? "#4CAF50" : row[ccy] < 0 ? "#ef4444" : "#666",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {(row[ccy] * 100).toFixed(0)}%
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div style={S.dim}>Run seed-fx-exposures.ts to populate</div>
+          )}
+        </div>
+      </>
+    );
+  }
+
+  /* ================================================================ */
+  /* TAB 2: SENSITIVITY ENGINE                                         */
+  /* ================================================================ */
+
+  function renderSensitivity() {
+    return (
+      <>
+        <div style={S.card}>
+          <div style={S.cardTitle}>MULTI-CURRENCY FX BETAS (252D ROLLING REGRESSION)</div>
+          <div style={{ fontSize: 11, color: "#555", marginBottom: 6 }}>
+            How sensitive is each stock to currency moves? Click a row for detailed breakdown.
+          </div>
+          {sortedSensitivity.length > 0 ? (
+            <table style={S.table}>
+              <thead>
+                <tr>
+                  <SortHeader label="TICKER" col="ticker" sort={sensSort} onSort={(c) => setSensSort(p => ({ col: c, asc: p.col === c ? !p.asc : true }))} />
+                  <SortHeader label="FX SENSITIVITY" col="betaFxTotal" sort={sensSort} onSort={(c) => setSensSort(p => ({ col: c, asc: p.col === c ? !p.asc : false }))} />
+                  <SortHeader label="MARKET" col="betaMarket" sort={sensSort} onSort={(c) => setSensSort(p => ({ col: c, asc: p.col === c ? !p.asc : false }))} />
+                  <SortHeader label="USD" col="betaUsd" sort={sensSort} onSort={(c) => setSensSort(p => ({ col: c, asc: p.col === c ? !p.asc : false }))} />
+                  <SortHeader label="EUR" col="betaEur" sort={sensSort} onSort={(c) => setSensSort(p => ({ col: c, asc: p.col === c ? !p.asc : false }))} />
+                  <SortHeader label="GBP" col="betaGbp" sort={sensSort} onSort={(c) => setSensSort(p => ({ col: c, asc: p.col === c ? !p.asc : false }))} />
+                  <SortHeader label="SEK" col="betaSek" sort={sensSort} onSort={(c) => setSensSort(p => ({ col: c, asc: p.col === c ? !p.asc : false }))} />
+                  <SortHeader label="FIT" col="rSquared" sort={sensSort} onSort={(c) => setSensSort(p => ({ col: c, asc: p.col === c ? !p.asc : false }))} />
+                  <SortHeader label="FX FIT" col="rSquaredFxOnly" sort={sensSort} onSort={(c) => setSensSort(p => ({ col: c, asc: p.col === c ? !p.asc : false }))} />
+                </tr>
+              </thead>
+              <tbody>
+                {sortedSensitivity.map((row) => (
+                  <tr
+                    key={row.ticker}
+                    style={{ cursor: "pointer", background: selectedSensTicker === row.ticker ? "rgba(249,115,22,0.08)" : undefined }}
+                    onClick={() => setSelectedSensTicker(row.ticker)}
+                  >
+                    <td style={{ ...S.td, fontWeight: 600, color: "#f97316" }}>{row.ticker}</td>
+                    <td style={{ ...S.td, textAlign: "center", fontWeight: 700 }}>
+                      {(Math.abs(row.betaUsd) + Math.abs(row.betaEur) + Math.abs(row.betaGbp) + Math.abs(row.betaSek)).toFixed(3)}
+                    </td>
+                    <td style={S.td}>{row.betaMarket.toFixed(3)}</td>
+                    <td style={{ ...S.td, color: CCY_COLORS.USD }}>
+                      {row.betaUsd.toFixed(3)}{sigStar(row.tstatUsd)}
+                    </td>
+                    <td style={{ ...S.td, color: CCY_COLORS.EUR }}>
+                      {row.betaEur.toFixed(3)}{sigStar(row.tstatEur)}
+                    </td>
+                    <td style={{ ...S.td, color: CCY_COLORS.GBP }}>
+                      {row.betaGbp.toFixed(3)}{sigStar(row.tstatGbp)}
+                    </td>
+                    <td style={{ ...S.td, color: CCY_COLORS.SEK }}>
+                      {row.betaSek.toFixed(3)}{sigStar(row.tstatSek)}
+                    </td>
+                    <td style={S.td}>{(row.rSquared * 100).toFixed(1)}%</td>
+                    <td style={S.td}>{(row.rSquaredFxOnly * 100).toFixed(1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div style={S.dim}>Run calculate-fx-regressions.ts to populate regression data</div>
+          )}
+
+          {sortedSensitivity.length > 0 && (
+            <HelpToggle id="sens-columns" label="Column guide" showHelp={showHelp} setShowHelp={setShowHelp}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 24px" }}>
+                <div><span style={{ color: "#888", fontWeight: 600 }}>FX SENSITIVITY</span> &mdash; Sum of absolute currency betas. Higher = more total FX exposure.</div>
+                <div><span style={{ color: "#888", fontWeight: 600 }}>MARKET</span> &mdash; Beta vs OBX index. 1.0 = stock moves 1:1 with the market.</div>
+                <div><span style={{ color: CCY_COLORS.USD, fontWeight: 600 }}>USD</span> / <span style={{ color: CCY_COLORS.EUR, fontWeight: 600 }}>EUR</span> / <span style={{ color: CCY_COLORS.GBP, fontWeight: 600 }}>GBP</span> / <span style={{ color: CCY_COLORS.SEK, fontWeight: 600 }}>SEK</span> &mdash; Sensitivity to each currency pair vs NOK. Positive = stock rises when NOK weakens.</div>
+                <div><span style={{ color: "#888", fontWeight: 600 }}>FIT (R&sup2;)</span> &mdash; How much of the stock&apos;s movement is explained by market + currencies combined (0-100%).</div>
+                <div><span style={{ color: "#888", fontWeight: 600 }}>FX FIT</span> &mdash; How much is explained by currencies alone, excluding the market factor.</div>
+                <div><span style={{ color: "#888", fontWeight: 600 }}>Stars</span> &mdash; {"\u2605"} = likely real (95%), {"\u2605\u2605"} = strong (99%), {"\u2605\u2605\u2605"} = very strong (99.9%). No star = may be noise.</div>
+              </div>
+            </HelpToggle>
+          )}
+        </div>
+
+        {/* Detail panel for selected ticker */}
+        {selectedSensTicker && sensDetail && (
+          <div style={S.card}>
+            <div style={S.cardTitle}>{selectedSensTicker} &mdash; DETAILED FX SENSITIVITY</div>
+
+            <HelpToggle id="sens-detail-intro" label="Statistical vs Fundamental — what's the difference?" showHelp={showHelp} setShowHelp={setShowHelp}>
+              <strong style={{ color: "#888" }}>Statistical</strong> = how the stock price actually moves with currencies (regression on 252 trading days).
+              <strong style={{ color: "#888" }}> Fundamental</strong> = where the company earns and spends money (from annual reports). Large gaps suggest active hedging or pricing power.
+            </HelpToggle>
+            <div style={S.grid2}>
+              {/* Statistical betas */}
+              {sensDetail.statistical && (
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "#888", marginBottom: 6 }}>STATISTICAL (REGRESSION)</div>
+                  <table style={S.table}>
+                    <thead>
+                      <tr>
+                        <th style={S.th}>CURRENCY</th>
+                        <th style={S.th}>BETA</th>
+                        <th style={S.th}>T-STAT</th>
+                        <th style={S.th}>SIG</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {["Market", "Usd", "Eur", "Gbp", "Sek"].map((c) => {
+                        const beta = sensDetail.statistical[`beta${c}`];
+                        const tstat = sensDetail.statistical[`tstat${c}`];
+                        return (
+                          <tr key={c}>
+                            <td style={{ ...S.td, color: CCY_COLORS[c.toUpperCase()] || "#888", fontWeight: 600 }}>
+                              {c === "Market" ? "OBX" : c.toUpperCase()}
+                            </td>
+                            <td style={S.td}>{beta?.toFixed(4)}</td>
+                            <td style={S.td}>{tstat?.toFixed(2)}</td>
+                            <td style={S.td}>{sigStar(tstat || 0)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  <div style={{ marginTop: 8, fontSize: 11, color: "#666" }}>
+                    R&sup2;: {(sensDetail.statistical.rSquared * 100).toFixed(1)}% | R&sup2; FX only: {(sensDetail.statistical.rSquaredFxOnly * 100).toFixed(1)}%
+                  </div>
+                  <HelpToggle id="sens-stat-help" showHelp={showHelp} setShowHelp={setShowHelp}>
+                    <strong style={{ color: "#888" }}>Beta</strong> = stock return per 1% currency move. <strong style={{ color: "#888" }}>T-stat</strong> = statistical reliability (higher is better, |t|&gt;2 is significant).
+                    <strong style={{ color: "#888" }}> R&sup2;</strong> = % of stock variance explained. <strong style={{ color: "#888" }}>R&sup2; FX only</strong> = portion explained by currencies after removing market effect.
+                  </HelpToggle>
+                </div>
+              )}
+
+              {/* Fundamental exposure */}
+              {sensDetail.fundamental && (
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "#888", marginBottom: 6 }}>FUNDAMENTAL (ANNUAL REPORT)</div>
+                  <table style={S.table}>
+                    <thead>
+                      <tr>
+                        <th style={S.th}>CURRENCY</th>
+                        <th style={S.th}>REVENUE</th>
+                        <th style={S.th}>COST</th>
+                        <th style={S.th}>NET</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {["usd", "eur", "gbp", "nok", "sek"].map((c) => (
+                        <tr key={c}>
+                          <td style={{ ...S.td, color: CCY_COLORS[c.toUpperCase()] || "#888", fontWeight: 600 }}>
+                            {c.toUpperCase()}
+                          </td>
+                          <td style={S.td}>{(sensDetail.fundamental.revenue[c] * 100).toFixed(0)}%</td>
+                          <td style={S.td}>{(sensDetail.fundamental.cost[c] * 100).toFixed(0)}%</td>
+                          <td style={{ ...S.td, fontWeight: 600, color: (sensDetail.fundamental.revenue[c] - sensDetail.fundamental.cost[c]) > 0 ? "#4CAF50" : "#ef4444" }}>
+                            {((sensDetail.fundamental.revenue[c] - sensDetail.fundamental.cost[c]) * 100).toFixed(0)}%
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div style={{ marginTop: 8, fontSize: 11, color: "#666" }}>
+                    Source: {sensDetail.fundamental.source} | FY{sensDetail.fundamental.fiscalYear}
+                  </div>
+                  <HelpToggle id="sens-fund-help" showHelp={showHelp} setShowHelp={setShowHelp}>
+                    <strong style={{ color: "#888" }}>Revenue</strong> = % of sales in each currency.
+                    <strong style={{ color: "#888" }}> Cost</strong> = % of expenses in each currency.
+                    <strong style={{ color: "#888" }}> Net</strong> = revenue minus cost &mdash; positive means a natural long position (weak NOK benefits earnings).
+                  </HelpToggle>
+                </div>
+              )}
+            </div>
+
+            {/* Divergence alerts */}
+            {sensDetail.divergences?.length > 0 && (
+              <div style={{ marginTop: 12, padding: 14, background: "rgba(249,115,22,0.06)", borderRadius: 4, border: "1px solid rgba(249,115,22,0.15)" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#f97316", marginBottom: 2 }}>STATISTICAL vs FUNDAMENTAL GAPS</div>
+                <div style={{ fontSize: 10, color: "#666", marginBottom: 10 }}>
+                  Comparing how the stock actually moves with currencies (regression) vs what the company reports (annual report).
+                  Difference = beta minus reported net exposure. A positive difference means the market sees more sensitivity than the company reports.
+                </div>
+                <table style={{ ...S.table, background: "transparent" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ ...S.th, width: 70 }}>CURRENCY</th>
+                      <th style={S.th}>MARKET BETA</th>
+                      <th style={S.th}>REPORTED NET</th>
+                      <th style={S.th}>DIFFERENCE</th>
+                      <th style={S.th}>ASSESSMENT</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sensDetail.divergences.map((d: any) => {
+                      const diff = d.difference ?? (d.statistical - d.fundamental);
+                      return (
+                        <tr key={d.currency}>
+                          <td style={{ ...S.td, color: CCY_COLORS[d.currency] || "#888", fontWeight: 600 }}>{d.currency}</td>
+                          <td style={S.td}>{d.statistical >= 0 ? "+" : ""}{d.statistical.toFixed(3)}</td>
+                          <td style={S.td}>{d.fundamental >= 0 ? "+" : ""}{(d.fundamental * 100).toFixed(0)}%</td>
+                          <td style={{ ...S.td, fontWeight: 600, color: Math.abs(diff) > 0.3 ? "#ef4444" : "#f97316" }}>
+                            {diff >= 0 ? "+" : ""}{diff.toFixed(3)}
+                          </td>
+                          <td style={{ ...S.td, fontSize: 10, color: "#999" }}>
+                            {d.assessment || (Math.abs(d.statistical) < Math.abs(d.fundamental) ? "May be actively hedging" : "Market prices in more exposure")}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Rolling beta sparklines */}
+            {sensDetail.rollingHistory?.length > 2 && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#888", marginBottom: 2 }}>ROLLING BETAS (LAST 2Y)</div>
+                <HelpToggle id="sens-rolling-help" showHelp={showHelp} setShowHelp={setShowHelp}>
+                  How the currency sensitivity has changed over time. Stable lines = consistent exposure. Large swings = changing business mix, hedging changes, or regime shifts.
+                </HelpToggle>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+                  {(["Usd", "Eur", "Gbp", "Sek"] as const).map((c) => (
+                    <div key={c}>
+                      <div style={{ fontSize: 10, color: CCY_COLORS[c.toUpperCase()], marginBottom: 4 }}>{c.toUpperCase()}</div>
+                      <Sparkline
+                        data={sensDetail.rollingHistory.map((r: any) => r[`beta${c}`])}
+                        color={CCY_COLORS[c.toUpperCase()]}
+                        width={180}
+                        height={40}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </>
+    );
+  }
+
+  /* ================================================================ */
+  /* TAB 3: COMPANY DEEP DIVE                                          */
+  /* ================================================================ */
+
+  function renderCompany() {
+    const exp = companyData?.exposure?.detailed?.[0];
+    const _sens = companyData?.sensitivity;
+
+    return (
+      <>
+        {/* Ticker selector */}
+        <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 16 }}>
+          <span style={{ fontSize: 11, color: "#888" }}>TICKER:</span>
+          <select
+            style={S.select}
+            value={companyTicker}
+            onChange={(e) => setCompanyTicker(e.target.value)}
+          >
+            {exposureHeatmap.map(r => (
+              <option key={r.ticker} value={r.ticker}>{r.ticker}</option>
+            ))}
+          </select>
+        </div>
+
+        {exp ? (
+          <>
+            {/* Revenue / Cost waterfalls */}
+            <div style={S.grid2}>
+              <div style={S.card}>
+                <div style={S.cardTitle}>REVENUE BY CURRENCY</div>
+                {(["usd", "eur", "gbp", "nok", "sek", "other"] as const).map((c) => {
+                  const pct = exp.revenue[c] * 100;
+                  return (
+                    <div key={c} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <span style={{ width: 40, fontSize: 10, color: CCY_COLORS[c.toUpperCase()] || "#888", fontWeight: 600 }}>{c.toUpperCase()}</span>
+                      <div style={{ flex: 1, height: 16, background: "#1a1a1a", borderRadius: 2, overflow: "hidden" }}>
+                        <div style={{
+                          width: `${pct}%`,
+                          height: "100%",
+                          background: CCY_COLORS[c.toUpperCase()] || "#555",
+                          opacity: 0.7,
+                        }} />
+                      </div>
+                      <span style={{ width: 40, textAlign: "right", fontSize: 11 }}>{pct.toFixed(0)}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={S.card}>
+                <div style={S.cardTitle}>COST BY CURRENCY</div>
+                {(["usd", "eur", "gbp", "nok", "sek", "other"] as const).map((c) => {
+                  const pct = exp.cost[c] * 100;
+                  return (
+                    <div key={c} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <span style={{ width: 40, fontSize: 10, color: CCY_COLORS[c.toUpperCase()] || "#888", fontWeight: 600 }}>{c.toUpperCase()}</span>
+                      <div style={{ flex: 1, height: 16, background: "#1a1a1a", borderRadius: 2, overflow: "hidden" }}>
+                        <div style={{
+                          width: `${pct}%`,
+                          height: "100%",
+                          background: CCY_COLORS[c.toUpperCase()] || "#555",
+                          opacity: 0.5,
+                        }} />
+                      </div>
+                      <span style={{ width: 40, textAlign: "right", fontSize: 11 }}>{pct.toFixed(0)}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Net exposure + EBITDA/EPS sensitivity */}
+            <div style={S.grid2}>
+              <div style={S.card}>
+                <div style={S.cardTitle}>NET CURRENCY EXPOSURE</div>
+                {(["usd", "eur", "gbp", "sek"] as const).map((c) => {
+                  const net = exp.netExposure[c];
+                  const pctAbs = Math.min(Math.abs(net) * 100, 50);
+                  return (
+                    <div key={c} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <span style={{ width: 40, fontSize: 10, color: CCY_COLORS[c.toUpperCase()], fontWeight: 600 }}>{c.toUpperCase()}</span>
+                      <div style={{ flex: 1, height: 16, background: "#1a1a1a", borderRadius: 2, position: "relative", overflow: "hidden" }}>
+                        <div style={{
+                          position: "absolute",
+                          left: net >= 0 ? "50%" : `${50 - pctAbs}%`,
+                          width: `${pctAbs}%`,
+                          height: "100%",
+                          background: net >= 0 ? "#4CAF50" : "#ef4444",
+                          opacity: 0.5,
+                          borderRadius: 2,
+                        }} />
+                        <div style={{ position: "absolute", left: "50%", top: 0, width: 1, height: "100%", background: "#444" }} />
+                      </div>
+                      <span style={{ width: 50, textAlign: "right", fontSize: 11, color: net >= 0 ? "#4CAF50" : "#ef4444", fontWeight: 600 }}>
+                        {net >= 0 ? "+" : ""}{(net * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={S.card}>
+                <div style={S.cardTitle}>EBITDA / EPS SENSITIVITY</div>
+                <table style={S.table}>
+                  <thead>
+                    <tr>
+                      <th style={S.th}>IF +10% MOVE</th>
+                      <th style={S.th}>EBITDA IMPACT</th>
+                      <th style={S.th}>EPS IMPACT</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(["Usd", "Eur", "Gbp"] as const).map((c) => (
+                      <tr key={c}>
+                        <td style={{ ...S.td, color: CCY_COLORS[c.toUpperCase()], fontWeight: 600 }}>
+                          {c.toUpperCase()}/NOK +10%
+                        </td>
+                        <td style={{ ...S.td, color: exp.sensitivity[`ebitda${c}`] > 0 ? "#4CAF50" : "#ef4444" }}>
+                          {fmtPct(exp.sensitivity[`ebitda${c}`] * 10, 1)}
+                        </td>
+                        <td style={{ ...S.td, color: exp.sensitivity[`eps${c}`] > 0 ? "#4CAF50" : "#ef4444" }}>
+                          {fmtPct(exp.sensitivity[`eps${c}`] * 10, 1)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Forward rate panel */}
+            {forwardData && (
+              <div style={S.card}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={S.cardTitle}>FORWARD RATES &mdash; WHAT&apos;S PRICED IN</div>
+                  <select style={S.select} value={hedgeCurrency} onChange={(e) => setHedgeCurrency(e.target.value)}>
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="GBP">GBP</option>
+                    <option value="SEK">SEK</option>
+                  </select>
+                </div>
+                <table style={S.table}>
+                  <thead>
+                    <tr>
+                      <th style={S.th}>TENOR</th>
+                      <th style={S.th}>SPOT</th>
+                      <th style={S.th}>FORWARD</th>
+                      <th style={S.th}>FWD PTS (BPS)</th>
+                      <th style={S.th}>CARRY (ANN)</th>
+                      <th style={S.th}>HEDGE COST</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {forwardData.forwards.map((f) => (
+                      <tr key={f.tenor}>
+                        <td style={{ ...S.td, fontWeight: 600 }}>{f.tenor}</td>
+                        <td style={S.td}>{f.spot.toFixed(4)}</td>
+                        <td style={S.td}>{f.forward.toFixed(4)}</td>
+                        <td style={{ ...S.td, color: f.forwardPointsBps > 0 ? "#4CAF50" : "#ef4444" }}>
+                          {f.forwardPointsBps >= 0 ? "+" : ""}{f.forwardPointsBps.toFixed(1)}
+                        </td>
+                        <td style={{ ...S.td, color: f.annualizedCarryPct > 0 ? "#4CAF50" : "#ef4444" }}>
+                          {fmtPct(f.annualizedCarryPct, 2)}
+                        </td>
+                        <td style={S.td}>{fmtBps(f.hedgeCostBps)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Hedge calculator */}
+            <div style={S.card}>
+              <div style={S.cardTitle}>HEDGE CALCULATOR &mdash; {companyTicker}</div>
+              <div style={{ fontSize: 12, color: "#888", marginBottom: 10, lineHeight: 1.6 }}>
+                {companyTicker} earns revenue in foreign currencies. If NOK strengthens, those earnings are worth less in NOK.
+                A <b style={{ color: "#ccc" }}>forward contract</b> lets the company lock in today&apos;s exchange rate for a future date, removing that uncertainty.
+              </div>
+              <HelpToggle id="hedge-calc" label="How to read this calculator" showHelp={showHelp} setShowHelp={setShowHelp}>
+                <div>
+                  <b style={{ color: "#ccc" }}>What you&apos;re simulating:</b> You have {hedgeNotional.toLocaleString("no-NO")} NOK of foreign currency exposure.
+                  The hedge ratio controls how much of that exposure you protect with a forward contract.<br /><br />
+                  <b style={{ color: "#ccc" }}>The 4 metrics:</b><br />
+                  &bull; <b style={{ color: "#ccc" }}>FORWARD</b> — The locked-in exchange rate for your chosen tenor. If spot is 9.70 and forward is 9.73, you&apos;ll pay slightly more per USD, but you know the exact rate.<br />
+                  &bull; <b style={{ color: "#ccc" }}>COST (ANN BPS)</b> — The annualized cost of hedging in basis points. E.g., 38 bps means hedging costs ~0.38% per year. This comes from the interest rate difference between NOK and the foreign currency.<br />
+                  &bull; <b style={{ color: "#ccc" }}>BREAK-EVEN</b> — How much NOK must strengthen before the hedge saves you money. If break-even is +0.14%, the hedge only pays off if NOK moves more than that.<br />
+                  &bull; <b style={{ color: "#ccc" }}>VOL REDUCTION</b> — How much the hedge reduces your P&amp;L volatility. Higher = more stable cashflows.<br /><br />
+                  <b style={{ color: "#ccc" }}>The scenario table:</b><br />
+                  &bull; <b style={{ color: "#ccc" }}>FX MOVE</b> — Hypothetical NOK/{hedgeCurrency} change. Negative = NOK strengthens (bad for exporters), positive = NOK weakens (good for exporters).<br />
+                  &bull; <b style={{ color: "#ccc" }}>UNHEDGED P&amp;L</b> — Your gain/loss if you do nothing.<br />
+                  &bull; <b style={{ color: "#ccc" }}>HEDGED P&amp;L</b> — Your gain/loss with the forward contract in place.<br />
+                  &bull; <b style={{ color: "#ccc" }}>SAVINGS</b> — Difference. Green = the hedge helped. Red = you would have been better off unhedged (because NOK weakened in your favor).
+                </div>
+              </HelpToggle>
+              <div style={{ display: "flex", gap: 16, alignItems: "flex-end", marginBottom: 12, flexWrap: "wrap" }}>
+                <div>
+                  <div style={{ fontSize: 10, color: "#666", marginBottom: 4 }}>NOTIONAL (NOK)</div>
+                  <input
+                    type="number"
+                    style={{ ...S.input, width: 130 }}
+                    value={hedgeNotional}
+                    onChange={(e) => setHedgeNotional(parseFloat(e.target.value) || 0)}
+                  />
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: "#666", marginBottom: 4 }}>HEDGE RATIO: {hedgeRatio}%</div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={hedgeRatio}
+                    onChange={(e) => setHedgeRatio(parseInt(e.target.value))}
+                    style={{ ...S.slider, width: 200 }}
+                  />
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: "#666", marginBottom: 4 }}>TENOR</div>
+                  <select style={S.select} value={hedgeTenor} onChange={(e) => setHedgeTenor(e.target.value)}>
+                    <option value="1M">1M</option>
+                    <option value="3M">3M</option>
+                    <option value="6M">6M</option>
+                    <option value="12M">12M</option>
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: "#666", marginBottom: 4 }}>CURRENCY</div>
+                  <select style={S.select} value={hedgeCurrency} onChange={(e) => setHedgeCurrency(e.target.value)}>
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="GBP">GBP</option>
+                  </select>
+                </div>
+                <button style={S.button} onClick={runHedge}>CALCULATE</button>
+              </div>
+
+              {hedgeResult && (
+                <div>
+                  <div style={{ display: "flex", gap: 24, marginBottom: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 10, color: "#666" }}>FORWARD</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{hedgeResult.forward?.toFixed(4)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: "#666" }}>COST (ANN BPS)</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#f97316" }}>{hedgeResult.costBpsAnnualized?.toFixed(1)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: "#666" }}>BREAK-EVEN</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{fmtPct(hedgeResult.breakEvenPct, 2)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: "#666" }}>VOL REDUCTION</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#4CAF50" }}>{hedgeResult.volReductionPct?.toFixed(1)}%</div>
+                    </div>
+                  </div>
+
+                  {/* Scenario table */}
+                  <table style={S.table}>
+                    <thead>
+                      <tr>
+                        <th style={S.th}>FX MOVE</th>
+                        <th style={S.th}>UNHEDGED P&amp;L</th>
+                        <th style={S.th}>HEDGED P&amp;L</th>
+                        <th style={S.th}>SAVINGS</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {hedgeResult.scenarios?.map((s: any) => (
+                        <tr key={s.fxMovePct}>
+                          <td style={{ ...S.td, fontWeight: 600 }}>{s.fxMovePct >= 0 ? "+" : ""}{s.fxMovePct}%</td>
+                          <td style={{ ...S.td, color: s.unhedgedPnl >= 0 ? "#4CAF50" : "#ef4444" }}>
+                            {Math.round(s.unhedgedPnl).toLocaleString("no-NO")} NOK
+                          </td>
+                          <td style={{ ...S.td, color: s.hedgedPnl >= 0 ? "#4CAF50" : "#ef4444" }}>
+                            {Math.round(s.hedgedPnl).toLocaleString("no-NO")} NOK
+                          </td>
+                          <td style={{ ...S.td, color: s.savings > 0 ? "#4CAF50" : "#ef4444" }}>
+                            {Math.round(s.savings).toLocaleString("no-NO")} NOK
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  {/* Plain-language summary */}
+                  <div style={{ marginTop: 12, padding: 10, background: "#111", borderRadius: 4, border: "1px solid #222", fontSize: 12, color: "#999", lineHeight: 1.6 }}>
+                    <b style={{ color: "#ccc" }}>Bottom line:</b>{" "}
+                    {hedgeResult.costBpsAnnualized < 50
+                      ? `Hedging ${hedgeRatio}% of your ${hedgeCurrency} exposure costs ~${hedgeResult.costBpsAnnualized?.toFixed(0)} bps/year. `
+                      : `Hedging is relatively expensive at ${hedgeResult.costBpsAnnualized?.toFixed(0)} bps/year. `}
+                    {hedgeResult.volReductionPct >= 20
+                      ? `In return, your cashflow volatility drops by ${hedgeResult.volReductionPct?.toFixed(0)}% — a meaningful reduction in risk. `
+                      : hedgeResult.volReductionPct >= 5
+                        ? `Vol reduction of ${hedgeResult.volReductionPct?.toFixed(0)}% is modest. `
+                        : `Vol reduction is minimal at ${hedgeResult.volReductionPct?.toFixed(0)}%. Consider if the cost is worth it. `}
+                    The hedge protects you if NOK strengthens (negative FX moves), but you give up gains if NOK weakens.
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <div style={{ ...S.card, textAlign: "center" }}>
+            <div style={S.dim}>
+              {companyData === null ? "Loading..." : "No exposure data for this ticker. Run seed-fx-exposures.ts to populate."}
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  /* ================================================================ */
+  /* TAB 4: PORTFOLIO FX RISK                                          */
+  /* ================================================================ */
+
+  function renderPortfolio() {
+    // Parse current tickers/weights for holdings table
+    const holdingTickers = pfTickers.split(",").map(t => t.trim()).filter(Boolean);
+    const holdingWeights = pfWeights.split(",").map(w => parseFloat(w.trim())).filter(w => !isNaN(w));
+
+    return (
+      <>
+        {/* Login modal (same pattern as portfolio optimizer) */}
+        {showLoginModal && (
+          <div
+            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}
+            onClick={() => setShowLoginModal(false)}
+          >
+            <form
+              style={{ ...S.card, padding: 28, width: 340, background: "#111" }}
+              onSubmit={(e) => { e.preventDefault(); handlePortfolioLogin(); }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ textAlign: "center", marginBottom: 20 }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#f97316" }}>Sign In</div>
+                <div style={{ fontSize: 10, color: "#666", marginTop: 4 }}>Sign in to load saved portfolios</div>
+              </div>
+              <div style={{ fontSize: 10, color: "#666", marginBottom: 4, letterSpacing: 1 }}>USERNAME</div>
+              <input
+                type="text" value={authUser} onChange={(e) => setAuthUser(e.target.value)}
+                placeholder="Enter username" autoFocus autoComplete="username"
+                style={{ ...S.input, width: "100%", padding: "10px 12px", marginBottom: 12, boxSizing: "border-box" as const }}
+              />
+              <div style={{ fontSize: 10, color: "#666", marginBottom: 4, letterSpacing: 1 }}>PASSWORD</div>
+              <input
+                type="password" value={authPass} onChange={(e) => setAuthPass(e.target.value)}
+                placeholder="Enter password" autoComplete="current-password"
+                style={{ ...S.input, width: "100%", padding: "10px 12px", marginBottom: 12, boxSizing: "border-box" as const }}
+              />
+              <button
+                type="submit" disabled={authLoading || !authPass || !authUser}
+                style={{ ...S.button, width: "100%", padding: "11px 0", marginTop: 4, opacity: (authLoading || !authPass || !authUser) ? 0.5 : 1 }}
+              >
+                {authLoading ? "Signing in..." : "SIGN IN"}
+              </button>
+              {authError && <div style={{ color: "#ef4444", fontSize: 11, marginTop: 10, textAlign: "center" }}>{authError}</div>}
+            </form>
+          </div>
+        )}
+
+        {/* Portfolio selector header */}
+        <div style={S.card}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div style={S.cardTitle}>PORTFOLIO FX RISK ANALYSIS</div>
+            {token && profile ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ ...S.badge, background: "rgba(76,175,80,0.15)", color: "#4CAF50" }}>{profile}</span>
+                <span style={{ fontSize: 10, color: "#888", cursor: "pointer", textDecoration: "underline" }} onClick={authLogout}>logout</span>
+              </div>
+            ) : (
+              <button
+                style={{ ...S.button, background: "transparent", border: "1px solid #f97316", color: "#f97316", fontSize: 10 }}
+                onClick={() => setShowLoginModal(true)}
+              >
+                SIGN IN TO LOAD PORTFOLIOS
+              </button>
+            )}
+          </div>
+
+          {/* Saved portfolio cards */}
+          {token && !configsLoading && savedConfigs.length > 0 && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+              {savedConfigs.map((cfg) => {
+                const active = selectedConfigId === cfg.id;
+                return (
+                  <div
+                    key={cfg.id}
+                    onClick={() => selectConfig(cfg)}
+                    style={{
+                      padding: "8px 14px", minWidth: 120,
+                      background: active ? "rgba(249,115,22,0.12)" : "#1a1a1a",
+                      border: active ? "1px solid #f97316" : "1px solid #333",
+                      borderRadius: 4, cursor: "pointer", transition: "all 0.15s",
+                    }}
+                  >
+                    <div style={{ fontSize: 12, fontWeight: 700, color: active ? "#f97316" : "#e5e5e5" }}>{cfg.name}</div>
+                    <div style={{ fontSize: 9, color: "#666", marginTop: 2 }}>
+                      {cfg.tickers.length} stocks{cfg.mode ? ` \u00B7 ${cfg.mode}` : ""}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {token && configsLoading && <div style={{ fontSize: 11, color: "#666", marginBottom: 8 }}>Loading portfolios...</div>}
+          {token && !configsLoading && savedConfigs.length === 0 && (
+            <div style={{ fontSize: 11, color: "#666", marginBottom: 8 }}>
+              No saved portfolios. <Link href="/portfolio" style={{ color: "#f97316" }}>Create one in the Portfolio Optimizer</Link>
+            </div>
+          )}
+
+          {/* Holdings table */}
+          {holdingTickers.length > 0 && (
+            <table style={{ ...S.table, marginTop: 4 }}>
+              <thead>
+                <tr>
+                  <th style={S.th}>TICKER</th>
+                  <th style={{ ...S.th, textAlign: "right" }}>WEIGHT</th>
+                  <th style={S.th}>ALLOCATION</th>
+                </tr>
+              </thead>
+              <tbody>
+                {holdingTickers.map((t, i) => {
+                  const w = holdingWeights[i] ?? 0;
+                  return (
+                    <tr key={t}>
+                      <td style={{ ...S.td, fontWeight: 600, color: "#f97316" }}>{t}</td>
+                      <td style={{ ...S.td, textAlign: "right", fontWeight: 600 }}>{(w * 100).toFixed(1)}%</td>
+                      <td style={S.td}>
+                        <div style={{ width: "100%", height: 12, background: "#1a1a1a", borderRadius: 2, overflow: "hidden" }}>
+                          <div style={{ width: `${Math.min(w * 100 * 2, 100)}%`, height: "100%", background: "#f97316", opacity: 0.5, borderRadius: 2 }} />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr>
+                  <td style={{ ...S.td, color: "#888", fontWeight: 600 }}>TOTAL</td>
+                  <td style={{ ...S.td, textAlign: "right", fontWeight: 700, color: Math.abs(holdingWeights.reduce((a, b) => a + b, 0) - 1) < 0.01 ? "#4CAF50" : "#ef4444" }}>
+                    {(holdingWeights.reduce((a, b) => a + b, 0) * 100).toFixed(1)}%
+                  </td>
+                  <td style={S.td} />
+                </tr>
+              </tbody>
+            </table>
+          )}
+
+          <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 10 }}>
+            <button style={S.button} onClick={runPortfolio} disabled={pfLoading || holdingTickers.length < 2}>
+              {pfLoading ? "ANALYZING..." : "ANALYZE FX RISK"}
+            </button>
+            {holdingTickers.length < 2 && <span style={{ fontSize: 10, color: "#666" }}>Select a portfolio or sign in to load saved portfolios</span>}
+          </div>
+        </div>
+
+        {pfResult && (
+          <>
+            {/* FX VaR cards */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 12 }}>
+              {[
+                { label: "1D VaR 95%", value: pfResult.fxVaR?.var95_1d, suffix: "%" },
+                { label: "1D VaR 99%", value: pfResult.fxVaR?.var99_1d, suffix: "%" },
+                { label: "1M VaR 95%", value: pfResult.fxVaR?.var95_1m, suffix: "%" },
+                { label: "1M VaR 99%", value: pfResult.fxVaR?.var99_1m, suffix: "%" },
+              ].map((v) => (
+                <div key={v.label} style={S.card}>
+                  <div style={{ fontSize: 10, color: "#888" }}>{v.label}</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: "#ef4444" }}>
+                    {v.value != null ? `${v.value.toFixed(2)}${v.suffix}` : "\u2014"}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={S.grid2}>
+              {/* Aggregate exposure */}
+              <div style={S.card}>
+                <div style={S.cardTitle}>WEIGHTED FX EXPOSURE</div>
+                {pfResult.weightedExposure && (["usd", "eur", "gbp", "sek"] as const).map((c) => {
+                  const v = pfResult.weightedExposure[c];
+                  const pctAbs = Math.min(Math.abs(v) * 100, 50);
+                  return (
+                    <div key={c} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <span style={{ width: 40, fontSize: 10, color: CCY_COLORS[c.toUpperCase()], fontWeight: 600 }}>{c.toUpperCase()}</span>
+                      <div style={{ flex: 1, height: 16, background: "#1a1a1a", borderRadius: 2, position: "relative", overflow: "hidden" }}>
+                        <div style={{
+                          position: "absolute",
+                          left: v >= 0 ? "50%" : `${50 - pctAbs}%`,
+                          width: `${pctAbs}%`,
+                          height: "100%",
+                          background: v >= 0 ? "#4CAF50" : "#ef4444",
+                          opacity: 0.5,
+                        }} />
+                      </div>
+                      <span style={{ width: 50, textAlign: "right", fontSize: 11, color: v >= 0 ? "#4CAF50" : "#ef4444" }}>
+                        {(v * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Currency contributions */}
+              <div style={S.card}>
+                <div style={S.cardTitle}>CURRENCY RISK CONTRIBUTION</div>
+                {pfResult.fxVaR?.currencyContributions && Object.entries(pfResult.fxVaR.currencyContributions).map(([c, v]) => (
+                  <div key={c} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <span style={{ width: 40, fontSize: 10, color: CCY_COLORS[c.toUpperCase()], fontWeight: 600 }}>{c.toUpperCase()}</span>
+                    <div style={{ flex: 1, height: 16, background: "#1a1a1a", borderRadius: 2, overflow: "hidden" }}>
+                      <div style={{ width: `${v as number}%`, height: "100%", background: CCY_COLORS[c.toUpperCase()] || "#888", opacity: 0.6 }} />
+                    </div>
+                    <span style={{ width: 40, textAlign: "right", fontSize: 11 }}>{(v as number).toFixed(0)}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Per-stock FX risk contribution */}
+            <div style={S.card}>
+              <div style={S.cardTitle}>PER-STOCK FX RISK CONTRIBUTION</div>
+              <table style={S.table}>
+                <thead>
+                  <tr>
+                    <th style={S.th}>TICKER</th>
+                    <th style={S.th}>WEIGHT</th>
+                    <th style={S.th}>|&beta; FX|</th>
+                    <th style={S.th}>RISK CONTRIB</th>
+                    <th style={S.th}>&beta; USD</th>
+                    <th style={S.th}>&beta; EUR</th>
+                    <th style={S.th}>&beta; GBP</th>
+                    <th style={S.th}>&beta; SEK</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pfResult.perStock?.map((s: any) => (
+                    <tr key={s.ticker}>
+                      <td style={{ ...S.td, fontWeight: 600, color: "#f97316" }}>{s.ticker}</td>
+                      <td style={S.td}>{(s.weight * 100).toFixed(1)}%</td>
+                      <td style={S.td}>{s.fxBetaTotal.toFixed(3)}</td>
+                      <td style={{ ...S.td, fontWeight: 600 }}>{(s.riskContribution * 100).toFixed(2)}%</td>
+                      <td style={{ ...S.td, color: CCY_COLORS.USD }}>{s.betas.usd.toFixed(3)}</td>
+                      <td style={{ ...S.td, color: CCY_COLORS.EUR }}>{s.betas.eur.toFixed(3)}</td>
+                      <td style={{ ...S.td, color: CCY_COLORS.GBP }}>{s.betas.gbp.toFixed(3)}</td>
+                      <td style={{ ...S.td, color: CCY_COLORS.SEK }}>{s.betas.sek.toFixed(3)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Stress scenarios */}
+            <div style={S.card}>
+              <div style={S.cardTitle}>STRESS SCENARIOS</div>
+              <HelpToggle id="stress-help" label="How are stress impacts calculated?" showHelp={showHelp} setShowHelp={setShowHelp}>
+                Estimated earnings impact based on your portfolio&apos;s weighted FX exposure. E.g. if portfolio has 40% net USD exposure and NOK weakens 5%, earnings impact is ~2%.
+              </HelpToggle>
+              <table style={S.table}>
+                <thead>
+                  <tr>
+                    <th style={S.th}>SCENARIO</th>
+                    <th style={S.th}>USD IMPACT</th>
+                    <th style={S.th}>EUR IMPACT</th>
+                    <th style={S.th}>TOTAL IMPACT</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pfResult.stressScenarios?.map((s: any) => (
+                    <tr key={s.scenario}>
+                      <td style={{ ...S.td, fontWeight: 600 }}>{s.scenario}</td>
+                      <td style={{ ...S.td, color: s.usdImpact >= 0 ? "#4CAF50" : "#ef4444" }}>
+                        {fmtPct(s.usdImpact * 100, 1)}
+                      </td>
+                      <td style={{ ...S.td, color: s.eurImpact >= 0 ? "#4CAF50" : "#ef4444" }}>
+                        {fmtPct(s.eurImpact * 100, 1)}
+                      </td>
+                      <td style={{ ...S.td, fontWeight: 700, color: s.totalImpact >= 0 ? "#4CAF50" : "#ef4444" }}>
+                        {fmtPct(s.totalImpact * 100, 1)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </>
+    );
+  }
+
+  /* ================================================================ */
+  /* TAB 5: FORWARDS & CARRY                                           */
+  /* ================================================================ */
+
+  function renderForwards() {
+    return (
+      <>
+        {/* Pair selector */}
+        <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 16 }}>
+          <span style={{ fontSize: 11, color: "#888" }}>PAIR:</span>
+          {["NOKUSD", "NOKEUR", "NOKGBP", "NOKSEK", "NOKDKK"].map((p) => (
+            <div
+              key={p}
+              style={{
+                ...S.badge,
+                background: fwdPair === p ? "rgba(249,115,22,0.2)" : "#1a1a1a",
+                color: fwdPair === p ? "#f97316" : "#888",
+                cursor: "pointer",
+                border: fwdPair === p ? "1px solid #f97316" : "1px solid #333",
+              }}
+              onClick={() => setFwdPair(p)}
+            >
+              {PAIR_LABELS[p] || p}
+            </div>
+          ))}
+        </div>
+
+        {/* Forward curve */}
+        <div style={S.card}>
+          <div style={S.cardTitle}>FORWARD CURVE &mdash; {PAIR_LABELS[fwdPair]}</div>
+          <HelpToggle id="fwd-curve-help" label="How are forward rates calculated?" showHelp={showHelp} setShowHelp={setShowHelp}>
+            Forward rates are derived from interest rate parity (IRP): the forward price reflects the interest rate differential between the two currencies.
+            Hedge cost shows the annualized cost of locking in the forward rate to eliminate currency risk.
+          </HelpToggle>
+          {fwdForwards.length > 0 ? (
+            <table style={S.table}>
+              <thead>
+                <tr>
+                  <th style={S.th}>TENOR</th>
+                  <th style={S.th}>SPOT</th>
+                  <th style={S.th}>FORWARD</th>
+                  <th style={S.th}>FWD POINTS</th>
+                  <th style={S.th}>FWD PTS (BPS)</th>
+                  <th style={S.th}>CARRY (ANN %)</th>
+                  <th style={S.th}>NOK RATE</th>
+                  <th style={S.th}>FOREIGN RATE</th>
+                  <th style={S.th}>HEDGE COST</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fwdForwards.map((f) => (
+                  <tr key={f.tenor}>
+                    <td style={{ ...S.td, fontWeight: 600 }}>{f.tenor}</td>
+                    <td style={S.td}>{f.spot.toFixed(4)}</td>
+                    <td style={{ ...S.td, fontWeight: 600 }}>{f.forward.toFixed(4)}</td>
+                    <td style={{ ...S.td, color: f.forwardPoints > 0 ? "#4CAF50" : "#ef4444" }}>
+                      {f.forwardPoints >= 0 ? "+" : ""}{f.forwardPoints.toFixed(4)}
+                    </td>
+                    <td style={{ ...S.td, color: f.forwardPointsBps > 0 ? "#4CAF50" : "#ef4444" }}>
+                      {f.forwardPointsBps >= 0 ? "+" : ""}{f.forwardPointsBps.toFixed(1)}
+                    </td>
+                    <td style={{ ...S.td, color: f.annualizedCarryPct > 0 ? "#4CAF50" : "#ef4444" }}>
+                      {fmtPct(f.annualizedCarryPct)}
+                    </td>
+                    <td style={S.td}>{f.nokRate.toFixed(2)}%</td>
+                    <td style={S.td}>{f.foreignRate.toFixed(2)}%</td>
+                    <td style={S.td}>{fmtBps(f.hedgeCostBps)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div style={S.dim}>Loading forward rates... (Ensure interest_rates table is seeded)</div>
+          )}
+        </div>
+
+        <div style={S.grid2}>
+          {/* Interest rate table */}
+          <div style={S.card}>
+            <div style={S.cardTitle}>INTEREST RATES BY CURRENCY</div>
+            {Object.keys(interestRates).length > 0 ? (
+              <table style={S.table}>
+                <thead>
+                  <tr>
+                    <th style={S.th}>CURRENCY</th>
+                    <th style={S.th}>TENOR</th>
+                    <th style={S.th}>RATE</th>
+                    <th style={S.th}>SOURCE</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(interestRates).flatMap(([ccy, rates]) =>
+                    (rates as any[]).map((r, i) => (
+                      <tr key={`${ccy}-${i}`}>
+                        {i === 0 && (
+                          <td style={{ ...S.td, fontWeight: 600, color: CCY_COLORS[ccy] || "#888" }} rowSpan={rates.length}>
+                            {ccy}
+                          </td>
+                        )}
+                        <td style={S.td}>{r.tenor}</td>
+                        <td style={{ ...S.td, fontWeight: 600 }}>{r.rate.toFixed(2)}%</td>
+                        <td style={{ ...S.td, color: "#555" }}>{r.source}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            ) : (
+              <div style={S.dim}>Run seed-fx-interest-rates.ts to populate</div>
+            )}
+          </div>
+
+          {/* Carry trade metrics */}
+          <div style={S.card}>
+            <div style={S.cardTitle}>CARRY TRADE &mdash; {PAIR_LABELS[fwdPair]}</div>
+            <HelpToggle id="carry-intro" label="What is a carry trade?" showHelp={showHelp} setShowHelp={setShowHelp}>
+              A carry trade earns the interest rate differential between two currencies. Borrow in the low-rate currency, invest in the high-rate one.
+              {carryData?.carry > 0
+                ? ` NOK currently yields more than ${fwdPair.replace("NOK", "")}, so holding NOK earns carry income \u2014 but currency depreciation can erase gains.`
+                : carryData?.carry < 0
+                ? ` ${fwdPair.replace("NOK", "")} currently yields more than NOK, meaning borrowing NOK to invest in ${fwdPair.replace("NOK", "")} earns carry income.`
+                : ""}
+            </HelpToggle>
+            {carryData ? (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 14 }}>
+                  <div style={{ padding: 10, background: "#111", borderRadius: 4, border: "1px solid #222" }}>
+                    <div style={{ fontSize: 10, color: "#666", marginBottom: 4 }}>ANNUALIZED CARRY</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: carryData.carry > 0 ? "#4CAF50" : "#ef4444" }}>
+                      {fmtPct(carryData.carry)}
+                    </div>
+                    <div style={{ fontSize: 9, color: "#555", marginTop: 2 }}>Interest rate differential</div>
+                  </div>
+                  <div style={{ padding: 10, background: "#111", borderRadius: 4, border: "1px solid #222" }}>
+                    <div style={{ fontSize: 10, color: "#666", marginBottom: 4 }}>CARRY SHARPE</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: (carryData.carrySharpe ?? 0) > 0.5 ? "#4CAF50" : (carryData.carrySharpe ?? 0) > 0 ? "#f97316" : "#ef4444" }}>
+                      {carryData.carrySharpe?.toFixed(2)}
+                    </div>
+                    <div style={{ fontSize: 9, color: "#555", marginTop: 2 }}>Carry / spot volatility</div>
+                  </div>
+                  <div style={{ padding: 10, background: "#111", borderRadius: 4, border: "1px solid #222" }}>
+                    <div style={{ fontSize: 10, color: "#666", marginBottom: 4 }}>SPOT VOLATILITY</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: "#fff" }}>
+                      {carryData.spotVol?.toFixed(1)}%
+                    </div>
+                    <div style={{ fontSize: 9, color: "#555", marginTop: 2 }}>Annualized FX volatility</div>
+                  </div>
+                  <div style={{ padding: 10, background: "#111", borderRadius: 4, border: "1px solid #222" }}>
+                    <div style={{ fontSize: 10, color: "#666", marginBottom: 4 }}>CARRY-TO-VOL</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: "#fff" }}>
+                      {carryData.spotVol > 0 ? (Math.abs(carryData.carry) / carryData.spotVol * 100).toFixed(0) : "\u2014"}%
+                    </div>
+                    <div style={{ fontSize: 9, color: "#555", marginTop: 2 }}>How much carry vs risk</div>
+                  </div>
+                </div>
+
+                <div style={{ padding: 10, background: "#111", borderRadius: 4, border: "1px solid #222", marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "#888", marginBottom: 6 }}>RATE DIFFERENTIAL BREAKDOWN</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                        <span style={{ fontSize: 12 }}>
+                          <span style={{ color: "#F44336", fontWeight: 600 }}>NOK</span>
+                          <span style={{ color: "#888" }}> (3M Nibor)</span>
+                        </span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: "#F44336" }}>{carryData.rates?.nokRate?.toFixed(2)}%</span>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                        <span style={{ fontSize: 12 }}>
+                          <span style={{ color: CCY_COLORS[fwdPair.replace("NOK", "")] || "#888", fontWeight: 600 }}>{fwdPair.replace("NOK", "")}</span>
+                          <span style={{ color: "#888" }}> (3M rate)</span>
+                        </span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: CCY_COLORS[fwdPair.replace("NOK", "")] || "#888" }}>
+                          {carryData.rates?.foreignRate?.toFixed(2)}%
+                        </span>
+                      </div>
+                      <div style={{ height: 1, background: "#333", margin: "4px 0" }} />
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ fontSize: 12, color: "#888" }}>Carry (NOK - {fwdPair.replace("NOK", "")})</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: carryData.rates?.differential > 0 ? "#4CAF50" : "#ef4444" }}>
+                          {fmtPct(carryData.rates?.differential, 2)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Cumulative P&L chart */}
+                {carryData.cumulativePnl?.length > 2 && (
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "#888", marginBottom: 2 }}>CUMULATIVE P&amp;L (CARRY + SPOT RETURN)</div>
+                    <HelpToggle id="carry-pnl-help" label="How to read this chart" showHelp={showHelp} setShowHelp={setShowHelp}>
+                      Orange line = total return from holding this carry position. Carry income is steady, but spot moves dominate short-term.
+                    </HelpToggle>
+                    <Sparkline
+                      data={carryData.cumulativePnl.map((p: any) => p.total)}
+                      color="#f97316"
+                      width={400}
+                      height={80}
+                    />
+                    <div style={{ display: "flex", gap: 20, fontSize: 11, marginTop: 6, padding: "6px 0" }}>
+                      <span><span style={{ display: "inline-block", width: 8, height: 8, background: "#4CAF50", borderRadius: 1, marginRight: 4 }} />Carry income: <span style={{ fontWeight: 600, color: "#4CAF50" }}>{fmtPct(carryData.cumulativePnl[carryData.cumulativePnl.length - 1]?.carry)}</span></span>
+                      <span><span style={{ display: "inline-block", width: 8, height: 8, background: "#2196F3", borderRadius: 1, marginRight: 4 }} />Spot return: <span style={{ fontWeight: 600, color: "#2196F3" }}>{fmtPct(carryData.cumulativePnl[carryData.cumulativePnl.length - 1]?.spot)}</span></span>
+                      <span><span style={{ display: "inline-block", width: 8, height: 8, background: "#f97316", borderRadius: 1, marginRight: 4 }} />Total: <span style={{ fontWeight: 700, color: "#f97316" }}>{fmtPct(carryData.cumulativePnl[carryData.cumulativePnl.length - 1]?.total)}</span></span>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div style={S.dim}>Loading carry data...</div>
+            )}
+          </div>
+        </div>
+      </>
+    );
+  }
+}

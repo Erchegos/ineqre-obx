@@ -10,6 +10,7 @@
  *   4. Fetch Yahoo fundamentals (factor_fundamentals.bm/ep/dy/sp/sg/mktcap)
  *   5. Refresh materialized view (factor_combined_view)
  *   6. Regenerate ML predictions (ml_predictions)
+ *   7. FX multi-currency regressions (fx_regression_results)
  *
  * Usage:
  *   npx tsx scripts/ml-daily-pipeline.ts              # Run all steps
@@ -75,6 +76,12 @@ const PIPELINE_STEPS: PipelineStep[] = [
     script: 'regenerate-predictions.ts',
     timeoutMinutes: 10,
     critical: true,
+  },
+  {
+    name: 'FX Multi-Currency Regressions',
+    script: 'calculate-fx-regressions.ts',
+    timeoutMinutes: 10,
+    critical: false, // FX regressions don't block ML predictions
   },
 ];
 

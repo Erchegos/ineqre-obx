@@ -70,7 +70,7 @@ InEqRe_OBX/
 | **OBX Volatility Dashboard** | `/volatility/obx` | `apps/web/src/app/volatility/obx/page.tsx` |
 | **Std Channel Strategy** | `/std-channel-strategy` | `apps/web/src/app/std-channel-strategy/page.tsx` |
 | **Backtest Results** | `/backtest` | `apps/web/src/app/backtest/page.tsx` |
-| **FX Hedging** | `/fx-hedging` | `apps/web/src/app/fx-hedging/page.tsx` |
+| **FX Terminal** | `/fx` | `apps/web/src/app/fx/page.tsx` |
 | **Options List** | `/options` | `apps/web/src/app/options/page.tsx` |
 | **Options Analysis** | `/options/[ticker]` | `apps/web/src/app/options/[ticker]/page.tsx` |
 | **Portfolio Optimizer** | `/portfolio` | `apps/web/src/app/portfolio/page.tsx` |
@@ -162,8 +162,16 @@ All endpoints in `apps/web/src/app/api/`
 ### FX APIs
 | Endpoint | Purpose |
 |----------|---------|
-| `GET /api/fx-pairs` | FX pair data |
-| `GET /api/fx-hedging/exposures` | FX exposure analysis |
+| `GET /api/fx-pairs` | FX pair data (legacy, still active) |
+| `GET /api/fx-hedging/exposures` | FX exposure analysis (legacy) |
+| `GET /api/fx/dashboard` | FX Terminal dashboard: rates, TWI, correlations, regimes, exposure heatmap |
+| `GET /api/fx/rates/forward?pair=NOKUSD` | Forward rates at 1M/3M/6M/12M via covered IRP |
+| `GET /api/fx/sensitivity/[ticker]` | Multi-currency regression betas + fundamental exposure + divergences |
+| `GET /api/fx/exposure/[ticker]` | Revenue/cost breakdown from fx_fundamental_exposure |
+| `POST /api/fx/portfolio` | Portfolio FX VaR, weighted exposure, stress scenarios (body: tickers + weights) |
+| `POST /api/fx/hedge-calculator` | Forward hedge P&L scenarios, cost, break-even (body: ticker + params) |
+| `GET /api/fx/carry?pair=NOKUSD&days=252` | Carry trade metrics: carry, Sharpe, cumulative P&L |
+| `GET /api/fx/interest-rates` | Current rates per currency/tenor from interest_rates table |
 
 ### Seafood APIs
 | Endpoint | Purpose |
@@ -231,6 +239,7 @@ All in `apps/web/src/lib/`
 | `factorAdvanced.ts` | Advanced ML-related factor derivations |
 | `fxHedging.ts` | FX exposure, hedge ratios, carry trade P&L |
 | `fxPairCalculations.ts` | Forward pricing, Interest Rate Parity |
+| `fxTerminal.ts` | Multi-currency OLS regression, NOK TWI, portfolio FX VaR, carry trade metrics, hedge cost/break-even |
 | `riskManagement.ts` | Position sizing, portfolio risk, drawdown tracking |
 | `positionSizing.ts` | Kelly criterion, volatility-adjusted sizing |
 | `stdChannelStrategy.ts` | Std channel trading strategy backtesting |
@@ -344,9 +353,13 @@ Schema files in `packages/db/src/schema/`
 ### FX Tables
 | Table | Purpose |
 |-------|---------|
-| `fxSpotRates` | Daily spot rates (NOK base) |
-| `stockFxExposure` | Currency revenue breakdown per stock |
-| `fxCurrencyBetas` | Rolling currency betas |
+| `fxSpotRates` | Daily spot rates (NOK base: NOKUSD, NOKEUR, NOKGBP, NOKSEK, NOKDKK) |
+| `interestRates` | Policy/market rates by currency, tenor, source |
+| `fxForwardRates` | Computed forward rates |
+| `stockFxExposure` | Currency revenue breakdown per stock (simple) |
+| `fxFundamentalExposure` | Revenue + cost currency splits, net exposure, EBITDA/EPS sensitivity |
+| `fxRegressionResults` | Multi-currency regression: joint β_mkt/USD/EUR/GBP/SEK, t-stats, R², partial R² |
+| `fxCurrencyBetas` | Rolling single-pair currency betas |
 | `fxOptimalHedges` | Optimal hedge ratios |
 | `fxMarketRegimes` | Market regime classification |
 
@@ -431,7 +444,7 @@ Schema files in `packages/db/src/schema/`
 7. **Fiskeridirektoratet** - Monthly biomass/harvest/mortality CSV (no auth, free)
 8. **SSB (Statistics Norway)** - Weekly salmon export price+volume via PxWebApi v2 (no auth, free)
 
-### ML Pipeline (6 steps)
+### ML Pipeline (7 steps)
 Located in `apps/web/scripts/ml-daily-pipeline.ts`:
 
 1. Calculate technical factors (19 factors)
@@ -440,6 +453,7 @@ Located in `apps/web/scripts/ml-daily-pipeline.ts`:
 4. Fetch Yahoo fundamentals
 5. Refresh materialized view
 6. Regenerate ML predictions
+7. FX multi-currency regressions (non-critical)
 
 **Run**: `pnpm run ml:pipeline` (from apps/web)
 
@@ -477,6 +491,9 @@ Run after market close alongside ML pipeline:
 | `import-new-tickers.ts` | Import tickers to database |
 | `fetch-options-daily.ts` | Fetch options chains from Yahoo Finance, store in DB |
 | `fetch-options-nasdaq.ts` | Fetch options OI/bid/ask from Nasdaq API (supplements Yahoo) |
+| `seed-fx-exposures.ts` | Seed fx_fundamental_exposure for ~23 major OSE companies (revenue/cost splits) |
+| `seed-fx-interest-rates.ts` | Seed interest_rates with policy/market rates for NOK/USD/EUR/GBP/SEK/DKK |
+| `calculate-fx-regressions.ts` | Rolling multi-currency regression pipeline (252D windows, 21D step) |
 | `fetch-ssr-shorts.ts` | Fetch short positions from Finanstilsynet SSR API |
 | `fetch-commodities.ts` | Fetch commodity prices from Yahoo + calculate stock sensitivity |
 | `fetch-newsweb-filings.ts` | Fetch regulatory filings from Oslo Børs NewsWeb API into `newsweb_filings` |
@@ -580,6 +597,10 @@ pnpm run harvest:seed             # Seed wellboats + slaughterhouses
 pnpm run harvest:lookup-mmsi      # Resolve wellboat MMSIs
 pnpm run harvest:track            # Run AIS trip detection (long-running)
 pnpm run harvest:aggregate        # Aggregate quarterly harvest estimates
+pnpm run fx:seed-exposures        # Seed FX fundamental exposures (23 companies)
+pnpm run fx:seed-rates            # Seed interest rates (NOK/USD/EUR/GBP/SEK/DKK)
+pnpm run fx:regression            # Run FX multi-currency regression pipeline
+pnpm run fx:regression:dry        # Dry run (no DB writes)
 ```
 
 ---

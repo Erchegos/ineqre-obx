@@ -311,6 +311,18 @@ export default function HomePage() {
                 visible={modulesReveal.visible}
                 delay={6}
               />
+              <FeatureCard
+                href="/fx"
+                title="FX Terminal"
+                description="Currency risk terminal for NOK portfolios. Multi-currency regression betas, forward curves via IRP, revenue/cost exposure decomposition, portfolio FX VaR, carry trade analytics, and interactive hedge calculators."
+                tags={[
+                  { label: "NOK/FX", color: "var(--warning)" },
+                  { label: "IRP", color: "var(--accent)" },
+                  { label: "Hedging", color: "var(--success)" },
+                ]}
+                visible={modulesReveal.visible}
+                delay={7}
+              />
             </div>
           </section>
 
@@ -345,7 +357,7 @@ export default function HomePage() {
                   { label: "Harvest", color: "var(--success)" },
                 ]}
                 visible={modulesReveal.visible}
-                delay={7}
+                delay={8}
               />
               <FeatureCard
                 href="/shipping"
@@ -357,7 +369,7 @@ export default function HomePage() {
                   { label: "10 Companies", color: "var(--success)" },
                 ]}
                 visible={modulesReveal.visible}
-                delay={8}
+                delay={9}
               />
             </div>
           </section>

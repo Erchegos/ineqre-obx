@@ -91,6 +91,38 @@ export {
   type NewShippingPort,
 } from "./shipping";
 
+// FX rates, forwards, commodities
+export {
+  fxSpotRates,
+  interestRates,
+  fxForwardRates,
+  commodityPrices,
+} from "./fxRates";
+
+// FX exposures, betas, hedging, regimes
+export {
+  stockFxExposure,
+  fxCurrencyBetas,
+  fxExposureDecomposition,
+  fxHedgePnl,
+  fxOptimalHedges,
+  fxMarketRegimes,
+} from "./fxExposures";
+
+// FX Terminal: multi-currency regression
+export {
+  fxRegressionResults,
+  type FxRegressionResult,
+  type NewFxRegressionResult,
+} from "./fxRegression";
+
+// FX Terminal: fundamental exposure with cost breakdown
+export {
+  fxFundamentalExposure,
+  type FxFundamentalExposure,
+  type NewFxFundamentalExposure,
+} from "./fxFundamentalExposure";
+
 // Harvest tracker (wellboat trip tracking)
 export {
   harvestVessels,

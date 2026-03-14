@@ -2,7 +2,7 @@
  * Fetch FX Rates from Norges Bank (no IBKR required)
  *
  * Uses the Norges Bank SDMX-JSON API (free, no auth) to fetch daily
- * FX spot rates for USD/NOK, EUR/NOK, GBP/NOK.
+ * FX spot rates for USD/NOK, EUR/NOK, GBP/NOK, SEK/NOK, DKK/NOK.
  *
  * Stores in fx_spot_rates table with source='norgesbank'.
  *
@@ -31,6 +31,8 @@ const PAIRS: { currency: string; pairName: string }[] = [
   { currency: "USD", pairName: "NOKUSD" },
   { currency: "EUR", pairName: "NOKEUR" },
   { currency: "GBP", pairName: "NOKGBP" },
+  { currency: "SEK", pairName: "NOKSEK" },
+  { currency: "DKK", pairName: "NOKDKK" },
 ];
 
 interface NorgesBankRate {
