@@ -120,7 +120,7 @@ function portfolioVariance(w: number[], cov: number[][]): number {
   return dotProduct(w, matVecMul(cov, w));
 }
 
-function portfolioVol(w: number[], cov: number[][]): number {
+export function portfolioVol(w: number[], cov: number[][]): number {
   return Math.sqrt(Math.max(0, portfolioVariance(w, cov)));
 }
 
@@ -626,7 +626,7 @@ function optimizeMaxDiversification(
 /**
  * Compute annualized portfolio return from daily weights and returns.
  */
-function computePortfolioReturn(
+export function computePortfolioReturn(
   w: number[],
   returns: number[][]
 ): { annualizedReturn: number; dailyReturns: number[] } {
@@ -650,7 +650,7 @@ function computePortfolioReturn(
 /**
  * Compute Sortino ratio (penalizes only downside vol).
  */
-function computeSortino(
+export function computeSortino(
   dailyReturns: number[],
   riskFreeRate: number
 ): number {
@@ -672,7 +672,7 @@ function computeSortino(
 /**
  * Compute VaR and CVaR from daily returns.
  */
-function computeVaR(
+export function computeVaR(
   dailyReturns: number[],
   confidence: number = 0.95
 ): { var: number; cvar: number } {
@@ -692,7 +692,7 @@ function computeVaR(
 /**
  * Compute maximum drawdown from daily returns.
  */
-function computeMaxDrawdown(dailyReturns: number[]): number {
+export function computeMaxDrawdown(dailyReturns: number[]): number {
   let peak = 1;
   let cumValue = 1;
   let maxDD = 0;
@@ -710,7 +710,7 @@ function computeMaxDrawdown(dailyReturns: number[]): number {
 /**
  * Compute risk decomposition per holding.
  */
-function computeRiskDecomposition(
+export function computeRiskDecomposition(
   w: number[],
   cov: number[][],
   tickers: string[]

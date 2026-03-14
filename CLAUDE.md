@@ -140,6 +140,7 @@ All endpoints in `apps/web/src/app/api/`
 | Endpoint | Purpose |
 |----------|---------|
 | `POST /api/portfolio/optimize` | Mean-variance optimization — **public, no auth required** |
+| `POST /api/portfolio/analyze` | Manual portfolio analysis: risk metrics, historical series, mode comparison, ML forecast |
 | `POST /api/portfolio/auth` | Optional login for save/load (JWT 8h) |
 | `GET /api/portfolio/configs` | List saved portfolios (auth required) |
 | `POST /api/portfolio/configs` | Save portfolio (auth required) |
@@ -294,6 +295,11 @@ All in `apps/web/src/components/`
 - `TradingImplications.tsx` - Trading signals
 - `MethodologySection.tsx` - Expandable methodology explanations
 - `MarketCorrelation.tsx` - Market-level correlation
+
+### Portfolio
+- `ManualWeightEditor.tsx` - Spreadsheet editor for manual portfolio weights/amounts/shares with auto-calculation
+- `PortfolioPerformanceChart.tsx` - Multi-line cumulative returns chart (per-stock + portfolio + OBX benchmark)
+- `PortfolioComparisonPanel.tsx` - Side-by-side metrics comparison with APPLY ALL / per-stock APPLY buttons
 
 ### Harvest Tracker
 - `HarvestMap.tsx` - Map wrapper with company filter bar, vessel status counts (dynamic import, no SSR)
@@ -835,6 +841,15 @@ The optimize API (`POST /api/portfolio/optimize`) enriches results with:
 - Drawdown alert (>20%)
 - Negative ML on large positions (>5% weight)
 - High portfolio beta (>1.3)
+
+### Manual Portfolio Mode
+Toggle between OPTIMIZER and MANUAL PORTFOLIO at the top. Manual mode provides:
+- **Weight Editor**: Spreadsheet-style table — edit Weight %, Amount (NOK), or Shares per holding; other two auto-calculate. Text-based inputs allow clearing zeros. Normalize/Equal Weight buttons.
+- **Historical Performance**: Multi-line Recharts chart with per-stock weighted returns + portfolio total + OBX benchmark. Timeframe buttons (3M/6M/1Y/2Y/ALL).
+- **Optimal Adjustment Suggestions**: Side-by-side YOUR PORTFOLIO vs suggested (EW/MV/MS/RP/MD). APPLY ALL button replaces all weights; per-stock APPLY buttons for selective changes. Auto-re-analyzes after applying.
+- **ML Forecast**: Aggregate weighted portfolio forecast + per-holding table.
+- **Risk Decomposition, Correlation, Sector Allocation**: Same as optimizer mode.
+- **API**: `POST /api/portfolio/analyze` — computes metrics, historical series, mode comparison, ML forecast for user-supplied weights.
 
 ### Dashboard Layout (3-step workflow)
 1. **Select Assets**: Ticker search with sector badges, chips with sector-colored borders, clear all
