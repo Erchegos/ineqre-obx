@@ -167,19 +167,44 @@ export default function PortfolioPerformanceChart({
             width={55}
           />
           <Tooltip
-            contentStyle={{
-              background: "#161b22",
-              border: "1px solid #30363d",
-              borderRadius: 4,
-              fontFamily: "monospace",
-              fontSize: 11,
+            content={({ active, payload, label }) => {
+              if (!active || !payload || payload.length === 0) return null;
+              // Sort entries: portfolio first, then stocks by value desc, benchmark last
+              const sorted = [...payload].sort((a, b) => {
+                const aKey = a.dataKey as string;
+                const bKey = b.dataKey as string;
+                if (aKey === "portfolio") return 1; // portfolio last (bottom)
+                if (bKey === "portfolio") return -1;
+                if (aKey === "benchmark") return 1; // benchmark second-to-last
+                if (bKey === "benchmark") return -1;
+                return ((b.value as number) ?? 0) - ((a.value as number) ?? 0);
+              });
+              return (
+                <div style={{
+                  background: "#161b22",
+                  border: "1px solid #30363d",
+                  borderRadius: 4,
+                  padding: "8px 10px",
+                  fontFamily: "monospace",
+                  fontSize: 11,
+                }}>
+                  <div style={{ marginBottom: 4, color: "rgba(255,255,255,0.7)" }}>{label}</div>
+                  {sorted.map(entry => {
+                    const key = entry.dataKey as string;
+                    const val = (entry.value as number) ?? 0;
+                    const displayName = key === "portfolio" ? "Portfolio" : key === "benchmark" ? "OBX" : key;
+                    return (
+                      <div key={key} style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                        <span style={{ color: entry.color }}>{displayName}</span>
+                        <span style={{ color: entry.color, fontWeight: key === "portfolio" ? 700 : 400 }}>
+                          {val >= 0 ? "+" : ""}{val.toFixed(2)}%
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
             }}
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            formatter={(value: any, name: any) => [
-              `${(value ?? 0) >= 0 ? "+" : ""}${(value ?? 0).toFixed(2)}%`,
-              name === "portfolio" ? "Portfolio" : name === "benchmark" ? "OBX" : (name ?? ""),
-            ]}
-            labelFormatter={(label: string) => label}
           />
           <Legend
             verticalAlign="top"
