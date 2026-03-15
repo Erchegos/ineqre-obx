@@ -702,9 +702,10 @@ export default function StocksPage() {
           </div>
         )}
 
-        <div style={{ overflowX: "auto" }}>
+        <div style={{ width: "100%", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
           <table className="stock-table" style={{
             width: "100%",
+            minWidth: 800,
             borderCollapse: "collapse",
             background: "#161b22",
             border: "1px solid #30363d",

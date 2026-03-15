@@ -91,19 +91,19 @@ const PAIR_LABELS: Record<string, string> = {
 };
 
 const S: Record<string, React.CSSProperties> = {
-  page: { background: "#0a0a0a", color: "#fff", minHeight: "100vh", fontFamily: "monospace", fontSize: 13 },
+  page: { background: "#0a0a0a", color: "#fff", minHeight: "100vh", fontFamily: "monospace", fontSize: 13, overflowX: "hidden" as const },
   header: { padding: "20px 16px 12px", borderBottom: "1px solid #30363d" },
   title: { fontSize: 18, fontWeight: 700, color: "#fff", letterSpacing: 2 },
   subtitle: { fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 2 },
-  tabs: { display: "flex", gap: 0, borderBottom: "1px solid #30363d", padding: "0 16px" },
-  tab: { padding: "10px 14px", cursor: "pointer", fontSize: 12, letterSpacing: 1, fontWeight: 600, color: "rgba(255,255,255,0.5)", borderBottom: "2px solid transparent", transition: "all 0.2s", fontFamily: "monospace" },
+  tabs: { display: "flex", gap: 0, borderBottom: "1px solid #30363d", padding: "0 16px", overflowX: "auto" as const, WebkitOverflowScrolling: "touch" as any },
+  tab: { padding: "10px 12px", cursor: "pointer", fontSize: 12, letterSpacing: 1, fontWeight: 600, color: "rgba(255,255,255,0.5)", borderBottom: "2px solid transparent", transition: "all 0.2s", fontFamily: "monospace", whiteSpace: "nowrap" as const, flexShrink: 0 },
   tabActive: { color: "#3b82f6", borderBottomColor: "#3b82f6" },
-  content: { padding: "20px 16px", maxWidth: 1400, margin: "0 auto" },
-  card: { background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 16, marginBottom: 12 },
+  content: { padding: "20px 16px", maxWidth: 1400, margin: "0 auto", overflowX: "hidden" as const, boxSizing: "border-box" as const },
+  card: { background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 16, marginBottom: 12, boxSizing: "border-box" as const, minWidth: 0 },
   cardTitle: { fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", letterSpacing: "0.08em", textTransform: "uppercase" as const, marginBottom: 8, fontFamily: "monospace" },
-  grid2: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 },
-  grid3: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 },
-  grid5: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 },
+  grid2: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: 12 },
+  grid3: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(260px, 100%), 1fr))", gap: 12 },
+  grid5: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))", gap: 10 },
   accent: { color: "#3b82f6" },
   green: { color: "#10b981" },
   red: { color: "#ef4444" },
@@ -707,16 +707,16 @@ export default function FXTerminalPage() {
     <div style={S.page}>
       {/* Header */}
       <div style={S.header}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <Link href="/" style={{ color: "rgba(255,255,255,0.5)", textDecoration: "none", fontSize: 12 }}>&larr; HOME</Link>
-          <span style={S.title}>FX TERMINAL</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", minWidth: 0 }}>
+          <Link href="/" style={{ color: "rgba(255,255,255,0.5)", textDecoration: "none", fontSize: 12, flexShrink: 0 }}>&larr; HOME</Link>
+          <span style={{ ...S.title, flexShrink: 0 }}>FX TERMINAL</span>
           {nokIndexCurrent && (
-            <span style={{ ...S.badge, background: "rgba(59,130,246,0.15)", color: "#3b82f6" }}>
+            <span style={{ ...S.badge, background: "rgba(59,130,246,0.15)", color: "#3b82f6", flexShrink: 0 }}>
               NOK TWI: {nokIndexCurrent.index.toFixed(2)} ({fmtPct(nokIndexCurrent.change1d)})
             </span>
           )}
           {profile && (
-            <span style={{ fontSize: 10, fontFamily: "monospace", fontWeight: 600, padding: "2px 8px", background: "rgba(59,130,246,0.1)", borderRadius: 3, border: "1px solid rgba(59,130,246,0.2)", color: "#3b82f6", marginLeft: "auto" }}>
+            <span style={{ fontSize: 10, fontFamily: "monospace", fontWeight: 600, padding: "2px 8px", background: "rgba(59,130,246,0.1)", borderRadius: 3, border: "1px solid rgba(59,130,246,0.2)", color: "#3b82f6", marginLeft: "auto", flexShrink: 0 }}>
               {profile}
             </span>
           )}
@@ -757,15 +757,15 @@ export default function FXTerminalPage() {
       <>
         {/* Market Summary */}
         {dashboardInsights.length > 0 && (
-          <div style={{ ...S.card, background: "#0d1117", border: "1px solid #21262d", marginBottom: 16 }}>
+          <div style={{ ...S.card, background: "#0d1117", border: "1px solid #21262d", marginBottom: 16, boxSizing: "border-box" as const }}>
             <div style={{ ...S.cardTitle, color: "#3b82f6", fontSize: 12, marginBottom: 10 }}>MARKET SUMMARY</div>
-            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", minWidth: 0 }}>
               {dashboardInsights.map((ins, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", background: "#0d1117", borderRadius: 4, border: "1px solid #21262d" }}>
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", background: "#0d1117", borderRadius: 4, border: "1px solid #21262d", minWidth: 0, maxWidth: "100%", boxSizing: "border-box" as const }}>
                   <div style={{ width: 6, height: 6, borderRadius: "50%", background: ins.color, flexShrink: 0 }} />
-                  <div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "#fff" }}>{ins.label}</div>
-                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>{ins.detail}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", wordBreak: "break-word" as const }}>{ins.label}</div>
+                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", wordBreak: "break-word" as const }}>{ins.detail}</div>
                   </div>
                 </div>
               ))}
@@ -809,7 +809,7 @@ export default function FXTerminalPage() {
 
         {/* Key Metrics row */}
         {keyMetrics && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 12 }}>
             {[
               { label: "STRONGEST (1M)", pair: keyMetrics.strongest?.pair, value: keyMetrics.strongest?.change1m, color: "#10b981" },
               { label: "WEAKEST (1M)", pair: keyMetrics.weakest?.pair, value: keyMetrics.weakest?.change1m, color: "#ef4444" },
@@ -917,6 +917,7 @@ export default function FXTerminalPage() {
         <div style={S.card}>
           <div style={S.cardTitle}>OSE FX EXPOSURE HEATMAP (NET REVENUE - COST)</div>
           {sortedExposure.length > 0 ? (
+            <div style={{ overflowX: "auto" as const }}>
             <table style={S.table}>
               <thead>
                 <tr>
@@ -953,6 +954,7 @@ export default function FXTerminalPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           ) : (
             <div style={S.dim}>Run seed-fx-exposures.ts to populate</div>
           )}
@@ -1189,7 +1191,7 @@ export default function FXTerminalPage() {
                 <HelpToggle id="sens-rolling-help" showHelp={showHelp} setShowHelp={setShowHelp}>
                   How the currency sensitivity has changed over time. Stable lines = consistent exposure. Large swings = changing business mix, hedging changes, or regime shifts.
                 </HelpToggle>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
                   {(["Usd", "Eur", "Gbp", "Sek"] as const).map((c) => (
                     <div key={c}>
                       <div style={{ fontSize: 10, color: CCY_COLORS[c.toUpperCase()], marginBottom: 4 }}>{c.toUpperCase()}</div>
@@ -1352,6 +1354,7 @@ export default function FXTerminalPage() {
                     <option value="SEK">SEK</option>
                   </select>
                 </div>
+                <div style={{ overflowX: "auto" as const }}>
                 <table style={S.table}>
                   <thead>
                     <tr>
@@ -1380,6 +1383,7 @@ export default function FXTerminalPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
 
@@ -1404,7 +1408,7 @@ export default function FXTerminalPage() {
                     max={100}
                     value={hedgeRatio}
                     onChange={(e) => setHedgeRatio(parseInt(e.target.value))}
-                    style={{ ...S.slider, width: 200 }}
+                    style={{ ...S.slider, width: 200, maxWidth: "100%" }}
                   />
                 </div>
                 <div>
@@ -1933,7 +1937,7 @@ export default function FXTerminalPage() {
         {pfResult && (
           <>
             {/* FX VaR cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 12 }}>
               {[
                 { label: "1D VaR 95%", value: pfResult.fxVaR?.var95_1d, suffix: "%" },
                 { label: "1D VaR 99%", value: pfResult.fxVaR?.var99_1d, suffix: "%" },
@@ -1995,6 +1999,7 @@ export default function FXTerminalPage() {
             {/* Per-stock FX risk contribution */}
             <div style={S.card}>
               <div style={S.cardTitle}>PER-STOCK FX RISK CONTRIBUTION</div>
+              <div style={{ overflowX: "auto" as const }}>
               <table style={S.table}>
                 <thead>
                   <tr>
@@ -2023,6 +2028,7 @@ export default function FXTerminalPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
 
             {/* Stress scenarios */}
@@ -2072,8 +2078,8 @@ export default function FXTerminalPage() {
     return (
       <>
         {/* Pair selector */}
-        <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 16 }}>
-          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>PAIR:</span>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", flexShrink: 0 }}>PAIR:</span>
           {["NOKUSD", "NOKEUR", "NOKGBP", "NOKSEK", "NOKDKK"].map((p) => (
             <div
               key={p}
@@ -2099,6 +2105,7 @@ export default function FXTerminalPage() {
             Hedge cost shows the annualized cost of locking in the forward rate to eliminate currency risk.
           </HelpToggle>
           {fwdForwards.length > 0 ? (
+            <div style={{ overflowX: "auto" as const }}>
             <table style={S.table}>
               <thead>
                 <tr>
@@ -2135,6 +2142,7 @@ export default function FXTerminalPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           ) : (
             <div style={S.dim}>Loading forward rates... (Ensure interest_rates table is seeded)</div>
           )}
@@ -2189,7 +2197,7 @@ export default function FXTerminalPage() {
             </HelpToggle>
             {carryData ? (
               <>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 14 }}>
                   <div style={{ padding: 10, background: "#0d1117", borderRadius: 4, border: "1px solid #21262d" }}>
                     <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>ANNUALIZED CARRY</div>
                     <div style={{ fontSize: 20, fontWeight: 700, color: carryData.carry > 0 ? "#10b981" : "#ef4444" }}>

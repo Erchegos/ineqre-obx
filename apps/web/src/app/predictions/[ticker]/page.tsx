@@ -172,6 +172,7 @@ export default function PredictionsPage() {
         padding: "20px 24px",
         fontFamily: "monospace",
         background: "#0a0a0a",
+        overflowX: "hidden" as const,
       }}
     >
       {/* Terminal-style Header */}
@@ -184,9 +185,9 @@ export default function PredictionsPage() {
           borderRadius: 2,
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
               <h1
                 style={{
                   fontSize: 18,
@@ -212,7 +213,7 @@ export default function PredictionsPage() {
                 {ticker}
               </span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <ModelModeToggle
                 mode={mode}
                 onChange={setMode}
@@ -225,7 +226,7 @@ export default function PredictionsPage() {
               </div>
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             <Link
               href={`/stocks/${ticker}`}
               style={{
@@ -238,6 +239,7 @@ export default function PredictionsPage() {
                 border: "1px solid #3b82f6",
                 borderRadius: 2,
                 background: "#0d1117",
+                whiteSpace: "nowrap",
               }}
             >
               &larr; BACK TO STOCK
@@ -254,6 +256,7 @@ export default function PredictionsPage() {
                 border: "1px solid #10b981",
                 borderRadius: 2,
                 background: "#0d1117",
+                whiteSpace: "nowrap",
               }}
             >
               BACKTEST &rarr;
@@ -270,6 +273,7 @@ export default function PredictionsPage() {
                 border: "1px solid #30363d",
                 borderRadius: 2,
                 background: "#0d1117",
+                whiteSpace: "nowrap",
               }}
             >
               BACKTEST ALL STOCKS

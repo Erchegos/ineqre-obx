@@ -994,20 +994,33 @@ export default function StockTickerPage() {
   }, [activeStats, data]);
 
   return (
-    <main style={{ padding: "16px 32px", maxWidth: 1600, margin: "0 auto", minHeight: "100vh", background: "#0a0a0a", color: "#fff" }}>
+    <main style={{ padding: "16px 32px", maxWidth: 1600, margin: "0 auto", minHeight: "100vh", background: "#0a0a0a", color: "#fff", overflowX: "hidden" }}>
       <style>{`
         .stock-hero-metrics { display: flex; flex-wrap: wrap; }
         .stock-chart-news { display: grid; grid-template-columns: 3fr 1.5fr; gap: 10px; }
         .stock-metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; }
         .stock-mode-fundamentals { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
         .stock-mode-fundamentals .fundamentals-strip { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+        .stock-hero-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .stock-hero-nav { display: flex; gap: 0; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+        .stock-peers-strip { display: none; }
+        .stock-peers-inline { display: contents; }
         @media (max-width: 900px) {
           .stock-chart-news { grid-template-columns: 1fr; }
           .stock-metric-grid { grid-template-columns: repeat(3, 1fr); }
           .stock-mode-fundamentals .fundamentals-strip { margin-left: 0; width: 100%; }
+          .stock-hero-top { flex-wrap: wrap; gap: 6px; }
+          .stock-hero-nav { justify-content: flex-start; }
+          .stock-peers-inline { display: none !important; }
+          .stock-peers-strip { display: flex; gap: 4px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 4px 0; margin-top: 4px; flex-wrap: nowrap; align-items: center; }
+          .stock-peers-strip::-webkit-scrollbar { height: 3px; }
+          .stock-peers-strip::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
         }
         @media (max-width: 600px) {
           .stock-metric-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 480px) {
+          main { padding-left: 12px !important; padding-right: 12px !important; }
         }
       `}</style>
       {/* ═══ BLOOMBERG-STYLE HERO BAR ═══ */}
@@ -1020,33 +1033,34 @@ export default function StockTickerPage() {
         fontFamily: "monospace",
       }}>
         {/* Row 1: Ticker + Name + Badge + Nav */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>
+        <div className="stock-hero-top">
+          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flexShrink: 1, flexWrap: "wrap" }}>
+            <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0, letterSpacing: "-0.02em", whiteSpace: "nowrap" }}>
               {ticker || "?"}
             </h1>
             {stockName && (
-              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 400 }}>
+              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 400, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {stockName}
               </span>
             )}
             {ticker && <LiquidityBadge ticker={ticker} />}
             {stockSector && (
-              <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 2, background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 2, background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>
                 {stockSector}
               </span>
             )}
           </div>
-          <nav style={{ display: "flex", gap: 0, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
-            <Link href="/" style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textDecoration: "none", padding: "2px 6px", borderRadius: 3 }}>Home</Link>
+          <nav className="stock-hero-nav" style={{ flexShrink: 0 }}>
+            <Link href="/" style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textDecoration: "none", padding: "2px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>Home</Link>
             <span style={{ color: "#30363d", fontSize: 9 }}>/</span>
-            <Link href="/stocks" style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textDecoration: "none", padding: "2px 6px", borderRadius: 3 }}>Stocks</Link>
+            <Link href="/stocks" style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textDecoration: "none", padding: "2px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>Stocks</Link>
             <span style={{ color: "#30363d", fontSize: 9 }}>/</span>
-            <span style={{ fontSize: 10, color: "#fff", fontWeight: 600, padding: "2px 6px", fontFamily: "monospace" }}>{ticker}</span>
+            <span style={{ fontSize: 10, color: "#fff", fontWeight: 600, padding: "2px 6px", fontFamily: "monospace", whiteSpace: "nowrap" }}>{ticker}</span>
             <span style={{ color: "#30363d", fontSize: 10, margin: "0 4px" }}>|</span>
-            <Link href="/news" style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textDecoration: "none", padding: "2px 6px", borderRadius: 3 }}>News</Link>
+            <Link href="/news" style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textDecoration: "none", padding: "2px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>News</Link>
+            {/* Inline peers: visible on desktop, hidden on mobile via CSS */}
             {sectorPeers.length > 0 && (
-              <>
+              <span className="stock-peers-inline">
                 <span style={{ color: "#30363d", fontSize: 10, margin: "0 4px" }}>|</span>
                 <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", opacity: 0.6, textTransform: "uppercase", letterSpacing: "0.05em" }}>PEERS</span>
                 {sectorPeers.map((p) => (
@@ -1060,16 +1074,42 @@ export default function StockTickerPage() {
                       fontWeight: 600,
                       padding: "2px 5px",
                       fontFamily: "monospace",
+                      whiteSpace: "nowrap",
                     }}
                     title={p.name}
                   >
                     {p.ticker}
                   </Link>
                 ))}
-              </>
+              </span>
             )}
           </nav>
         </div>
+        {/* Mobile-only peers strip: horizontal scrollable row below breadcrumbs */}
+        {sectorPeers.length > 0 && (
+          <div className="stock-peers-strip">
+            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", opacity: 0.6, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap", flexShrink: 0 }}>PEERS</span>
+            {sectorPeers.map((p) => (
+              <Link
+                key={p.ticker}
+                href={`/stocks/${p.ticker}`}
+                style={{
+                  fontSize: 10,
+                  color: "#3b82f6",
+                  textDecoration: "none",
+                  fontWeight: 600,
+                  padding: "2px 5px",
+                  fontFamily: "monospace",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                }}
+                title={p.name}
+              >
+                {p.ticker}
+              </Link>
+            ))}
+          </div>
+        )}
 
         {/* Row 2: Price + Change + Key Metrics Strip */}
         <div style={{ display: "flex", alignItems: "baseline", gap: 16, marginBottom: 8, flexWrap: "wrap" }}>
