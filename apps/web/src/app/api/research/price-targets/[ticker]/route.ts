@@ -15,8 +15,97 @@ type PriceTarget = {
 };
 
 /**
+ * Parse a single broker segment and extract broker, target, old target, rating.
+ * Returns null if no price target info found.
+ */
+function parseSegment(
+  segment: string,
+  date: string,
+  company: string,
+  documentId: string
+): PriceTarget | null {
+  const text = segment.trim();
+  if (!text) return null;
+
+  // Must contain target-related keywords
+  if (
+    !/target|kursmål|reiterat|downgrad|upgrad|initiat|cut|adjust|øker|kutter|maintained|raised|lowered/i.test(
+      text
+    )
+  )
+    return null;
+
+  // Extract rating
+  const ratingEnd = text.match(
+    /(?:,\s*)?(?:reiterated?\s+)?(Buys?|Holds?|Sells?|Neutral|Kjøp|Nøytral|Selg)\s*$/i
+  );
+  const ratingMid = !ratingEnd
+    ? text.match(
+        /(?:downgrad|upgrad|initiat)\w*\s+(?:from\s+\w+\s+)?to\s+(Buy|Hold|Sell|Neutral|Kjøp|Nøytral|Selg)/i
+      )
+    : null;
+  const ratingRaw = ratingEnd ? ratingEnd[1] : ratingMid ? ratingMid[1] : null;
+  const ratingText = ratingRaw ? ratingRaw.replace(/s$/i, "") : null;
+  const ratingColor =
+    ratingText && /buy|kjøp/i.test(ratingText)
+      ? "#22c55e"
+      : ratingText && /sell|selg/i.test(ratingText)
+        ? "#ef4444"
+        : ratingText
+          ? "#f59e0b"
+          : null;
+
+  // Extract broker name
+  const brokerMatch = text.match(
+    /^([\w\s]+?)\s+(downgrad|upgrad|increas|cut|adjust|reiterat|initiat|øker|kutter|gjentar|set|raised|lowered|maintained)/i
+  );
+  const broker = brokerMatch ? brokerMatch[1].trim() : null;
+
+  // Extract new target and old target: "NOK 240 (220)" → new=240, old=220
+  const ccy = text.match(/(?:NOK|SEK|USD|EUR)/i)?.[0] || "NOK";
+  const targetMatch = text.match(
+    /(?:NOK|SEK|USD|EUR)\s+([\d,.]+)(?:\s*\(([\d,.]+)\))?/i
+  );
+  const newTarget = targetMatch
+    ? parseFloat(targetMatch[1].replace(",", ""))
+    : null;
+  const oldTarget =
+    targetMatch && targetMatch[2]
+      ? parseFloat(targetMatch[2].replace(",", ""))
+      : null;
+
+  // Build clean action text: "Target NOK 240 (220)" or "Target NOK 240"
+  let action: string;
+  if (newTarget != null) {
+    action = oldTarget != null
+      ? `Target ${ccy} ${newTarget} (${oldTarget})`
+      : `Target ${ccy} ${newTarget}`;
+  } else {
+    // Fallback: strip broker + rating, keep remainder
+    let cleaned = broker ? text.substring(broker.length).trim() : text;
+    cleaned = cleaned
+      .replace(/,\s*(Buys?|Holds?|Sells?|Neutral|Kjøp|Nøytral|Selg)\s*$/i, "")
+      .replace(/,\s*reiterated?\s+\w+\s*$/i, "")
+      .trim();
+    action = cleaned;
+  }
+
+  return {
+    date,
+    company,
+    broker,
+    action,
+    rating: ratingText,
+    ratingColor,
+    documentId,
+    targetPrice: newTarget,
+  };
+}
+
+/**
  * Parse price target lines from Xtrainvestor ai_summary.
  * Format: - **Company**: Broker action target to NOK X (Y), Rating
+ * Splits semicolon-separated multi-broker entries into individual rows.
  */
 function parsePriceTargets(
   summary: string,
@@ -29,95 +118,31 @@ function parsePriceTargets(
 
   for (const line of lines) {
     const ptMatch = line.match(/^- \*\*(.+?)\*\*:\s*(.+)/);
-    if (
-      !ptMatch ||
-      !/target|kursmål|reiterat|downgrad|upgrad|initiat|cut|adjust|øker|kutter|maintained|raised|lowered/i.test(
-        ptMatch[2]
-      )
-    )
-      continue;
+    if (!ptMatch) continue;
 
     const [, company, details] = ptMatch;
 
-    // Check if this company matches — strict word-boundary matching to avoid
-    // "Aker" matching "Aker BP", "Aker Solutions" etc.
+    // Check if this company matches — strict word-boundary matching
     const companyLower = company.toLowerCase().trim();
     const matched = matchNames.some((name) => {
       const nameLower = name.toLowerCase();
-      // Exact match
       if (companyLower === nameLower) return true;
-      // Word-boundary match: the name must appear as a complete word/phrase
-      // e.g. "Aker" matches "Aker" but NOT "Aker BP" or "Aker Solutions"
       const escName = nameLower.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const escComp = companyLower.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      // Company name in summary equals or is contained as whole-word in match name
       if (new RegExp(`^${escComp}$`, "i").test(nameLower)) return true;
-      // Match name equals or is contained as whole-word in company (but only if match is multi-word)
       if (nameLower.includes(" ") && new RegExp(`\\b${escName}\\b`, "i").test(companyLower)) return true;
-      // Company is multi-word and fully contained as whole words in match name
       if (companyLower.includes(" ") && new RegExp(`\\b${escComp}\\b`, "i").test(nameLower)) return true;
       return false;
     });
     if (!matched) continue;
 
-    // Extract rating
-    const ratingEnd = details.match(
-      /(Buys?|Holds?|Sells?|Neutral|Kjøp|Nøytral|Selg)\s*$/i
-    );
-    const ratingMid = !ratingEnd
-      ? details.match(
-          /(?:downgrad|upgrad|initiat)\w*\s+(?:from\s+\w+\s+)?to\s+(Buy|Hold|Sell|Neutral|Kjøp|Nøytral|Selg)/i
-        )
-      : null;
-    const ratingRaw = ratingEnd
-      ? ratingEnd[1]
-      : ratingMid
-        ? ratingMid[1]
-        : null;
-    const ratingText = ratingRaw ? ratingRaw.replace(/s$/i, "") : null;
-    const ratingColor =
-      ratingText && /buy|kjøp/i.test(ratingText)
-        ? "#22c55e"
-        : ratingText && /sell|selg/i.test(ratingText)
-          ? "#ef4444"
-          : ratingText
-            ? "#f59e0b"
-            : null;
+    // Split on semicolons to handle multi-broker entries
+    const segments = details.split(/;\s*/);
 
-    // Extract broker
-    const brokerMatch = details.match(
-      /^([\w\s]+?)\s+(downgrad|upgrad|increas|cut|adjust|reiterat|initiat|øker|kutter|gjentar|set|raised|lowered|maintained)/i
-    );
-    const broker = brokerMatch ? brokerMatch[1].trim() : null;
-    const action = broker
-      ? details
-          .substring(broker.length)
-          .replace(
-            /,\s*(Buys?|Holds?|Sells?|Neutral|Kjøp|Nøytral|Selg)\s*$/i,
-            ""
-          )
-          .trim()
-      : details
-          .replace(
-            /,\s*(Buys?|Holds?|Sells?|Neutral|Kjøp|Nøytral|Selg)\s*$/i,
-            ""
-          )
-          .trim();
-
-    // Extract numeric target price (e.g. "NOK 195" or "NOK 195 (190)")
-    const tpMatch = details.match(/(?:NOK|SEK|USD|EUR)\s+([\d,.]+)/i);
-    const targetPrice = tpMatch ? parseFloat(tpMatch[1].replace(",", "")) : null;
-
-    results.push({
-      date,
-      company: company.trim(),
-      broker,
-      action,
-      rating: ratingText,
-      ratingColor,
-      documentId,
-      targetPrice,
-    });
+    for (const segment of segments) {
+      const parsed = parseSegment(segment, date, company.trim(), documentId);
+      if (parsed) results.push(parsed);
+    }
   }
 
   return results;
