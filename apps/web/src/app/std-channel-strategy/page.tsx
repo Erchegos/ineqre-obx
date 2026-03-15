@@ -326,10 +326,10 @@ export default function STDChannelStrategyPage() {
     return (
       <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff" }}>
         {/* Header */}
-        <header style={{ borderBottom: "1px solid #30363d", padding: "16px 24px" }}>
+        <header style={{ borderBottom: "1px solid #30363d", padding: "16px 16px" }}>
           <div style={{ maxWidth: 1600, margin: "0 auto" }}>
             <Link href="/stocks" style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, textDecoration: "none" }}>← Back to Stocks</Link>
-            <h1 style={{ fontSize: 24, fontWeight: 600, marginTop: 4 }}>STD Channel Mean Reversion</h1>
+            <h1 style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>STD Channel Mean Reversion</h1>
             <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, marginTop: 2 }}>
               Slope-aligned mean reversion with fundamental quality filter
             </p>
@@ -457,7 +457,7 @@ export default function STDChannelStrategyPage() {
                 </button>
               </div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16 }}>
               <div>
                 <label style={labelStyle}>Entry Sigma (σ)</label>
                 <input
@@ -635,7 +635,7 @@ export default function STDChannelStrategyPage() {
                 </label>
               </div>
               {useEventFilters && (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16 }}>
                   <div>
                     <label style={labelStyle}>Min Event Score</label>
                     <input
@@ -665,7 +665,7 @@ export default function STDChannelStrategyPage() {
 
           {/* Placeholder metric cards */}
           <div style={sectionTitle}>Performance Metrics</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16, marginBottom: 24 }}>
             {["Win Rate", "Sharpe Ratio", "Total Return", "Profit Factor", "Avg Return", "Max Drawdown", "Avg Holding", "Avg R²"].map((label, i) => (
               <div key={i} style={cardStyle}>
                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
@@ -863,13 +863,13 @@ export default function STDChannelStrategyPage() {
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff" }}>
       {/* Header */}
-      <header style={{ borderBottom: "1px solid #30363d", padding: "16px 24px" }}>
+      <header style={{ borderBottom: "1px solid #30363d", padding: "16px 16px" }}>
         <div style={{ maxWidth: 1600, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <Link href="/stocks" style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, textDecoration: "none" }}>
               ← Back to Stocks
             </Link>
-            <h1 style={{ fontSize: 24, fontWeight: 600, marginTop: 4 }}>STD Channel Mean Reversion</h1>
+            <h1 style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>STD Channel Mean Reversion</h1>
             <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, marginTop: 2 }}>
               Slope-aligned mean reversion with fundamental quality filter
             </p>
@@ -917,7 +917,7 @@ export default function STDChannelStrategyPage() {
               </button>
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16 }}>
             <div>
               <label style={labelStyle}>Entry Sigma (σ)</label>
               <input
@@ -1083,7 +1083,7 @@ export default function STDChannelStrategyPage() {
               </label>
             </div>
             {useEventFilters && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16 }}>
                 <div>
                   <label style={labelStyle}>Min Event Score</label>
                   <input
@@ -1188,7 +1188,7 @@ export default function STDChannelStrategyPage() {
             {strategyDirection !== "BOTH" && <span style={{ marginLeft: 8, fontSize: 12, color: strategyDirection === "LONG" ? "#10b981" : "#ef4444" }}>({strategyDirection} only)</span>}
             {loading && <span style={{ color: "#f59e0b", marginLeft: 8 }}>(updating...)</span>}
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16 }}>
             <MetricCard
               label="Win Rate"
               value={`${(filteredStats.winRate * 100).toFixed(0)}%`}
@@ -1275,7 +1275,7 @@ export default function STDChannelStrategyPage() {
             </div>
 
             {/* Filter Weight Visualization */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16 }}>
               <FilterWeightCard
                 name="Volume Anomaly"
                 weight={20}
@@ -1584,7 +1584,7 @@ export default function STDChannelStrategyPage() {
                               <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                                 Event Filter Breakdown
                               </div>
-                              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+                              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 8 }}>
                                 {signal.eventFilters.map((filter, fIdx) => (
                                   <div key={fIdx} style={{
                                     padding: 8,
@@ -1990,7 +1990,7 @@ export default function STDChannelStrategyPage() {
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
             {/* Entry Logic */}
             <div style={{ padding: 16, background: "rgba(0,0,0,0.3)", borderRadius: 6, border: "1px solid #1a2a1a" }}>
               <div style={{ fontSize: 10, color: "#10b981", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>
@@ -2053,7 +2053,7 @@ export default function STDChannelStrategyPage() {
             <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>
               Mathematical Foundation
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, fontSize: 11 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16, fontSize: 11 }}>
               <div>
                 <div style={{ color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>Channel Model</div>
                 <code style={{ fontSize: 10, color: "#a855f7", fontFamily: "monospace" }}>

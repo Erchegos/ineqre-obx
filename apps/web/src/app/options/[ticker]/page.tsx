@@ -623,7 +623,7 @@ export default function OptionsPage() {
 
       <main style={{ maxWidth: 1400, margin: "0 auto", padding: "16px 24px" }}>
         {/* ═══ STATS STRIP ═══ */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8, marginBottom: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8, marginBottom: 16 }}>
           <StatCell label="ATM IV" value={atmIV ? `${(atmIV * 100).toFixed(1)}%` : "--"} color="#a78bfa" />
           <StatCell label="DAYS TO EXPIRY" value={String(dte)} />
           <StatCell label="MAX PAIN" value={data?.maxPain ? `$${data.maxPain.strike.toFixed(0)}` : "--"} color="#eab308" sub={data?.maxPain && underlyingPrice ? `${((data.maxPain.strike - underlyingPrice) / underlyingPrice * 100).toFixed(1)}% from spot` : undefined} />

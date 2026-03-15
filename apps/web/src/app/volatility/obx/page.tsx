@@ -99,7 +99,7 @@ export default function OBXVolatilityDashboard() {
   const regimeColor = getRegimeColor(regime);
 
   return (
-    <main style={{ padding: "20px 24px", maxWidth: 1400, margin: "0 auto" }}>
+    <main style={{ padding: "20px 16px", maxWidth: 1400, margin: "0 auto" }}>
       {/* ═══ HEADER ═══ */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -107,7 +107,7 @@ export default function OBXVolatilityDashboard() {
             ← Asset List
           </Link>
           <span style={{ color: "#30363d" }}>|</span>
-          <span style={{ fontSize: 24, fontWeight: 700, fontFamily: "monospace", color: "#fff" }}>OBX</span>
+          <span style={{ fontSize: 20, fontWeight: 700, fontFamily: "monospace", color: "#fff" }}>OBX</span>
           <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", fontFamily: "monospace" }}>Index Volatility Dashboard</span>
         </div>
         <div style={{ display: "flex", gap: 2 }}>
@@ -164,7 +164,7 @@ export default function OBXVolatilityDashboard() {
       </div>
 
       {/* ═══ 2. DASHBOARD: 3-column layout ═══ */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 24 }}>
         {/* Col 1: Index Vol Metrics */}
         <DashboardCard title="Index Volatility">
           <MetricRow label="Yang-Zhang" value={fmtPct(idx.yangZhang)} />
@@ -215,7 +215,7 @@ export default function OBXVolatilityDashboard() {
       )}
 
       {/* ═══ 4. TWO-COLUMN: Vol Cone + Avg Correlation ═══ */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20, marginBottom: 24 }}>
         {/* Vol Cone */}
         <div>
           {data.volCone && <VolConeChart data={data.volCone} />}

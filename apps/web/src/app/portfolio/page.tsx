@@ -842,7 +842,7 @@ export default function PortfolioPage() {
   const m = result?.metrics;
 
   return (
-    <main style={{ padding: "20px 24px", maxWidth: 1400, margin: "0 auto" }}>
+    <main style={{ padding: "20px 16px", maxWidth: 1400, margin: "0 auto" }}>
       {/* Loading bar — always visible when optimizing */}
       {loading && (
         <>
@@ -1351,7 +1351,7 @@ export default function PortfolioPage() {
                     onClick={() => runManualAnalysis()}
                     disabled={manualLoading || selectedTickers.length < 2}
                     style={{
-                      padding: "10px 32px",
+                      padding: "10px 16px",
                       background: manualLoading ? "#30363d" : "linear-gradient(135deg, #10b981, #059669)",
                       color: "#fff",
                       border: "none",
@@ -1398,7 +1398,7 @@ export default function PortfolioPage() {
           </div>
 
           {/* Optimization Mode Cards */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, marginBottom: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8, marginBottom: 14 }}>
             {([
               { key: "equal", label: "Equal Weight", desc: "1/N allocation across all assets", icon: "=" },
               { key: "min_variance", label: "Min Variance", desc: "Minimize portfolio volatility via Markowitz", icon: "▽" },
@@ -1539,7 +1539,7 @@ export default function PortfolioPage() {
               onClick={() => runOptimization()}
               disabled={loading || selectedTickers.length < 2}
               style={{
-                padding: "10px 32px",
+                padding: "10px 16px",
                 background: loading ? "#30363d" : selectedTickers.length < 2 ? "#21262d" : "linear-gradient(135deg, #3b82f6, #2563eb)",
                 color: selectedTickers.length < 2 ? "rgba(255,255,255,0.3)" : "#fff",
                 border: "none",
@@ -1620,7 +1620,7 @@ export default function PortfolioPage() {
               </div>
 
               {/* Key Metrics Strip */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8, marginBottom: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8, marginBottom: 14 }}>
                 {[
                   { label: "RETURN", value: `${(mm.expectedReturn * 100).toFixed(1)}%`, color: mm.expectedReturn >= 0 ? "#10b981" : "#ef4444" },
                   { label: "VOLATILITY", value: `${(mm.volatility * 100).toFixed(1)}%`, color: "#f59e0b" },
@@ -1980,7 +1980,7 @@ export default function PortfolioPage() {
             </div>
 
             {/* Key Metrics Strip */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8 }}>
               {[
                 { label: "Expected Return", value: `${(m.expectedReturn * 100).toFixed(1)}%`, color: m.expectedReturn >= 0 ? "#10b981" : "#ef4444", desc: "Annualized" },
                 { label: "Volatility", value: `${(m.volatility * 100).toFixed(1)}%`, color: "#fff", desc: "Annualized σ" },
@@ -2041,7 +2041,7 @@ export default function PortfolioPage() {
             {loading && !result && (
               <div style={{ marginTop: 16 }}>
                 <style dangerouslySetInnerHTML={{ __html: "@keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}" }} />
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10, marginBottom: 16 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 16 }}>
                   {Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} style={{
                       height: 64, borderRadius: 6,
@@ -2653,7 +2653,7 @@ export default function PortfolioPage() {
                     </div>
 
                     {/* Strategy Stats Cards */}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 20 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 20 }}>
                       {(Object.entries(bt.strategyStats) as [string, { totalReturn: number; annualizedReturn: number; volatility: number; sharpe: number; maxDrawdown: number; winRate: number }][]).map(([key, stats]) => {
                         const color = STRAT_COLORS[key] || "#fff";
                         const isActive = key === "mlTilted"; // highlight best ML strategy
@@ -3166,7 +3166,7 @@ export default function PortfolioPage() {
                       </div>
 
                       {/* Component Signal Breakdown */}
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 3, marginBottom: 12 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 3, marginBottom: 12 }}>
                         {componentList.map(comp => {
                           const val = comp.value;
                           const isAvailable = comp.available;
@@ -3227,7 +3227,7 @@ export default function PortfolioPage() {
                           <div style={{ fontSize: 8, fontFamily: "monospace", color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em", marginBottom: 4 }}>
                             VAL PEER Z-SCORES <span style={{ color: "rgba(255,255,255,0.25)" }}>vs sector</span>
                           </div>
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 3 }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 3 }}>
                             {([
                               { key: "ep" as const, label: "E/P", invert: false },
                               { key: "bm" as const, label: "P/B", invert: false },

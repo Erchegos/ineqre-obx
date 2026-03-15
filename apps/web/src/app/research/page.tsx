@@ -934,7 +934,7 @@ export default function ResearchPortalPage() {
       }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
-            <h1 style={{ fontSize: 32, fontWeight: 700, color: '#fff' }}>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>
               Research Portal
             </h1>
             <span style={{

@@ -328,9 +328,9 @@ export default function SeafoodPage() {
 
   const S = {
     page: { minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "monospace", fontSize: 12 } as React.CSSProperties,
-    container: { maxWidth: 1400, margin: "0 auto", padding: "0 24px" } as React.CSSProperties,
+    container: { maxWidth: 1400, margin: "0 auto", padding: "0 16px" } as React.CSSProperties,
     header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid #30363d" } as React.CSSProperties,
-    title: { fontSize: 22, fontWeight: 700, letterSpacing: "0.08em", color: "#fff" } as React.CSSProperties,
+    title: { fontSize: 18, fontWeight: 700, letterSpacing: "0.08em", color: "#fff" } as React.CSSProperties,
     badge: (bg: string, fg = "#fff") => ({ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 2, background: bg, color: fg, letterSpacing: "0.04em" }) as React.CSSProperties,
     section: { fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", letterSpacing: "0.08em", textTransform: "uppercase" as const, padding: "8px 10px 4px", borderBottom: "1px solid #21262d" } as React.CSSProperties,
     panel: { background: "#0d1117", borderLeft: "1px solid #30363d" } as React.CSSProperties,
@@ -478,7 +478,7 @@ export default function SeafoodPage() {
                     <div style={S.section}>PRICE INTELLIGENCE</div>
 
                     {/* Hero strip: 5 key prices */}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", borderBottom: "1px solid #30363d" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", borderBottom: "1px solid #30363d" }}>
                       {[
                         { label: "PARETO SPOT EST.", value: paretoData?.spot?.spot_nok, src: (() => { if (!paretoData?.spot?.report_date) return "Pareto W/W"; const d = new Date(paretoData.spot.report_date); const jan4 = new Date(d.getFullYear(), 0, 4); const wk = Math.ceil(((d.getTime() - jan4.getTime()) / 86400000 + jan4.getDay() + 1) / 7); return `Est. W${wk}`; })() },
                         { label: "FISH POOL AVG", value: fishPoolSpot?.latest?.sisalmon_avg, src: `SISALMON W${fishPoolSpot?.latest?.week ?? ""}` },
@@ -488,7 +488,7 @@ export default function SeafoodPage() {
                       ].map((m, i) => (
                         <div key={m.label} style={{ padding: "12px 16px", borderRight: i < 4 ? "1px solid #30363d" : "none" }}>
                           <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontWeight: 700, letterSpacing: "0.08em", marginBottom: 4 }}>{m.label}</div>
-                          <div style={{ fontSize: 26, fontWeight: 700, color: m.value != null ? "#3b82f6" : "#30363d", lineHeight: 1 }}>
+                          <div style={{ fontSize: 20, fontWeight: 700, color: m.value != null ? "#3b82f6" : "#30363d", lineHeight: 1 }}>
                             {m.value != null ? m.value.toFixed(1) : "\u2014"}
                           </div>
                           <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 4 }}>NOK/kg <span style={{ color: "rgba(255,255,255,0.35)" }}>{m.src}</span></div>
@@ -923,7 +923,7 @@ export default function SeafoodPage() {
                       {/* Margin trend sparklines per company */}
                       <div style={{ borderTop: "1px solid #30363d", padding: "8px 8px 4px" }}>
                         <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>MARGIN TREND</div>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 8 }}>
                           {displayTickers.map(tk => {
                             const pts = allQs.map(q => ({ q, ...allData[tk][q] })).filter(p => p.margin != null);
                             if (pts.length < 2) return null;
@@ -2236,7 +2236,7 @@ export default function SeafoodPage() {
 
                   {/* ─── PRICE ESTIMATES ───────────────────────────── */}
                   <div style={S.section}>QUARTERLY HARVEST ESTIMATES</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, padding: "1px", borderBottom: "1px solid #30363d" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 1, padding: "1px", borderBottom: "1px solid #30363d" }}>
                     {(["MOWI", "SALM", "LSG", "GSF", "BAKKA", "AUSS"] as const).map(tk => {
                       const cq = htCurrentQ.find(c => c.ticker === tk);
                       const tc: Record<string, string> = { MOWI: "#2563eb", SALM: "#16a34a", LSG: "#9333ea", GSF: "#ea580c", BAKKA: "#0891b2", AUSS: "#dc2626" };

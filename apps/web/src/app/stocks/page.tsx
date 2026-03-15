@@ -313,7 +313,7 @@ export default function StocksPage() {
         padding: 32
       }}>
         <div style={{ maxWidth: 1600, margin: "0 auto" }}>
-          <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 16 }}>Error</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 16 }}>Error</h1>
           <p style={{ color: "#ef4444" }}>{error}</p>
         </div>
       </div>
@@ -357,7 +357,7 @@ export default function StocksPage() {
       <div style={{ maxWidth: 1600, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <h1 style={{ fontSize: 32, fontWeight: 700, margin: 0 }}>Assets</h1>
+            <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Assets</h1>
             <Link
               href="/"
               style={{

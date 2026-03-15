@@ -354,7 +354,7 @@ export default function CorrelationPage() {
       background: "#0a0a0a",
       color: "#fff",
       fontFamily: "monospace",
-      padding: "20px 24px"
+      padding: "20px 16px"
     }}>
       <style dangerouslySetInnerHTML={{ __html: `
         .search-input {
@@ -1228,7 +1228,7 @@ export default function CorrelationPage() {
             )}
 
             {/* Matrix & Stats Grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(500px, 1fr))", gap: 16, marginBottom: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginBottom: 20 }}>
 
               {/* Correlation Matrix */}
               {correlationData.matrix && (

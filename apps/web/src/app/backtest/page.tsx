@@ -327,7 +327,7 @@ export default function BacktestPage() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
+          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
           gap: 8,
           marginBottom: 16,
         }}

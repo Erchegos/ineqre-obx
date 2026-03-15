@@ -118,7 +118,7 @@ export default function HomePage() {
         minHeight: "100vh",
         background: "#0d1117",
         color: "#e6edf3",
-        padding: "48px 32px"
+        padding: "32px 16px"
       }}>
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
 
@@ -142,7 +142,7 @@ export default function HomePage() {
               Ola Slettebak / InEqRe v3.0 / Oslo Børs
             </div>
             <h1 style={{
-              fontSize: 42,
+              fontSize: 28,
               fontWeight: 700,
               marginBottom: 16,
               color: "#e6edf3",

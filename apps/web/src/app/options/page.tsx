@@ -89,7 +89,7 @@ export default function OptionsOverviewPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "monospace" }}>
-      <header style={{ borderBottom: "1px solid #30363d", padding: "10px 24px", background: "#161b22" }}>
+      <header style={{ borderBottom: "1px solid #30363d", padding: "10px 16px", background: "#161b22" }}>
         <div style={{ maxWidth: 1400, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <Link href="/stocks" style={{ color: "rgba(255,255,255,0.35)", textDecoration: "none", fontSize: 16, lineHeight: 1, padding: "6px 10px", border: "1px solid #30363d", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center" }} title="Back to Assets">
@@ -114,7 +114,7 @@ export default function OptionsOverviewPage() {
         </div>
       </header>
 
-      <main style={{ maxWidth: 1400, margin: "0 auto", padding: "16px 24px" }}>
+      <main style={{ maxWidth: 1400, margin: "0 auto", padding: "16px 16px" }}>
         {loading && (
           <div style={{ ...panel, textAlign: "center", padding: 48 }}>
             <div style={{ width: 200, height: 2, background: "#30363d", margin: "0 auto", overflow: "hidden" }}>
@@ -218,7 +218,7 @@ export default function OptionsOverviewPage() {
                     </div>
 
                     {/* Row 2: Stats grid */}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 12 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 12 }}>
                       <div>
                         <div style={lbl}>TOTAL OI</div>
                         <div style={smVal}>{fmtK(stock.total_oi)}</div>

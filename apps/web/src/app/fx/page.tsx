@@ -92,16 +92,16 @@ const PAIR_LABELS: Record<string, string> = {
 
 const S: Record<string, React.CSSProperties> = {
   page: { background: "#0a0a0a", color: "#fff", minHeight: "100vh", fontFamily: "monospace", fontSize: 13 },
-  header: { padding: "20px 24px 12px", borderBottom: "1px solid #30363d" },
-  title: { fontSize: 22, fontWeight: 700, color: "#fff", letterSpacing: 2 },
+  header: { padding: "20px 16px 12px", borderBottom: "1px solid #30363d" },
+  title: { fontSize: 18, fontWeight: 700, color: "#fff", letterSpacing: 2 },
   subtitle: { fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 2 },
-  tabs: { display: "flex", gap: 0, borderBottom: "1px solid #30363d", padding: "0 24px" },
-  tab: { padding: "10px 20px", cursor: "pointer", fontSize: 12, letterSpacing: 1, fontWeight: 600, color: "rgba(255,255,255,0.5)", borderBottom: "2px solid transparent", transition: "all 0.2s", fontFamily: "monospace" },
+  tabs: { display: "flex", gap: 0, borderBottom: "1px solid #30363d", padding: "0 16px" },
+  tab: { padding: "10px 14px", cursor: "pointer", fontSize: 12, letterSpacing: 1, fontWeight: 600, color: "rgba(255,255,255,0.5)", borderBottom: "2px solid transparent", transition: "all 0.2s", fontFamily: "monospace" },
   tabActive: { color: "#3b82f6", borderBottomColor: "#3b82f6" },
-  content: { padding: "20px 24px", maxWidth: 1400, margin: "0 auto" },
+  content: { padding: "20px 16px", maxWidth: 1400, margin: "0 auto" },
   card: { background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 16, marginBottom: 12 },
   cardTitle: { fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", letterSpacing: "0.08em", textTransform: "uppercase" as const, marginBottom: 8, fontFamily: "monospace" },
-  grid2: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 12 },
+  grid2: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 },
   grid3: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 },
   grid5: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 },
   accent: { color: "#3b82f6" },
@@ -780,7 +780,7 @@ export default function FXTerminalPage() {
               <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", letterSpacing: 1, marginBottom: 4 }}>
                 {PAIR_LABELS[rc.pair] || rc.pair}
               </div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: "#fff" }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>
                 {fmtRate(rc.spot)}
               </div>
               <div style={{ fontSize: 11, color: changeColor(rc.change1d), marginTop: 2 }}>

@@ -388,9 +388,9 @@ export default function ShippingPage() {
 
   const S = {
     page: { minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "monospace", fontSize: 12 } as React.CSSProperties,
-    container: { maxWidth: 1400, margin: "0 auto", padding: "20px 24px" } as React.CSSProperties,
+    container: { maxWidth: 1400, margin: "0 auto", padding: "20px 16px" } as React.CSSProperties,
     header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #30363d" } as React.CSSProperties,
-    title: { fontSize: 22, fontWeight: 700, letterSpacing: "0.08em", color: "#3b82f6" } as React.CSSProperties,
+    title: { fontSize: 18, fontWeight: 700, letterSpacing: "0.08em", color: "#3b82f6" } as React.CSSProperties,
     badge: (bg: string, fg = "#fff") => ({ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 2, background: bg, color: fg, letterSpacing: "0.04em" }) as React.CSSProperties,
     section: { fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", letterSpacing: "0.08em", textTransform: "uppercase" as const, padding: "8px 10px 4px", borderBottom: "1px solid #21262d" } as React.CSSProperties,
     tabBtn: (active: boolean) => ({ padding: "6px 14px", borderRadius: 4, border: "none", borderBottom: active ? "2px solid #3b82f6" : "2px solid transparent", background: "transparent", color: active ? "#3b82f6" : "rgba(255,255,255,0.5)", fontFamily: "monospace", fontSize: 10, fontWeight: 700, cursor: "pointer", letterSpacing: "0.04em" }) as React.CSSProperties,
@@ -617,7 +617,7 @@ export default function ShippingPage() {
             <div key="overview" className="sh-tab-content">
 
               {/* KPI Cards Row */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8, padding: "10px 8px", borderBottom: "1px solid #30363d" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8, padding: "10px 8px", borderBottom: "1px solid #30363d" }}>
                 {/* Total Vessels */}
                 <div style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 4, padding: "8px 10px" }}>
                   <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>TOTAL VESSELS</div>
@@ -881,7 +881,7 @@ export default function ShippingPage() {
               {/* Segment Summary */}
               <div>
                 <div style={S.section}>SEGMENTS</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8, padding: "10px 8px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8, padding: "10px 8px" }}>
                   {Object.entries(SECTOR_LABELS).map(([key, label]) => {
                     const seg = segments[key];
                     if (!seg) return (
@@ -1038,7 +1038,7 @@ export default function ShippingPage() {
               </div>
 
               {/* ── Key Rates Grid (3x2) ── */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 0 }}>
                 {([
                   { label: "VLCC TD3C", key: "VLCC_TD3C_TCE", color: "#ef4444", sub: "MEG \u2192 China", sector: "tanker" },
                   { label: "Suezmax TD20", key: "SUEZMAX_TD20_TCE", color: "#fb923c", sub: "WAF \u2192 UKC", sector: "tanker" },
@@ -1239,7 +1239,7 @@ export default function ShippingPage() {
                 const expiring90 = contracts.filter(c => c.days_remaining != null && c.days_remaining >= 0 && c.days_remaining < 90).length;
                 const expiring180 = contracts.filter(c => c.days_remaining != null && c.days_remaining >= 90 && c.days_remaining < 180).length;
                 return (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 0, borderBottom: "1px solid #30363d" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 0, borderBottom: "1px solid #30363d" }}>
                     <div style={{ padding: "8px 12px", borderRight: "1px solid #21262d" }}>
                       <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", fontWeight: 700, letterSpacing: "0.08em" }}>TOTAL CONTRACTS</div>
                       <div style={{ fontSize: 18, fontWeight: 800, color: "#3b82f6", marginTop: 2 }}>{contracts.length}</div>
