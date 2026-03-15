@@ -146,14 +146,14 @@ function fmtDwt(v: number | null): string {
 }
 
 function daysColor(d: number | null): string {
-  if (d == null) return "#555";
+  if (d == null) return "rgba(255,255,255,0.35)";
   if (d < 90) return "#ef4444";
   if (d < 180) return "#f59e0b";
-  return "#888";
+  return "rgba(255,255,255,0.5)";
 }
 
 function deltaColor(v: number | null): string {
-  if (v == null) return "#555";
+  if (v == null) return "rgba(255,255,255,0.35)";
   if (v > 10) return "#22c55e";
   if (v > 0) return "#4ade80";
   if (v > -10) return "#fca5a5";
@@ -387,13 +387,13 @@ export default function ShippingPage() {
   /* ─── Styles ──────────────────────────────────────────────────── */
 
   const S = {
-    page: { minHeight: "100vh", background: "#0a0a0a", color: "#e5e5e5", fontFamily: "'Geist Mono','SF Mono','Consolas',monospace", fontSize: 12 } as React.CSSProperties,
-    container: { maxWidth: 1600, margin: "0 auto", padding: "0 12px" } as React.CSSProperties,
-    header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #222" } as React.CSSProperties,
-    title: { fontSize: 13, fontWeight: 700, letterSpacing: "0.08em", color: "#f97316" } as React.CSSProperties,
+    page: { minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "monospace", fontSize: 12 } as React.CSSProperties,
+    container: { maxWidth: 1400, margin: "0 auto", padding: "20px 24px" } as React.CSSProperties,
+    header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #30363d" } as React.CSSProperties,
+    title: { fontSize: 22, fontWeight: 700, letterSpacing: "0.08em", color: "#3b82f6" } as React.CSSProperties,
     badge: (bg: string, fg = "#fff") => ({ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 2, background: bg, color: fg, letterSpacing: "0.04em" }) as React.CSSProperties,
-    section: { fontSize: 9, fontWeight: 700, color: "#666", letterSpacing: "0.08em", textTransform: "uppercase" as const, padding: "8px 10px 4px", borderBottom: "1px solid #1a1a1a" } as React.CSSProperties,
-    tabBtn: (active: boolean) => ({ padding: "2px 7px", borderRadius: 2, border: `1px solid ${active ? "#f97316" : "#333"}`, background: active ? "#f97316" : "transparent", color: active ? "#000" : "#888", fontFamily: "inherit", fontSize: 9, fontWeight: 700, cursor: "pointer", letterSpacing: "0.04em" }) as React.CSSProperties,
+    section: { fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", letterSpacing: "0.08em", textTransform: "uppercase" as const, padding: "8px 10px 4px", borderBottom: "1px solid #21262d" } as React.CSSProperties,
+    tabBtn: (active: boolean) => ({ padding: "6px 14px", borderRadius: 4, border: "none", borderBottom: active ? "2px solid #3b82f6" : "2px solid transparent", background: "transparent", color: active ? "#3b82f6" : "rgba(255,255,255,0.5)", fontFamily: "monospace", fontSize: 10, fontWeight: 700, cursor: "pointer", letterSpacing: "0.04em" }) as React.CSSProperties,
   };
 
   /* ─── Sort header helper ──────────────────────────────────────── */
@@ -417,7 +417,7 @@ export default function ShippingPage() {
       <main style={S.page}>
         <div style={S.container}>
           <div style={S.header}><span style={S.title}>SHIPPING INTELLIGENCE</span></div>
-          <div style={{ padding: "40px 0", textAlign: "center", color: "#555" }}>Loading...</div>
+          <div style={{ padding: "40px 0", textAlign: "center", color: "rgba(255,255,255,0.35)" }}>Loading...</div>
         </div>
       </main>
     );
@@ -438,7 +438,7 @@ export default function ShippingPage() {
 
   function renderRateChart(key: string, series: { date: string; value: number }[], width: string, height: number, accentColor: string) {
     if (!series || series.length < 2) {
-      return <div style={{ height, display: "flex", alignItems: "center", justifyContent: "center", color: "#444", fontSize: 10 }}>No data</div>;
+      return <div style={{ height, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.35)", fontSize: 10 }}>No data</div>;
     }
     const vals = series.map(s => s.value);
     const minV = Math.min(...vals);
@@ -450,7 +450,7 @@ export default function ShippingPage() {
     return (
       <div style={{ position: "relative" }}>
         {/* Y-axis labels above chart */}
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#444", padding: "0 2px", marginBottom: 2 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "rgba(255,255,255,0.35)", padding: "0 2px", marginBottom: 2 }}>
           <span>{fmtNum(maxV)}</span>
         </div>
         <div
@@ -498,7 +498,7 @@ export default function ShippingPage() {
               const y = 38 - ((series[hIdx].value - minV) / range) * 34;
               return (
                 <>
-                  <line x1={x} y1={0} x2={x} y2={40} stroke="#555" strokeWidth={0.3} vectorEffect="non-scaling-stroke" />
+                  <line x1={x} y1={0} x2={x} y2={40} stroke="rgba(255,255,255,0.35)" strokeWidth={0.3} vectorEffect="non-scaling-stroke" />
                   <circle cx={x} cy={y} r={0.8} fill={accentColor} />
                 </>
               );
@@ -511,24 +511,24 @@ export default function ShippingPage() {
             position: "absolute",
             top: 4,
             right: 8,
-            background: "#161616",
-            border: "1px solid #2a2a2a",
+            background: "#161b22",
+            border: "1px solid #30363d",
             borderRadius: 4,
             padding: "4px 8px",
             pointerEvents: "none",
             zIndex: 10,
           }}>
-            <div style={{ fontSize: 9, color: "#888" }}>{series[hIdx].date}</div>
+            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.5)" }}>{series[hIdx].date}</div>
             <div style={{ fontSize: 12, fontWeight: 700, color: accentColor }}>{fmtNum(series[hIdx].value)}</div>
           </div>
         )}
         {/* Stats bar below chart */}
         {stats && (
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#555", marginTop: 6, padding: "0 2px" }}>
-            <span>Avg<span style={{ color: "#888", marginLeft: 3 }}>{fmtNum(stats.avg)}</span></span>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "rgba(255,255,255,0.35)", marginTop: 6, padding: "0 2px" }}>
+            <span>Avg<span style={{ color: "rgba(255,255,255,0.5)", marginLeft: 3 }}>{fmtNum(stats.avg)}</span></span>
             <span>H <span style={{ color: "#22c55e" }}>{fmtNum(stats.high)}</span></span>
             <span>L <span style={{ color: "#ef4444" }}>{fmtNum(stats.low)}</span></span>
-            <span style={{ color: "#666" }}>{fmtDate(stats.latestDate)}</span>
+            <span style={{ color: "rgba(255,255,255,0.4)" }}>{fmtDate(stats.latestDate)}</span>
           </div>
         )}
       </div>
@@ -542,7 +542,7 @@ export default function ShippingPage() {
   return (
     <>
       <style>{`
-        .sh-row:hover { background: #151515 !important; }
+        .sh-row:hover { background: rgba(59,130,246,0.08) !important; }
         @media (max-width: 1000px) { .sh-grid { grid-template-columns: 1fr !important; } }
         @keyframes sh-fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         .sh-tab-content { animation: sh-fade-in 0.35s ease-out; }
@@ -553,43 +553,43 @@ export default function ShippingPage() {
           {/* ─── Header Bar ─────────────────────────────────── */}
           <div style={S.header}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <Link href="/" style={{ fontSize: 10, color: "#666", textDecoration: "none" }}>HOME</Link>
-              <span style={{ color: "#333" }}>/</span>
+              <Link href="/" style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", textDecoration: "none" }}>HOME</Link>
+              <span style={{ color: "#30363d" }}>/</span>
               <span style={S.title}>SHIPPING INTELLIGENCE</span>
-              <span style={{ ...S.badge("#1a1a1a"), color: "#22c55e", border: "1px solid #22c55e33" }}>
+              <span style={{ ...S.badge("#0d1117"), color: "#22c55e", border: "1px solid #22c55e33" }}>
                 {positions.filter(p => p.latitude != null).length} AIS TRACKED
               </span>
-              <span style={{ ...S.badge("#1a1a1a"), color: "#888", border: "1px solid #333" }}>
+              <span style={{ ...S.badge("#0d1117"), color: "rgba(255,255,255,0.5)", border: "1px solid #30363d" }}>
                 {positions.length} FLEET
               </span>
-              <span style={{ ...S.badge("#1a1a1a"), color: "#888", border: "1px solid #333" }}>
+              <span style={{ ...S.badge("#0d1117"), color: "rgba(255,255,255,0.5)", border: "1px solid #30363d" }}>
                 {Object.keys(segments).length} SEGMENTS
               </span>
             </div>
             <div style={{ display: "flex", gap: 12, fontSize: 10, alignItems: "center" }}>
               {[
-                { label: "BDI", key: "BDI", color: "#f97316", data: overview?.bdi },
+                { label: "BDI", key: "BDI", color: "#3b82f6", data: overview?.bdi },
                 { label: "BDTI", key: "BDTI", color: "#3b82f6", data: overview?.bdti },
                 { label: "BCTI", key: "BCTI", color: "#a855f7", data: overview?.bcti },
               ].map((idx, i) => (
                 <React.Fragment key={idx.key}>
-                  {i > 0 && <span style={{ color: "#333" }}>|</span>}
-                  <span style={{ color: "#888" }}>{idx.label}</span>
+                  {i > 0 && <span style={{ color: "#30363d" }}>|</span>}
+                  <span style={{ color: "rgba(255,255,255,0.5)" }}>{idx.label}</span>
                   <span style={{ color: idx.color, fontWeight: 600 }}>{idx.data ? fmtNum(idx.data.value) : "\u2014"}</span>
                   {idx.data && <span style={{ color: idx.data.change >= 0 ? "#22c55e" : "#ef4444", fontWeight: 600 }}>{fmtPct(idx.data.change)}</span>}
                 </React.Fragment>
               ))}
-              <span style={{ color: "#333" }}>|</span>
+              <span style={{ color: "#30363d" }}>|</span>
               {/* Commodity benchmarks from market rates */}
               {(() => {
                 const brent = marketStats["BRENT"];
                 const iron = marketStats["IRON_ORE"];
                 return (
                   <>
-                    <span style={{ color: "#888" }}>BRENT</span>
+                    <span style={{ color: "rgba(255,255,255,0.5)" }}>BRENT</span>
                     <span style={{ color: "#eab308", fontWeight: 600 }}>{brent ? `$${brent.latest.toFixed(1)}` : "\u2014"}</span>
-                    <span style={{ color: "#333" }}>|</span>
-                    <span style={{ color: "#888" }}>IRON</span>
+                    <span style={{ color: "#30363d" }}>|</span>
+                    <span style={{ color: "rgba(255,255,255,0.5)" }}>IRON</span>
                     <span style={{ color: "#94a3b8", fontWeight: 600 }}>{iron ? `$${iron.latest.toFixed(1)}` : "\u2014"}</span>
                   </>
                 );
@@ -598,14 +598,14 @@ export default function ShippingPage() {
           </div>
 
           {/* ─── Tab Bar ────────────────────────────────────── */}
-          <div style={{ display: "flex", gap: 6, padding: "6px 8px", background: "#111", borderBottom: "1px solid #222", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 6, padding: "6px 8px", background: "#0d1117", borderBottom: "1px solid #30363d", alignItems: "center" }}>
             {(["overview", "map", "rates", "contracts"] as const).map(t => (
               <button key={t} style={S.tabBtn(tab === t)} onClick={() => setTab(t)}>
                 {{ overview: "OVERVIEW", map: "MAP & FLEET", rates: "RATES", contracts: "CONTRACTS" }[t]}
               </button>
             ))}
             <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 8, color: "#444", letterSpacing: "0.06em" }}>AIS FEED</span>
+              <span style={{ fontSize: 8, color: "rgba(255,255,255,0.35)", letterSpacing: "0.06em" }}>AIS FEED</span>
               <span style={{ width: 6, height: 6, borderRadius: "50%", background: positions.filter(p => p.latitude != null).length > 0 ? "#22c55e" : "#ef4444", display: "inline-block" }} />
             </div>
           </div>
@@ -617,35 +617,35 @@ export default function ShippingPage() {
             <div key="overview" className="sh-tab-content">
 
               {/* KPI Cards Row */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8, padding: "10px 8px", borderBottom: "1px solid #222" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8, padding: "10px 8px", borderBottom: "1px solid #30363d" }}>
                 {/* Total Vessels */}
-                <div style={{ background: "#111", border: "1px solid #222", borderRadius: 3, padding: "8px 10px" }}>
-                  <div style={{ fontSize: 8, color: "#666", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>TOTAL VESSELS</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: "#f97316", marginTop: 2 }}>{positions.length}</div>
-                  <div style={{ fontSize: 10, color: "#555", marginTop: 2 }}>{companies.length} companies tracked</div>
+                <div style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 4, padding: "8px 10px" }}>
+                  <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>TOTAL VESSELS</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: "#3b82f6", marginTop: 2 }}>{positions.length}</div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>{companies.length} companies tracked</div>
                 </div>
                 {/* Avg Fleet Age */}
-                <div style={{ background: "#111", border: "1px solid #222", borderRadius: 3, padding: "8px 10px" }}>
-                  <div style={{ fontSize: 8, color: "#666", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>AVG FLEET AGE</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: "#f97316", marginTop: 2 }}>{overview?.avgFleetAge?.toFixed(1) ?? "\u2014"} yr</div>
-                  <div style={{ fontSize: 10, color: "#555", marginTop: 2 }}>across fleet</div>
+                <div style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 4, padding: "8px 10px" }}>
+                  <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>AVG FLEET AGE</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: "#3b82f6", marginTop: 2 }}>{overview?.avgFleetAge?.toFixed(1) ?? "\u2014"} yr</div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>across fleet</div>
                 </div>
                 {/* At Sea % */}
-                <div style={{ background: "#111", border: "1px solid #222", borderRadius: 3, padding: "8px 10px" }}>
-                  <div style={{ fontSize: 8, color: "#666", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>AT SEA</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: "#22c55e", marginTop: 2 }}>{overview?.atSeaPct?.toFixed(0) ?? "\u2014"}%</div>
-                  <div style={{ fontSize: 10, color: "#555", marginTop: 2 }}>{fmtNum(overview?.atSeaCount ?? null)} vessels</div>
+                <div style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 4, padding: "8px 10px" }}>
+                  <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>AT SEA</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: "#22c55e", marginTop: 2 }}>{overview?.atSeaPct?.toFixed(0) ?? "\u2014"}%</div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>{fmtNum(overview?.atSeaCount ?? null)} vessels</div>
                 </div>
                 {/* Fleet Utilization */}
-                <div style={{ background: "#111", border: "1px solid #222", borderRadius: 3, padding: "8px 10px" }}>
-                  <div style={{ fontSize: 8, color: "#666", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>UTILIZATION</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: (overview?.fleetUtilization ?? 0) >= 90 ? "#22c55e" : "#f59e0b", marginTop: 2 }}>{overview?.fleetUtilization?.toFixed(0) ?? "\u2014"}%</div>
-                  <div style={{ fontSize: 10, color: "#555", marginTop: 2 }}>fleet utilization</div>
+                <div style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 4, padding: "8px 10px" }}>
+                  <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>UTILIZATION</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: (overview?.fleetUtilization ?? 0) >= 90 ? "#22c55e" : "#f59e0b", marginTop: 2 }}>{overview?.fleetUtilization?.toFixed(0) ?? "\u2014"}%</div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>fleet utilization</div>
                 </div>
                 {/* BDI */}
-                <div style={{ background: "#111", border: "1px solid #222", borderRadius: 3, padding: "8px 10px" }}>
-                  <div style={{ fontSize: 8, color: "#666", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>BDI INDEX</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: "#3b82f6", marginTop: 2 }}>{overview?.bdi ? fmtNum(overview.bdi.value) : "\u2014"}</div>
+                <div style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 4, padding: "8px 10px" }}>
+                  <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>BDI INDEX</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: "#3b82f6", marginTop: 2 }}>{overview?.bdi ? fmtNum(overview.bdi.value) : "\u2014"}</div>
                   {overview?.bdi && (
                     <div style={{ fontSize: 10, color: overview.bdi.change >= 0 ? "#22c55e" : "#ef4444", marginTop: 2 }}>
                       {fmtPct(overview.bdi.change)}
@@ -653,10 +653,10 @@ export default function ShippingPage() {
                   )}
                 </div>
                 {/* TC Coverage avg */}
-                <div style={{ background: "#111", border: "1px solid #222", borderRadius: 3, padding: "8px 10px" }}>
-                  <div style={{ fontSize: 8, color: "#666", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>TC COVERAGE AVG</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: "#a855f7", marginTop: 2 }}>{avgTcCoverage != null ? `${avgTcCoverage.toFixed(0)}%` : "\u2014"}</div>
-                  <div style={{ fontSize: 10, color: "#555", marginTop: 2 }}>contract coverage</div>
+                <div style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 4, padding: "8px 10px" }}>
+                  <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>TC COVERAGE AVG</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: "#a855f7", marginTop: 2 }}>{avgTcCoverage != null ? `${avgTcCoverage.toFixed(0)}%` : "\u2014"}</div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>contract coverage</div>
                 </div>
               </div>
 
@@ -677,8 +677,8 @@ export default function ShippingPage() {
                   { label: "SCFI", key: "SCFI", color: "#c0c0c0", unit: "pts" },
                 ];
                 return (
-                  <div style={{ borderBottom: "1px solid #222" }}>
-                    <div style={{ ...S.section, fontSize: 9 }}>MARKET PULSE — LATEST RATES</div>
+                  <div style={{ borderBottom: "1px solid #30363d" }}>
+                    <div style={{ ...S.section, fontSize: 11 }}>MARKET PULSE — LATEST RATES</div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 0 }}>
                       {rateCards.map((rc, i) => {
                         const stats = marketStats[rc.key];
@@ -691,22 +691,22 @@ export default function ShippingPage() {
                         return (
                           <div key={rc.key} style={{
                             padding: "10px 14px",
-                            borderRight: "1px solid #1a1a1a",
-                            borderBottom: "1px solid #1a1a1a",
+                            borderRight: "1px solid #21262d",
+                            borderBottom: "1px solid #21262d",
                             cursor: "pointer",
                           }} onClick={() => setTab("rates")}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                              <span style={{ fontSize: 9, fontWeight: 700, color: "#555", letterSpacing: "0.06em" }}>{rc.label}</span>
+                              <span style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.06em" }}>{rc.label}</span>
                               {chg != null && (
                                 <span style={{ fontSize: 9, fontWeight: 700, color: chg >= 0 ? "#22c55e" : "#ef4444" }}>
-                                  {chg >= 0 ? "▲" : "▼"} {Math.abs(chg).toFixed(1)}%
+                                  {chg >= 0 ? "\u25B2" : "\u25BC"} {Math.abs(chg).toFixed(1)}%
                                 </span>
                               )}
                             </div>
-                            <div style={{ fontSize: 20, fontWeight: 700, color: "#e0e0e0", lineHeight: 1.1 }}>
+                            <div style={{ fontSize: 20, fontWeight: 700, color: "#fff", lineHeight: 1.1 }}>
                               {latest != null ? `${rc.prefix || ""}${latest >= 1000 ? fmtNum(latest) : latest.toFixed(1)}` : "\u2014"}
                             </div>
-                            <div style={{ fontSize: 9, color: "#444", marginTop: 2 }}>{rc.unit}</div>
+                            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>{rc.unit}</div>
                             {/* Sparkline */}
                             {series.length >= 2 && (
                               <svg viewBox="0 0 60 16" preserveAspectRatio="none" style={{ width: "100%", height: 28, display: "block", marginTop: 6 }}>
@@ -736,14 +736,14 @@ export default function ShippingPage() {
                             {/* H/L range bar */}
                             {high != null && low != null && latest != null && high > low && (
                               <div style={{ marginTop: 6 }}>
-                                <div style={{ position: "relative", height: 4, background: "#1a1a1a", borderRadius: 2 }}>
+                                <div style={{ position: "relative", height: 4, background: "#21262d", borderRadius: 2 }}>
                                   <div style={{
                                     position: "absolute", left: 0, top: 0, height: "100%", borderRadius: 2,
                                     width: `${((latest - low) / (high - low)) * 100}%`,
                                     background: `linear-gradient(90deg, ${rc.color}44, ${rc.color})`,
                                   }} />
                                 </div>
-                                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3, fontSize: 8, color: "#444" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3, fontSize: 8, color: "rgba(255,255,255,0.35)" }}>
                                   <span>L {low >= 1000 ? fmtNum(low) : low.toFixed(0)}</span>
                                   <span>H {high >= 1000 ? fmtNum(high) : high.toFixed(0)}</span>
                                 </div>
@@ -758,8 +758,8 @@ export default function ShippingPage() {
               })()}
 
               {/* Mini Map */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, borderBottom: "1px solid #222" }}>
-                <div style={{ height: 260, borderRight: "1px solid #222", cursor: "pointer" }} onClick={() => setTab("map")}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, borderBottom: "1px solid #30363d" }}>
+                <div style={{ height: 260, borderRight: "1px solid #30363d", cursor: "pointer" }} onClick={() => setTab("map")}>
                   <ShippingMap
                     positions={positions}
                     ports={[]}
@@ -773,7 +773,7 @@ export default function ShippingPage() {
                 </div>
                 {/* TC Coverage + Exposure snapshot */}
                 <div style={{ display: "flex", flexDirection: "column" }}>
-                  <div style={{ ...S.section, fontSize: 9 }}>CONTRACT COVERAGE BY COMPANY</div>
+                  <div style={{ ...S.section, fontSize: 11 }}>CONTRACT COVERAGE BY COMPANY</div>
                   <div style={{ flex: 1, padding: "4px 10px", overflowY: "auto" }}>
                     {sortedCompanies.map(co => {
                       const tcPct = co.contract_coverage_pct ?? 0;
@@ -790,17 +790,17 @@ export default function ShippingPage() {
                             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                               <div style={{ width: 3, height: 12, background: co.color_hex, borderRadius: 1 }} />
                               <span style={{ fontSize: 10, fontWeight: 600, color: co.color_hex }}>{co.ticker}</span>
-                              <span style={{ fontSize: 9, color: "#555" }}>{co.fleet_size}v</span>
+                              <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)" }}>{co.fleet_size}v</span>
                             </div>
                             <div style={{ fontSize: 9 }}>
                               <span style={{ color: "#3b82f6", fontWeight: 600 }}>{calcTcPct.toFixed(0)}% TC</span>
-                              <span style={{ color: "#333", margin: "0 3px" }}>|</span>
-                              <span style={{ color: "#f97316", fontWeight: 600 }}>{calcSpotPct.toFixed(0)}% Spot</span>
+                              <span style={{ color: "#30363d", margin: "0 3px" }}>|</span>
+                              <span style={{ color: "#f59e0b", fontWeight: 600 }}>{calcSpotPct.toFixed(0)}% Spot</span>
                             </div>
                           </div>
-                          <div style={{ height: 4, display: "flex", borderRadius: 2, overflow: "hidden", background: "#1a1a1a" }}>
+                          <div style={{ height: 4, display: "flex", borderRadius: 2, overflow: "hidden", background: "#21262d" }}>
                             <div style={{ width: `${calcTcPct}%`, background: "#3b82f6", transition: "width 0.3s" }} />
-                            <div style={{ width: `${calcSpotPct}%`, background: "#f97316", transition: "width 0.3s" }} />
+                            <div style={{ width: `${calcSpotPct}%`, background: "#f59e0b", transition: "width 0.3s" }} />
                           </div>
                         </div>
                       );
@@ -812,7 +812,7 @@ export default function ShippingPage() {
               {/* Company Table */}
               <div>
                 <div style={S.section}>COMPANY OVERVIEW</div>
-                <div style={{ display: "grid", gridTemplateColumns: "3px 80px 1fr 70px 48px 48px 48px 72px 56px 68px 56px", padding: "4px 8px", fontSize: 9, fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.06em", background: "#111", borderBottom: "1px solid #222" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "3px 80px 1fr 70px 48px 48px 48px 72px 56px 68px 56px", padding: "4px 8px", fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.05em", background: "#0d1117", borderBottom: "1px solid #30363d" }}>
                   <div />
                   <SortHeader label="TICKER" col="ticker" sort={companySort} setSort={setCompanySort} />
                   <SortHeader label="COMPANY" col="company_name" sort={companySort} setSort={setCompanySort} />
@@ -827,7 +827,7 @@ export default function ShippingPage() {
                 </div>
                 {sortedCompanies.map(co => {
                   const isActive = selectedTicker === co.ticker;
-                  const sectorCol = SECTOR_COLORS[co.sector] || "#888";
+                  const sectorCol = SECTOR_COLORS[co.sector] || "rgba(255,255,255,0.5)";
                   return (
                     <div
                       key={co.ticker}
@@ -840,31 +840,31 @@ export default function ShippingPage() {
                         display: "grid",
                         gridTemplateColumns: "3px 80px 1fr 70px 48px 48px 48px 72px 56px 68px 56px",
                         padding: "5px 8px",
-                        borderBottom: "1px solid #1a1a1a",
+                        borderBottom: "1px solid #21262d",
                         alignItems: "center",
                         cursor: "pointer",
                         transition: "background 0.08s",
-                        background: isActive ? "#1a1a2a" : undefined,
-                        outline: isActive ? "1px solid #333" : undefined,
+                        background: isActive ? "rgba(59,130,246,0.08)" : undefined,
+                        outline: isActive ? "1px solid #30363d" : undefined,
                       }}
                     >
                       <div style={{ width: 3, minHeight: 16, background: co.color_hex || sectorCol, borderRadius: 1 }} />
                       <div>
-                        <Link href={`/stocks/${co.ticker}`} style={{ color: co.color_hex || "#58a6ff", textDecoration: "none", fontWeight: 600 }} onClick={e => e.stopPropagation()}>
+                        <Link href={`/stocks/${co.ticker}`} style={{ color: co.color_hex || "#3b82f6", textDecoration: "none", fontWeight: 600 }} onClick={e => e.stopPropagation()}>
                           {co.ticker}
                         </Link>
                       </div>
-                      <div style={{ color: "#888", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {co.company_name?.replace(/\s*ASA\s*$/i, "")}
                       </div>
                       <div style={{ textAlign: "center" }}>
                         <span style={S.badge(sectorCol)}>{SECTOR_LABELS[co.sector] || co.sector.toUpperCase()}</span>
                       </div>
                       <div style={{ textAlign: "right", fontWeight: 600 }}>{co.fleet_size}</div>
-                      <div style={{ textAlign: "right", color: "#888" }}>{co.fleet_owned}</div>
-                      <div style={{ textAlign: "right", color: co.avg_vessel_age > 15 ? "#f59e0b" : "#888" }}>{co.avg_vessel_age?.toFixed(1) ?? "\u2014"}</div>
-                      <div style={{ textAlign: "right", fontWeight: 600, color: "#f97316" }}>{fmtRate(co.avg_tce)}</div>
-                      <div style={{ textAlign: "right", color: (co.contract_coverage_pct ?? 0) > 50 ? "#22c55e" : "#888" }}>
+                      <div style={{ textAlign: "right", color: "rgba(255,255,255,0.5)" }}>{co.fleet_owned}</div>
+                      <div style={{ textAlign: "right", color: co.avg_vessel_age > 15 ? "#f59e0b" : "rgba(255,255,255,0.5)" }}>{co.avg_vessel_age?.toFixed(1) ?? "\u2014"}</div>
+                      <div style={{ textAlign: "right", fontWeight: 600, color: "#3b82f6" }}>{fmtRate(co.avg_tce)}</div>
+                      <div style={{ textAlign: "right", color: (co.contract_coverage_pct ?? 0) > 50 ? "#22c55e" : "rgba(255,255,255,0.5)" }}>
                         {co.contract_coverage_pct != null ? `${co.contract_coverage_pct.toFixed(0)}%` : "\u2014"}
                       </div>
                       <div style={{ textAlign: "right", fontWeight: 600 }}>
@@ -885,19 +885,19 @@ export default function ShippingPage() {
                   {Object.entries(SECTOR_LABELS).map(([key, label]) => {
                     const seg = segments[key];
                     if (!seg) return (
-                      <div key={key} style={{ background: "#111", border: "1px solid #1a1a1a", borderRadius: 3, padding: "8px 10px", opacity: 0.4 }}>
+                      <div key={key} style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 4, padding: "8px 10px", opacity: 0.4 }}>
                         <div style={{ fontSize: 10, fontWeight: 700, color: SECTOR_COLORS[key] }}>{label}</div>
-                        <div style={{ fontSize: 9, color: "#555", marginTop: 4 }}>No companies</div>
+                        <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginTop: 4 }}>No companies</div>
                       </div>
                     );
                     return (
-                      <div key={key} style={{ background: "#111", border: "1px solid #222", borderRadius: 3, padding: "8px 10px" }}>
+                      <div key={key} style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 4, padding: "8px 10px" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <span style={{ fontSize: 10, fontWeight: 700, color: SECTOR_COLORS[key] }}>{label}</span>
-                          <span style={{ fontSize: 9, color: "#888" }}>{seg.count} co.</span>
+                          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)" }}>{seg.count} co.</span>
                         </div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: "#e5e5e5", marginTop: 4 }}>{seg.fleet} vessels</div>
-                        <div style={{ height: 3, background: "#1a1a1a", borderRadius: 2, marginTop: 6, overflow: "hidden" }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginTop: 4 }}>{seg.fleet} vessels</div>
+                        <div style={{ height: 3, background: "#21262d", borderRadius: 2, marginTop: 6, overflow: "hidden" }}>
                           <div style={{ height: "100%", background: SECTOR_COLORS[key], borderRadius: 2, width: `${Math.min(100, (seg.fleet / Math.max(...Object.values(segments).map(s => s.fleet))) * 100)}%` }} />
                         </div>
                       </div>
@@ -914,7 +914,7 @@ export default function ShippingPage() {
           {tab === "map" && (
             <div key="map" className="sh-tab-content sh-grid" style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 0, marginTop: 1 }}>
               {/* Left: Map */}
-              <div style={{ height: "calc(100vh - 140px)", minHeight: 600, border: "1px solid #222" }}>
+              <div style={{ height: "calc(100vh - 140px)", minHeight: 600, border: "1px solid #30363d" }}>
                 <ShippingMap
                   positions={positions}
                   ports={ports}
@@ -927,16 +927,16 @@ export default function ShippingPage() {
               </div>
 
               {/* Right: Fleet detail panel */}
-              <div style={{ background: "#0d0d0d", borderLeft: "1px solid #222", overflowY: "auto", maxHeight: "calc(100vh - 140px)" }}>
+              <div style={{ background: "#0d1117", borderLeft: "1px solid #30363d", overflowY: "auto", maxHeight: "calc(100vh - 140px)" }}>
                 {selectedTicker ? (
                   <>
                     <div style={{ ...S.section, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span>FLEET: {selectedTicker}</span>
-                      <span style={{ fontSize: 9, color: "#888" }}>{selectedCompanyVessels.length} vessels</span>
+                      <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)" }}>{selectedCompanyVessels.length} vessels</span>
                     </div>
                     <div style={{ padding: 0 }}>
                       {/* vessel header */}
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 60px 56px 64px 72px", padding: "4px 8px", fontSize: 8, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.06em", background: "#111", borderBottom: "1px solid #222" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 60px 56px 64px 72px", padding: "4px 8px", fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.05em", background: "#0d1117", borderBottom: "1px solid #30363d" }}>
                         <div>VESSEL</div>
                         <div>TYPE</div>
                         <div>STATUS</div>
@@ -947,26 +947,26 @@ export default function ShippingPage() {
                         <div
                           key={v.imo}
                           className="sh-row"
-                          style={{ display: "grid", gridTemplateColumns: "1fr 60px 56px 64px 72px", padding: "4px 8px", borderBottom: "1px solid #1a1a1a", alignItems: "center", cursor: "pointer", fontSize: 10 }}
+                          style={{ display: "grid", gridTemplateColumns: "1fr 60px 56px 64px 72px", padding: "4px 8px", borderBottom: "1px solid #21262d", alignItems: "center", cursor: "pointer", fontSize: 10 }}
                           onClick={() => {
                             if (v.latitude != null && v.longitude != null) {
                               setFocusVessel({ lat: v.latitude, lng: v.longitude, name: v.vessel_name });
                             }
                           }}
                         >
-                          <div style={{ color: "#e5e5e5", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.vessel_name}</div>
-                          <div style={{ color: "#666", fontSize: 9, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.vessel_type}</div>
+                          <div style={{ color: "#fff", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.vessel_name}</div>
+                          <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 9, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.vessel_type}</div>
                           <div>
                             <span style={{
                               fontSize: 8, fontWeight: 700, padding: "1px 4px", borderRadius: 2,
                               background: v.status === "at_sea" ? "rgba(34,197,94,0.15)" : v.status === "in_port" ? "rgba(59,130,246,0.15)" : "rgba(107,114,128,0.15)",
-                              color: v.status === "at_sea" ? "#22c55e" : v.status === "in_port" ? "#3b82f6" : "#888",
+                              color: v.status === "at_sea" ? "#22c55e" : v.status === "in_port" ? "#3b82f6" : "rgba(255,255,255,0.5)",
                             }}>
                               {v.status === "at_sea" ? "SEA" : v.status === "in_port" ? "PORT" : v.status?.toUpperCase() || "UNK"}
                             </span>
                           </div>
-                          <div style={{ textAlign: "right", color: "#f97316", fontWeight: 600 }}>{fmtRate(v.rate_usd_per_day)}</div>
-                          <div style={{ textAlign: "right", color: "#555", fontSize: 9, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.destination_port_name || v.destination || "\u2014"}</div>
+                          <div style={{ textAlign: "right", color: "#3b82f6", fontWeight: 600 }}>{fmtRate(v.rate_usd_per_day)}</div>
+                          <div style={{ textAlign: "right", color: "rgba(255,255,255,0.35)", fontSize: 9, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.destination_port_name || v.destination || "\u2014"}</div>
                         </div>
                       ))}
                     </div>
@@ -982,14 +982,14 @@ export default function ShippingPage() {
                           <div
                             key={co.ticker}
                             className="sh-row"
-                            style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 10px", borderBottom: "1px solid #1a1a1a", cursor: "pointer" }}
+                            style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 10px", borderBottom: "1px solid #21262d", cursor: "pointer" }}
                             onClick={() => setSelectedTicker(co.ticker)}
                           >
                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                              <div style={{ width: 8, height: 8, borderRadius: "50%", background: co.color_hex || SECTOR_COLORS[co.sector] || "#888" }} />
+                              <div style={{ width: 8, height: 8, borderRadius: "50%", background: co.color_hex || SECTOR_COLORS[co.sector] || "rgba(255,255,255,0.5)" }} />
                               <div>
-                                <div style={{ fontWeight: 600, color: co.color_hex || "#e5e5e5", fontSize: 11 }}>{co.ticker}</div>
-                                <div style={{ color: "#555", fontSize: 9 }}>{co.company_name?.replace(/\s*ASA\s*$/i, "")}</div>
+                                <div style={{ fontWeight: 600, color: co.color_hex || "#fff", fontSize: 11 }}>{co.ticker}</div>
+                                <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 9 }}>{co.company_name?.replace(/\s*ASA\s*$/i, "")}</div>
                               </div>
                             </div>
                             <div style={{ textAlign: "right" }}>
@@ -1013,7 +1013,7 @@ export default function ShippingPage() {
             <div key="rates" className="sh-tab-content">
 
               {/* ── Timeframe Selector ── */}
-              <div style={{ display: "flex", gap: 6, padding: "10px 18px", background: "#0a0a0a", borderBottom: "1px solid #222", alignItems: "center" }}>
+              <div style={{ display: "flex", gap: 6, padding: "10px 18px", background: "#0a0a0a", borderBottom: "1px solid #30363d", alignItems: "center" }}>
                 {([
                   { label: "7D", days: 7 },
                   { label: "30D", days: 30 },
@@ -1027,14 +1027,14 @@ export default function ShippingPage() {
                     style={{
                       padding: "3px 10px", fontSize: 10, fontWeight: 700, borderRadius: 999,
                       border: "none", cursor: "pointer", letterSpacing: "0.04em",
-                      background: rateDays === tf.days ? "#3b82f6" : "#1a1a1a",
-                      color: rateDays === tf.days ? "#fff" : "#888",
+                      background: rateDays === tf.days ? "#3b82f6" : "#21262d",
+                      color: rateDays === tf.days ? "#fff" : "rgba(255,255,255,0.5)",
                     }}
                   >
                     {tf.label}
                   </button>
                 ))}
-                <span style={{ fontSize: 9, color: "#444", marginLeft: "auto" }}>TCE $/DAY</span>
+                <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginLeft: "auto" }}>TCE $/DAY</span>
               </div>
 
               {/* ── Key Rates Grid (3x2) ── */}
@@ -1059,11 +1059,11 @@ export default function ShippingPage() {
                   const periodChg = latest != null && first != null && first > 0 ? ((latest - first) / first) * 100 : null;
                   // Range position (0-100)
                   const rangePct = high != null && low != null && latest != null && high > low ? ((latest - low) / (high - low)) * 100 : null;
-                  const sectorCol = SECTOR_COLORS[rd.sector] || "#888";
+                  const sectorCol = SECTOR_COLORS[rd.sector] || "rgba(255,255,255,0.5)";
                   return (
                     <div key={rd.key} style={{
-                      borderRight: (i % 3 < 2) ? "1px solid #1a1a1a" : undefined,
-                      borderBottom: "1px solid #1a1a1a",
+                      borderRight: (i % 3 < 2) ? "1px solid #21262d" : undefined,
+                      borderBottom: "1px solid #21262d",
                       padding: "16px 20px 12px",
                     }}>
                       {/* Header */}
@@ -1073,7 +1073,7 @@ export default function ShippingPage() {
                             <div style={{ width: 6, height: 6, borderRadius: "50%", background: sectorCol }} />
                             <span style={{ fontSize: 12, fontWeight: 700, color: rd.color, letterSpacing: "0.02em" }}>{rd.label}</span>
                           </div>
-                          <div style={{ fontSize: 9, color: "#555", marginTop: 2, marginLeft: 12 }}>{rd.sub}</div>
+                          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginTop: 2, marginLeft: 12 }}>{rd.sub}</div>
                         </div>
                         <div style={{ textAlign: "right" }}>
                           {chg != null && (
@@ -1107,14 +1107,14 @@ export default function ShippingPage() {
                         if (!yoy) return null;
                         const up = yoy.changePct >= 0;
                         return (
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, fontSize: 9, color: "#666" }}>
-                            <span>1Y ago <span style={{ color: "#888", fontWeight: 600 }}>${fmtNum(Math.round(yoy.oneYearAgo))}</span></span>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, fontSize: 9, color: "rgba(255,255,255,0.4)" }}>
+                            <span>1Y ago <span style={{ color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>${fmtNum(Math.round(yoy.oneYearAgo))}</span></span>
                             <span style={{
                               fontWeight: 700, padding: "1px 5px", borderRadius: 3,
                               background: up ? "rgba(34,197,94,0.08)" : "rgba(239,68,68,0.08)",
                               color: up ? "#22c55e" : "#ef4444",
                             }}>
-                              {up ? "▲" : "▼"} {Math.abs(yoy.changePct).toFixed(0)}% YoY
+                              {up ? "\u25B2" : "\u25BC"} {Math.abs(yoy.changePct).toFixed(0)}% YoY
                             </span>
                           </div>
                         );
@@ -1128,7 +1128,7 @@ export default function ShippingPage() {
                       {/* Range bar */}
                       {rangePct != null && (
                         <div style={{ marginBottom: 8 }}>
-                          <div style={{ position: "relative", height: 4, background: "#1a1a1a", borderRadius: 2 }}>
+                          <div style={{ position: "relative", height: 4, background: "#21262d", borderRadius: 2 }}>
                             <div style={{
                               position: "absolute", left: 0, top: 0, height: "100%", borderRadius: 2,
                               width: `${Math.min(100, rangePct)}%`,
@@ -1141,7 +1141,7 @@ export default function ShippingPage() {
                               left: `${Math.min(98, rangePct)}%`,
                             }} />
                           </div>
-                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#555", marginTop: 3 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "rgba(255,255,255,0.35)", marginTop: 3 }}>
                             <span>Lo <span style={{ color: "#ef4444" }}>${low != null ? fmtNum(Math.round(low)) : "\u2014"}</span></span>
                             <span>Hi <span style={{ color: "#22c55e" }}>${high != null ? fmtNum(Math.round(high)) : "\u2014"}</span></span>
                           </div>
@@ -1172,19 +1172,19 @@ export default function ShippingPage() {
                     <div style={{ overflowX: "auto" }}>
                       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
                         <thead>
-                          <tr style={{ background: "#111" }}>
-                            <th style={{ textAlign: "left", padding: "8px 10px", fontWeight: 700, color: "#666", fontSize: 9, letterSpacing: "0.06em", borderBottom: "2px solid #333" }}>VESSEL CLASS</th>
-                            <th style={{ textAlign: "right", padding: "8px 10px", fontWeight: 700, color: "#f97316", fontSize: 9, letterSpacing: "0.06em", borderBottom: "2px solid #333" }}>MARKET SPOT</th>
+                          <tr style={{ background: "#0d1117" }}>
+                            <th style={{ textAlign: "left", padding: "8px 10px", fontWeight: 600, color: "rgba(255,255,255,0.5)", fontSize: 9, letterSpacing: "0.05em", borderBottom: "2px solid #30363d" }}>VESSEL CLASS</th>
+                            <th style={{ textAlign: "right", padding: "8px 10px", fontWeight: 600, color: "#3b82f6", fontSize: 9, letterSpacing: "0.05em", borderBottom: "2px solid #30363d" }}>MARKET SPOT</th>
                             {companyTickers.map(t => (
-                              <th key={t} style={{ textAlign: "right", padding: "8px 10px", fontWeight: 700, color: companies.find(c => c.ticker === t)?.color_hex || "#888", fontSize: 9, letterSpacing: "0.06em", borderBottom: "2px solid #333" }}>{t}</th>
+                              <th key={t} style={{ textAlign: "right", padding: "8px 10px", fontWeight: 600, color: companies.find(c => c.ticker === t)?.color_hex || "rgba(255,255,255,0.5)", fontSize: 9, letterSpacing: "0.05em", borderBottom: "2px solid #30363d" }}>{t}</th>
                             ))}
                           </tr>
                         </thead>
                         <tbody>
                           {vesselClasses.map(vc => (
-                            <tr key={vc} className="sh-row" style={{ borderBottom: "1px solid #1a1a1a" }}>
-                              <td style={{ padding: "6px 10px", fontWeight: 700, color: "#ccc" }}>{vc}</td>
-                              <td style={{ padding: "6px 10px", textAlign: "right", color: "#f97316", fontWeight: 700, fontSize: 12 }}>
+                            <tr key={vc} className="sh-row" style={{ borderBottom: "1px solid #21262d" }}>
+                              <td style={{ padding: "6px 10px", fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>{vc}</td>
+                              <td style={{ padding: "6px 10px", textAlign: "right", color: "#3b82f6", fontWeight: 700, fontSize: 12 }}>
                                 {marketLatest[vc] ? fmtRate(marketLatest[vc]) : "\u2014"}
                               </td>
                               {companyTickers.map(t => {
@@ -1198,7 +1198,7 @@ export default function ShippingPage() {
                                   }}>
                                     {rate != null ? (
                                       <>
-                                        <div style={{ fontWeight: 700, color: delta != null && delta > 0 ? "#22c55e" : delta != null && delta < 0 ? "#ef4444" : "#888", fontSize: 11 }}>
+                                        <div style={{ fontWeight: 700, color: delta != null && delta > 0 ? "#22c55e" : delta != null && delta < 0 ? "#ef4444" : "rgba(255,255,255,0.5)", fontSize: 11 }}>
                                           {fmtRate(rate)}
                                         </div>
                                         {delta != null && (
@@ -1207,7 +1207,7 @@ export default function ShippingPage() {
                                           </div>
                                         )}
                                       </>
-                                    ) : <span style={{ color: "#333" }}>{"\u2014"}</span>}
+                                    ) : <span style={{ color: "#30363d" }}>{"\u2014"}</span>}
                                   </td>
                                 );
                               })}
@@ -1239,52 +1239,52 @@ export default function ShippingPage() {
                 const expiring90 = contracts.filter(c => c.days_remaining != null && c.days_remaining >= 0 && c.days_remaining < 90).length;
                 const expiring180 = contracts.filter(c => c.days_remaining != null && c.days_remaining >= 90 && c.days_remaining < 180).length;
                 return (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 0, borderBottom: "1px solid #222" }}>
-                    <div style={{ padding: "8px 12px", borderRight: "1px solid #1a1a1a" }}>
-                      <div style={{ fontSize: 8, color: "#555", fontWeight: 700, letterSpacing: "0.08em" }}>TOTAL CONTRACTS</div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: "#f97316", marginTop: 2 }}>{contracts.length}</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 0, borderBottom: "1px solid #30363d" }}>
+                    <div style={{ padding: "8px 12px", borderRight: "1px solid #21262d" }}>
+                      <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", fontWeight: 700, letterSpacing: "0.08em" }}>TOTAL CONTRACTS</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: "#3b82f6", marginTop: 2 }}>{contracts.length}</div>
                     </div>
-                    <div style={{ padding: "8px 12px", borderRight: "1px solid #1a1a1a" }}>
-                      <div style={{ fontSize: 8, color: "#555", fontWeight: 700, letterSpacing: "0.08em" }}>TC / SPOT SPLIT</div>
+                    <div style={{ padding: "8px 12px", borderRight: "1px solid #21262d" }}>
+                      <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", fontWeight: 700, letterSpacing: "0.08em" }}>TC / SPOT SPLIT</div>
                       <div style={{ marginTop: 2 }}>
                         <span style={{ fontSize: 14, fontWeight: 700, color: "#3b82f6" }}>{tcContracts.length}</span>
-                        <span style={{ fontSize: 10, color: "#555" }}> TC </span>
-                        <span style={{ fontSize: 14, fontWeight: 700, color: "#f97316" }}>{spotContracts.length}</span>
-                        <span style={{ fontSize: 10, color: "#555" }}> Spot</span>
+                        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}> TC </span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: "#f59e0b" }}>{spotContracts.length}</span>
+                        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}> Spot</span>
                       </div>
                     </div>
-                    <div style={{ padding: "8px 12px", borderRight: "1px solid #1a1a1a" }}>
-                      <div style={{ fontSize: 8, color: "#555", fontWeight: 700, letterSpacing: "0.08em" }}>AVG RATE</div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: "#f97316", marginTop: 2 }}>{avgRate != null ? fmtRate(avgRate) : "\u2014"}</div>
+                    <div style={{ padding: "8px 12px", borderRight: "1px solid #21262d" }}>
+                      <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", fontWeight: 700, letterSpacing: "0.08em" }}>AVG RATE</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: "#3b82f6", marginTop: 2 }}>{avgRate != null ? fmtRate(avgRate) : "\u2014"}</div>
                     </div>
-                    <div style={{ padding: "8px 12px", borderRight: "1px solid #1a1a1a" }}>
-                      <div style={{ fontSize: 8, color: "#555", fontWeight: 700, letterSpacing: "0.08em" }}>vs SPOT</div>
+                    <div style={{ padding: "8px 12px", borderRight: "1px solid #21262d" }}>
+                      <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", fontWeight: 700, letterSpacing: "0.08em" }}>vs SPOT</div>
                       <div style={{ marginTop: 2 }}>
                         <span style={{ fontSize: 14, fontWeight: 700, color: "#22c55e" }}>{aboveSpot}</span>
-                        <span style={{ fontSize: 10, color: "#555" }}> above </span>
+                        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}> above </span>
                         <span style={{ fontSize: 14, fontWeight: 700, color: "#ef4444" }}>{belowSpot}</span>
-                        <span style={{ fontSize: 10, color: "#555" }}> below</span>
+                        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}> below</span>
                       </div>
                     </div>
-                    <div style={{ padding: "8px 12px", borderRight: "1px solid #1a1a1a" }}>
-                      <div style={{ fontSize: 8, color: "#555", fontWeight: 700, letterSpacing: "0.08em" }}>EXPIRING &lt;90D</div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: expiring90 > 0 ? "#ef4444" : "#888", marginTop: 2 }}>{expiring90}</div>
+                    <div style={{ padding: "8px 12px", borderRight: "1px solid #21262d" }}>
+                      <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", fontWeight: 700, letterSpacing: "0.08em" }}>EXPIRING &lt;90D</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: expiring90 > 0 ? "#ef4444" : "rgba(255,255,255,0.5)", marginTop: 2 }}>{expiring90}</div>
                     </div>
                     <div style={{ padding: "8px 12px" }}>
-                      <div style={{ fontSize: 8, color: "#555", fontWeight: 700, letterSpacing: "0.08em" }}>EXPIRING 90-180D</div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: expiring180 > 0 ? "#f59e0b" : "#888", marginTop: 2 }}>{expiring180}</div>
+                      <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", fontWeight: 700, letterSpacing: "0.08em" }}>EXPIRING 90-180D</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: expiring180 > 0 ? "#f59e0b" : "rgba(255,255,255,0.5)", marginTop: 2 }}>{expiring180}</div>
                     </div>
                   </div>
                 );
               })()}
 
               {/* Controls */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 10px", background: "#111", borderBottom: "1px solid #222" }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#888", letterSpacing: "0.06em" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 10px", background: "#0d1117", borderBottom: "1px solid #30363d" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.5)", letterSpacing: "0.06em" }}>
                   VESSEL EMPLOYMENT &mdash; {contracts.length} contracts
                 </div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <span style={{ fontSize: 9, color: "#555" }}>GROUP:</span>
+                  <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)" }}>GROUP:</span>
                   <button
                     style={{ ...S.tabBtn(contractGroup), fontSize: 8 }}
                     onClick={() => setContractGroup(!contractGroup)}
@@ -1299,13 +1299,13 @@ export default function ShippingPage() {
                 display: "grid",
                 gridTemplateColumns: "76px 1fr 76px 64px 62px 76px 56px 90px 76px 76px 56px 64px",
                 padding: "4px 8px",
-                fontSize: 8,
-                fontWeight: 700,
-                color: "#555",
+                fontSize: 9,
+                fontWeight: 600,
+                color: "rgba(255,255,255,0.5)",
                 textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                background: "#111",
-                borderBottom: "1px solid #222",
+                letterSpacing: "0.05em",
+                background: "#0d1117",
+                borderBottom: "1px solid #30363d",
               }}>
                 <SortHeader label="COMPANY" col="company_ticker" sort={contractSort} setSort={setContractSort} />
                 <SortHeader label="VESSEL" col="vessel_name" sort={contractSort} setSort={setContractSort} />
@@ -1327,7 +1327,7 @@ export default function ShippingPage() {
                   /* Grouped by company */
                   Object.entries(groupedContracts).map(([ticker, items]) => {
                     const co = companies.find(c => c.ticker === ticker);
-                    const col = co?.color_hex || SECTOR_COLORS[co?.sector || ""] || "#888";
+                    const col = co?.color_hex || SECTOR_COLORS[co?.sector || ""] || "rgba(255,255,255,0.5)";
                     const groupAvgRate = (() => {
                       const withRate = items.filter(c => c.rate_usd_per_day != null);
                       return withRate.length > 0 ? withRate.reduce((s, c) => s + (c.rate_usd_per_day ?? 0), 0) / withRate.length : null;
@@ -1340,15 +1340,15 @@ export default function ShippingPage() {
                         <div style={{
                           display: "flex", alignItems: "center", gap: 8,
                           padding: "6px 10px",
-                          background: "#0e0e0e",
-                          borderBottom: "1px solid #222",
-                          borderTop: "1px solid #222",
+                          background: "#0d1117",
+                          borderBottom: "1px solid #30363d",
+                          borderTop: "1px solid #30363d",
                         }}>
                           <div style={{ width: 8, height: 8, borderRadius: "50%", background: col }} />
                           <span style={{ fontWeight: 700, color: col, fontSize: 11 }}>{ticker}</span>
-                          <span style={{ color: "#555", fontSize: 9 }}>{co?.company_name?.replace(/\s*ASA\s*$/i, "")}</span>
-                          <span style={{ fontSize: 9, color: "#888", marginLeft: 8 }}>{tcCount > 0 && <span style={{ color: "#3b82f6" }}>{tcCount} TC</span>}{tcCount > 0 && spotCount > 0 && " / "}{spotCount > 0 && <span style={{ color: "#f97316" }}>{spotCount} Spot</span>}</span>
-                          <span style={{ fontSize: 9, color: "#666", marginLeft: "auto" }}>
+                          <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 9 }}>{co?.company_name?.replace(/\s*ASA\s*$/i, "")}</span>
+                          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", marginLeft: 8 }}>{tcCount > 0 && <span style={{ color: "#3b82f6" }}>{tcCount} TC</span>}{tcCount > 0 && spotCount > 0 && " / "}{spotCount > 0 && <span style={{ color: "#f59e0b" }}>{spotCount} Spot</span>}</span>
+                          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginLeft: "auto" }}>
                             Avg {fmtRate(groupAvgRate)} &middot; {items.length} vessels
                           </span>
                         </div>
@@ -1369,23 +1369,23 @@ export default function ShippingPage() {
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
                       <thead>
-                        <tr style={{ background: "#111" }}>
-                          <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 700, color: "#666", fontSize: 9, letterSpacing: "0.06em", borderBottom: "1px solid #222" }}>COMPANY</th>
+                        <tr style={{ background: "#0d1117" }}>
+                          <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, color: "rgba(255,255,255,0.5)", fontSize: 9, letterSpacing: "0.05em", borderBottom: "1px solid #30363d" }}>COMPANY</th>
                           {vesselClasses.map(vc => (
-                            <th key={vc} style={{ textAlign: "center", padding: "6px 8px", fontWeight: 700, color: "#666", fontSize: 9, letterSpacing: "0.06em", borderBottom: "1px solid #222" }}>{vc}</th>
+                            <th key={vc} style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600, color: "rgba(255,255,255,0.5)", fontSize: 9, letterSpacing: "0.05em", borderBottom: "1px solid #30363d" }}>{vc}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {exposureTickers.map(tk => {
                           const co = companies.find(c => c.ticker === tk);
-                          const col = co?.color_hex || "#888";
+                          const col = co?.color_hex || "rgba(255,255,255,0.5)";
                           return (
-                            <tr key={tk} className="sh-row" style={{ borderBottom: "1px solid #1a1a1a" }}>
+                            <tr key={tk} className="sh-row" style={{ borderBottom: "1px solid #21262d" }}>
                               <td style={{ padding: "5px 8px", fontWeight: 700, color: col }}>{tk}</td>
                               {vesselClasses.map(vc => {
                                 const cell = exposureMatrix.find(e => e.ticker === tk && e.vessel_class === vc);
-                                if (!cell) return <td key={vc} style={{ padding: "5px 8px", textAlign: "center", color: "#333" }}>{"\u2014"}</td>;
+                                if (!cell) return <td key={vc} style={{ padding: "5px 8px", textAlign: "center", color: "#30363d" }}>{"\u2014"}</td>;
                                 return (
                                   <td key={vc} style={{
                                     padding: "5px 8px",
@@ -1406,7 +1406,7 @@ export default function ShippingPage() {
                     </table>
                   </div>
                   {/* Legend */}
-                  <div style={{ display: "flex", gap: 14, justifyContent: "center", padding: "6px 0 4px", fontSize: 9, color: "#555" }}>
+                  <div style={{ display: "flex", gap: 14, justifyContent: "center", padding: "6px 0 4px", fontSize: 9, color: "rgba(255,255,255,0.35)" }}>
                     <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 1, background: "rgba(34,197,94,0.3)", marginRight: 3, verticalAlign: "middle" }} /> Above spot (&gt;10%)</span>
                     <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 1, background: "rgba(34,197,94,0.15)", marginRight: 3, verticalAlign: "middle" }} /> Above spot (0-10%)</span>
                     <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 1, background: "rgba(239,68,68,0.15)", marginRight: 3, verticalAlign: "middle" }} /> Below spot (0-10%)</span>
@@ -1418,14 +1418,14 @@ export default function ShippingPage() {
           )}
 
           {/* ── Data Sources ── */}
-          <div style={{ borderTop: "1px solid #1a1a1a", marginTop: 16, padding: "12px 10px", fontSize: 9, color: "#444", lineHeight: 1.8 }}>
-            <span style={{ fontWeight: 700, color: "#555", letterSpacing: "0.06em" }}>DATA SOURCES</span>
+          <div style={{ borderTop: "1px solid #21262d", marginTop: 16, padding: "12px 10px", fontSize: 9, color: "rgba(255,255,255,0.35)", lineHeight: 1.8 }}>
+            <span style={{ fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "0.06em" }}>DATA SOURCES</span>
             <div style={{ marginTop: 4 }}>
-              <span style={{ color: "#666" }}>Market Rates:</span> Yahoo Finance (BDI), Pareto Shipping Daily &middot;{" "}
-              <span style={{ color: "#666" }}>Fleet & Vessels:</span> Company filings, quarterly fleet reports &middot;{" "}
-              <span style={{ color: "#666" }}>Contracts:</span> Quarterly fleet reports, broker estimates &middot;{" "}
-              <span style={{ color: "#666" }}>Commodities:</span> ICE Brent, SGX Iron Ore &middot;{" "}
-              <span style={{ color: "#666" }}>Indices:</span> Baltic Exchange (BDI, BDTI, BCTI), Shanghai Shipping Exchange (SCFI)
+              <span style={{ color: "rgba(255,255,255,0.4)" }}>Market Rates:</span> Yahoo Finance (BDI), Pareto Shipping Daily &middot;{" "}
+              <span style={{ color: "rgba(255,255,255,0.4)" }}>Fleet & Vessels:</span> Company filings, quarterly fleet reports &middot;{" "}
+              <span style={{ color: "rgba(255,255,255,0.4)" }}>Contracts:</span> Quarterly fleet reports, broker estimates &middot;{" "}
+              <span style={{ color: "rgba(255,255,255,0.4)" }}>Commodities:</span> ICE Brent, SGX Iron Ore &middot;{" "}
+              <span style={{ color: "rgba(255,255,255,0.4)" }}>Indices:</span> Baltic Exchange (BDI, BDTI, BCTI), Shanghai Shipping Exchange (SCFI)
             </div>
           </div>
 
@@ -1438,7 +1438,7 @@ export default function ShippingPage() {
 
   function renderContractRow(c: ContractItem) {
     const co = companies.find(co => co.ticker === c.company_ticker);
-    const col = c.color_hex || co?.color_hex || SECTOR_COLORS[c.sector] || "#888";
+    const col = c.color_hex || co?.color_hex || SECTOR_COLORS[c.sector] || "rgba(255,255,255,0.5)";
     const sizeLabel = c.dwt ? fmtDwt(c.dwt) : c.teu ? `${fmtNum(c.teu)} TEU` : c.cbm ? `${fmtNum(c.cbm)} CBM` : "\u2014";
 
     return (
@@ -1449,7 +1449,7 @@ export default function ShippingPage() {
           display: "grid",
           gridTemplateColumns: "76px 1fr 76px 64px 62px 76px 56px 90px 76px 76px 56px 64px",
           padding: "4px 8px",
-          borderBottom: "1px solid #1a1a1a",
+          borderBottom: "1px solid #21262d",
           alignItems: "center",
           fontSize: 10,
           transition: "background 0.08s",
@@ -1458,11 +1458,11 @@ export default function ShippingPage() {
         {/* Company */}
         <div style={{ fontWeight: 600, color: col }}>{c.company_ticker}</div>
         {/* Vessel */}
-        <div style={{ color: "#e5e5e5", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.vessel_name}</div>
+        <div style={{ color: "#fff", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.vessel_name}</div>
         {/* Class */}
-        <div style={{ color: "#888", fontSize: 9, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.vessel_class || c.vessel_type}</div>
+        <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 9, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.vessel_class || c.vessel_type}</div>
         {/* DWT */}
-        <div style={{ textAlign: "right", color: "#888" }}>{sizeLabel}</div>
+        <div style={{ textAlign: "right", color: "rgba(255,255,255,0.5)" }}>{sizeLabel}</div>
         {/* Contract type */}
         <div>
           {(() => {
@@ -1472,8 +1472,8 @@ export default function ShippingPage() {
             return (
               <span style={{
                 fontSize: 8, fontWeight: 700, padding: "1px 4px", borderRadius: 2, letterSpacing: "0.04em",
-                background: isTc ? "rgba(59,130,246,0.15)" : isSpot ? "rgba(249,115,22,0.15)" : "rgba(107,114,128,0.15)",
-                color: isTc ? "#3b82f6" : isSpot ? "#f97316" : "#888",
+                background: isTc ? "rgba(59,130,246,0.15)" : isSpot ? "rgba(245,158,11,0.15)" : "rgba(107,114,128,0.15)",
+                color: isTc ? "#3b82f6" : isSpot ? "#f59e0b" : "rgba(255,255,255,0.5)",
               }}>
                 {label}
               </span>
@@ -1481,19 +1481,19 @@ export default function ShippingPage() {
           })()}
         </div>
         {/* Rate */}
-        <div style={{ textAlign: "right", fontWeight: 600, color: "#f97316" }}>
+        <div style={{ textAlign: "right", fontWeight: 600, color: "#3b82f6" }}>
           {c.rate_usd_per_day != null ? fmtRate(c.rate_usd_per_day) : c.rate_worldscale != null ? `WS${c.rate_worldscale}` : "\u2014"}
         </div>
         {/* Spot rate */}
-        <div style={{ textAlign: "right", color: "#666", fontSize: 9 }}>
+        <div style={{ textAlign: "right", color: "rgba(255,255,255,0.4)", fontSize: 9 }}>
           {c.spot_rate != null ? fmtRate(c.spot_rate) : "\u2014"}
         </div>
         {/* Charterer */}
-        <div style={{ color: "#666", fontSize: 9, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.charterer || "\u2014"}</div>
+        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 9, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.charterer || "\u2014"}</div>
         {/* Start */}
-        <div style={{ textAlign: "right", color: "#555", fontSize: 9 }}>{fmtDate(c.contract_start)}</div>
+        <div style={{ textAlign: "right", color: "rgba(255,255,255,0.35)", fontSize: 9 }}>{fmtDate(c.contract_start)}</div>
         {/* End */}
-        <div style={{ textAlign: "right", color: "#555", fontSize: 9 }}>{fmtDate(c.contract_end)}</div>
+        <div style={{ textAlign: "right", color: "rgba(255,255,255,0.35)", fontSize: 9 }}>{fmtDate(c.contract_end)}</div>
         {/* Days remaining */}
         <div style={{ textAlign: "right", fontWeight: 600, color: daysColor(c.days_remaining) }}>
           {c.days_remaining != null ? c.days_remaining : "\u2014"}
@@ -1501,7 +1501,7 @@ export default function ShippingPage() {
         {/* vs Spot */}
         <div style={{
           textAlign: "right", fontWeight: 700,
-          color: c.rate_vs_spot_pct == null ? "#555" : (c.rate_vs_spot_pct >= 0 ? "#22c55e" : "#ef4444"),
+          color: c.rate_vs_spot_pct == null ? "rgba(255,255,255,0.35)" : (c.rate_vs_spot_pct >= 0 ? "#22c55e" : "#ef4444"),
         }}>
           {fmtPct(c.rate_vs_spot_pct)}
         </div>

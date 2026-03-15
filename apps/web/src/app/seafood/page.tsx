@@ -145,14 +145,14 @@ function fmtPrice(v: number | null): string {
 }
 
 function getLiceColor(v: number | null): string {
-  if (v == null) return "#555";
+  if (v == null) return "rgba(255,255,255,0.35)";
   if (v < 0.2) return "#22c55e";
   if (v < 0.5) return "#f59e0b";
   return "#ef4444";
 }
 
 function getRiskColor(v: number | null): string {
-  if (v == null) return "#555";
+  if (v == null) return "rgba(255,255,255,0.35)";
   if (v < 25) return "#22c55e";
   if (v < 40) return "#f59e0b";
   return "#ef4444";
@@ -327,18 +327,18 @@ export default function SeafoodPage() {
   /* ─── Styles ─────────────────────────────────────────────────── */
 
   const S = {
-    page: { minHeight: "100vh", background: "#0a0a0a", color: "#e5e5e5", fontFamily: "'Geist Mono','SF Mono','Consolas',monospace", fontSize: 12 } as React.CSSProperties,
-    container: { maxWidth: 1600, margin: "0 auto", padding: "0 12px" } as React.CSSProperties,
-    header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #222" } as React.CSSProperties,
-    title: { fontSize: 13, fontWeight: 700, letterSpacing: "0.08em", color: "#f97316" } as React.CSSProperties,
+    page: { minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "monospace", fontSize: 12 } as React.CSSProperties,
+    container: { maxWidth: 1400, margin: "0 auto", padding: "0 24px" } as React.CSSProperties,
+    header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid #30363d" } as React.CSSProperties,
+    title: { fontSize: 22, fontWeight: 700, letterSpacing: "0.08em", color: "#fff" } as React.CSSProperties,
     badge: (bg: string, fg = "#fff") => ({ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 2, background: bg, color: fg, letterSpacing: "0.04em" }) as React.CSSProperties,
-    section: { fontSize: 9, fontWeight: 700, color: "#666", letterSpacing: "0.08em", textTransform: "uppercase" as const, padding: "8px 10px 4px", borderBottom: "1px solid #1a1a1a" } as React.CSSProperties,
-    panel: { background: "#0d0d0d", borderLeft: "1px solid #222" } as React.CSSProperties,
-    tabBtn: (active: boolean) => ({ padding: "2px 7px", borderRadius: 2, border: `1px solid ${active ? "#f97316" : "#333"}`, background: active ? "#f97316" : "transparent", color: active ? "#000" : "#888", fontFamily: "inherit", fontSize: 9, fontWeight: 700, cursor: "pointer", letterSpacing: "0.04em" }) as React.CSSProperties,
+    section: { fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", letterSpacing: "0.08em", textTransform: "uppercase" as const, padding: "8px 10px 4px", borderBottom: "1px solid #21262d" } as React.CSSProperties,
+    panel: { background: "#0d1117", borderLeft: "1px solid #30363d" } as React.CSSProperties,
+    tabBtn: (active: boolean) => ({ padding: "4px 12px", borderRadius: 4, border: `1px solid ${active ? "#3b82f6" : "#30363d"}`, background: active ? "rgba(59,130,246,0.15)" : "transparent", color: active ? "#3b82f6" : "rgba(255,255,255,0.5)", fontFamily: "inherit", fontSize: 10, fontWeight: 700, cursor: "pointer", letterSpacing: "0.04em" }) as React.CSSProperties,
   };
 
   if (loading) {
-    return (<main style={S.page}><div style={S.container}><div style={S.header}><span style={S.title}>SEAFOOD INTELLIGENCE</span></div><div style={{ padding: "40px 0", textAlign: "center", color: "#555" }}>Loading...</div></div></main>);
+    return (<main style={S.page}><div style={S.container}><div style={S.header}><span style={S.title}>SEAFOOD INTELLIGENCE</span></div><div style={{ padding: "40px 0", textAlign: "center", color: "rgba(255,255,255,0.35)" }}>Loading...</div></div></main>);
   }
 
   if (error) {
@@ -348,11 +348,11 @@ export default function SeafoodPage() {
   return (
     <>
       <style>{`
-        .sf-row:hover { background: #151515 !important; }
+        .sf-row:hover { background: rgba(59,130,246,0.08) !important; }
         @media (max-width: 1000px) { .sf-grid { grid-template-columns: 1fr !important; } .sf-right { display: none !important; } }
         @keyframes sf-fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         .sf-tab-content { animation: sf-fade-in 0.35s ease-out; }
-        .biomass-cta:hover { box-shadow: 0 0 12px rgba(249,115,22,0.15); }
+        .biomass-cta:hover { box-shadow: 0 0 12px rgba(59,130,246,0.15); }
       `}</style>
       <main style={S.page}>
         <div style={S.container}>
@@ -360,33 +360,33 @@ export default function SeafoodPage() {
           {/* ─── Header Bar ─────────────────────────────────── */}
           <div style={S.header}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <Link href="/" style={{ fontSize: 10, color: "#666", textDecoration: "none" }}>HOME</Link>
-              <span style={{ color: "#333" }}>/</span>
+              <Link href="/" style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", textDecoration: "none" }}>HOME</Link>
+              <span style={{ color: "#30363d" }}>/</span>
               <span style={S.title}>SEAFOOD INTELLIGENCE</span>
               {aboveCount > 0 && <span style={S.badge("#ef4444")}>{aboveCount} ABOVE THRESHOLD</span>}
               {redAreas > 0 && <span style={S.badge("#ef4444")}>{redAreas} RED AREAS</span>}
               {diseases.filter(d => d.isActive).length > 0 && (
-                <span style={S.badge("#f97316")}>{diseases.filter(d => d.isActive).length} DISEASE</span>
+                <span style={S.badge("#f59e0b")}>{diseases.filter(d => d.isActive).length} DISEASE</span>
               )}
-              <span style={{ ...S.badge("#1a1a1a"), color: "#888", border: "1px solid #333" }}>
+              <span style={{ ...S.badge("#21262d"), color: "rgba(255,255,255,0.5)", border: "1px solid #30363d" }}>
                 {companies.length} COMPANIES
               </span>
             </div>
             <div style={{ display: "flex", gap: 12, fontSize: 10, alignItems: "center" }}>
-              <span style={{ color: "#888" }}>SALMON</span>
-              <span style={{ color: "#f97316", fontWeight: 600 }}>
+              <span style={{ color: "rgba(255,255,255,0.5)" }}>SALMON</span>
+              <span style={{ color: "#3b82f6", fontWeight: 600 }}>
                 {paretoData?.spot ? `NOK ${paretoData.spot.spot_nok}` : fishPoolSpot?.latest?.sisalmon_avg ? `NOK ${fishPoolSpot.latest.sisalmon_avg.toFixed(1)}` : overview?.salmonPrice ? `NOK${overview.salmonPrice.price.toFixed(2)}` : "\u2014"}
               </span>
               <span style={{ color: (overview?.salmonPrice?.changePct ?? 0) >= 0 ? "#22c55e" : "#ef4444", fontWeight: 600 }}>
                 {fmtPct(overview?.salmonPrice?.changePct)}
               </span>
-              <span style={{ color: "#333" }}>|</span>
-              <span style={{ color: "#888" }}>LICE</span>
+              <span style={{ color: "#30363d" }}>|</span>
+              <span style={{ color: "rgba(255,255,255,0.5)" }}>LICE</span>
               <span style={{ color: getLiceColor(overview?.industryAvgLice ?? null), fontWeight: 600 }}>
                 {overview?.industryAvgLice?.toFixed(3) ?? "\u2014"}
               </span>
-              <span style={{ color: "#333" }}>|</span>
-              <span style={{ color: "#888" }}>TRAFFIC</span>
+              <span style={{ color: "#30363d" }}>|</span>
+              <span style={{ color: "rgba(255,255,255,0.5)" }}>TRAFFIC</span>
               <span style={{ color: "#22c55e", fontWeight: 600 }}>{overview?.trafficLights?.green || 0}</span>
               <span style={{ color: "#f59e0b", fontWeight: 600 }}>{overview?.trafficLights?.yellow || 0}</span>
               <span style={{ color: "#ef4444", fontWeight: 600 }}>{overview?.trafficLights?.red || 0}</span>
@@ -394,7 +394,7 @@ export default function SeafoodPage() {
           </div>
 
           {/* ─── Tab Bar ────────────────────────────────────── */}
-          <div style={{ display: "flex", gap: 6, padding: "6px 8px", background: "#111", borderBottom: "1px solid #222", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 6, padding: "6px 8px", background: "#161b22", borderBottom: "1px solid #30363d", alignItems: "center" }}>
             {(["overview", "map", "areas", "biomass", "harvest"] as const).map(t => (
               <button key={t} style={S.tabBtn(tab === t)} onClick={() => setTab(t)}>
                 {t.toUpperCase()}
@@ -411,7 +411,7 @@ export default function SeafoodPage() {
                 display: "flex", alignItems: "center", gap: 14,
                 width: "100%", padding: "10px 16px",
                 background: "linear-gradient(90deg, rgba(34,197,94,0.08) 0%, rgba(34,197,94,0.03) 60%, transparent 100%)",
-                borderBottom: "1px solid #222", border: "none", borderLeft: "2px solid #22c55e",
+                borderBottom: "1px solid #30363d", border: "none", borderLeft: "2px solid #22c55e",
                 cursor: "pointer", textAlign: "left",
               }}
             >
@@ -446,11 +446,11 @@ export default function SeafoodPage() {
                   <span style={{ fontSize: 11, fontWeight: 700, color: "#22c55e", letterSpacing: "0.05em" }}>HARVEST TRACKER</span>
                   <span style={{ fontSize: 8, fontWeight: 700, background: "#22c55e", color: "#000", padding: "1px 5px", borderRadius: 3 }}>NEW</span>
                 </div>
-                <span style={{ fontSize: 11, color: "#888", lineHeight: 1.4 }}>
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", lineHeight: 1.4 }}>
                   Live wellboat AIS tracking &middot; Farm-to-slaughterhouse trip detection &middot; Volume-weighted price estimates per company per quarter
                 </span>
               </div>
-              <span style={{ fontSize: 11, color: "#555", flexShrink: 0 }}>VIEW &rarr;</span>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", flexShrink: 0 }}>VIEW &rarr;</span>
             </button>
           )}
 
@@ -462,8 +462,8 @@ export default function SeafoodPage() {
               {tab === "overview" && (
                 <>
                   {/* Charts Row */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "1px solid #222" }}>
-                    <div style={{ padding: 12, borderRight: "1px solid #222" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "1px solid #30363d" }}>
+                    <div style={{ padding: 12, borderRight: "1px solid #30363d" }}>
                       <div style={S.section}>SALMON SPOT PRICE</div>
                       <SalmonPriceChart data={salmonData?.history || []} stats={salmonData?.stats} />
                     </div>
@@ -474,11 +474,11 @@ export default function SeafoodPage() {
                   </div>
 
                   {/* ─── Price Intelligence ─── */}
-                  <div style={{ borderBottom: "1px solid #222" }}>
+                  <div style={{ borderBottom: "1px solid #30363d" }}>
                     <div style={S.section}>PRICE INTELLIGENCE</div>
 
                     {/* Hero strip: 5 key prices */}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", borderBottom: "1px solid #333" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", borderBottom: "1px solid #30363d" }}>
                       {[
                         { label: "PARETO SPOT EST.", value: paretoData?.spot?.spot_nok, src: (() => { if (!paretoData?.spot?.report_date) return "Pareto W/W"; const d = new Date(paretoData.spot.report_date); const jan4 = new Date(d.getFullYear(), 0, 4); const wk = Math.ceil(((d.getTime() - jan4.getTime()) / 86400000 + jan4.getDay() + 1) / 7); return `Est. W${wk}`; })() },
                         { label: "FISH POOL AVG", value: fishPoolSpot?.latest?.sisalmon_avg, src: `SISALMON W${fishPoolSpot?.latest?.week ?? ""}` },
@@ -486,20 +486,20 @@ export default function SeafoodPage() {
                         { label: "QTD PRICE", value: paretoData?.spot?.qtd_price_nok, src: "Pareto QTD" },
                         { label: "CONSENSUS", value: paretoData?.spot?.consensus_nok != null && paretoData.spot.consensus_nok > 10 ? paretoData.spot.consensus_nok : null, src: "PAS FCA Oslo" },
                       ].map((m, i) => (
-                        <div key={m.label} style={{ padding: "12px 16px", borderRight: i < 4 ? "1px solid #222" : "none" }}>
-                          <div style={{ fontSize: 10, color: "#666", fontWeight: 700, letterSpacing: "0.08em", marginBottom: 4 }}>{m.label}</div>
-                          <div style={{ fontSize: 26, fontWeight: 700, color: m.value != null ? "#f97316" : "#333", lineHeight: 1 }}>
+                        <div key={m.label} style={{ padding: "12px 16px", borderRight: i < 4 ? "1px solid #30363d" : "none" }}>
+                          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontWeight: 700, letterSpacing: "0.08em", marginBottom: 4 }}>{m.label}</div>
+                          <div style={{ fontSize: 26, fontWeight: 700, color: m.value != null ? "#3b82f6" : "#30363d", lineHeight: 1 }}>
                             {m.value != null ? m.value.toFixed(1) : "\u2014"}
                           </div>
-                          <div style={{ fontSize: 10, color: "#555", marginTop: 4 }}>NOK/kg <span style={{ color: "#444" }}>{m.src}</span></div>
+                          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 4 }}>NOK/kg <span style={{ color: "rgba(255,255,255,0.35)" }}>{m.src}</span></div>
                         </div>
                       ))}
                     </div>
 
                     {/* 1W / 4W change strip */}
                     {fishPoolSpot?.latest && (
-                      <div style={{ display: "flex", gap: 20, padding: "6px 16px", borderBottom: "1px solid #222", fontSize: 11, alignItems: "center" }}>
-                        <span style={{ color: "#666", fontWeight: 700, letterSpacing: "0.06em", fontSize: 10 }}>SISALMON AVG</span>
+                      <div style={{ display: "flex", gap: 20, padding: "6px 16px", borderBottom: "1px solid #30363d", fontSize: 11, alignItems: "center" }}>
+                        <span style={{ color: "rgba(255,255,255,0.4)", fontWeight: 700, letterSpacing: "0.06em", fontSize: 10 }}>SISALMON AVG</span>
                         <span style={{ fontWeight: 600, color: (fishPoolSpot.latest.sisalmon_avg_1w_change ?? 0) >= 0 ? "#22c55e" : "#ef4444" }}>
                           1W {fmtPct(fishPoolSpot.latest.sisalmon_avg_1w_change)}
                         </span>
@@ -507,10 +507,10 @@ export default function SeafoodPage() {
                           4W {fmtPct(fishPoolSpot.latest.sisalmon_avg_4w_change)}
                         </span>
                         {fishPoolSpot.latest.total_volume != null && (
-                          <span style={{ color: "#555", marginLeft: "auto" }}>
-                            Fish Pool Vol: <span style={{ color: "#999" }}>{fishPoolSpot.latest.total_volume >= 1000 ? `${(fishPoolSpot.latest.total_volume / 1000).toFixed(1)}K` : fishPoolSpot.latest.total_volume.toFixed(0)} tonnes</span>
+                          <span style={{ color: "rgba(255,255,255,0.35)", marginLeft: "auto" }}>
+                            Fish Pool Vol: <span style={{ color: "rgba(255,255,255,0.5)" }}>{fishPoolSpot.latest.total_volume >= 1000 ? `${(fishPoolSpot.latest.total_volume / 1000).toFixed(1)}K` : fishPoolSpot.latest.total_volume.toFixed(0)} tonnes</span>
                             {fishPoolSpot.latest.avg_weight_kg != null && (
-                              <> | Avg: <span style={{ color: "#999" }}>{fishPoolSpot.latest.avg_weight_kg.toFixed(2)} kg</span></>
+                              <> | Avg: <span style={{ color: "rgba(255,255,255,0.5)" }}>{fishPoolSpot.latest.avg_weight_kg.toFixed(2)} kg</span></>
                             )}
                           </span>
                         )}
@@ -521,10 +521,10 @@ export default function SeafoodPage() {
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 0 }}>
 
                       {/* Col 1: Pareto Quarterly Estimates */}
-                      <div style={{ padding: "14px 16px", borderRight: "1px solid #222" }}>
+                      <div style={{ padding: "14px 16px", borderRight: "1px solid #30363d" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
-                          <span style={{ fontSize: 11, color: "#888", fontWeight: 700, letterSpacing: "0.06em" }}>PARETO ESTIMATES</span>
-                          {paretoData?.spot && <span style={{ fontSize: 10, color: "#555" }}>{paretoData.spot.report_date?.slice(0, 10)}</span>}
+                          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 700, letterSpacing: "0.06em" }}>PARETO ESTIMATES</span>
+                          {paretoData?.spot && <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{paretoData.spot.report_date?.slice(0, 10)}</span>}
                         </div>
                         {paretoData?.quarterly && paretoData.quarterly.length > 0 ? (() => {
                           const rows = paretoData.quarterly.filter(q => {
@@ -533,7 +533,7 @@ export default function SeafoodPage() {
                           });
                           return (
                             <div>
-                              <div style={{ display: "grid", gridTemplateColumns: "72px 1fr 1fr 1fr", gap: 0, padding: "5px 0", borderBottom: "1px solid #333", fontSize: 10, color: "#666", fontWeight: 700 }}>
+                              <div style={{ display: "grid", gridTemplateColumns: "72px 1fr 1fr 1fr", gap: 0, padding: "5px 0", borderBottom: "1px solid #30363d", fontSize: 10, color: "rgba(255,255,255,0.4)", fontWeight: 700 }}>
                                 <span>PERIOD</span>
                                 <span style={{ textAlign: "right" }}>NOK</span>
                                 <span style={{ textAlign: "right" }}>EUR</span>
@@ -541,13 +541,13 @@ export default function SeafoodPage() {
                               </div>
                               {rows.map(q => (
                                 <div key={q.period} style={{ display: "grid", gridTemplateColumns: "72px 1fr 1fr 1fr", gap: 0, padding: "4px 0", borderBottom: "1px solid #181818", fontSize: 12 }}>
-                                  <span style={{ color: q.is_estimate ? "#777" : "#aaa", fontWeight: 600, fontSize: 11 }}>
+                                  <span style={{ color: q.is_estimate ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: 11 }}>
                                     {q.period}{q.is_estimate ? "e" : ""}
                                   </span>
-                                  <span style={{ textAlign: "right", color: "#e5e5e5", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                                  <span style={{ textAlign: "right", color: "#fff", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
                                     {q.price_nok_kg?.toFixed(1)}
                                   </span>
-                                  <span style={{ textAlign: "right", color: "#777", fontVariantNumeric: "tabular-nums" }}>
+                                  <span style={{ textAlign: "right", color: "rgba(255,255,255,0.45)", fontVariantNumeric: "tabular-nums" }}>
                                     {q.price_eur_kg?.toFixed(1)}
                                   </span>
                                   <span style={{ textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums", color: (q.supply_growth_yoy ?? 0) >= 0 ? "#22c55e" : "#ef4444" }}>
@@ -557,11 +557,11 @@ export default function SeafoodPage() {
                               ))}
                             </div>
                           );
-                        })() : <div style={{ color: "#444", fontSize: 12, padding: "20px 0" }}>No estimate data</div>}
+                        })() : <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 12, padding: "20px 0" }}>No estimate data</div>}
                       </div>
 
                       {/* Col 2: Forward Curve */}
-                      <div style={{ padding: "14px 16px", borderRight: "1px solid #222" }}>
+                      <div style={{ padding: "14px 16px", borderRight: "1px solid #30363d" }}>
                         {(() => {
                           const EURNOK = paretoData?.spot?.spot_nok && paretoData?.spot?.spot_eur
                             ? paretoData.spot.spot_nok / paretoData.spot.spot_eur
@@ -569,8 +569,8 @@ export default function SeafoodPage() {
                           return (
                             <>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
-                                <span style={{ fontSize: 11, color: "#888", fontWeight: 700, letterSpacing: "0.06em" }}>FORWARD CURVE</span>
-                                <span style={{ fontSize: 10, color: "#555" }}>EUR/NOK {EURNOK.toFixed(2)}</span>
+                                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 700, letterSpacing: "0.06em" }}>FORWARD CURVE</span>
+                                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>EUR/NOK {EURNOK.toFixed(2)}</span>
                               </div>
                               {forwardPrices?.forwards && forwardPrices.forwards.length > 0 ? (() => {
                                 const fwds = forwardPrices.forwards.map(f => {
@@ -597,7 +597,7 @@ export default function SeafoodPage() {
                                 });
                                 return (
                                   <div>
-                                    <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 1fr 60px", gap: 0, padding: "5px 0", borderBottom: "1px solid #333", fontSize: 10, color: "#666", fontWeight: 700 }}>
+                                    <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 1fr 60px", gap: 0, padding: "5px 0", borderBottom: "1px solid #30363d", fontSize: 10, color: "rgba(255,255,255,0.4)", fontWeight: 700 }}>
                                       <span>CONTRACT</span>
                                       <span style={{ textAlign: "right" }}>EUR/T</span>
                                       <span style={{ textAlign: "right" }}>NOK/KG</span>
@@ -605,21 +605,21 @@ export default function SeafoodPage() {
                                     </div>
                                     {fwds.slice(0, 12).map((f, i) => (
                                       <div key={i} style={{ display: "grid", gridTemplateColumns: "80px 1fr 1fr 60px", gap: 0, padding: "4px 0", borderBottom: "1px solid #181818", fontSize: 12 }}>
-                                        <span style={{ color: "#999", fontWeight: 600, fontSize: 11 }}>{f.label}</span>
-                                        <span style={{ textAlign: "right", color: "#e5e5e5", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                                        <span style={{ color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: 11 }}>{f.label}</span>
+                                        <span style={{ textAlign: "right", color: "#fff", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
                                           {f.price_eur_tonne?.toLocaleString() ?? "\u2014"}
                                         </span>
-                                        <span style={{ textAlign: "right", color: "#f97316", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                                        <span style={{ textAlign: "right", color: "#3b82f6", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
                                           {f.nokKg != null ? f.nokKg.toFixed(1) : "\u2014"}
                                         </span>
-                                        <span style={{ textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums", color: f.change_pct == null ? "#444" : (f.change_pct >= 0 ? "#22c55e" : "#ef4444") }}>
+                                        <span style={{ textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums", color: f.change_pct == null ? "rgba(255,255,255,0.35)" : (f.change_pct >= 0 ? "#22c55e" : "#ef4444") }}>
                                           {f.change_pct != null ? `${f.change_pct >= 0 ? "+" : ""}${f.change_pct.toFixed(1)}%` : "\u2014"}
                                         </span>
                                       </div>
                                     ))}
                                   </div>
                                 );
-                              })() : <div style={{ color: "#444", fontSize: 12, padding: "20px 0" }}>No forward data</div>}
+                              })() : <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 12, padding: "20px 0" }}>No forward data</div>}
                             </>
                           );
                         })()}
@@ -628,12 +628,12 @@ export default function SeafoodPage() {
                       {/* Col 3: Weight Class Breakdown */}
                       <div style={{ padding: "14px 16px" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
-                          <span style={{ fontSize: 11, color: "#888", fontWeight: 700, letterSpacing: "0.06em" }}>SPOT BY WEIGHT</span>
-                          {fishPoolSpot?.latest && <span style={{ fontSize: 10, color: "#555" }}>Week {fishPoolSpot.latest.week}</span>}
+                          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 700, letterSpacing: "0.06em" }}>SPOT BY WEIGHT</span>
+                          {fishPoolSpot?.latest && <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>Week {fishPoolSpot.latest.week}</span>}
                         </div>
                         {fishPoolSpot?.latest ? (
                           <div>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, padding: "5px 0", borderBottom: "1px solid #333", fontSize: 10, color: "#666", fontWeight: 700 }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, padding: "5px 0", borderBottom: "1px solid #30363d", fontSize: 10, color: "rgba(255,255,255,0.4)", fontWeight: 700 }}>
                               <span>CLASS</span>
                               <span style={{ textAlign: "right" }}>NOK/KG</span>
                             </div>
@@ -652,35 +652,35 @@ export default function SeafoodPage() {
                               const isPremium = v != null && avg > 0 && v > avg;
                               return (
                                 <div key={label as string} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, padding: "4px 0", borderBottom: "1px solid #181818", fontSize: 12 }}>
-                                  <span style={{ color: "#888" }}>{label}</span>
-                                  <span style={{ textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums", color: isPremium ? "#22c55e" : "#e5e5e5" }}>
+                                  <span style={{ color: "rgba(255,255,255,0.5)" }}>{label}</span>
+                                  <span style={{ textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums", color: isPremium ? "#22c55e" : "#fff" }}>
                                     {v?.toFixed(1) ?? "\u2014"}
                                   </span>
                                 </div>
                               );
                             })}
-                            <div style={{ marginTop: 8, padding: "6px 0", borderTop: "1px solid #333", display: "grid", gridTemplateColumns: "1fr 1fr", fontSize: 12, fontWeight: 700 }}>
-                              <span style={{ color: "#999" }}>AVG</span>
-                              <span style={{ textAlign: "right", color: "#f97316", fontVariantNumeric: "tabular-nums" }}>
+                            <div style={{ marginTop: 8, padding: "6px 0", borderTop: "1px solid #30363d", display: "grid", gridTemplateColumns: "1fr 1fr", fontSize: 12, fontWeight: 700 }}>
+                              <span style={{ color: "rgba(255,255,255,0.5)" }}>AVG</span>
+                              <span style={{ textAlign: "right", color: "#3b82f6", fontVariantNumeric: "tabular-nums" }}>
                                 {fishPoolSpot.latest.sisalmon_avg?.toFixed(1) ?? "\u2014"}
                               </span>
                             </div>
                           </div>
-                        ) : <div style={{ color: "#444", fontSize: 12, padding: "20px 0" }}>No spot data</div>}
+                        ) : <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 12, padding: "20px 0" }}>No spot data</div>}
                       </div>
 
                     </div>
                   </div>
 
                   {/* Biomass & Export Teaser */}
-                  <div style={{ borderBottom: "1px solid #222" }}>
+                  <div style={{ borderBottom: "1px solid #30363d" }}>
                     <div style={S.section}>BIOMASS & EXPORT INTELLIGENCE</div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
                       {/* Left: Export price mini chart */}
-                      <div style={{ padding: "12px 14px", borderRight: "1px solid #222" }}>
+                      <div style={{ padding: "12px 14px", borderRight: "1px solid #30363d" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-                          <span style={{ fontSize: 10, color: "#666", fontWeight: 700, letterSpacing: "0.06em" }}>SALMON EXPORT PRICE</span>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: "#f97316" }}>
+                          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontWeight: 700, letterSpacing: "0.06em" }}>SALMON EXPORT PRICE</span>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: "#3b82f6" }}>
                             NOK {exportData?.stats?.currentPrice?.toFixed(2) ?? "\u2014"}/kg
                           </span>
                         </div>
@@ -703,14 +703,14 @@ export default function SeafoodPage() {
                                   const x = (i / (pts.length - 1)) * 100;
                                   const y = 28 - ((p.price_nok_kg! - minP) / (maxP - minP || 1)) * 24;
                                   return `${i === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
-                                }).join(" ")} fill="none" stroke="#f97316" strokeWidth={0.4} vectorEffect="non-scaling-stroke" />
+                                }).join(" ")} fill="none" stroke="#3b82f6" strokeWidth={0.4} vectorEffect="non-scaling-stroke" />
                               </svg>
-                              <div style={{ position: "absolute", top: 2, left: 2, fontSize: 9, color: "#555", pointerEvents: "none" }}>{maxP.toFixed(0)}</div>
-                              <div style={{ position: "absolute", bottom: 2, left: 2, fontSize: 9, color: "#555", pointerEvents: "none" }}>{minP.toFixed(0)}</div>
+                              <div style={{ position: "absolute", top: 2, left: 2, fontSize: 9, color: "rgba(255,255,255,0.35)", pointerEvents: "none" }}>{maxP.toFixed(0)}</div>
+                              <div style={{ position: "absolute", bottom: 2, left: 2, fontSize: 9, color: "rgba(255,255,255,0.35)", pointerEvents: "none" }}>{minP.toFixed(0)}</div>
                             </div>
                           );
-                        })() : <div style={{ height: 80, display: "flex", alignItems: "center", justifyContent: "center", color: "#444", fontSize: 10 }}>Loading...</div>}
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#555", marginTop: 4 }}>
+                        })() : <div style={{ height: 80, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.35)", fontSize: 10 }}>Loading...</div>}
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "rgba(255,255,255,0.35)", marginTop: 4 }}>
                           <span>52W TREND</span>
                           <div style={{ display: "flex", gap: 10 }}>
                             <span>H <span style={{ color: "#22c55e" }}>{exportData?.stats?.high52w?.toFixed(0)}</span></span>
@@ -721,41 +721,41 @@ export default function SeafoodPage() {
                       {/* Right: Biomass summary + CTA */}
                       <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                         <div>
-                          <div style={{ fontSize: 10, color: "#666", fontWeight: 700, letterSpacing: "0.06em", marginBottom: 8 }}>NATIONAL BIOMASS</div>
+                          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontWeight: 700, letterSpacing: "0.06em", marginBottom: 8 }}>NATIONAL BIOMASS</div>
                           {biomassData?.nationalTrend && biomassData.nationalTrend.length > 0 ? (() => {
                             const latest = biomassData.nationalTrend[biomassData.nationalTrend.length - 1];
                             const prev = biomassData.nationalTrend.length > 1 ? biomassData.nationalTrend[biomassData.nationalTrend.length - 2] : null;
                             const bioChg = prev && Number(prev.total_biomass) > 0 ? ((Number(latest.total_biomass) - Number(prev.total_biomass)) / Number(prev.total_biomass) * 100) : null;
                             return (
                               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                                <div style={{ background: "#111", border: "1px solid #222", borderRadius: 3, padding: "8px 10px" }}>
-                                  <div style={{ fontSize: 8, color: "#666", fontWeight: 700 }}>STANDING</div>
-                                  <div style={{ fontSize: 18, fontWeight: 700, color: "#f97316", marginTop: 2 }}>{(Number(latest.total_biomass || 0) / 1000).toFixed(0)}K t</div>
+                                <div style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 3, padding: "8px 10px" }}>
+                                  <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontWeight: 700 }}>STANDING</div>
+                                  <div style={{ fontSize: 18, fontWeight: 700, color: "#3b82f6", marginTop: 2 }}>{(Number(latest.total_biomass || 0) / 1000).toFixed(0)}K t</div>
                                   {bioChg != null && <div style={{ fontSize: 10, color: bioChg >= 0 ? "#22c55e" : "#ef4444", marginTop: 2 }}>{bioChg >= 0 ? "+" : ""}{bioChg.toFixed(1)}% MoM</div>}
                                 </div>
-                                <div style={{ background: "#111", border: "1px solid #222", borderRadius: 3, padding: "8px 10px" }}>
-                                  <div style={{ fontSize: 8, color: "#666", fontWeight: 700 }}>HARVEST</div>
+                                <div style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 3, padding: "8px 10px" }}>
+                                  <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontWeight: 700 }}>HARVEST</div>
                                   <div style={{ fontSize: 18, fontWeight: 700, color: "#3b82f6", marginTop: 2 }}>{(Number(latest.total_harvest || 0) / 1000).toFixed(0)}K t</div>
-                                  <div style={{ fontSize: 10, color: "#666", marginTop: 2 }}>{(Number(latest.total_stock || 0) / 1e6).toFixed(0)}M fish</div>
+                                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>{(Number(latest.total_stock || 0) / 1e6).toFixed(0)}M fish</div>
                                 </div>
                               </div>
                             );
-                          })() : <div style={{ color: "#444", fontSize: 10 }}>No biomass data</div>}
+                          })() : <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 10 }}>No biomass data</div>}
                         </div>
                         <button
                           onClick={() => setTab("biomass")}
                           className="biomass-cta"
                           style={{
                             marginTop: 10, width: "100%", padding: "9px 0",
-                            background: "#0d0d0d", border: "1px solid #333", borderRadius: 3,
-                            color: "#ccc", fontWeight: 600, fontSize: 11,
+                            background: "#0d1117", border: "1px solid #30363d", borderRadius: 3,
+                            color: "rgba(255,255,255,0.7)", fontWeight: 600, fontSize: 11,
                             cursor: "pointer", letterSpacing: "0.1em",
                             transition: "all 0.25s ease",
                             textTransform: "uppercase",
                             display: "flex", alignItems: "center", justifyContent: "center", gap: 8
                           }}
-                          onMouseEnter={e => { e.currentTarget.style.borderColor = "#f97316"; e.currentTarget.style.color = "#f97316"; }}
-                          onMouseLeave={e => { e.currentTarget.style.borderColor = "#333"; e.currentTarget.style.color = "#ccc"; }}
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = "#3b82f6"; e.currentTarget.style.color = "#3b82f6"; }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = "#30363d"; e.currentTarget.style.color = "rgba(255,255,255,0.7)"; }}
                         >
                           <span style={{ fontSize: 14 }}>&#9656;</span> BIOMASS TERMINAL
                         </button>
@@ -766,7 +766,7 @@ export default function SeafoodPage() {
                   {/* Company Table */}
                   <div>
                     <div style={S.section}>COMPANY EXPOSURE MATRIX</div>
-                    <div style={{ display: "grid", gridTemplateColumns: "3px 1fr 64px 52px 52px 52px 56px 50px 56px 44px", padding: "4px 8px", fontSize: 9, fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.06em", background: "#111", borderBottom: "1px solid #222" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "3px 1fr 64px 52px 52px 52px 56px 50px 56px 44px", padding: "4px 8px", fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.06em", background: "#161b22", borderBottom: "1px solid #30363d" }}>
                       <div />
                       <div>COMPANY</div>
                       <div style={{ textAlign: "right" }}>PRICE</div>
@@ -781,21 +781,21 @@ export default function SeafoodPage() {
                     {sortedCompanies.map(co => {
                       const isActive = selectedTicker === co.ticker;
                       return (
-                      <div key={co.ticker} className="sf-row" onClick={() => setSelectedTicker(isActive ? null : co.ticker)} style={{ display: "grid", gridTemplateColumns: "3px 1fr 64px 52px 52px 52px 56px 50px 56px 44px", padding: "5px 8px", borderBottom: "1px solid #1a1a1a", alignItems: "center", cursor: "pointer", transition: "background 0.08s", background: isActive ? "#1a1a2a" : undefined, outline: isActive ? "1px solid #333" : undefined }}>
+                      <div key={co.ticker} className="sf-row" onClick={() => setSelectedTicker(isActive ? null : co.ticker)} style={{ display: "grid", gridTemplateColumns: "3px 1fr 64px 52px 52px 52px 56px 50px 56px 44px", padding: "5px 8px", borderBottom: "1px solid #21262d", alignItems: "center", cursor: "pointer", transition: "background 0.08s", background: isActive ? "rgba(59,130,246,0.08)" : undefined, outline: isActive ? "1px solid #30363d" : undefined }}>
                         <div style={{ width: 3, minHeight: 16, background: getRiskColor(co.riskScore), borderRadius: 1 }} />
                         <div>
                           <Link href={`/stocks/${co.ticker}`} style={{ color: "#58a6ff", textDecoration: "none", fontWeight: 600 }}>{co.ticker}</Link>
-                          <span style={{ color: "#666", marginLeft: 6, fontSize: 10 }}>{co.name?.replace(/\s*ASA\s*$/i, "")}</span>
+                          <span style={{ color: "rgba(255,255,255,0.4)", marginLeft: 6, fontSize: 10 }}>{co.name?.replace(/\s*ASA\s*$/i, "")}</span>
                         </div>
                         <div style={{ textAlign: "right", fontWeight: 600 }}>{fmtPrice(co.price)}</div>
                         <div style={{ textAlign: "right", color: (co.change1d ?? 0) >= 0 ? "#22c55e" : "#ef4444" }}>{fmtPct(co.change1d)}</div>
                         <div style={{ textAlign: "right", color: (co.change1w ?? 0) >= 0 ? "#22c55e" : "#ef4444" }}>{fmtPct(co.change1w)}</div>
                         <div style={{ textAlign: "right", color: (co.change1m ?? 0) >= 0 ? "#22c55e" : "#ef4444" }}>{fmtPct(co.change1m)}</div>
                         <div style={{ textAlign: "right", color: getLiceColor(co.avgLice4w), fontWeight: 600 }}>{co.avgLice4w?.toFixed(3) ?? "\u2014"}</div>
-                        <div style={{ textAlign: "right", color: (co.pctAboveThreshold ?? 0) > 10 ? "#ef4444" : "#888" }}>{co.pctAboveThreshold != null ? `${co.pctAboveThreshold.toFixed(0)}%` : "\u2014"}</div>
+                        <div style={{ textAlign: "right", color: (co.pctAboveThreshold ?? 0) > 10 ? "#ef4444" : "rgba(255,255,255,0.5)" }}>{co.pctAboveThreshold != null ? `${co.pctAboveThreshold.toFixed(0)}%` : "\u2014"}</div>
                         <div style={{ display: "flex", gap: 2, justifyContent: "center" }}>
                           {co.productionAreas.map(a => (
-                            <div key={a} title={`Area ${a}`} style={{ width: 7, height: 7, borderRadius: "50%", background: TL_C[trafficLights[a]] || "#333" }} />
+                            <div key={a} title={`Area ${a}`} style={{ width: 7, height: 7, borderRadius: "50%", background: TL_C[trafficLights[a]] || "#30363d" }} />
                           ))}
                         </div>
                         <div style={{ textAlign: "right", color: getRiskColor(co.riskScore), fontWeight: 700, fontSize: 13 }}>{co.riskScore?.toFixed(0) ?? "\u2014"}</div>
@@ -867,7 +867,7 @@ export default function SeafoodPage() {
                     return (
                     <div style={{ marginTop: 2 }}>
                       <div style={S.section}>QUARTERLY OPERATIONS</div>
-                      <div style={{ fontSize: 9, color: "#555", padding: "2px 10px 6px", letterSpacing: "0.04em" }}>
+                      <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", padding: "2px 10px 6px", letterSpacing: "0.04em" }}>
                         All values converted to NOK/kg. Source: company quarterly reports.
                       </div>
 
@@ -877,34 +877,34 @@ export default function SeafoodPage() {
                         return (
                         <div style={{ fontSize: 11 }}>
                             {/* Header */}
-                            <div style={{ display: "grid", gridTemplateColumns: cols, borderBottom: "1px solid #333", padding: "0 6px" }}>
+                            <div style={{ display: "grid", gridTemplateColumns: cols, borderBottom: "1px solid #30363d", padding: "0 6px" }}>
                               <div />
                               {latest5.map(q => (
-                                <div key={q} style={{ textAlign: "center", fontSize: 10, fontWeight: 700, color: "#888", letterSpacing: "0.05em", padding: "6px 0" }}>{q}</div>
+                                <div key={q} style={{ textAlign: "center", fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.5)", letterSpacing: "0.05em", padding: "6px 0" }}>{q}</div>
                               ))}
                             </div>
                             {/* Rows */}
                             {sortedTickers.map(tk => (
-                              <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: cols, borderBottom: "1px solid #1a1a1a", padding: "7px 6px", alignItems: "center", transition: "background 0.08s" }}>
+                              <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: cols, borderBottom: "1px solid #21262d", padding: "7px 6px", alignItems: "center", transition: "background 0.08s" }}>
                                 <div style={{ padding: "0 4px" }}>
                                   <Link href={`/stocks/${tk}`} style={{ color: TK_COLORS[tk] || "#58a6ff", textDecoration: "none", fontWeight: 700, fontSize: 11 }}>{tk}</Link>
                                 </div>
                                 {latest5.map(q => {
                                   const v = allData[tk][q];
-                                  const mCol = v.margin == null ? "#333" : v.margin >= 25 ? "#22c55e" : v.margin >= 15 ? "#4ade80" : v.margin > 0 ? "#a3a3a3" : "#ef4444";
+                                  const mCol = v.margin == null ? "#30363d" : v.margin >= 25 ? "#22c55e" : v.margin >= 15 ? "#4ade80" : v.margin > 0 ? "#a3a3a3" : "#ef4444";
                                   return (
                                     <div key={q} style={{ textAlign: "center", padding: "0 4px" }}>
                                       {v.cost != null && v.price != null ? (
                                         <>
                                           <div style={{ display: "flex", justifyContent: "center", gap: 6, fontSize: 11 }}>
                                             <span style={{ color: "#f59e0b" }}>{v.cost.toFixed(1)}</span>
-                                            <span style={{ color: "#333" }}>/</span>
+                                            <span style={{ color: "#30363d" }}>/</span>
                                             <span style={{ color: "#3b82f6", fontWeight: 600 }}>{v.price.toFixed(1)}</span>
                                           </div>
                                           <div style={{ fontSize: 11, fontWeight: 700, color: mCol, marginTop: 2 }}>{v.margin != null ? `${v.margin.toFixed(0)}%` : ""}</div>
                                         </>
                                       ) : (
-                                        <span style={{ color: "#333" }}>{"\u2014"}</span>
+                                        <span style={{ color: "#30363d" }}>{"\u2014"}</span>
                                       )}
                                     </div>
                                   );
@@ -915,14 +915,14 @@ export default function SeafoodPage() {
                         );
                       })()}
                       {/* Legend */}
-                      <div style={{ display: "flex", gap: 12, justifyContent: "center", padding: "4px 0 2px", fontSize: 9, color: "#555" }}>
+                      <div style={{ display: "flex", gap: 12, justifyContent: "center", padding: "4px 0 2px", fontSize: 9, color: "rgba(255,255,255,0.35)" }}>
                         <span><span style={{ color: "#f59e0b" }}>Cost</span> / <span style={{ color: "#3b82f6" }}>Price</span> NOK/kg</span>
                         <span style={{ color: "#22c55e" }}>Margin %</span>
                       </div>
 
                       {/* Margin trend sparklines per company */}
-                      <div style={{ borderTop: "1px solid #222", padding: "8px 8px 4px" }}>
-                        <div style={{ fontSize: 9, fontWeight: 700, color: "#555", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>MARGIN TREND</div>
+                      <div style={{ borderTop: "1px solid #30363d", padding: "8px 8px 4px" }}>
+                        <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>MARGIN TREND</div>
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
                           {displayTickers.map(tk => {
                             const pts = allQs.map(q => ({ q, ...allData[tk][q] })).filter(p => p.margin != null);
@@ -961,9 +961,9 @@ export default function SeafoodPage() {
                             const hIdx = marginHover?.tk === tk ? marginHover.idx : -1;
                             const hPt = hIdx >= 0 ? pts[hIdx] : null;
                             return (
-                              <div key={tk} style={{ background: "#0e0e0e", borderRadius: 8, padding: "8px 10px", border: "1px solid #1c1c1c" }}>
+                              <div key={tk} style={{ background: "#0d1117", borderRadius: 8, padding: "8px 10px", border: "1px solid #1c1c1c" }}>
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                                  <span style={{ fontSize: 11, fontWeight: 700, color: TK_COLORS[tk] || "#888" }}>{tk}</span>
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: TK_COLORS[tk] || "rgba(255,255,255,0.5)" }}>{tk}</span>
                                   <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
                                     <span style={{ fontSize: 13, fontWeight: 700, color: latestMargin >= 20 ? "#22c55e" : latestMargin > 0 ? "#4ade80" : "#ef4444" }}>{latestMargin.toFixed(0)}%</span>
                                     <span style={{ fontSize: 9, color: mDelta >= 0 ? "#22c55e" : "#ef4444" }}>{mDelta >= 0 ? "\u25B2" : "\u25BC"}{Math.abs(mDelta).toFixed(0)}pp</span>
@@ -983,7 +983,7 @@ export default function SeafoodPage() {
                                   <svg width="100%" viewBox={`0 0 ${chartW} ${chartH}`} preserveAspectRatio="none" style={{ display: "block" }}>
                                     {/* Grid lines */}
                                     {[0.25, 0.5, 0.75].map(f => (
-                                      <line key={f} x1={pad} y1={pad + (chartH - pad * 2) * f} x2={chartW - pad} y2={pad + (chartH - pad * 2) * f} stroke="#1a1a1a" strokeWidth="0.5" />
+                                      <line key={f} x1={pad} y1={pad + (chartH - pad * 2) * f} x2={chartW - pad} y2={pad + (chartH - pad * 2) * f} stroke="#21262d" strokeWidth="0.5" />
                                     ))}
                                     {/* Margin fill */}
                                     <polygon points={marginFill} fill="#22c55e" opacity="0.06" />
@@ -1000,9 +1000,9 @@ export default function SeafoodPage() {
                                     {/* Hover crosshair */}
                                     {hIdx >= 0 && (
                                       <>
-                                        <line x1={xOf(hIdx)} y1={pad} x2={xOf(hIdx)} y2={chartH - pad} stroke="#444" strokeWidth="0.5" />
-                                        <circle cx={xOf(hIdx)} cy={costPts[hIdx].y} r="3" fill="#f59e0b" stroke="#0e0e0e" strokeWidth="1" />
-                                        <circle cx={xOf(hIdx)} cy={pricePts[hIdx].y} r="3" fill="#3b82f6" stroke="#0e0e0e" strokeWidth="1" />
+                                        <line x1={xOf(hIdx)} y1={pad} x2={xOf(hIdx)} y2={chartH - pad} stroke="#30363d" strokeWidth="0.5" />
+                                        <circle cx={xOf(hIdx)} cy={costPts[hIdx].y} r="3" fill="#f59e0b" stroke="#0d1117" strokeWidth="1" />
+                                        <circle cx={xOf(hIdx)} cy={pricePts[hIdx].y} r="3" fill="#3b82f6" stroke="#0d1117" strokeWidth="1" />
                                       </>
                                     )}
                                   </svg>
@@ -1013,27 +1013,27 @@ export default function SeafoodPage() {
                                       left: `${Math.min(Math.max((hIdx / (pts.length - 1)) * 100, 10), 70)}%`,
                                       transform: "translateX(-50%)",
                                       background: "#161616", border: "1px solid #2a2a2a", borderRadius: 6, padding: "5px 10px",
-                                      fontSize: 9, color: "#ccc", pointerEvents: "none", zIndex: 10, whiteSpace: "nowrap",
+                                      fontSize: 9, color: "rgba(255,255,255,0.7)", pointerEvents: "none", zIndex: 10, whiteSpace: "nowrap",
                                       boxShadow: "0 2px 8px rgba(0,0,0,0.4)"
                                     }}>
-                                      <div style={{ fontWeight: 700, color: "#999", marginBottom: 3, fontSize: 8, letterSpacing: "0.04em" }}>{hPt.q}</div>
+                                      <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 3, fontSize: 8, letterSpacing: "0.04em" }}>{hPt.q}</div>
                                       <div style={{ display: "flex", gap: 10 }}>
-                                        <span style={{ color: "#f59e0b" }}><span style={{ color: "#666" }}>C</span> {hPt.cost!.toFixed(1)}</span>
-                                        <span style={{ color: "#3b82f6" }}><span style={{ color: "#666" }}>P</span> {hPt.price!.toFixed(1)}</span>
+                                        <span style={{ color: "#f59e0b" }}><span style={{ color: "rgba(255,255,255,0.4)" }}>C</span> {hPt.cost!.toFixed(1)}</span>
+                                        <span style={{ color: "#3b82f6" }}><span style={{ color: "rgba(255,255,255,0.4)" }}>P</span> {hPt.price!.toFixed(1)}</span>
                                         <span style={{ color: hPt.margin! >= 20 ? "#22c55e" : hPt.margin! > 0 ? "#4ade80" : "#ef4444", fontWeight: 700 }}>{hPt.margin!.toFixed(0)}%</span>
                                       </div>
                                     </div>
                                   )}
                                 </div>
                                 {/* X-axis labels — show full label on first and year transitions */}
-                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#333", marginTop: 3 }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#30363d", marginTop: 3 }}>
                                   {pts.map((p, i) => {
                                     const qNum = p.q.substring(0, 2); // "Q1"
                                     const yr = p.q.split(" ")[1]?.slice(-2); // "24"
                                     const prevYr = i > 0 ? pts[i - 1].q.split(" ")[1]?.slice(-2) : "";
                                     const showYr = i === 0 || yr !== prevYr;
                                     return (
-                                      <span key={i} style={{ color: hIdx === i ? "#999" : "#444", fontWeight: hIdx === i ? 600 : 400, transition: "color 0.15s" }}>
+                                      <span key={i} style={{ color: hIdx === i ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.35)", fontWeight: hIdx === i ? 600 : 400, transition: "color 0.15s" }}>
                                         {showYr ? `${qNum}\u2019${yr}` : qNum}
                                       </span>
                                     );
@@ -1043,7 +1043,7 @@ export default function SeafoodPage() {
                             );
                           })}
                         </div>
-                        <div style={{ display: "flex", gap: 12, justifyContent: "center", padding: "6px 0 0", fontSize: 8, color: "#444" }}>
+                        <div style={{ display: "flex", gap: 12, justifyContent: "center", padding: "6px 0 0", fontSize: 8, color: "rgba(255,255,255,0.35)" }}>
                           <span><span style={{ display: "inline-block", width: 12, height: 2, background: "#f59e0b", verticalAlign: "middle", marginRight: 3 }} />Cost/kg</span>
                           <span><span style={{ display: "inline-block", width: 12, height: 2, background: "#3b82f6", verticalAlign: "middle", marginRight: 3 }} />Price/kg</span>
                           <span><span style={{ display: "inline-block", width: 8, height: 8, background: "#22c55e", opacity: 0.15, verticalAlign: "middle", marginRight: 3, borderRadius: 1 }} />Margin</span>
@@ -1054,7 +1054,7 @@ export default function SeafoodPage() {
                       <div style={{ marginTop: 2 }}>
                         <div
                           onClick={() => setQopsDetailOpen(!qopsDetailOpen)}
-                          style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", cursor: "pointer", color: "#888", fontSize: 10, fontWeight: 600, letterSpacing: "0.04em", borderTop: "1px solid #222", userSelect: "none" }}
+                          style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", cursor: "pointer", color: "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: 600, letterSpacing: "0.04em", borderTop: "1px solid #30363d", userSelect: "none" }}
                         >
                           <span style={{ fontSize: 8, transition: "transform 0.2s", transform: qopsDetailOpen ? "rotate(90deg)" : "rotate(0deg)" }}>{"\u25B6"}</span>
                           EBIT/KG &amp; HARVEST VOLUME
@@ -1064,40 +1064,40 @@ export default function SeafoodPage() {
                           return (
                           <div>
                             {/* EBIT/kg */}
-                            <div style={{ fontSize: 9, fontWeight: 700, color: "#555", letterSpacing: "0.06em", textTransform: "uppercase", padding: "6px 8px 4px" }}>EBIT PER KG</div>
+                            <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.06em", textTransform: "uppercase", padding: "6px 8px 4px" }}>EBIT PER KG</div>
                             <div style={{ padding: "0 6px" }}>
-                                <div style={{ display: "grid", gridTemplateColumns: detCols, borderBottom: "1px solid #222", paddingBottom: 2 }}>
+                                <div style={{ display: "grid", gridTemplateColumns: detCols, borderBottom: "1px solid #30363d", paddingBottom: 2 }}>
                                   <div />
-                                  {latest5.map(q => <div key={q} style={{ textAlign: "center", fontSize: 9, color: "#555", fontWeight: 600 }}>{q}</div>)}
+                                  {latest5.map(q => <div key={q} style={{ textAlign: "center", fontSize: 9, color: "rgba(255,255,255,0.35)", fontWeight: 600 }}>{q}</div>)}
                                 </div>
                                 {sortedTickers.map(tk => (
-                                  <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: detCols, borderBottom: "1px solid #1a1a1a", padding: "5px 0", alignItems: "center", transition: "background 0.08s" }}>
+                                  <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: detCols, borderBottom: "1px solid #21262d", padding: "5px 0", alignItems: "center", transition: "background 0.08s" }}>
                                     <div style={{ padding: "0 4px" }}>
                                       <Link href={`/stocks/${tk}`} style={{ color: TK_COLORS[tk] || "#58a6ff", textDecoration: "none", fontWeight: 700, fontSize: 10 }}>{tk}</Link>
                                     </div>
                                     {latest5.map(q => {
                                       const v = allData[tk][q].ebit;
-                                      const col = v == null ? "#333" : v > 20 ? "#22c55e" : v > 10 ? "#4ade80" : v > 0 ? "#a3a3a3" : "#ef4444";
+                                      const col = v == null ? "#30363d" : v > 20 ? "#22c55e" : v > 10 ? "#4ade80" : v > 0 ? "#a3a3a3" : "#ef4444";
                                       return <div key={q} style={{ textAlign: "center", color: col, fontWeight: 600, fontSize: 10 }}>{v != null ? v.toFixed(1) : "\u2014"}</div>;
                                     })}
                                   </div>
                                 ))}
                             </div>
                             {/* Harvest GWT */}
-                            <div style={{ fontSize: 9, fontWeight: 700, color: "#555", letterSpacing: "0.06em", textTransform: "uppercase", padding: "10px 8px 4px" }}>HARVEST VOLUME (GWT)</div>
+                            <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.06em", textTransform: "uppercase", padding: "10px 8px 4px" }}>HARVEST VOLUME (GWT)</div>
                             <div style={{ padding: "0 6px" }}>
-                                <div style={{ display: "grid", gridTemplateColumns: detCols, borderBottom: "1px solid #222", paddingBottom: 2 }}>
+                                <div style={{ display: "grid", gridTemplateColumns: detCols, borderBottom: "1px solid #30363d", paddingBottom: 2 }}>
                                   <div />
-                                  {latest5.map(q => <div key={q} style={{ textAlign: "center", fontSize: 9, color: "#555", fontWeight: 600 }}>{q}</div>)}
+                                  {latest5.map(q => <div key={q} style={{ textAlign: "center", fontSize: 9, color: "rgba(255,255,255,0.35)", fontWeight: 600 }}>{q}</div>)}
                                 </div>
                                 {sortedTickers.map(tk => (
-                                  <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: detCols, borderBottom: "1px solid #1a1a1a", padding: "5px 0", alignItems: "center", transition: "background 0.08s" }}>
+                                  <div key={tk} className="sf-row" style={{ display: "grid", gridTemplateColumns: detCols, borderBottom: "1px solid #21262d", padding: "5px 0", alignItems: "center", transition: "background 0.08s" }}>
                                     <div style={{ padding: "0 4px" }}>
                                       <Link href={`/stocks/${tk}`} style={{ color: TK_COLORS[tk] || "#58a6ff", textDecoration: "none", fontWeight: 700, fontSize: 10 }}>{tk}</Link>
                                     </div>
                                     {latest5.map(q => {
                                       const v = allData[tk][q].harvest;
-                                      return <div key={q} style={{ textAlign: "center", color: v != null ? "#ccc" : "#333", fontSize: 10 }}>{v != null ? (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v))) : "\u2014"}</div>;
+                                      return <div key={q} style={{ textAlign: "center", color: v != null ? "rgba(255,255,255,0.7)" : "#30363d", fontSize: 10 }}>{v != null ? (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v))) : "\u2014"}</div>;
                                     })}
                                   </div>
                                 ))}
@@ -1111,7 +1111,7 @@ export default function SeafoodPage() {
                   })()}
 
                   {/* Map */}
-                  <div id="seafood-map" style={{ borderBottom: "1px solid #222" }}>
+                  <div id="seafood-map" style={{ borderBottom: "1px solid #30363d" }}>
                     <div style={S.section}>COASTAL MAP</div>
                     <div style={{ height: 460 }}>
                       <ProductionAreaMap areas={areas} localities={localities} selectedTicker={selectedTicker} onTickerSelect={setSelectedTicker} focusLocation={focusLocation} />
@@ -1141,7 +1141,7 @@ export default function SeafoodPage() {
                     const maxSites = Math.max(...TCO.map(tk => coByTL[tk].total), 1);
                     const totalSites = TCO.reduce((s, tk) => s + coByTL[tk].total, 0);
                     return (
-                      <div style={{ borderBottom: "1px solid #222", padding: "10px 10px 12px" }}>
+                      <div style={{ borderBottom: "1px solid #30363d", padding: "10px 10px 12px" }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                           <div style={S.section}>COMPANY FOOTPRINT</div>
                           <button
@@ -1161,7 +1161,7 @@ export default function SeafoodPage() {
                             return (
                               <div key={tk} style={{ display: "grid", gridTemplateColumns: "52px 1fr 70px", alignItems: "center", gap: 8, animation: `teaserSlide 0.5s ease-out ${idx * 0.07}s both` }}>
                                 <Link href={`/stocks/${tk}`} style={{ color: TCO_COLORS[tk], textDecoration: "none", fontWeight: 700, fontSize: 12 }}>{tk}</Link>
-                                <div style={{ position: "relative", height: 20, background: "#111", borderRadius: 4, overflow: "hidden" }}>
+                                <div style={{ position: "relative", height: 20, background: "#161b22", borderRadius: 4, overflow: "hidden" }}>
                                   <div style={{ display: "flex", height: "100%", width: `${barPct}%`, borderRadius: 4, overflow: "hidden" }}>
                                     {d.green > 0 && <div style={{ width: `${(d.green / d.total) * 100}%`, background: "#22c55e", height: "100%" }} title={`${d.green} sites in green zones`} />}
                                     {d.yellow > 0 && <div style={{ width: `${(d.yellow / d.total) * 100}%`, background: "#f59e0b", height: "100%" }} title={`${d.yellow} sites in yellow zones`} />}
@@ -1169,17 +1169,17 @@ export default function SeafoodPage() {
                                   </div>
                                   <span style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", fontSize: 10, fontWeight: 700, color: "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>{d.total} sites</span>
                                 </div>
-                                <span style={{ fontSize: 10, color: "#666", textAlign: "right" }}>{d.areaCnt}/{areas.length} areas</span>
+                                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", textAlign: "right" }}>{d.areaCnt}/{areas.length} areas</span>
                               </div>
                             );
                           })}
                         </div>
                         {/* Legend */}
-                        <div style={{ display: "flex", gap: 14, justifyContent: "center", marginTop: 8, fontSize: 9, color: "#555" }}>
+                        <div style={{ display: "flex", gap: 14, justifyContent: "center", marginTop: 8, fontSize: 9, color: "rgba(255,255,255,0.35)" }}>
                           <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "#22c55e", verticalAlign: "middle", marginRight: 3 }} />Green</span>
                           <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "#f59e0b", verticalAlign: "middle", marginRight: 3 }} />Yellow</span>
                           <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "#ef4444", verticalAlign: "middle", marginRight: 3 }} />Red</span>
-                          <span style={{ color: "#444" }}>|</span>
+                          <span style={{ color: "rgba(255,255,255,0.35)" }}>|</span>
                           <span>{totalSites} sites across {areas.length} areas</span>
                         </div>
                         <style>{`
@@ -1196,10 +1196,10 @@ export default function SeafoodPage() {
                   <div>
                     <div style={S.section}>DISEASE OUTBREAKS (PD / ILA)</div>
                     {diseases.length === 0 ? (
-                      <div style={{ padding: "16px 10px", color: "#555", fontSize: 11 }}>No active disease outbreaks detected in current reporting period.</div>
+                      <div style={{ padding: "16px 10px", color: "rgba(255,255,255,0.35)", fontSize: 11 }}>No active disease outbreaks detected in current reporting period.</div>
                     ) : (
                       <>
-                        <div style={{ display: "grid", gridTemplateColumns: "3px 1fr 50px 60px 140px 80px 52px", padding: "4px 8px", fontSize: 9, fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.06em", background: "#111", borderBottom: "1px solid #222" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "3px 1fr 50px 60px 140px 80px 52px", padding: "4px 8px", fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.06em", background: "#161b22", borderBottom: "1px solid #30363d" }}>
                           <div />
                           <div>LOCALITY</div>
                           <div>TYPE</div>
@@ -1219,17 +1219,17 @@ export default function SeafoodPage() {
                                 if (mapEl) mapEl.scrollIntoView({ behavior: "smooth", block: "center" });
                               }
                             }}
-                            style={{ display: "grid", gridTemplateColumns: "3px 1fr 50px 60px 140px 80px 52px", padding: "5px 8px", borderBottom: "1px solid #1a1a1a", alignItems: "center", transition: "background 0.08s", cursor: d.lat ? "pointer" : "default" }}
+                            style={{ display: "grid", gridTemplateColumns: "3px 1fr 50px 60px 140px 80px 52px", padding: "5px 8px", borderBottom: "1px solid #21262d", alignItems: "center", transition: "background 0.08s", cursor: d.lat ? "pointer" : "default" }}
                           >
-                            <div style={{ width: 3, minHeight: 14, background: d.disease === "ILA" ? "#ef4444" : "#f97316", borderRadius: 1 }} />
+                            <div style={{ width: 3, minHeight: 14, background: d.disease === "ILA" ? "#ef4444" : "#f59e0b", borderRadius: 1 }} />
                             <div style={{ fontSize: 11 }}>{d.localityName}</div>
-                            <div><span style={{ ...S.badge(d.disease === "ILA" ? "#ef4444" : "#f97316"), fontSize: 8 }}>{d.disease}</span></div>
-                            <div>{d.ticker ? <Link href={`/stocks/${d.ticker}`} style={{ color: "#58a6ff", textDecoration: "none", fontSize: 10 }} onClick={e => e.stopPropagation()}>{d.ticker}</Link> : <span style={{ color: "#555" }}>{"\u2014"}</span>}</div>
-                            <div style={{ fontSize: 10, color: "#aaa" }}>{d.areaName ? `${d.area} — ${d.areaName}` : d.area ?? "\u2014"}</div>
-                            <div style={{ textAlign: "right", fontSize: 10, color: "#888" }}>
+                            <div><span style={{ ...S.badge(d.disease === "ILA" ? "#ef4444" : "#f59e0b"), fontSize: 8 }}>{d.disease}</span></div>
+                            <div>{d.ticker ? <Link href={`/stocks/${d.ticker}`} style={{ color: "#58a6ff", textDecoration: "none", fontSize: 10 }} onClick={e => e.stopPropagation()}>{d.ticker}</Link> : <span style={{ color: "rgba(255,255,255,0.35)" }}>{"\u2014"}</span>}</div>
+                            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>{d.areaName ? `${d.area} — ${d.areaName}` : d.area ?? "\u2014"}</div>
+                            <div style={{ textAlign: "right", fontSize: 10, color: "rgba(255,255,255,0.5)" }}>
                               {d.predatesWindow
                                 ? <span title="Disease predates our data window">&gt;{d.weeksFlagged}w</span>
-                                : <span title={`First detected ${d.firstDetected}`}>{d.weeksFlagged}w <span style={{ color: "#555" }}>from {d.firstDetected}</span></span>
+                                : <span title={`First detected ${d.firstDetected}`}>{d.weeksFlagged}w <span style={{ color: "rgba(255,255,255,0.35)" }}>from {d.firstDetected}</span></span>
                               }
                             </div>
                             <div style={{ textAlign: "center" }}>
@@ -1245,18 +1245,18 @@ export default function SeafoodPage() {
                   <div>
                     <div style={S.section}>INTELLIGENCE ALERTS</div>
                     {alerts.length === 0 ? (
-                      <div style={{ padding: "16px 10px", color: "#555", fontSize: 11 }}>No active alerts.</div>
+                      <div style={{ padding: "16px 10px", color: "rgba(255,255,255,0.35)", fontSize: 11 }}>No active alerts.</div>
                     ) : (
                       alerts.map((a, i) => {
-                        const sevColor = a.severity === "high" ? "#ef4444" : a.severity === "medium" ? "#f59e0b" : "#3b82f6";
+                        const sevColor = a.severity === "high" ? "#ef4444" : a.severity === "medium" ? "#f59e0b" : "#30363d";
                         return (
-                          <div key={i} className="sf-row" style={{ display: "flex", gap: 8, padding: "5px 8px", borderBottom: "1px solid #1a1a1a", alignItems: "start", transition: "background 0.08s" }}>
+                          <div key={i} className="sf-row" style={{ display: "flex", gap: 8, padding: "5px 8px", borderBottom: "1px solid #21262d", alignItems: "start", transition: "background 0.08s" }}>
                             <div style={{ width: 3, minHeight: 14, background: sevColor, borderRadius: 1, marginTop: 2, flexShrink: 0 }} />
                             <div style={{ flex: 1 }}>
                               <span style={{ color: sevColor, fontWeight: 600, fontSize: 11 }}>{a.message}</span>
-                              {a.detail && <span style={{ color: "#666", fontSize: 10, marginLeft: 8 }}>{a.detail}</span>}
+                              {a.detail && <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 10, marginLeft: 8 }}>{a.detail}</span>}
                             </div>
-                            <span style={{ ...S.badge(sevColor === "#ef4444" ? "#ef4444" : sevColor === "#f59e0b" ? "#f97316" : "#333"), fontSize: 8, flexShrink: 0 }}>
+                            <span style={{ ...S.badge(sevColor === "#ef4444" ? "#ef4444" : sevColor === "#f59e0b" ? "#f59e0b" : "#30363d"), fontSize: 8, flexShrink: 0 }}>
                               {a.severity.toUpperCase()}
                             </span>
                           </div>
@@ -1286,17 +1286,17 @@ export default function SeafoodPage() {
                         const maxBio = Math.max(...biomassData.currentTotals.map(x => x.biomass_tonnes || 1));
                         const pct = (b.biomass_tonnes / maxBio) * 100;
                         return (
-                          <div key={b.area_number} style={{ background: "#111", border: "1px solid #222", borderRadius: 3, padding: "3px 6px", fontSize: 9, minWidth: 70 }}>
+                          <div key={b.area_number} style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 3, padding: "3px 6px", fontSize: 9, minWidth: 70 }}>
                             <div style={{ display: "flex", justifyContent: "space-between", gap: 6 }}>
-                              <span style={{ color: "#888" }}>Area {b.area_number}</span>
-                              <span style={{ color: yoy?.yoy_change_pct != null ? (yoy.yoy_change_pct >= 0 ? "#22c55e" : "#ef4444") : "#888", fontSize: 8 }}>
+                              <span style={{ color: "rgba(255,255,255,0.5)" }}>Area {b.area_number}</span>
+                              <span style={{ color: yoy?.yoy_change_pct != null ? (yoy.yoy_change_pct >= 0 ? "#22c55e" : "#ef4444") : "rgba(255,255,255,0.5)", fontSize: 8 }}>
                                 {yoy?.yoy_change_pct != null ? `${yoy.yoy_change_pct >= 0 ? "+" : ""}${yoy.yoy_change_pct}%` : ""}
                               </span>
                             </div>
-                            <div style={{ height: 3, background: "#1a1a1a", borderRadius: 1, marginTop: 2 }}>
-                              <div style={{ width: `${pct}%`, height: 3, background: "#f97316", borderRadius: 1 }} />
+                            <div style={{ height: 3, background: "#21262d", borderRadius: 1, marginTop: 2 }}>
+                              <div style={{ width: `${pct}%`, height: 3, background: "#3b82f6", borderRadius: 1 }} />
                             </div>
-                            <div style={{ fontSize: 8, color: "#666", marginTop: 1 }}>{(b.biomass_tonnes / 1000).toFixed(0)}K t</div>
+                            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", marginTop: 1 }}>{(b.biomass_tonnes / 1000).toFixed(0)}K t</div>
                           </div>
                         );
                       })}
@@ -1327,11 +1327,11 @@ export default function SeafoodPage() {
                   <div style={{ padding: "6px 8px", overflowX: "auto" }}>
                     <div style={{ display: "grid", gridTemplateColumns: `52px repeat(${areas.length}, 1fr)`, gap: 2, fontSize: 9 }}>
                       {/* Header: area numbers */}
-                      <div style={{ padding: "4px 2px", fontWeight: 700, color: "#555" }}>AREA</div>
+                      <div style={{ padding: "4px 2px", fontWeight: 700, color: "rgba(255,255,255,0.35)" }}>AREA</div>
                       {areas.map(a => (
                         <div key={a.areaNumber} style={{ textAlign: "center", padding: "2px 0" }}>
-                          <div style={{ fontWeight: 700, color: "#888", fontSize: 10 }}>{a.areaNumber}</div>
-                          <div style={{ width: 6, height: 6, borderRadius: "50%", background: TL_C[a.trafficLight] || "#333", margin: "2px auto 0" }} />
+                          <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.5)", fontSize: 10 }}>{a.areaNumber}</div>
+                          <div style={{ width: 6, height: 6, borderRadius: "50%", background: TL_C[a.trafficLight] || "#30363d", margin: "2px auto 0" }} />
                         </div>
                       ))}
                       {/* Company rows */}
@@ -1356,21 +1356,21 @@ export default function SeafoodPage() {
                                   justifyContent: "center",
                                 }}
                               >
-                                {sites > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: intensity > 0.4 ? "#fff" : "#aaa" }}>{sites}</span>}
+                                {sites > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: intensity > 0.4 ? "#fff" : "rgba(255,255,255,0.5)" }}>{sites}</span>}
                               </div>
                             );
                           })}
                         </React.Fragment>
                       ))}
                     </div>
-                    <div style={{ fontSize: 9, color: "#444", textAlign: "center", marginTop: 6, paddingBottom: 4 }}>
+                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", textAlign: "center", marginTop: 6, paddingBottom: 4 }}>
                       Number = active farm sites. Color intensity = relative concentration for each company.
                     </div>
                   </div>
 
                   {/* Area Detail Table */}
                   <div style={S.section}>PRODUCTION AREA DETAIL</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "3px 40px 1fr 70px 70px 70px 60px", padding: "4px 8px", fontSize: 9, fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.06em", background: "#111", borderBottom: "1px solid #222" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "3px 40px 1fr 70px 70px 70px 60px", padding: "4px 8px", fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.06em", background: "#161b22", borderBottom: "1px solid #30363d" }}>
                     <div />
                     <div>AREA</div>
                     <div>NAME</div>
@@ -1384,22 +1384,22 @@ export default function SeafoodPage() {
                     const totalTracked = coInArea.reduce((s, tk) => s + (areaCo[a.areaNumber]?.[tk] || 0), 0);
                     return (
                     <div key={a.areaNumber}>
-                      <div className="sf-row" style={{ display: "grid", gridTemplateColumns: "3px 40px 1fr 70px 70px 70px 60px", padding: "5px 8px", borderBottom: coInArea.length > 0 ? "none" : "1px solid #1a1a1a", alignItems: "center", transition: "background 0.08s" }}>
-                        <div style={{ width: 3, minHeight: 14, background: TL_C[a.trafficLight] || "#555", borderRadius: 1 }} />
+                      <div className="sf-row" style={{ display: "grid", gridTemplateColumns: "3px 40px 1fr 70px 70px 70px 60px", padding: "5px 8px", borderBottom: coInArea.length > 0 ? "none" : "1px solid #21262d", alignItems: "center", transition: "background 0.08s" }}>
+                        <div style={{ width: 3, minHeight: 14, background: TL_C[a.trafficLight] || "#30363d", borderRadius: 1 }} />
                         <div style={{ fontWeight: 600 }}>{a.areaNumber}</div>
                         <div style={{ fontSize: 11 }}>{a.name}</div>
-                        <div style={{ textAlign: "center" }}><span style={{ ...S.badge(TL_C[a.trafficLight] || "#555"), fontSize: 8 }}>{a.trafficLight?.toUpperCase()}</span></div>
+                        <div style={{ textAlign: "center" }}><span style={{ ...S.badge(TL_C[a.trafficLight] || "#30363d"), fontSize: 8 }}>{a.trafficLight?.toUpperCase()}</span></div>
                         <div style={{ textAlign: "right", color: getLiceColor(a.avgLice), fontWeight: 600 }}>{a.avgLice?.toFixed(3) ?? "\u2014"}</div>
-                        <div style={{ textAlign: "right", color: "#888" }}>{a.localityCount}</div>
-                        <div style={{ textAlign: "right", color: (a.capacityChangePct ?? 0) < 0 ? "#ef4444" : (a.capacityChangePct ?? 0) > 0 ? "#22c55e" : "#888" }}>
+                        <div style={{ textAlign: "right", color: "rgba(255,255,255,0.5)" }}>{a.localityCount}</div>
+                        <div style={{ textAlign: "right", color: (a.capacityChangePct ?? 0) < 0 ? "#ef4444" : (a.capacityChangePct ?? 0) > 0 ? "#22c55e" : "rgba(255,255,255,0.5)" }}>
                           {a.capacityChangePct != null ? `${a.capacityChangePct > 0 ? "+" : ""}${a.capacityChangePct}%` : "\u2014"}
                         </div>
                       </div>
                       {/* Company breakdown bar */}
                       {coInArea.length > 0 && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "2px 8px 6px 46px", borderBottom: "1px solid #1a1a1a" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "2px 8px 6px 46px", borderBottom: "1px solid #21262d" }}>
                           {/* Stacked bar */}
-                          <div style={{ display: "flex", height: 6, borderRadius: 3, overflow: "hidden", flex: 1, background: "#111" }}>
+                          <div style={{ display: "flex", height: 6, borderRadius: 3, overflow: "hidden", flex: 1, background: "#161b22" }}>
                             {coInArea.map(tk => {
                               const w = (areaCo[a.areaNumber][tk] / (a.localityCount || totalTracked || 1)) * 100;
                               return <div key={tk} style={{ width: `${w}%`, background: CO_COLORS[tk], minWidth: 2 }} title={`${tk}: ${areaCo[a.areaNumber][tk]} sites`} />;
@@ -1411,7 +1411,7 @@ export default function SeafoodPage() {
                               <Link key={tk} href={`/stocks/${tk}`} style={{ display: "flex", alignItems: "center", gap: 3, textDecoration: "none", fontSize: 9 }}>
                                 <span style={{ width: 6, height: 6, borderRadius: 1, background: CO_COLORS[tk], display: "inline-block" }} />
                                 <span style={{ color: CO_COLORS[tk], fontWeight: 600 }}>{tk}</span>
-                                <span style={{ color: "#555" }}>{areaCo[a.areaNumber][tk]}</span>
+                                <span style={{ color: "rgba(255,255,255,0.35)" }}>{areaCo[a.areaNumber][tk]}</span>
                               </Link>
                             ))}
                           </div>
@@ -1432,20 +1432,20 @@ export default function SeafoodPage() {
                     <div style={{ padding: "10px 12px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
                         <div>
-                          <span style={{ fontSize: 22, fontWeight: 700, color: "#f97316" }}>
+                          <span style={{ fontSize: 22, fontWeight: 700, color: "#3b82f6" }}>
                             NOK {exportData.stats.currentPrice?.toFixed(2) ?? "\u2014"}
                           </span>
-                          <span style={{ color: "#666", fontSize: 11, marginLeft: 8 }}>/kg</span>
+                          <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, marginLeft: 8 }}>/kg</span>
                         </div>
                         <div style={{ display: "flex", gap: 16, fontSize: 11 }}>
-                          <span><span style={{ color: "#666" }}>52W H</span> <span style={{ color: "#22c55e" }}>{exportData.stats.high52w?.toFixed(2)}</span></span>
-                          <span><span style={{ color: "#666" }}>52W L</span> <span style={{ color: "#ef4444" }}>{exportData.stats.low52w?.toFixed(2)}</span></span>
-                          <span><span style={{ color: "#666" }}>AVG</span> <span style={{ color: "#aaa" }}>{exportData.stats.avg52w}</span></span>
+                          <span><span style={{ color: "rgba(255,255,255,0.4)" }}>52W H</span> <span style={{ color: "#22c55e" }}>{exportData.stats.high52w?.toFixed(2)}</span></span>
+                          <span><span style={{ color: "rgba(255,255,255,0.4)" }}>52W L</span> <span style={{ color: "#ef4444" }}>{exportData.stats.low52w?.toFixed(2)}</span></span>
+                          <span><span style={{ color: "rgba(255,255,255,0.4)" }}>AVG</span> <span style={{ color: "rgba(255,255,255,0.5)" }}>{exportData.stats.avg52w}</span></span>
                         </div>
                       </div>
                       {(() => {
                         const pts = exportData.timeSeries.filter(d => d.price_nok_kg != null).slice(-104);
-                        if (pts.length < 2) return <div style={{ color: "#555", padding: 16 }}>Insufficient data</div>;
+                        if (pts.length < 2) return <div style={{ color: "rgba(255,255,255,0.35)", padding: 16 }}>Insufficient data</div>;
                         const prices = pts.map(p => p.price_nok_kg!);
                         const vols = pts.map(p => p.volume_tonnes || 0);
                         const minP = Math.min(...prices); const maxP = Math.max(...prices);
@@ -1469,11 +1469,11 @@ export default function SeafoodPage() {
                                 top: Math.max(4, mousePos.y - 44),
                                 transform: mousePos.x > mousePos.cw * 0.65 ? "translateX(-100%)" : "none",
                                 zIndex: 10,
-                                background: "#111e", border: "1px solid #333", borderRadius: 4, padding: "8px 12px",
+                                background: "#161b22ee", border: "1px solid #30363d", borderRadius: 4, padding: "8px 12px",
                                 fontSize: 12, lineHeight: 1.6, pointerEvents: "none", whiteSpace: "nowrap"
                               }}>
-                                <div style={{ color: "#aaa", fontWeight: 700 }}>{hov.week_start?.slice(0, 10)}</div>
-                                <div style={{ color: "#f97316" }}>Price: NOK {hov.price_nok_kg?.toFixed(2)}/kg</div>
+                                <div style={{ color: "rgba(255,255,255,0.5)", fontWeight: 700 }}>{hov.week_start?.slice(0, 10)}</div>
+                                <div style={{ color: "#3b82f6" }}>Price: NOK {hov.price_nok_kg?.toFixed(2)}/kg</div>
                                 <div style={{ color: "#6366f1" }}>Volume: {((hov.volume_tonnes || 0) / 1000).toFixed(1)}K t</div>
                               </div>
                             )}
@@ -1490,10 +1490,10 @@ export default function SeafoodPage() {
                                 const x = (i / (pts.length - 1)) * 100;
                                 const y = 38 - ((p.price_nok_kg! - minP) / (maxP - minP || 1)) * 34;
                                 return `${i === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
-                              }).join(" ")} fill="none" stroke="#f97316" strokeWidth={0.4} vectorEffect="non-scaling-stroke" />
+                              }).join(" ")} fill="none" stroke="#3b82f6" strokeWidth={0.4} vectorEffect="non-scaling-stroke" />
                               {/* Hover crosshair */}
                               {hoveredExportIdx != null && (
-                                <line x1={(hoveredExportIdx / (pts.length - 1)) * 100} y1={0} x2={(hoveredExportIdx / (pts.length - 1)) * 100} y2={40} stroke="#555" strokeWidth={0.15} strokeDasharray="0.5,0.5" vectorEffect="non-scaling-stroke" />
+                                <line x1={(hoveredExportIdx / (pts.length - 1)) * 100} y1={0} x2={(hoveredExportIdx / (pts.length - 1)) * 100} y2={40} stroke="#30363d" strokeWidth={0.15} strokeDasharray="0.5,0.5" vectorEffect="non-scaling-stroke" />
                               )}
                               {/* Hit targets */}
                               {pts.map((_, i) => (
@@ -1501,30 +1501,30 @@ export default function SeafoodPage() {
                               ))}
                             </svg>
                             {/* Y-axis labels as HTML */}
-                            <div style={{ position: "absolute", top: 4, left: 6, fontSize: 11, color: "#666", fontWeight: 600, pointerEvents: "none" }}>{maxP.toFixed(0)}</div>
-                            <div style={{ position: "absolute", bottom: 44, left: 6, fontSize: 11, color: "#666", pointerEvents: "none" }}>{minP.toFixed(0)}</div>
+                            <div style={{ position: "absolute", top: 4, left: 6, fontSize: 11, color: "rgba(255,255,255,0.4)", fontWeight: 600, pointerEvents: "none" }}>{maxP.toFixed(0)}</div>
+                            <div style={{ position: "absolute", bottom: 44, left: 6, fontSize: 11, color: "rgba(255,255,255,0.4)", pointerEvents: "none" }}>{minP.toFixed(0)}</div>
                             {/* Date ticks as HTML */}
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#555", marginTop: 6, paddingBottom: 2 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 6, paddingBottom: 2 }}>
                               {dateTicks.map((t, i) => (
                                 <span key={i}>{t.label}</span>
                               ))}
                             </div>
-                            <div style={{ textAlign: "center", fontSize: 10, color: "#444", marginTop: 2 }}>WEEKLY EXPORT PRICE + VOLUME</div>
+                            <div style={{ textAlign: "center", fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>WEEKLY EXPORT PRICE + VOLUME</div>
                           </div>
                         );
                       })()}
                     </div>
                   ) : (
-                    <div style={{ padding: "16px 10px", color: "#555", fontSize: 11 }}>No export price data available.</div>
+                    <div style={{ padding: "16px 10px", color: "rgba(255,255,255,0.35)", fontSize: 11 }}>No export price data available.</div>
                   )}
 
                   {/* ─── Biomass Distribution Map ──────────────────── */}
                   <div style={{ ...S.section, marginTop: 8 }}>BIOMASS DISTRIBUTION MAP</div>
                   <div style={{ padding: "6px 10px" }}>
-                    <div style={{ height: 380, border: "1px solid #222", borderRadius: 4, overflow: "hidden" }}>
+                    <div style={{ height: 380, border: "1px solid #30363d", borderRadius: 4, overflow: "hidden" }}>
                       <ProductionAreaMap areas={areas} localities={[]} selectedTicker={null} onTickerSelect={() => {}} biomassData={biomassData?.currentTotals} />
                     </div>
-                    <div style={{ fontSize: 9, color: "#555", marginTop: 4, textAlign: "center" }}>
+                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginTop: 4, textAlign: "center" }}>
                       Circle size = standing biomass by production area. Click circles for details.
                     </div>
                   </div>
@@ -1543,9 +1543,9 @@ export default function SeafoodPage() {
                           const yoyPrev = nt.length > 12 ? nt[nt.length - 13] : null;
                           const pctChg = (cur: number, ref: number | undefined) => ref && ref > 0 ? ((cur - ref) / ref * 100) : null;
                           const fmtChg = (v: number | null, suffix = "%") => v != null ? `${v >= 0 ? "+" : ""}${v.toFixed(1)}${suffix}` : null;
-                          const chgColor = (v: number | null) => v != null ? (v >= 0 ? "#22c55e" : "#ef4444") : "#666";
+                          const chgColor = (v: number | null) => v != null ? (v >= 0 ? "#22c55e" : "#ef4444") : "rgba(255,255,255,0.4)";
                           return [
-                            { label: "STANDING BIOMASS", value: `${(Number(latest.total_biomass || 0) / 1000).toFixed(0)}K t`, color: "#f97316",
+                            { label: "STANDING BIOMASS", value: `${(Number(latest.total_biomass || 0) / 1000).toFixed(0)}K t`, color: "#3b82f6",
                               mom: fmtChg(pctChg(Number(latest.total_biomass), prev ? Number(prev.total_biomass) : undefined)), momC: chgColor(pctChg(Number(latest.total_biomass), prev ? Number(prev.total_biomass) : undefined)),
                               yoy: fmtChg(pctChg(Number(latest.total_biomass), yoyPrev ? Number(yoyPrev.total_biomass) : undefined)), yoyC: chgColor(pctChg(Number(latest.total_biomass), yoyPrev ? Number(yoyPrev.total_biomass) : undefined)) },
                             { label: "MONTHLY HARVEST", value: `${(Number(latest.total_harvest || 0) / 1000).toFixed(0)}K t`, color: "#3b82f6",
@@ -1558,12 +1558,12 @@ export default function SeafoodPage() {
                               mom: fmtChg(pctChg(Number(latest.total_stock), prev ? Number(prev.total_stock) : undefined)), momC: chgColor(pctChg(Number(latest.total_stock), prev ? Number(prev.total_stock) : undefined)),
                               yoy: fmtChg(pctChg(Number(latest.total_stock), yoyPrev ? Number(yoyPrev.total_stock) : undefined)), yoyC: chgColor(pctChg(Number(latest.total_stock), yoyPrev ? Number(yoyPrev.total_stock) : undefined)) },
                           ].map((card, i) => (
-                            <div key={i} style={{ background: "#111", border: "1px solid #222", borderRadius: 4, padding: "12px 16px" }}>
-                              <div style={{ fontSize: 9, color: "#666", letterSpacing: "0.06em", fontWeight: 700 }}>{card.label}</div>
+                            <div key={i} style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 4, padding: "12px 16px" }}>
+                              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", letterSpacing: "0.06em", fontWeight: 700 }}>{card.label}</div>
                               <div style={{ fontSize: 24, fontWeight: 700, color: card.color, marginTop: 4 }}>{card.value}</div>
                               <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 11 }}>
-                                {card.mom && <span style={{ color: card.momC }}>{card.mom} <span style={{ color: "#555" }}>MoM</span></span>}
-                                {card.yoy && <span style={{ color: card.yoyC }}>{card.yoy} <span style={{ color: "#555" }}>YoY</span></span>}
+                                {card.mom && <span style={{ color: card.momC }}>{card.mom} <span style={{ color: "rgba(255,255,255,0.35)" }}>MoM</span></span>}
+                                {card.yoy && <span style={{ color: card.yoyC }}>{card.yoy} <span style={{ color: "rgba(255,255,255,0.35)" }}>YoY</span></span>}
                               </div>
                             </div>
                           ));
@@ -1606,21 +1606,21 @@ export default function SeafoodPage() {
                                 top: Math.max(4, mousePos.y - 60),
                                 transform: mousePos.x > mousePos.cw * 0.6 ? "translateX(-100%)" : "none",
                                 zIndex: 10,
-                                background: "#111e", border: "1px solid #333", borderRadius: 4, padding: "10px 14px",
+                                background: "#161b22ee", border: "1px solid #30363d", borderRadius: 4, padding: "10px 14px",
                                 fontSize: 12, lineHeight: 1.7, pointerEvents: "none", whiteSpace: "nowrap"
                               }}>
-                                <div style={{ color: "#aaa", fontWeight: 700, marginBottom: 2 }}>{hovP.month?.slice(0, 7)}</div>
-                                <div style={{ color: "#f97316" }}>Biomass: {(Number(hovP.total_biomass) / 1000).toFixed(0)}K t</div>
+                                <div style={{ color: "rgba(255,255,255,0.5)", fontWeight: 700, marginBottom: 2 }}>{hovP.month?.slice(0, 7)}</div>
+                                <div style={{ color: "#3b82f6" }}>Biomass: {(Number(hovP.total_biomass) / 1000).toFixed(0)}K t</div>
                                 <div style={{ color: "#3b82f6" }}>Harvest: {(Number(hovP.total_harvest) / 1000).toFixed(0)}K t</div>
                                 <div style={{ color: "#8b5cf6" }}>Feed: {(Number(hovP.total_feed) / 1000).toFixed(0)}K t</div>
                                 <div style={{ color: "#ef4444" }}>Mortality: {(morts[hoveredBioIdx] / 1000).toFixed(0)}K t</div>
                                 <div style={{ color: "#22c55e" }}>Stock: {(Number(hovP.total_stock) / 1e6).toFixed(0)}M fish</div>
-                                {hovHm && <div style={{ color: "#666", fontSize: 10, marginTop: 2 }}>FCR: {Number(hovHm.feed_conversion_ratio || 0).toFixed(2)} | Mort: {Number(hovHm.mortality_rate_pct || 0).toFixed(1)}%</div>}
+                                {hovHm && <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 10, marginTop: 2 }}>FCR: {Number(hovHm.feed_conversion_ratio || 0).toFixed(2)} | Mort: {Number(hovHm.mortality_rate_pct || 0).toFixed(1)}%</div>}
                               </div>
                             )}
                             {/* Y-axis labels as HTML */}
-                            <div style={{ position: "absolute", top: 2, left: 4, fontSize: 11, color: "#f97316", fontWeight: 700, pointerEvents: "none" }}>{(maxB / 1000).toFixed(0)}K</div>
-                            <div style={{ position: "absolute", bottom: 24, left: 4, fontSize: 11, color: "#f97316", pointerEvents: "none" }}>{(minB / 1000).toFixed(0)}K</div>
+                            <div style={{ position: "absolute", top: 2, left: 4, fontSize: 11, color: "#3b82f6", fontWeight: 700, pointerEvents: "none" }}>{(maxB / 1000).toFixed(0)}K</div>
+                            <div style={{ position: "absolute", bottom: 24, left: 4, fontSize: 11, color: "#3b82f6", pointerEvents: "none" }}>{(minB / 1000).toFixed(0)}K</div>
                             <div style={{ position: "absolute", top: 2, right: 4, fontSize: 11, color: "#3b82f6", fontWeight: 700, pointerEvents: "none" }}>{(maxR / 1000).toFixed(0)}K</div>
                             <div style={{ position: "absolute", bottom: 24, right: 4, fontSize: 11, color: "#3b82f6", pointerEvents: "none" }}>0</div>
                             <svg viewBox="0 0 100 50" preserveAspectRatio="none" style={{ width: "100%", height: 280, display: "block" }}>
@@ -1635,10 +1635,10 @@ export default function SeafoodPage() {
                               {/* Feed line (dashed) */}
                               <path d={pts.map((p, i) => `${i === 0 ? "M" : "L"}${xP(i).toFixed(2)},${yR(Number(p.total_feed)).toFixed(2)}`).join(" ")} fill="none" stroke="#8b5cf6" strokeWidth={0.3} strokeDasharray="1,0.8" vectorEffect="non-scaling-stroke" />
                               {/* Biomass line */}
-                              <path d={pts.map((p, i) => `${i === 0 ? "M" : "L"}${xP(i).toFixed(2)},${yB(Number(p.total_biomass)).toFixed(2)}`).join(" ")} fill="none" stroke="#f97316" strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
+                              <path d={pts.map((p, i) => `${i === 0 ? "M" : "L"}${xP(i).toFixed(2)},${yB(Number(p.total_biomass)).toFixed(2)}`).join(" ")} fill="none" stroke="#3b82f6" strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
                               {/* Hover crosshair */}
                               {hoveredBioIdx != null && (
-                                <line x1={xP(hoveredBioIdx)} y1={0} x2={xP(hoveredBioIdx)} y2={50} stroke="#555" strokeWidth={0.15} strokeDasharray="0.5,0.5" vectorEffect="non-scaling-stroke" />
+                                <line x1={xP(hoveredBioIdx)} y1={0} x2={xP(hoveredBioIdx)} y2={50} stroke="#30363d" strokeWidth={0.15} strokeDasharray="0.5,0.5" vectorEffect="non-scaling-stroke" />
                               )}
                               {/* Hit targets */}
                               {pts.map((_, i) => (
@@ -1646,11 +1646,11 @@ export default function SeafoodPage() {
                               ))}
                             </svg>
                             {/* Date ticks + legend as HTML */}
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#555", marginTop: 4 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 4 }}>
                               {dateTicks.map((t, i) => <span key={i}>{t.label}</span>)}
                             </div>
-                            <div style={{ display: "flex", justifyContent: "center", gap: 18, fontSize: 10, color: "#555", marginTop: 4, paddingBottom: 6 }}>
-                              <span><span style={{ display: "inline-block", width: 14, height: 2, background: "#f97316", marginRight: 5, verticalAlign: "middle" }} />BIOMASS</span>
+                            <div style={{ display: "flex", justifyContent: "center", gap: 18, fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 4, paddingBottom: 6 }}>
+                              <span><span style={{ display: "inline-block", width: 14, height: 2, background: "#3b82f6", marginRight: 5, verticalAlign: "middle" }} />BIOMASS</span>
                               <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#1a2a1a", marginRight: 5, verticalAlign: "middle" }} />HARVEST</span>
                               <span><span style={{ display: "inline-block", width: 14, height: 2, background: "#8b5cf6", marginRight: 5, verticalAlign: "middle", borderTop: "1px dashed #8b5cf6" }} />FEED</span>
                               <span><span style={{ display: "inline-block", width: 10, height: 10, background: "rgba(239,68,68,0.12)", marginRight: 5, verticalAlign: "middle" }} />MORTALITY</span>
@@ -1660,14 +1660,14 @@ export default function SeafoodPage() {
                       })()}
                     </div>
                   ) : (
-                    <div style={{ padding: "16px 10px", color: "#555", fontSize: 11 }}>No biomass data available.</div>
+                    <div style={{ padding: "16px 10px", color: "rgba(255,255,255,0.35)", fontSize: 11 }}>No biomass data available.</div>
                   )}
 
                   {/* ─── Biomass by Area (with MoM) ────────────────── */}
                   <div style={{ ...S.section, marginTop: 8 }}>BIOMASS BY PRODUCTION AREA</div>
                   {biomassData?.currentTotals && biomassData.currentTotals.length > 0 ? (
                     <div style={{ padding: "4px 0" }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "4px 44px 1fr 80px 72px 68px 68px", padding: "6px 10px", fontSize: 10, fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.06em", background: "#111", borderBottom: "1px solid #222" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "4px 44px 1fr 80px 72px 68px 68px", padding: "6px 10px", fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.06em", background: "#161b22", borderBottom: "1px solid #30363d" }}>
                         <div />
                         <div>AREA</div>
                         <div>BIOMASS</div>
@@ -1705,20 +1705,20 @@ export default function SeafoodPage() {
                             const areaInfo = areas.find(a => a.areaNumber === b.area_number);
                             const mom = areaMoM[b.area_number];
                             return (
-                              <div key={b.area_number} className="sf-row" style={{ display: "grid", gridTemplateColumns: "4px 44px 1fr 80px 72px 68px 68px", padding: "7px 10px", borderBottom: "1px solid #1a1a1a", alignItems: "center", transition: "background 0.08s", fontSize: 11 }}>
-                                <div style={{ width: 4, minHeight: 18, background: TL_C[areaInfo?.trafficLight || ""] || "#555", borderRadius: 1 }} />
+                              <div key={b.area_number} className="sf-row" style={{ display: "grid", gridTemplateColumns: "4px 44px 1fr 80px 72px 68px 68px", padding: "7px 10px", borderBottom: "1px solid #21262d", alignItems: "center", transition: "background 0.08s", fontSize: 11 }}>
+                                <div style={{ width: 4, minHeight: 18, background: TL_C[areaInfo?.trafficLight || ""] || "#30363d", borderRadius: 1 }} />
                                 <div style={{ fontWeight: 600, fontSize: 12 }}>{b.area_number}</div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                  <div style={{ flex: 1, height: 10, background: "#1a1a1a", borderRadius: 3 }}>
-                                    <div style={{ width: `${pct}%`, height: 10, background: "#f97316", borderRadius: 3, opacity: 0.7 }} />
+                                  <div style={{ flex: 1, height: 10, background: "#21262d", borderRadius: 3 }}>
+                                    <div style={{ width: `${pct}%`, height: 10, background: "#3b82f6", borderRadius: 3, opacity: 0.7 }} />
                                   </div>
                                 </div>
                                 <div style={{ textAlign: "right", fontWeight: 600 }}>{(Number(b.biomass_tonnes) / 1000).toFixed(1)}K</div>
-                                <div style={{ textAlign: "right", color: "#888" }}>{(Number(b.harvest_tonnes) / 1000).toFixed(1)}K</div>
-                                <div style={{ textAlign: "right", color: mom != null ? (mom >= 0 ? "#22c55e" : "#ef4444") : "#555" }}>
+                                <div style={{ textAlign: "right", color: "rgba(255,255,255,0.5)" }}>{(Number(b.harvest_tonnes) / 1000).toFixed(1)}K</div>
+                                <div style={{ textAlign: "right", color: mom != null ? (mom >= 0 ? "#22c55e" : "#ef4444") : "rgba(255,255,255,0.35)" }}>
                                   {mom != null ? `${mom >= 0 ? "+" : ""}${mom.toFixed(1)}%` : "\u2014"}
                                 </div>
-                                <div style={{ textAlign: "right", color: yoy?.yoy_change_pct != null ? (yoy.yoy_change_pct >= 0 ? "#22c55e" : "#ef4444") : "#888", fontWeight: 600 }}>
+                                <div style={{ textAlign: "right", color: yoy?.yoy_change_pct != null ? (yoy.yoy_change_pct >= 0 ? "#22c55e" : "#ef4444") : "rgba(255,255,255,0.5)", fontWeight: 600 }}>
                                   {yoy?.yoy_change_pct != null ? `${yoy.yoy_change_pct >= 0 ? "+" : ""}${yoy.yoy_change_pct}%` : "\u2014"}
                                 </div>
                               </div>
@@ -1727,7 +1727,7 @@ export default function SeafoodPage() {
                       })()}
                     </div>
                   ) : (
-                    <div style={{ padding: "16px 10px", color: "#555", fontSize: 11 }}>No area biomass data available.</div>
+                    <div style={{ padding: "16px 10px", color: "rgba(255,255,255,0.35)", fontSize: 11 }}>No area biomass data available.</div>
                   )}
 
                   {/* ─── Harvest & Mortality (Redesigned) ──────────── */}
@@ -1755,7 +1755,7 @@ export default function SeafoodPage() {
                           const fmtPP = (v: number | null) => v != null ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}pp` : null;
                           const fmtD = (v: number | null) => v != null ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}` : null;
                           const fmtP = (v: number | null) => v != null ? `${v >= 0 ? "+" : ""}${v.toFixed(1)}%` : null;
-                          const chgC = (v: number | null, invert = false) => v != null ? ((invert ? v <= 0 : v >= 0) ? "#22c55e" : "#ef4444") : "#555";
+                          const chgC = (v: number | null, invert = false) => v != null ? ((invert ? v <= 0 : v >= 0) ? "#22c55e" : "#ef4444") : "rgba(255,255,255,0.35)";
                           return [
                             { label: "MORTALITY RATE", value: `${mortRate.toFixed(2)}%`, color: mortRate > 2 ? "#ef4444" : "#f59e0b",
                               mom: fmtPP(ppChg(mortRate, prevMortRate)), momC: chgC(ppChg(mortRate, prevMortRate), true),
@@ -1767,14 +1767,14 @@ export default function SeafoodPage() {
                               mom: fmtD(ppChg(fcr, prevFcr)), momC: chgC(ppChg(fcr, prevFcr), true),
                               yoy: fmtD(ppChg(fcr, yoyFcr)), yoyC: chgC(ppChg(fcr, yoyFcr), true) },
                             { label: "HARVEST / BIOMASS", value: `${harvBioRatio.toFixed(1)}%`, color: "#3b82f6",
-                              mom: null, momC: "#555", yoy: null, yoyC: "#555" },
+                              mom: null, momC: "rgba(255,255,255,0.35)", yoy: null, yoyC: "rgba(255,255,255,0.35)" },
                           ].map((card, i) => (
-                            <div key={i} style={{ background: "#111", border: "1px solid #222", borderRadius: 4, padding: "12px 16px" }}>
-                              <div style={{ fontSize: 9, color: "#666", letterSpacing: "0.06em", fontWeight: 700 }}>{card.label}</div>
+                            <div key={i} style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 4, padding: "12px 16px" }}>
+                              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", letterSpacing: "0.06em", fontWeight: 700 }}>{card.label}</div>
                               <div style={{ fontSize: 24, fontWeight: 700, color: card.color, marginTop: 4 }}>{card.value}</div>
                               <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 11 }}>
-                                {card.mom && <span style={{ color: card.momC }}>{card.mom} <span style={{ color: "#555" }}>MoM</span></span>}
-                                {card.yoy && <span style={{ color: card.yoyC }}>{card.yoy} <span style={{ color: "#555" }}>YoY</span></span>}
+                                {card.mom && <span style={{ color: card.momC }}>{card.mom} <span style={{ color: "rgba(255,255,255,0.35)" }}>MoM</span></span>}
+                                {card.yoy && <span style={{ color: card.yoyC }}>{card.yoy} <span style={{ color: "rgba(255,255,255,0.35)" }}>YoY</span></span>}
                               </div>
                             </div>
                           ));
@@ -1782,10 +1782,10 @@ export default function SeafoodPage() {
                       </div>
 
                       {/* Mortality trend chart */}
-                      <div style={{ fontSize: 10, color: "#666", fontWeight: 700, letterSpacing: "0.06em", marginBottom: 6 }}>MORTALITY TREND</div>
+                      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontWeight: 700, letterSpacing: "0.06em", marginBottom: 6 }}>MORTALITY TREND</div>
                       {(() => {
                         const pts = harvestData.national;
-                        if (pts.length < 2) return <div style={{ color: "#555", padding: 16 }}>Insufficient data</div>;
+                        if (pts.length < 2) return <div style={{ color: "rgba(255,255,255,0.35)", padding: 16 }}>Insufficient data</div>;
                         const mortRates = pts.map(p => Number(p.mortality_rate_pct) || 0);
                         const mortTonnes = pts.map(p => Number(p.total_mortality || 0));
                         const maxRate = Math.max(...mortRates); const minRate = Math.min(...mortRates);
@@ -1812,10 +1812,10 @@ export default function SeafoodPage() {
                                 top: Math.max(4, mousePos.y - 50),
                                 transform: mousePos.x > mousePos.cw * 0.6 ? "translateX(-100%)" : "none",
                                 zIndex: 10,
-                                background: "#111e", border: "1px solid #333", borderRadius: 4, padding: "10px 14px",
+                                background: "#161b22ee", border: "1px solid #30363d", borderRadius: 4, padding: "10px 14px",
                                 fontSize: 12, lineHeight: 1.7, pointerEvents: "none", whiteSpace: "nowrap"
                               }}>
-                                <div style={{ color: "#aaa", fontWeight: 700, marginBottom: 2 }}>{hovMP.month?.slice(0, 7)}</div>
+                                <div style={{ color: "rgba(255,255,255,0.5)", fontWeight: 700, marginBottom: 2 }}>{hovMP.month?.slice(0, 7)}</div>
                                 <div style={{ color: "#ef4444" }}>Mort Rate: {(Number(hovMP.mortality_rate_pct) || 0).toFixed(2)}%</div>
                                 <div style={{ color: "#ef4444" }}>Mortality: {(Number(hovMP.total_mortality || 0) / 1000).toFixed(0)}K t</div>
                                 <div style={{ color: "#8b5cf6" }}>FCR: {Number(hovMP.feed_conversion_ratio || 0).toFixed(2)}</div>
@@ -1825,21 +1825,21 @@ export default function SeafoodPage() {
                             {/* Y-axis labels as HTML */}
                             <div style={{ position: "absolute", top: 2, left: 4, fontSize: 11, color: "#ef4444", fontWeight: 700, pointerEvents: "none" }}>{maxRate.toFixed(1)}%</div>
                             <div style={{ position: "absolute", bottom: 24, left: 4, fontSize: 11, color: "#ef4444", pointerEvents: "none" }}>{minRate.toFixed(1)}%</div>
-                            <div style={{ position: "absolute", top: 2, right: 4, fontSize: 11, color: "#666", pointerEvents: "none" }}>{(maxTonnes / 1000).toFixed(0)}K t</div>
+                            <div style={{ position: "absolute", top: 2, right: 4, fontSize: 11, color: "rgba(255,255,255,0.4)", pointerEvents: "none" }}>{(maxTonnes / 1000).toFixed(0)}K t</div>
                             <svg viewBox="0 0 100 50" preserveAspectRatio="none" style={{ width: "100%", height: 240, display: "block" }}>
                               <path d={`M${pts.map((_, i) => `${xP2(i).toFixed(2)},${yT2(mortTonnes[i]).toFixed(2)}`).join(" L")} L100,${yT2(0).toFixed(2)} L0,${yT2(0).toFixed(2)} Z`} fill="#ef4444" opacity={0.1} />
                               <path d={pts.map((_, i) => `${i === 0 ? "M" : "L"}${xP2(i).toFixed(2)},${yR2(mortRates[i]).toFixed(2)}`).join(" ")} fill="none" stroke="#ef4444" strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
                               {hoveredMortIdx != null && (
-                                <line x1={xP2(hoveredMortIdx)} y1={0} x2={xP2(hoveredMortIdx)} y2={50} stroke="#555" strokeWidth={0.15} strokeDasharray="0.5,0.5" vectorEffect="non-scaling-stroke" />
+                                <line x1={xP2(hoveredMortIdx)} y1={0} x2={xP2(hoveredMortIdx)} y2={50} stroke="#30363d" strokeWidth={0.15} strokeDasharray="0.5,0.5" vectorEffect="non-scaling-stroke" />
                               )}
                               {pts.map((_, i) => (
                                 <rect key={`mh${i}`} x={xP2(i) - 50 / pts.length} y={0} width={100 / pts.length} height={50} fill="transparent" onMouseEnter={() => setHoveredMortIdx(i)} style={{ cursor: "crosshair" }} />
                               ))}
                             </svg>
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#555", marginTop: 4 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 4 }}>
                               {mDateTicks.map((t, i) => <span key={i}>{t.label}</span>)}
                             </div>
-                            <div style={{ display: "flex", justifyContent: "center", gap: 18, fontSize: 10, color: "#555", marginTop: 4, paddingBottom: 6 }}>
+                            <div style={{ display: "flex", justifyContent: "center", gap: 18, fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 4, paddingBottom: 6 }}>
                               <span><span style={{ display: "inline-block", width: 14, height: 2, background: "#ef4444", marginRight: 5, verticalAlign: "middle" }} />MORTALITY RATE</span>
                               <span><span style={{ display: "inline-block", width: 10, height: 10, background: "rgba(239,68,68,0.12)", marginRight: 5, verticalAlign: "middle" }} />MORTALITY TONNES</span>
                             </div>
@@ -1850,8 +1850,8 @@ export default function SeafoodPage() {
                       {/* Area-by-area harvest comparison table */}
                       {harvestData.yoyComparison.length > 0 && (
                         <>
-                          <div style={{ fontSize: 10, color: "#666", fontWeight: 700, letterSpacing: "0.06em", marginTop: 20, marginBottom: 6 }}>HARVEST COMPARISON BY AREA (12-MONTH ROLLING)</div>
-                          <div style={{ display: "grid", gridTemplateColumns: "4px 40px 1fr 84px 84px 68px 74px", padding: "6px 10px", fontSize: 10, fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.06em", background: "#111", borderBottom: "1px solid #222" }}>
+                          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontWeight: 700, letterSpacing: "0.06em", marginTop: 20, marginBottom: 6 }}>HARVEST COMPARISON BY AREA (12-MONTH ROLLING)</div>
+                          <div style={{ display: "grid", gridTemplateColumns: "4px 40px 1fr 84px 84px 68px 74px", padding: "6px 10px", fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.06em", background: "#161b22", borderBottom: "1px solid #30363d" }}>
                             <div />
                             <div>AREA</div>
                             <div>NAME</div>
@@ -1870,16 +1870,16 @@ export default function SeafoodPage() {
                               const mortRate = latestRow && Number(latestRow.biomass_tonnes) > 0
                                 ? (Number(latestRow.mortality_tonnes) / Number(latestRow.biomass_tonnes) * 100) : null;
                               return (
-                                <div key={y.area_number} className="sf-row" style={{ display: "grid", gridTemplateColumns: "4px 40px 1fr 84px 84px 68px 74px", padding: "7px 10px", borderBottom: "1px solid #1a1a1a", alignItems: "center", transition: "background 0.08s", fontSize: 11 }}>
-                                  <div style={{ width: 4, minHeight: 18, background: TL_C[areaInfo?.trafficLight || ""] || "#555", borderRadius: 1 }} />
+                                <div key={y.area_number} className="sf-row" style={{ display: "grid", gridTemplateColumns: "4px 40px 1fr 84px 84px 68px 74px", padding: "7px 10px", borderBottom: "1px solid #21262d", alignItems: "center", transition: "background 0.08s", fontSize: 11 }}>
+                                  <div style={{ width: 4, minHeight: 18, background: TL_C[areaInfo?.trafficLight || ""] || "#30363d", borderRadius: 1 }} />
                                   <div style={{ fontWeight: 600, fontSize: 12 }}>{y.area_number}</div>
-                                  <div style={{ color: "#aaa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{areaInfo?.name ?? "\u2014"}</div>
+                                  <div style={{ color: "rgba(255,255,255,0.5)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{areaInfo?.name ?? "\u2014"}</div>
                                   <div style={{ textAlign: "right", fontWeight: 600 }}>{(Number(y.recent_harvest) / 1000).toFixed(1)}K</div>
-                                  <div style={{ textAlign: "right", color: "#888" }}>{(Number(y.prior_harvest) / 1000).toFixed(1)}K</div>
-                                  <div style={{ textAlign: "right", color: y.yoy_change_pct != null ? (y.yoy_change_pct >= 0 ? "#22c55e" : "#ef4444") : "#888", fontWeight: 600 }}>
+                                  <div style={{ textAlign: "right", color: "rgba(255,255,255,0.5)" }}>{(Number(y.prior_harvest) / 1000).toFixed(1)}K</div>
+                                  <div style={{ textAlign: "right", color: y.yoy_change_pct != null ? (y.yoy_change_pct >= 0 ? "#22c55e" : "#ef4444") : "rgba(255,255,255,0.5)", fontWeight: 600 }}>
                                     {y.yoy_change_pct != null ? `${y.yoy_change_pct >= 0 ? "+" : ""}${Number(y.yoy_change_pct).toFixed(1)}%` : "\u2014"}
                                   </div>
-                                  <div style={{ textAlign: "right", color: mortRate != null ? (mortRate > 2 ? "#ef4444" : mortRate > 1.5 ? "#f59e0b" : "#22c55e") : "#555", fontWeight: 600 }}>
+                                  <div style={{ textAlign: "right", color: mortRate != null ? (mortRate > 2 ? "#ef4444" : mortRate > 1.5 ? "#f59e0b" : "#22c55e") : "rgba(255,255,255,0.35)", fontWeight: 600 }}>
                                     {mortRate != null ? `${mortRate.toFixed(2)}%` : "\u2014"}
                                   </div>
                                 </div>
@@ -1889,7 +1889,7 @@ export default function SeafoodPage() {
                       )}
                     </div>
                   ) : (
-                    <div style={{ padding: "16px 10px", color: "#555", fontSize: 11 }}>No harvest data available.</div>
+                    <div style={{ padding: "16px 10px", color: "rgba(255,255,255,0.35)", fontSize: 11 }}>No harvest data available.</div>
                   )}
                 </div>
               )}
@@ -1901,7 +1901,7 @@ export default function SeafoodPage() {
                 <div>
                   {/* ─── LIVE TRACKER ─────────────────────────────── */}
                   <div style={S.section}>LIVE HARVEST TRACKER</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", borderBottom: "1px solid #222" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", borderBottom: "1px solid #30363d" }}>
                     <div style={{ height: 420 }}>
                       <HarvestMap
                         farms={htFarms}
@@ -1917,51 +1917,51 @@ export default function SeafoodPage() {
                       />
                     </div>
                     {/* Vessel sidebar */}
-                    <div style={{ borderLeft: "1px solid #222", overflow: "auto", maxHeight: 420 }}>
+                    <div style={{ borderLeft: "1px solid #30363d", overflow: "auto", maxHeight: 420 }}>
                       {/* Vessel detail panel (when a vessel is selected) */}
                       {htSelectedVessel && htVesselDetail ? (
                         <div>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 10px", borderBottom: "1px solid #222", background: "#111" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 10px", borderBottom: "1px solid #30363d", background: "#161b22" }}>
                             <span style={{ fontWeight: 700, fontSize: 11, color: "#60a5fa" }}>{htVesselDetail.vessel.vessel_name}</span>
                             <button onClick={() => { setHtSelectedVessel(null); setHtVesselDetail(null); }} style={{
-                              background: "transparent", border: "1px solid #333", color: "#888", fontSize: 9,
+                              background: "transparent", border: "1px solid #30363d", color: "rgba(255,255,255,0.5)", fontSize: 9,
                               padding: "1px 6px", borderRadius: 2, cursor: "pointer", fontFamily: "inherit",
                             }}>CLOSE</button>
                           </div>
-                          <div style={{ padding: "6px 10px", borderBottom: "1px solid #1a1a1a" }}>
+                          <div style={{ padding: "6px 10px", borderBottom: "1px solid #21262d" }}>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 8px", fontSize: 10 }}>
-                              <span style={{ color: "#555" }}>Owner</span>
-                              <span style={{ color: "#ccc", textAlign: "right" }}>{htVesselDetail.vessel.owner_company || "—"}</span>
-                              <span style={{ color: "#555" }}>Type</span>
-                              <span style={{ color: "#ccc", textAlign: "right" }}>{htVesselDetail.vessel.vessel_type}</span>
-                              <span style={{ color: "#555" }}>Capacity</span>
-                              <span style={{ color: "#ccc", textAlign: "right" }}>{htVesselDetail.vessel.capacity_tonnes ? `${htVesselDetail.vessel.capacity_tonnes}t` : "—"}</span>
-                              <span style={{ color: "#555" }}>Built</span>
-                              <span style={{ color: "#ccc", textAlign: "right" }}>{htVesselDetail.vessel.built_year || "—"}</span>
-                              <span style={{ color: "#555" }}>MMSI</span>
-                              <span style={{ color: "#888", textAlign: "right", fontSize: 9 }}>{htVesselDetail.vessel.mmsi || "—"}</span>
-                              <span style={{ color: "#555" }}>IMO</span>
-                              <span style={{ color: "#888", textAlign: "right", fontSize: 9 }}>{htVesselDetail.vessel.imo || "—"}</span>
+                              <span style={{ color: "rgba(255,255,255,0.35)" }}>Owner</span>
+                              <span style={{ color: "rgba(255,255,255,0.7)", textAlign: "right" }}>{htVesselDetail.vessel.owner_company || "—"}</span>
+                              <span style={{ color: "rgba(255,255,255,0.35)" }}>Type</span>
+                              <span style={{ color: "rgba(255,255,255,0.7)", textAlign: "right" }}>{htVesselDetail.vessel.vessel_type}</span>
+                              <span style={{ color: "rgba(255,255,255,0.35)" }}>Capacity</span>
+                              <span style={{ color: "rgba(255,255,255,0.7)", textAlign: "right" }}>{htVesselDetail.vessel.capacity_tonnes ? `${htVesselDetail.vessel.capacity_tonnes}t` : "—"}</span>
+                              <span style={{ color: "rgba(255,255,255,0.35)" }}>Built</span>
+                              <span style={{ color: "rgba(255,255,255,0.7)", textAlign: "right" }}>{htVesselDetail.vessel.built_year || "—"}</span>
+                              <span style={{ color: "rgba(255,255,255,0.35)" }}>MMSI</span>
+                              <span style={{ color: "rgba(255,255,255,0.5)", textAlign: "right", fontSize: 9 }}>{htVesselDetail.vessel.mmsi || "—"}</span>
+                              <span style={{ color: "rgba(255,255,255,0.35)" }}>IMO</span>
+                              <span style={{ color: "rgba(255,255,255,0.5)", textAlign: "right", fontSize: 9 }}>{htVesselDetail.vessel.imo || "—"}</span>
                             </div>
                           </div>
                           {/* Stats */}
-                          <div style={{ padding: "4px 10px", borderBottom: "1px solid #1a1a1a" }}>
-                            <div style={{ fontSize: 8, color: "#555", fontWeight: 700, marginBottom: 2 }}>12-MONTH STATS</div>
+                          <div style={{ padding: "4px 10px", borderBottom: "1px solid #21262d" }}>
+                            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.35)", fontWeight: 700, marginBottom: 2 }}>12-MONTH STATS</div>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 8px", fontSize: 10 }}>
-                              <span style={{ color: "#555" }}>Trips</span>
-                              <span style={{ color: "#f97316", textAlign: "right", fontWeight: 600 }}>{htVesselDetail.stats.total_trips}</span>
-                              <span style={{ color: "#555" }}>Volume</span>
-                              <span style={{ color: "#ccc", textAlign: "right" }}>{htVesselDetail.stats.total_volume ? `${(htVesselDetail.stats.total_volume / 1000).toFixed(1)}kt` : "—"}</span>
-                              <span style={{ color: "#555" }}>Avg Duration</span>
-                              <span style={{ color: "#ccc", textAlign: "right" }}>{htVesselDetail.stats.avg_duration_hours ? `${htVesselDetail.stats.avg_duration_hours.toFixed(1)}h` : "—"}</span>
-                              <span style={{ color: "#555" }}>Avg Spot</span>
-                              <span style={{ color: "#ccc", textAlign: "right" }}>{htVesselDetail.stats.avg_spot_price ? `${htVesselDetail.stats.avg_spot_price.toFixed(1)} NOK` : "—"}</span>
+                              <span style={{ color: "rgba(255,255,255,0.35)" }}>Trips</span>
+                              <span style={{ color: "#3b82f6", textAlign: "right", fontWeight: 600 }}>{htVesselDetail.stats.total_trips}</span>
+                              <span style={{ color: "rgba(255,255,255,0.35)" }}>Volume</span>
+                              <span style={{ color: "rgba(255,255,255,0.7)", textAlign: "right" }}>{htVesselDetail.stats.total_volume ? `${(htVesselDetail.stats.total_volume / 1000).toFixed(1)}kt` : "—"}</span>
+                              <span style={{ color: "rgba(255,255,255,0.35)" }}>Avg Duration</span>
+                              <span style={{ color: "rgba(255,255,255,0.7)", textAlign: "right" }}>{htVesselDetail.stats.avg_duration_hours ? `${htVesselDetail.stats.avg_duration_hours.toFixed(1)}h` : "—"}</span>
+                              <span style={{ color: "rgba(255,255,255,0.35)" }}>Avg Spot</span>
+                              <span style={{ color: "rgba(255,255,255,0.7)", textAlign: "right" }}>{htVesselDetail.stats.avg_spot_price ? `${htVesselDetail.stats.avg_spot_price.toFixed(1)} NOK` : "—"}</span>
                             </div>
                           </div>
                           {/* Route info + spot price */}
-                          <div style={{ padding: "4px 10px", borderBottom: "1px solid #1a1a1a" }}>
-                            <div style={{ fontSize: 8, color: "#555", fontWeight: 700, marginBottom: 2 }}>TRACKING</div>
-                            <div style={{ fontSize: 10, color: htVesselDetail.positionCount > 0 ? "#60a5fa" : "#444" }}>
+                          <div style={{ padding: "4px 10px", borderBottom: "1px solid #21262d" }}>
+                            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.35)", fontWeight: 700, marginBottom: 2 }}>TRACKING</div>
+                            <div style={{ fontSize: 10, color: htVesselDetail.positionCount > 0 ? "#60a5fa" : "rgba(255,255,255,0.35)" }}>
                               {htVesselDetail.positionCount > 0
                                 ? `${htVesselDetail.positionCount} AIS positions (shown on map)`
                                 : "No AIS positions collected yet. Run harvest:track to start."}
@@ -1973,35 +1973,35 @@ export default function SeafoodPage() {
                             )}
                           </div>
                           {/* Detected visits (farm + slaughterhouse proximity events) */}
-                          <div style={{ padding: "4px 10px", borderBottom: "1px solid #1a1a1a" }}>
-                            <div style={{ fontSize: 8, color: "#555", fontWeight: 700, marginBottom: 2 }}>
+                          <div style={{ padding: "4px 10px", borderBottom: "1px solid #21262d" }}>
+                            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.35)", fontWeight: 700, marginBottom: 2 }}>
                               DETECTED VISITS ({htVesselDetail.visits?.length || 0})
                             </div>
                             {(htVesselDetail.visits || []).length > 0 ? htVesselDetail.visits.slice(0, 30).map((vis, i) => {
                               const isFarm = vis.type === "farm";
                               const icon = isFarm ? "\u25CF" : "\u25A0"; // circle for farm, square for slaughterhouse
-                              const color = isFarm ? "#22c55e" : "#f97316";
+                              const color = isFarm ? "#22c55e" : "#f59e0b";
                               const dateStr = new Date(vis.arrivalTime).toLocaleDateString("no-NO", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
                               return (
-                                <div key={i} style={{ padding: "3px 0", borderBottom: "1px solid #111", fontSize: 9 }}>
+                                <div key={i} style={{ padding: "3px 0", borderBottom: "1px solid #21262d", fontSize: 9 }}>
                                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                     <span>
                                       <span style={{ color, marginRight: 4 }}>{icon}</span>
-                                      <span style={{ color: "#ccc" }}>{vis.name}</span>
+                                      <span style={{ color: "rgba(255,255,255,0.7)" }}>{vis.name}</span>
                                     </span>
-                                    <span style={{ color: "#555", fontSize: 8 }}>{vis.durationMinutes > 0 ? `${vis.durationMinutes}m` : ""}</span>
+                                    <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 8 }}>{vis.durationMinutes > 0 ? `${vis.durationMinutes}m` : ""}</span>
                                   </div>
-                                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#666", paddingLeft: 12 }}>
+                                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "rgba(255,255,255,0.4)", paddingLeft: 12 }}>
                                     <span>{dateStr}</span>
                                     <span>
                                       {vis.ticker && <span style={{ color: "#58a6ff" }}>[{vis.ticker}] </span>}
-                                      <span style={{ color: "#555" }}>{isFarm ? "FARM" : "SLAUGHTER"}</span>
+                                      <span style={{ color: "rgba(255,255,255,0.35)" }}>{isFarm ? "FARM" : "SLAUGHTER"}</span>
                                     </span>
                                   </div>
                                 </div>
                               );
                             }) : (
-                              <div style={{ fontSize: 9, color: "#444" }}>
+                              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)" }}>
                                 {htVesselDetail.positionCount > 0
                                   ? "No farm/slaughterhouse visits detected in range"
                                   : "Visits detected from AIS proximity analysis"}
@@ -2010,14 +2010,14 @@ export default function SeafoodPage() {
                           </div>
                           {/* Completed trips (farm → slaughterhouse) */}
                           <div style={{ padding: "4px 10px" }}>
-                            <div style={{ fontSize: 8, color: "#555", fontWeight: 700, marginBottom: 2 }}>COMPLETED TRIPS ({htVesselDetail.trips.length})</div>
+                            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.35)", fontWeight: 700, marginBottom: 2 }}>COMPLETED TRIPS ({htVesselDetail.trips.length})</div>
                             {htVesselDetail.trips.length > 0 ? htVesselDetail.trips.slice(0, 20).map(t => (
-                              <div key={t.id} style={{ padding: "3px 0", borderBottom: "1px solid #111", fontSize: 9 }}>
+                              <div key={t.id} style={{ padding: "3px 0", borderBottom: "1px solid #21262d", fontSize: 9 }}>
                                 <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                  <span style={{ color: "#888" }}>{new Date(t.departure_time).toLocaleDateString("no-NO", { month: "short", day: "numeric" })}</span>
+                                  <span style={{ color: "rgba(255,255,255,0.5)" }}>{new Date(t.departure_time).toLocaleDateString("no-NO", { month: "short", day: "numeric" })}</span>
                                   <span style={{ color: "#f59e0b", fontWeight: 600 }}>{t.estimated_volume_tonnes ? `${t.estimated_volume_tonnes.toFixed(0)}t` : ""}</span>
                                 </div>
-                                <div style={{ color: "#666", fontSize: 8 }}>
+                                <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 8 }}>
                                   {t.origin_name || "?"} → {t.destination_name || "?"}
                                   {t.origin_ticker && <span style={{ color: "#58a6ff" }}> [{t.origin_ticker}]</span>}
                                   {t.spot_price_at_harvest && <span style={{ color: "#f59e0b" }}> @ {t.spot_price_at_harvest.toFixed(1)}</span>}
@@ -2025,12 +2025,12 @@ export default function SeafoodPage() {
                                 </div>
                               </div>
                             )) : (
-                              <div style={{ fontSize: 9, color: "#444" }}>No completed farm→slaughterhouse trips yet</div>
+                              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)" }}>No completed farm→slaughterhouse trips yet</div>
                             )}
                           </div>
                         </div>
                       ) : htVesselLoading ? (
-                        <div style={{ padding: "20px 10px", textAlign: "center", color: "#555", fontSize: 10 }}>Loading vessel data...</div>
+                        <div style={{ padding: "20px 10px", textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: 10 }}>Loading vessel data...</div>
                       ) : (
                         /* Default: vessel list */
                         <div>
@@ -2042,23 +2042,23 @@ export default function SeafoodPage() {
                                 key={v.vessel_id}
                                 onClick={() => handleVesselClick(v.vessel_id)}
                                 style={{
-                                  padding: "4px 10px", borderBottom: "1px solid #1a1a1a", cursor: "pointer",
-                                  background: htFocusVessel?.name === v.vessel_name ? "#1a1a2a" : "transparent",
+                                  padding: "4px 10px", borderBottom: "1px solid #21262d", cursor: "pointer",
+                                  background: htFocusVessel?.name === v.vessel_name ? "rgba(59,130,246,0.08)" : "transparent",
                                 }}
                               >
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                  <span style={{ fontWeight: 600, fontSize: 10, color: "#ccc" }}>{v.vessel_name}</span>
+                                  <span style={{ fontWeight: 600, fontSize: 10, color: "rgba(255,255,255,0.7)" }}>{v.vessel_name}</span>
                                   {v.hasPosition && (
                                     <span style={{
                                       fontSize: 8, padding: "1px 4px", borderRadius: 2,
-                                      background: (sc[v.status] || "#444") + "22", color: sc[v.status] || "#888",
+                                      background: (sc[v.status] || "rgba(255,255,255,0.35)") + "22", color: sc[v.status] || "rgba(255,255,255,0.5)",
                                       fontWeight: 700, letterSpacing: "0.04em",
                                     }}>
                                       {v.status.toUpperCase().replace(/_/g, " ")}
                                     </span>
                                   )}
                                 </div>
-                                <div style={{ fontSize: 9, color: "#666", marginTop: 1 }}>
+                                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginTop: 1 }}>
                                   {v.owner_company || "Unknown"} {v.capacity_tonnes ? `| ${v.capacity_tonnes}t` : ""}
                                   {v.speed_knots != null ? ` | ${v.speed_knots.toFixed(1)}kn` : ""}
                                 </div>
@@ -2066,7 +2066,7 @@ export default function SeafoodPage() {
                             );
                           })}
                           {(htLive?.vessels || []).length === 0 && (
-                            <div style={{ padding: "12px 10px", color: "#555", fontSize: 10 }}>
+                            <div style={{ padding: "12px 10px", color: "rgba(255,255,255,0.35)", fontSize: 10 }}>
                               No vessels in fleet. Run harvest:seed to populate.
                             </div>
                           )}
@@ -2077,28 +2077,28 @@ export default function SeafoodPage() {
 
                   {/* ─── TRIP LOG ──────────────────────────────────── */}
                   <div style={S.section}>TRIP LOG</div>
-                  <div style={{ padding: "4px 10px", borderBottom: "1px solid #222", display: "flex", gap: 6, alignItems: "center" }}>
-                    <span style={{ fontSize: 9, color: "#555" }}>PERIOD:</span>
+                  <div style={{ padding: "4px 10px", borderBottom: "1px solid #30363d", display: "flex", gap: 6, alignItems: "center" }}>
+                    <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)" }}>PERIOD:</span>
                     {[7, 30, 90].map(d => (
                       <button key={d} onClick={() => setHtTripDays(d)} style={{
                         padding: "1px 6px", borderRadius: 2, fontSize: 9, fontWeight: 600, cursor: "pointer",
-                        border: `1px solid ${htTripDays === d ? "#666" : "#333"}`,
-                        background: htTripDays === d ? "#222" : "transparent",
-                        color: htTripDays === d ? "#ccc" : "#666",
-                        fontFamily: "'Geist Mono','SF Mono','Consolas',monospace",
+                        border: `1px solid ${htTripDays === d ? "#3b82f6" : "#30363d"}`,
+                        background: htTripDays === d ? "rgba(59,130,246,0.15)" : "transparent",
+                        color: htTripDays === d ? "#3b82f6" : "rgba(255,255,255,0.4)",
+                        fontFamily: "monospace",
                       }}>
                         {`${d}D`}
                       </button>
                     ))}
-                    <span style={{ marginLeft: "auto", fontSize: 9, color: "#555" }}>
+                    <span style={{ marginLeft: "auto", fontSize: 9, color: "rgba(255,255,255,0.35)" }}>
                       {htTrips.length} trips
                     </span>
                   </div>
 
                   {/* Activity chart */}
                   {htActivity && htActivity.daily.length > 0 && (
-                    <div style={{ padding: "8px 10px", borderBottom: "1px solid #222" }}>
-                      <div style={{ fontSize: 9, color: "#555", marginBottom: 4 }}>DAILY TRIPS & SPOT PRICE ({`${htTripDays}D`})</div>
+                    <div style={{ padding: "8px 10px", borderBottom: "1px solid #30363d" }}>
+                      <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginBottom: 4 }}>DAILY TRIPS & SPOT PRICE ({`${htTripDays}D`})</div>
                       <svg viewBox={`0 0 ${Math.max(htActivity.daily.length * 8, 200)} 80`} style={{ width: "100%", height: 70 }}>
                         {(() => {
                           const d = htActivity.daily;
@@ -2163,7 +2163,7 @@ export default function SeafoodPage() {
                           );
                         })()}
                       </svg>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#555" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "rgba(255,255,255,0.35)" }}>
                         <div style={{ display: "flex", gap: 12 }}>
                           <span><span style={{ color: "#f59e0b" }}>■</span> Daily Trips</span>
                           <span><span style={{ color: "#22c55e" }}>—</span> Spot Price (NOK/kg)</span>
@@ -2181,9 +2181,9 @@ export default function SeafoodPage() {
                   <div style={{ overflow: "auto", maxHeight: 300 }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
                       <thead>
-                        <tr style={{ background: "#111", position: "sticky", top: 0 }}>
+                        <tr style={{ background: "#161b22", position: "sticky", top: 0 }}>
                           {["DATE", "VESSEL", "FARM", "SLAUGHTERHOUSE", "COMPANY", "EST.VOL", "SPOT"].map(h => (
-                            <th key={h} style={{ padding: "4px 6px", textAlign: "left", color: "#555", fontWeight: 600, fontSize: 9, borderBottom: "1px solid #222" }}>{h}</th>
+                            <th key={h} style={{ padding: "4px 6px", textAlign: "left", color: "rgba(255,255,255,0.35)", fontWeight: 600, fontSize: 9, borderBottom: "1px solid #30363d" }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
@@ -2209,26 +2209,26 @@ export default function SeafoodPage() {
                               });
                             }}
                             style={{
-                              borderBottom: "1px solid #1a1a1a",
+                              borderBottom: "1px solid #21262d",
                               cursor: hasCoords ? "pointer" : "default",
-                              background: isSelected ? "#1a1a2a" : "transparent",
+                              background: isSelected ? "rgba(59,130,246,0.08)" : "transparent",
                               borderLeft: isSelected ? "2px solid #f59e0b" : "2px solid transparent",
                             }}
                           >
-                            <td style={{ padding: "3px 6px", color: "#888" }}>{new Date(t.departure_time).toLocaleDateString("no-NO", { month: "short", day: "numeric" })}</td>
-                            <td style={{ padding: "3px 6px", color: "#ccc", fontWeight: 600 }}>{t.vessel_name}</td>
-                            <td style={{ padding: "3px 6px", color: "#888" }}>{t.origin_name || "—"}</td>
-                            <td style={{ padding: "3px 6px", color: "#888" }}>{t.destination_name || "—"}</td>
-                            <td style={{ padding: "3px 6px", color: t.origin_ticker ? ({MOWI:"#2563eb",SALM:"#16a34a",LSG:"#9333ea",GSF:"#ea580c",BAKKA:"#0891b2",AUSS:"#dc2626"} as Record<string,string>)[t.origin_ticker] || "#888" : "#555" }}>
+                            <td style={{ padding: "3px 6px", color: "rgba(255,255,255,0.5)" }}>{new Date(t.departure_time).toLocaleDateString("no-NO", { month: "short", day: "numeric" })}</td>
+                            <td style={{ padding: "3px 6px", color: "rgba(255,255,255,0.7)", fontWeight: 600 }}>{t.vessel_name}</td>
+                            <td style={{ padding: "3px 6px", color: "rgba(255,255,255,0.5)" }}>{t.origin_name || "—"}</td>
+                            <td style={{ padding: "3px 6px", color: "rgba(255,255,255,0.5)" }}>{t.destination_name || "—"}</td>
+                            <td style={{ padding: "3px 6px", color: t.origin_ticker ? ({MOWI:"#2563eb",SALM:"#16a34a",LSG:"#9333ea",GSF:"#ea580c",BAKKA:"#0891b2",AUSS:"#dc2626"} as Record<string,string>)[t.origin_ticker] || "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.35)" }}>
                               {t.origin_ticker || "—"}
                             </td>
-                            <td style={{ padding: "3px 6px", color: "#ccc" }}>{t.estimated_volume_tonnes ? `${t.estimated_volume_tonnes.toFixed(0)}t` : "—"}</td>
-                            <td style={{ padding: "3px 6px", color: "#f97316" }}>{t.spot_price_at_harvest ? `${t.spot_price_at_harvest.toFixed(1)}` : "—"}</td>
+                            <td style={{ padding: "3px 6px", color: "rgba(255,255,255,0.7)" }}>{t.estimated_volume_tonnes ? `${t.estimated_volume_tonnes.toFixed(0)}t` : "—"}</td>
+                            <td style={{ padding: "3px 6px", color: "#3b82f6" }}>{t.spot_price_at_harvest ? `${t.spot_price_at_harvest.toFixed(1)}` : "—"}</td>
                           </tr>
                           );
                         })}
                         {htTrips.length === 0 && (
-                          <tr><td colSpan={7} style={{ padding: "12px 6px", color: "#555", textAlign: "center" }}>No trips recorded yet. Run the harvest tracker to detect wellboat movements.</td></tr>
+                          <tr><td colSpan={7} style={{ padding: "12px 6px", color: "rgba(255,255,255,0.35)", textAlign: "center" }}>No trips recorded yet. Run the harvest tracker to detect wellboat movements.</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -2236,29 +2236,29 @@ export default function SeafoodPage() {
 
                   {/* ─── PRICE ESTIMATES ───────────────────────────── */}
                   <div style={S.section}>QUARTERLY HARVEST ESTIMATES</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, padding: "1px", borderBottom: "1px solid #222" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, padding: "1px", borderBottom: "1px solid #30363d" }}>
                     {(["MOWI", "SALM", "LSG", "GSF", "BAKKA", "AUSS"] as const).map(tk => {
                       const cq = htCurrentQ.find(c => c.ticker === tk);
                       const tc: Record<string, string> = { MOWI: "#2563eb", SALM: "#16a34a", LSG: "#9333ea", GSF: "#ea580c", BAKKA: "#0891b2", AUSS: "#dc2626" };
                       const now = new Date();
                       const qLabel = `Q${Math.ceil((now.getMonth() + 1) / 3)} ${now.getFullYear()}`;
                       return (
-                        <div key={tk} style={{ background: "#0d0d0d", padding: "8px 10px" }}>
+                        <div key={tk} style={{ background: "#0d1117", padding: "8px 10px" }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                             <span style={{ fontWeight: 700, color: tc[tk], fontSize: 11 }}>{tk}</span>
-                            <span style={{ fontSize: 8, color: "#555" }}>{qLabel}</span>
+                            <span style={{ fontSize: 8, color: "rgba(255,255,255,0.35)" }}>{qLabel}</span>
                           </div>
                           {cq ? (
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 8px", fontSize: 10 }}>
-                              <span style={{ color: "#666" }}>TRIPS</span>
-                              <span style={{ textAlign: "right", color: "#ccc" }}>{cq.trip_count}</span>
-                              <span style={{ color: "#666" }}>EST. VOL</span>
-                              <span style={{ textAlign: "right", color: "#ccc" }}>{cq.est_volume > 0 ? `${(cq.est_volume / 1000).toFixed(1)}kt` : "—"}</span>
-                              <span style={{ color: "#666" }}>VWAP</span>
-                              <span style={{ textAlign: "right", color: "#f97316" }}>{cq.vwap_price ? `${cq.vwap_price.toFixed(1)}` : "—"}</span>
+                              <span style={{ color: "rgba(255,255,255,0.4)" }}>TRIPS</span>
+                              <span style={{ textAlign: "right", color: "rgba(255,255,255,0.7)" }}>{cq.trip_count}</span>
+                              <span style={{ color: "rgba(255,255,255,0.4)" }}>EST. VOL</span>
+                              <span style={{ textAlign: "right", color: "rgba(255,255,255,0.7)" }}>{cq.est_volume > 0 ? `${(cq.est_volume / 1000).toFixed(1)}kt` : "—"}</span>
+                              <span style={{ color: "rgba(255,255,255,0.4)" }}>VWAP</span>
+                              <span style={{ textAlign: "right", color: "#3b82f6" }}>{cq.vwap_price ? `${cq.vwap_price.toFixed(1)}` : "—"}</span>
                             </div>
                           ) : (
-                            <div style={{ fontSize: 9, color: "#444" }}>No data yet</div>
+                            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)" }}>No data yet</div>
                           )}
                         </div>
                       );
@@ -2272,25 +2272,25 @@ export default function SeafoodPage() {
                       <div style={{ overflow: "auto", maxHeight: 250 }}>
                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
                           <thead>
-                            <tr style={{ background: "#111", position: "sticky", top: 0 }}>
+                            <tr style={{ background: "#161b22", position: "sticky", top: 0 }}>
                               {["COMPANY", "QTR", "EST.VOL", "ACT.VOL", "EST.PRICE", "ACT.PRICE", "ACC."].map(h => (
-                                <th key={h} style={{ padding: "4px 6px", textAlign: "left", color: "#555", fontWeight: 600, fontSize: 9, borderBottom: "1px solid #222" }}>{h}</th>
+                                <th key={h} style={{ padding: "4px 6px", textAlign: "left", color: "rgba(255,255,255,0.35)", fontWeight: 600, fontSize: 9, borderBottom: "1px solid #30363d" }}>{h}</th>
                               ))}
                             </tr>
                           </thead>
                           <tbody>
                             {htEstimates.map((e, i) => {
-                              const accColor = e.estimation_accuracy_pct == null ? "#555"
+                              const accColor = e.estimation_accuracy_pct == null ? "rgba(255,255,255,0.35)"
                                 : Math.abs(e.estimation_accuracy_pct) <= 10 ? "#22c55e"
                                 : Math.abs(e.estimation_accuracy_pct) <= 20 ? "#f59e0b" : "#ef4444";
                               return (
-                                <tr key={i} style={{ borderBottom: "1px solid #1a1a1a" }}>
-                                  <td style={{ padding: "3px 6px", color: "#ccc", fontWeight: 600 }}>{e.ticker}</td>
-                                  <td style={{ padding: "3px 6px", color: "#888" }}>Q{e.quarter} {e.year}</td>
-                                  <td style={{ padding: "3px 6px", color: "#888" }}>{e.estimated_harvest_tonnes ? `${(e.estimated_harvest_tonnes / 1000).toFixed(1)}kt` : "—"}</td>
-                                  <td style={{ padding: "3px 6px", color: "#ccc" }}>{e.actual_harvest_tonnes ? `${(e.actual_harvest_tonnes / 1000).toFixed(1)}kt` : "—"}</td>
-                                  <td style={{ padding: "3px 6px", color: "#888" }}>{e.estimated_avg_price_nok ? e.estimated_avg_price_nok.toFixed(1) : "—"}</td>
-                                  <td style={{ padding: "3px 6px", color: "#f97316" }}>{e.actual_price_realization ? e.actual_price_realization.toFixed(1) : "—"}</td>
+                                <tr key={i} style={{ borderBottom: "1px solid #21262d" }}>
+                                  <td style={{ padding: "3px 6px", color: "rgba(255,255,255,0.7)", fontWeight: 600 }}>{e.ticker}</td>
+                                  <td style={{ padding: "3px 6px", color: "rgba(255,255,255,0.5)" }}>Q{e.quarter} {e.year}</td>
+                                  <td style={{ padding: "3px 6px", color: "rgba(255,255,255,0.5)" }}>{e.estimated_harvest_tonnes ? `${(e.estimated_harvest_tonnes / 1000).toFixed(1)}kt` : "—"}</td>
+                                  <td style={{ padding: "3px 6px", color: "rgba(255,255,255,0.7)" }}>{e.actual_harvest_tonnes ? `${(e.actual_harvest_tonnes / 1000).toFixed(1)}kt` : "—"}</td>
+                                  <td style={{ padding: "3px 6px", color: "rgba(255,255,255,0.5)" }}>{e.estimated_avg_price_nok ? e.estimated_avg_price_nok.toFixed(1) : "—"}</td>
+                                  <td style={{ padding: "3px 6px", color: "#3b82f6" }}>{e.actual_price_realization ? e.actual_price_realization.toFixed(1) : "—"}</td>
                                   <td style={{ padding: "3px 6px", color: accColor, fontWeight: 600 }}>
                                     {e.estimation_accuracy_pct != null ? `${e.estimation_accuracy_pct > 0 ? "+" : ""}${e.estimation_accuracy_pct.toFixed(0)}%` : "—"}
                                   </td>
@@ -2304,8 +2304,8 @@ export default function SeafoodPage() {
                   )}
 
                   {/* ─── METHODOLOGY ──────────────────────────────── */}
-                  <div style={{ padding: "8px 10px", borderTop: "1px solid #222", fontSize: 9, color: "#444", lineHeight: 1.6 }}>
-                    <div style={{ fontWeight: 700, color: "#555", marginBottom: 4 }}>METHODOLOGY</div>
+                  <div style={{ padding: "8px 10px", borderTop: "1px solid #30363d", fontSize: 9, color: "rgba(255,255,255,0.35)", lineHeight: 1.6 }}>
+                    <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.35)", marginBottom: 4 }}>METHODOLOGY</div>
                     <div>Volume estimates use historical same-quarter averages with YoY trend adjustment from reported company earnings (salmon_quarterly_ops).</div>
                     <div>Price estimates from Fish Pool SISALMON weekly spot (NOK/kg), volume-weighted by AIS-tracked trip departures.</div>
                     <div>AIS tracking (wellboat positions) provides supplementary trip count data. Accuracy measured against reported quarterly earnings.</div>
@@ -2320,7 +2320,7 @@ export default function SeafoodPage() {
               <div style={S.section}>SALMON SPOT</div>
               <div style={{ padding: "8px 10px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                  <span style={{ fontSize: 20, fontWeight: 700, color: "#f97316" }}>
+                  <span style={{ fontSize: 20, fontWeight: 700, color: "#3b82f6" }}>
                     {overview?.salmonPrice ? `NOK ${overview.salmonPrice.price.toFixed(2)}` : "\u2014"}
                   </span>
                   <span style={{ color: (overview?.salmonPrice?.changePct ?? 0) >= 0 ? "#22c55e" : "#ef4444", fontWeight: 600, fontSize: 11 }}>
@@ -2329,11 +2329,11 @@ export default function SeafoodPage() {
                 </div>
                 {salmonData?.stats && (
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 12px", marginTop: 6, fontSize: 10 }}>
-                    <span style={{ color: "#666" }}>52W HIGH</span>
+                    <span style={{ color: "rgba(255,255,255,0.4)" }}>52W HIGH</span>
                     <span style={{ textAlign: "right", color: "#22c55e" }}>NOK {salmonData.stats.high52w.toFixed(2)}</span>
-                    <span style={{ color: "#666" }}>52W LOW</span>
+                    <span style={{ color: "rgba(255,255,255,0.4)" }}>52W LOW</span>
                     <span style={{ textAlign: "right", color: "#ef4444" }}>NOK {salmonData.stats.low52w.toFixed(2)}</span>
-                    <span style={{ color: "#666" }}>AVERAGE</span>
+                    <span style={{ color: "rgba(255,255,255,0.4)" }}>AVERAGE</span>
                     <span style={{ textAlign: "right" }}>NOK {salmonData.stats.avg.toFixed(2)}</span>
                   </div>
                 )}
@@ -2346,14 +2346,14 @@ export default function SeafoodPage() {
                   <span style={{ fontSize: 20, fontWeight: 700, color: getLiceColor(overview?.industryAvgLice ?? null) }}>
                     {overview?.industryAvgLice?.toFixed(3) ?? "\u2014"}
                   </span>
-                  <span style={{ color: "#666", fontSize: 10 }}>THRESHOLD 0.500</span>
+                  <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 10 }}>THRESHOLD 0.500</span>
                 </div>
                 {liceData?.weekly && liceData.weekly.length > 0 && (
                   <div style={{ marginTop: 6, fontSize: 10 }}>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 12px" }}>
-                      <span style={{ color: "#666" }}>REPORTING</span>
+                      <span style={{ color: "rgba(255,255,255,0.4)" }}>REPORTING</span>
                       <span style={{ textAlign: "right" }}>{liceData.weekly[liceData.weekly.length - 1]?.reportCount ?? 0} sites</span>
-                      <span style={{ color: "#666" }}>ABOVE 0.5</span>
+                      <span style={{ color: "rgba(255,255,255,0.4)" }}>ABOVE 0.5</span>
                       <span style={{ textAlign: "right", color: "#ef4444" }}>{liceData.weekly[liceData.weekly.length - 1]?.aboveThreshold ?? 0}</span>
                     </div>
                   </div>
@@ -2364,27 +2364,27 @@ export default function SeafoodPage() {
               <div style={S.section}>TRAFFIC LIGHT STATUS</div>
               <div style={{ padding: "4px 0" }}>
                 {areas.map(a => (
-                  <div key={a.areaNumber} style={{ display: "grid", gridTemplateColumns: "24px 1fr 50px", padding: "3px 10px", fontSize: 10, borderBottom: "1px solid #111" }}>
-                    <span style={{ color: "#666" }}>{a.areaNumber}</span>
-                    <span style={{ color: "#aaa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.name}</span>
+                  <div key={a.areaNumber} style={{ display: "grid", gridTemplateColumns: "24px 1fr 50px", padding: "3px 10px", fontSize: 10, borderBottom: "1px solid #21262d" }}>
+                    <span style={{ color: "rgba(255,255,255,0.4)" }}>{a.areaNumber}</span>
+                    <span style={{ color: "rgba(255,255,255,0.5)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.name}</span>
                     <span style={{ textAlign: "right" }}>
-                      <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: TL_C[a.trafficLight] || "#555", marginRight: 4 }} />
-                      <span style={{ color: TL_C[a.trafficLight] || "#555", fontWeight: 600, fontSize: 9 }}>{a.trafficLight?.toUpperCase()}</span>
+                      <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: TL_C[a.trafficLight] || "#30363d", marginRight: 4 }} />
+                      <span style={{ color: TL_C[a.trafficLight] || "#30363d", fontWeight: 600, fontSize: 9 }}>{a.trafficLight?.toUpperCase()}</span>
                     </span>
                   </div>
                 ))}
               </div>
 
               {/* Company Risk Scores */}
-              <div style={S.section}>RISK SCORES <span style={{ fontWeight: 400, color: "#555" }}>(click to filter map)</span></div>
+              <div style={S.section}>RISK SCORES <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.35)" }}>(click to filter map)</span></div>
               <div style={{ padding: "4px 0" }}>
                 {sortedCompanies.map(co => {
                   const isActive = selectedTicker === co.ticker;
                   return (
-                  <div key={co.ticker} onClick={() => setSelectedTicker(isActive ? null : co.ticker)} style={{ display: "grid", gridTemplateColumns: "48px 1fr 36px", padding: "3px 10px", fontSize: 10, borderBottom: "1px solid #111", cursor: "pointer", background: isActive ? "#1a1a2a" : undefined }}>
+                  <div key={co.ticker} onClick={() => setSelectedTicker(isActive ? null : co.ticker)} style={{ display: "grid", gridTemplateColumns: "48px 1fr 36px", padding: "3px 10px", fontSize: 10, borderBottom: "1px solid #21262d", cursor: "pointer", background: isActive ? "rgba(59,130,246,0.08)" : undefined }}>
                     <span style={{ color: "#58a6ff", fontWeight: 600 }}>{co.ticker}</span>
                     <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                      <div style={{ flex: 1, height: 3, background: "#1a1a1a", borderRadius: 1 }}>
+                      <div style={{ flex: 1, height: 3, background: "#21262d", borderRadius: 1 }}>
                         <div style={{ width: `${Math.min(100, co.riskScore ?? 0)}%`, height: 3, background: getRiskColor(co.riskScore), borderRadius: 1 }} />
                       </div>
                     </div>
@@ -2403,11 +2403,11 @@ export default function SeafoodPage() {
                     <div style={S.section}>BIOMASS</div>
                     <div style={{ padding: "6px 10px", fontSize: 10 }}>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 12px" }}>
-                        <span style={{ color: "#666" }}>STANDING</span>
-                        <span style={{ textAlign: "right", color: "#f97316", fontWeight: 600 }}>{((latest.total_biomass || 0) / 1000).toFixed(0)}K t</span>
-                        <span style={{ color: "#666" }}>HARVEST/M</span>
+                        <span style={{ color: "rgba(255,255,255,0.4)" }}>STANDING</span>
+                        <span style={{ textAlign: "right", color: "#3b82f6", fontWeight: 600 }}>{((latest.total_biomass || 0) / 1000).toFixed(0)}K t</span>
+                        <span style={{ color: "rgba(255,255,255,0.4)" }}>HARVEST/M</span>
                         <span style={{ textAlign: "right" }}>{((latest.total_harvest || 0) / 1000).toFixed(0)}K t</span>
-                        <span style={{ color: "#666" }}>STOCK</span>
+                        <span style={{ color: "rgba(255,255,255,0.4)" }}>STOCK</span>
                         <span style={{ textAlign: "right" }}>{(Number(latest.total_stock || 0) / 1000000).toFixed(1)}M fish</span>
                       </div>
                     </div>
@@ -2421,15 +2421,15 @@ export default function SeafoodPage() {
                   <div style={S.section}>EXPORT PRICE</div>
                   <div style={{ padding: "6px 10px", fontSize: 10 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                      <span style={{ fontSize: 16, fontWeight: 700, color: "#f97316" }}>
+                      <span style={{ fontSize: 16, fontWeight: 700, color: "#3b82f6" }}>
                         {exportData.stats.currentPrice.toFixed(2)}
                       </span>
-                      <span style={{ color: "#666", fontSize: 9 }}>NOK/kg</span>
+                      <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 9 }}>NOK/kg</span>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 12px", marginTop: 4 }}>
-                      <span style={{ color: "#666" }}>52W H</span>
+                      <span style={{ color: "rgba(255,255,255,0.4)" }}>52W H</span>
                       <span style={{ textAlign: "right", color: "#22c55e" }}>{exportData.stats.high52w?.toFixed(2)}</span>
-                      <span style={{ color: "#666" }}>52W L</span>
+                      <span style={{ color: "rgba(255,255,255,0.4)" }}>52W L</span>
                       <span style={{ textAlign: "right", color: "#ef4444" }}>{exportData.stats.low52w?.toFixed(2)}</span>
                     </div>
                   </div>
@@ -2438,7 +2438,7 @@ export default function SeafoodPage() {
 
               {/* Data Sources */}
               <div style={S.section}>DATA SOURCES</div>
-              <div style={{ padding: "6px 10px", fontSize: 9, color: "#555", lineHeight: 1.6 }}>
+              <div style={{ padding: "6px 10px", fontSize: 9, color: "rgba(255,255,255,0.35)", lineHeight: 1.6 }}>
                 SSB (salmon export prices)<br />
                 BarentsWatch (lice, disease)<br />
                 Fiskeridirektoratet (biomass, localities)<br />

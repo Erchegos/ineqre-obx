@@ -138,20 +138,20 @@ type SeafoodOverview = {
 
 /* ─── Constants ────────────────────────────────────────────────── */
 
-const SEV_C: Record<number, string> = { 1: "#555", 2: "#3b82f6", 3: "#f59e0b", 4: "#f97316", 5: "#ef4444" };
+const SEV_C: Record<number, string> = { 1: "rgba(255,255,255,0.35)", 2: "#3b82f6", 3: "#f59e0b", 4: "#f97316", 5: "#ef4444" };
 // Sector heatmap colors handled inline
 const TYPE_C: Record<string, string> = {
   earnings: "#22c55e", guidance: "#3b82f6", analyst_action: "#a855f7",
   corporate_action: "#f59e0b", insider_trade: "#ec4899", regulatory: "#06b6d4",
-  macro: "#6366f1", geopolitical: "#ef4444", sector_news: "#14b8a6", other: "#555",
+  macro: "#6366f1", geopolitical: "#ef4444", sector_news: "#14b8a6", other: "rgba(255,255,255,0.35)",
 };
 const DIR_SYM: Record<string, { icon: string; color: string }> = {
   positive: { icon: "\u25B2", color: "#22c55e" },
   negative: { icon: "\u25BC", color: "#ef4444" },
-  neutral: { icon: "\u2500", color: "#555" },
+  neutral: { icon: "\u2500", color: "rgba(255,255,255,0.35)" },
 };
 const TRAFFIC_C: Record<string, string> = { green: "#22c55e", yellow: "#f59e0b", red: "#ef4444" };
-const MONO = "'Geist Mono','SF Mono','Consolas',monospace";
+const MONO = "monospace";
 
 /* ─── Helpers ──────────────────────────────────────────────────── */
 
@@ -230,15 +230,15 @@ function importanceFilter(threshold: number, items: { importance: number }[]): t
 
 /* ─── Section Header Component ─────────────────────────────────── */
 
-function SectionHeader({ title, count, color = "#f97316" }: { title: string; count?: number; color?: string }) {
+function SectionHeader({ title, count, color = "#3b82f6" }: { title: string; count?: number; color?: string }) {
   return (
     <div style={{
       fontSize: 9, fontWeight: 700, color, letterSpacing: "0.08em",
-      padding: "6px 10px 4px", borderBottom: "1px solid #222", background: "#111",
+      padding: "6px 10px 4px", borderBottom: "1px solid #30363d", background: "#161b22",
       display: "flex", justifyContent: "space-between", alignItems: "center",
     }}>
       <span>{title}</span>
-      {count != null && <span style={{ color: "#555", fontWeight: 500 }}>{count}</span>}
+      {count != null && <span style={{ color: "rgba(255,255,255,0.35)", fontWeight: 500 }}>{count}</span>}
     </div>
   );
 }
@@ -423,10 +423,10 @@ export default function IntelligencePage() {
   return (
     <>
       <style>{`
-        .intel-row:hover { background: #151515 !important; }
-        .panel-scroll { overflow-y: auto; scrollbar-width: thin; scrollbar-color: #333 transparent; }
+        .intel-row:hover { background: rgba(59,130,246,0.08) !important; }
+        .panel-scroll { overflow-y: auto; scrollbar-width: thin; scrollbar-color: #30363d transparent; }
         .panel-scroll::-webkit-scrollbar { width: 4px; }
-        .panel-scroll::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+        .panel-scroll::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
         @media (max-width: 1200px) {
           .intel-3col { grid-template-columns: 1fr 1fr !important; }
         }
@@ -436,11 +436,11 @@ export default function IntelligencePage() {
         }
       `}</style>
 
-      <main style={{ minHeight: "100vh", background: "#0a0a0a", color: "#e5e5e5", fontFamily: MONO, fontSize: 12 }}>
+      <main style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: MONO, fontSize: 12 }}>
         {/* ─── Ticker Strip ────────────────────────────────────────── */}
         <div className="ticker-strip" style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "4px 16px", borderBottom: "1px solid #222", background: "#0d0d0d",
+          padding: "4px 16px", borderBottom: "1px solid #30363d", background: "#0d1117",
           fontSize: 10, gap: 12, flexWrap: "wrap",
         }}>
           <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
@@ -449,13 +449,13 @@ export default function IntelligencePage() {
               const isSalmon = c.symbol === "SALMON";
               return (
                 <span key={c.symbol} style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                  <span style={{ color: "#666", fontWeight: 600 }}>{c.name.split(" ")[0].toUpperCase()}</span>
+                  <span style={{ color: "rgba(255,255,255,0.4)", fontWeight: 600 }}>{c.name.split(" ")[0].toUpperCase()}</span>
                   {isOpeningAuction ? (
-                    <span style={{ color: "#444", fontWeight: 600 }}>{"\u2013\u2013"}</span>
+                    <span style={{ color: "rgba(255,255,255,0.3)", fontWeight: 600 }}>{"\u2013\u2013"}</span>
                   ) : isSalmon ? (
-                    <span style={{ color: "#e5e5e5", fontWeight: 600 }}>{"\u20AC"}{c.eurClose ? c.eurClose.toFixed(2) : "\u2013"}</span>
+                    <span style={{ color: "#fff", fontWeight: 600 }}>{"\u20AC"}{c.eurClose ? c.eurClose.toFixed(2) : "\u2013"}</span>
                   ) : (
-                    <span style={{ color: "#e5e5e5", fontWeight: 600 }}>{c.currency === "USD" ? "$" : ""}{fmtPrice(c.latest.close)}</span>
+                    <span style={{ color: "#fff", fontWeight: 600 }}>{c.currency === "USD" ? "$" : ""}{fmtPrice(c.latest.close)}</span>
                   )}
                   {!isOpeningAuction && (
                     <span style={{ color: (c.dayReturnPct ?? 0) >= 0 ? "#22c55e" : "#ef4444", fontWeight: 600 }}>
@@ -466,17 +466,17 @@ export default function IntelligencePage() {
               );
             })}
 
-            <span style={{ width: 1, height: 12, background: "#333" }} />
+            <span style={{ width: 1, height: 12, background: "#30363d" }} />
 
             {/* FX */}
             {fxRates.map(fx => (
               <span key={fx.pair} style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                <span style={{ color: "#666", fontWeight: 600 }}>{fx.pair}</span>
+                <span style={{ color: "rgba(255,255,255,0.4)", fontWeight: 600 }}>{fx.pair}</span>
                 {isOpeningAuction ? (
-                  <span style={{ color: "#444", fontWeight: 600 }}>{"\u2013\u2013"}</span>
+                  <span style={{ color: "rgba(255,255,255,0.3)", fontWeight: 600 }}>{"\u2013\u2013"}</span>
                 ) : (
                   <>
-                    <span style={{ color: "#e5e5e5", fontWeight: 600 }}>{fx.latest.spot.toFixed(4)}</span>
+                    <span style={{ color: "#fff", fontWeight: 600 }}>{fx.latest.spot.toFixed(4)}</span>
                     {fx.latest.simpleReturn != null && (
                       <span style={{ color: fx.latest.simpleReturn >= 0 ? "#22c55e" : "#ef4444", fontWeight: 600 }}>
                         {fmtPct(fx.latest.simpleReturn, 1)}
@@ -487,14 +487,14 @@ export default function IntelligencePage() {
               </span>
             ))}
 
-            <span style={{ width: 1, height: 12, background: "#333" }} />
+            <span style={{ width: 1, height: 12, background: "#30363d" }} />
 
             {/* OBX Regime */}
             {obx && (
               <span style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                <span style={{ color: "#666", fontWeight: 600 }}>OBX</span>
+                <span style={{ color: "rgba(255,255,255,0.4)", fontWeight: 600 }}>OBX</span>
                 {isOpeningAuction ? (
-                  <span style={{ color: "#444", fontWeight: 600 }}>{"\u2013\u2013"}</span>
+                  <span style={{ color: "rgba(255,255,255,0.3)", fontWeight: 600 }}>{"\u2013\u2013"}</span>
                 ) : (
                   <>
                     <span style={{
@@ -505,7 +505,7 @@ export default function IntelligencePage() {
                       {obx.index.regime.toUpperCase()}
                     </span>
                     {obx.index.lastClose && (
-                      <span style={{ color: "#888" }}>{obx.index.lastClose.toFixed(0)}</span>
+                      <span style={{ color: "rgba(255,255,255,0.5)" }}>{obx.index.lastClose.toFixed(0)}</span>
                     )}
                   </>
                 )}
@@ -513,9 +513,9 @@ export default function IntelligencePage() {
             )}
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#666" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "rgba(255,255,255,0.4)" }}>
             <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: "0.06em", color: "#f59e0b", opacity: 0.7 }}>15 MIN DELAYED</span>
-            <span style={{ width: 1, height: 10, background: "#333" }} />
+            <span style={{ width: 1, height: 10, background: "#30363d" }} />
             <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
               <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 4px #22c55e" }} />
               <span>{lastRefresh.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span>
@@ -526,15 +526,15 @@ export default function IntelligencePage() {
         {/* ─── Filter Bar ──────────────────────────────────────────── */}
         <div style={{
           display: "flex", alignItems: "center", gap: 8, padding: "4px 16px",
-          borderBottom: "1px solid #222", background: "#111", flexWrap: "wrap",
+          borderBottom: "1px solid #30363d", background: "#161b22", flexWrap: "wrap",
         }}>
-          <Link href="/" style={{ fontSize: 10, color: "#666", textDecoration: "none" }}>HOME</Link>
-          <span style={{ color: "#333" }}>/</span>
-          <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.08em", color: "#f97316" }}>INTELLIGENCE TERMINAL</span>
+          <Link href="/" style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", textDecoration: "none" }}>HOME</Link>
+          <span style={{ color: "#30363d" }}>/</span>
+          <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.08em", color: "#3b82f6" }}>INTELLIGENCE TERMINAL</span>
 
-          <span style={{ width: 1, height: 14, background: "#333", margin: "0 4px" }} />
+          <span style={{ width: 1, height: 14, background: "#30363d", margin: "0 4px" }} />
 
-          <span style={{ fontSize: 9, color: "#666", fontWeight: 600 }}>IMPORTANCE:</span>
+          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontWeight: 600 }}>IMPORTANCE:</span>
           {[
             { label: "ALL", value: 1 },
             { label: "3+", value: 3 },
@@ -547,16 +547,16 @@ export default function IntelligencePage() {
               style={{
                 padding: "2px 7px", borderRadius: 2, fontSize: 9, fontWeight: 700,
                 fontFamily: MONO, cursor: "pointer", letterSpacing: "0.04em",
-                border: `1px solid ${importanceMin === f.value ? "#f97316" : "#333"}`,
-                background: importanceMin === f.value ? "#f97316" : "transparent",
-                color: importanceMin === f.value ? "#000" : "#888",
+                border: `1px solid ${importanceMin === f.value ? "#3b82f6" : "#30363d"}`,
+                background: importanceMin === f.value ? "#3b82f6" : "transparent",
+                color: importanceMin === f.value ? "#000" : "rgba(255,255,255,0.5)",
               }}
             >
               {f.label}
             </button>
           ))}
 
-          <span style={{ width: 1, height: 14, background: "#333", margin: "0 4px" }} />
+          <span style={{ width: 1, height: 14, background: "#30363d", margin: "0 4px" }} />
 
           <input
             type="text"
@@ -564,15 +564,15 @@ export default function IntelligencePage() {
             value={tickerFilter}
             onChange={e => setTickerFilter(e.target.value.toUpperCase())}
             style={{
-              width: 72, padding: "3px 6px", background: "#1a1a1a", border: "1px solid #333",
-              borderRadius: 2, color: "#e5e5e5", fontFamily: MONO, fontSize: 10, outline: "none",
+              width: 72, padding: "3px 6px", background: "#0d1117", border: "1px solid #30363d",
+              borderRadius: 2, color: "#fff", fontFamily: MONO, fontSize: 10, outline: "none",
             }}
           />
 
           <span style={{ flex: 1 }} />
 
           {/* Summary badges */}
-          <span style={{ fontSize: 9, color: "#666" }}>{events.length} events</span>
+          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.4)" }}>{events.length} events</span>
           {sev5Count > 0 && <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 2, background: "#ef4444", color: "#fff" }}>{sev5Count} CRITICAL</span>}
           {sev4Count > 0 && <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 2, background: "#f97316", color: "#fff" }}>{sev4Count} HIGH</span>}
           {totalUp > 0 && <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 2, background: "#22c55e22", color: "#22c55e", border: "1px solid #22c55e44" }}>{totalUp} UP</span>}
@@ -580,7 +580,7 @@ export default function IntelligencePage() {
         </div>
 
         {loading ? (
-          <div style={{ padding: 80, textAlign: "center", color: "#666", fontSize: 11 }}>Loading intelligence data...</div>
+          <div style={{ padding: 80, textAlign: "center", color: "rgba(255,255,255,0.4)", fontSize: 11 }}>Loading intelligence data...</div>
         ) : (
           /* ─── 3-Column Grid ──────────────────────────────────────── */
           <div className="intel-3col" style={{
@@ -591,11 +591,11 @@ export default function IntelligencePage() {
             {/* ══════════════════════════════════════════════════════════
                 COLUMN 1: NEWS FEED
                 ══════════════════════════════════════════════════════════ */}
-            <div style={{ borderRight: "1px solid #222", display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 80px)" }}>
+            <div style={{ borderRight: "1px solid #30363d", display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 80px)" }}>
               <SectionHeader title="NEWS FEED" count={filteredEvents.length} />
 
               {/* Severity distribution bar */}
-              <div style={{ display: "flex", height: 2, background: "#111" }}>
+              <div style={{ display: "flex", height: 2, background: "#161b22" }}>
                 {[1, 2, 3, 4, 5].map(s => {
                   const count = filteredEvents.filter(e => e.severity === s).length;
                   return <div key={s} style={{ width: `${filteredEvents.length > 0 ? (count / filteredEvents.length) * 100 : 0}%`, background: SEV_C[s] }} />;
@@ -604,11 +604,11 @@ export default function IntelligencePage() {
 
               <div className="panel-scroll" style={{ flex: 1, minHeight: 0 }}>
                 {filteredEvents.length === 0 ? (
-                  <div style={{ padding: 30, textAlign: "center", color: "#555", fontSize: 10 }}>No events match filters</div>
+                  <div style={{ padding: 30, textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: 10 }}>No events match filters</div>
                 ) : (
                   filteredEvents.map(ev => {
                     const isExp = expandedId === ev.id;
-                    const sevColor = SEV_C[ev.severity] || "#555";
+                    const sevColor = SEV_C[ev.severity] || "rgba(255,255,255,0.35)";
                     const typeColor = TYPE_C[ev.eventType] || TYPE_C.other;
                     const hasSummary = !!(ev.summary && ev.summary !== ev.headline);
                     const hasFacts = !!(ev.structuredFacts && Object.values(ev.structuredFacts).some(v => v !== null));
@@ -623,19 +623,19 @@ export default function IntelligencePage() {
                           style={{
                             display: "grid", gridTemplateColumns: "36px 3px 1fr 54px",
                             padding: "5px 8px", cursor: hasExpandable ? "pointer" : "default",
-                            borderBottom: "1px solid #1a1a1a", alignItems: "start",
+                            borderBottom: "1px solid #0d1117", alignItems: "start",
                           }}
                         >
-                          <span style={{ fontSize: 10, color: "#666", paddingTop: 1 }}>{timeAgo(ev.publishedAt)}</span>
+                          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", paddingTop: 1 }}>{timeAgo(ev.publishedAt)}</span>
                           <div style={{ width: 3, minHeight: 16, background: sevColor, borderRadius: 1, marginTop: 1 }} />
                           <div style={{ paddingLeft: 6 }}>
                             <div style={{
-                              color: ev.severity >= 4 ? "#fff" : "#e5e5e5", fontWeight: 500,
+                              color: ev.severity >= 4 ? "#fff" : "#fff", fontWeight: 500,
                               lineHeight: 1.35, fontSize: 11,
                             }}>
                               {ev.headline}
                               {hasExpandable && (
-                                <span style={{ fontSize: 8, color: "#444", marginLeft: 6 }}>{isExp ? "\u25B4" : "\u25BE"}</span>
+                                <span style={{ fontSize: 8, color: "rgba(255,255,255,0.3)", marginLeft: 6 }}>{isExp ? "\u25B4" : "\u25BE"}</span>
                               )}
                             </div>
                             <div style={{ display: "flex", gap: 4, marginTop: 2, flexWrap: "wrap", alignItems: "center" }}>
@@ -643,38 +643,38 @@ export default function IntelligencePage() {
                                 const dir = DIR_SYM[t.direction] || DIR_SYM.neutral;
                                 return (
                                   <Link key={t.ticker} href={`/stocks/${t.ticker}`} onClick={e => e.stopPropagation()}
-                                    style={{ fontSize: 9, fontWeight: 700, padding: "0px 3px", borderRadius: 1, background: "#1a1a1a", color: dir.color, textDecoration: "none" }}>
+                                    style={{ fontSize: 9, fontWeight: 700, padding: "0px 3px", borderRadius: 1, background: "#0d1117", color: dir.color, textDecoration: "none" }}>
                                     {dir.icon} {t.ticker}
                                   </Link>
                                 );
                               })}
                               <span style={{ fontSize: 8, fontWeight: 700, padding: "1px 4px", borderRadius: 1, background: `${typeColor}15`, color: typeColor }}>{ev.eventType.replace(/_/g, " ").toUpperCase()}</span>
                               {ev.dayReturnPct != null && (
-                                <span style={{ fontSize: 9, fontWeight: 600, color: ev.dayReturnPct > 0.3 ? "#22c55e" : ev.dayReturnPct < -0.3 ? "#ef4444" : "#555" }}>
+                                <span style={{ fontSize: 9, fontWeight: 600, color: ev.dayReturnPct > 0.3 ? "#22c55e" : ev.dayReturnPct < -0.3 ? "#ef4444" : "rgba(255,255,255,0.35)" }}>
                                   {fmtPctRaw(ev.dayReturnPct, 1)}
                                 </span>
                               )}
                             </div>
                           </div>
-                          <div style={{ textAlign: "right", fontSize: 10, paddingTop: 1, fontWeight: 600, color: ev.sentiment != null ? (ev.sentiment > 0.1 ? "#22c55e" : ev.sentiment < -0.1 ? "#ef4444" : "#555") : "#444" }}>
+                          <div style={{ textAlign: "right", fontSize: 10, paddingTop: 1, fontWeight: 600, color: ev.sentiment != null ? (ev.sentiment > 0.1 ? "#22c55e" : ev.sentiment < -0.1 ? "#ef4444" : "rgba(255,255,255,0.35)") : "rgba(255,255,255,0.3)" }}>
                             {ev.sentiment != null ? `${ev.sentiment > 0 ? "+" : ""}${ev.sentiment.toFixed(2)}` : ""}
                           </div>
                         </div>
 
                         {/* Expanded detail */}
                         {isExp && hasExpandable && (
-                          <div style={{ padding: "10px 12px 10px 52px", background: "#111", borderBottom: "1px solid #222", fontSize: 11 }}>
+                          <div style={{ padding: "10px 12px 10px 52px", background: "#161b22", borderBottom: "1px solid #30363d", fontSize: 11 }}>
                             {hasFacts && ev.structuredFacts && (
-                              <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "2px 12px", marginBottom: 8, padding: "6px 10px", background: "#1a1a1a", borderRadius: 2, border: "1px solid #222", fontSize: 10 }}>
-                                {ev.structuredFacts.person_name && (<><span style={{ color: "#666" }}>Person</span><span>{String(ev.structuredFacts.person_name)}{ev.structuredFacts.person_role ? ` (${ev.structuredFacts.person_role})` : ""}</span></>)}
-                                {ev.structuredFacts.transaction_type && (<><span style={{ color: "#666" }}>Type</span><span style={{ fontWeight: 700, color: String(ev.structuredFacts.transaction_type).toLowerCase() === "buy" ? "#22c55e" : "#ef4444" }}>{String(ev.structuredFacts.transaction_type).toUpperCase()}</span></>)}
-                                {ev.structuredFacts.shares && (<><span style={{ color: "#666" }}>Shares</span><span>{fmtNum(Number(ev.structuredFacts.shares), true)}</span></>)}
-                                {ev.structuredFacts.price_per_share && (<><span style={{ color: "#666" }}>Price</span><span>NOK {Number(ev.structuredFacts.price_per_share).toFixed(2)}</span></>)}
-                                {ev.structuredFacts.total_value && (<><span style={{ color: "#666" }}>Value</span><span>NOK {fmtNum(Number(ev.structuredFacts.total_value), true)}</span></>)}
+                              <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "2px 12px", marginBottom: 8, padding: "6px 10px", background: "#0d1117", borderRadius: 2, border: "1px solid #21262d", fontSize: 10 }}>
+                                {ev.structuredFacts.person_name && (<><span style={{ color: "rgba(255,255,255,0.4)" }}>Person</span><span>{String(ev.structuredFacts.person_name)}{ev.structuredFacts.person_role ? ` (${ev.structuredFacts.person_role})` : ""}</span></>)}
+                                {ev.structuredFacts.transaction_type && (<><span style={{ color: "rgba(255,255,255,0.4)" }}>Type</span><span style={{ fontWeight: 700, color: String(ev.structuredFacts.transaction_type).toLowerCase() === "buy" ? "#22c55e" : "#ef4444" }}>{String(ev.structuredFacts.transaction_type).toUpperCase()}</span></>)}
+                                {ev.structuredFacts.shares && (<><span style={{ color: "rgba(255,255,255,0.4)" }}>Shares</span><span>{fmtNum(Number(ev.structuredFacts.shares), true)}</span></>)}
+                                {ev.structuredFacts.price_per_share && (<><span style={{ color: "rgba(255,255,255,0.4)" }}>Price</span><span>NOK {Number(ev.structuredFacts.price_per_share).toFixed(2)}</span></>)}
+                                {ev.structuredFacts.total_value && (<><span style={{ color: "rgba(255,255,255,0.4)" }}>Value</span><span>NOK {fmtNum(Number(ev.structuredFacts.total_value), true)}</span></>)}
                               </div>
                             )}
-                            {hasSummary && <p style={{ color: "#bbb", margin: "0 0 8px", lineHeight: 1.5 }}>{ev.summary}</p>}
-                            <div style={{ display: "flex", gap: 16, fontSize: 10, color: "#555", flexWrap: "wrap" }}>
+                            {hasSummary && <p style={{ color: "rgba(255,255,255,0.6)", margin: "0 0 8px", lineHeight: 1.5 }}>{ev.summary}</p>}
+                            <div style={{ display: "flex", gap: 16, fontSize: 10, color: "rgba(255,255,255,0.35)", flexWrap: "wrap" }}>
                               {ev.tickers?.length > 0 && <span>Tickers: {ev.tickers.map(t => t.ticker).join(", ")}</span>}
                               {ev.sectors?.length > 0 && <span>Sectors: {ev.sectors.map(s => s.sector).join(", ")}</span>}
                               {hasUrl && <a href={ev.url!} target="_blank" rel="noopener noreferrer" style={{ color: "#3b82f6", textDecoration: "none" }} onClick={e => e.stopPropagation()}>Source {"\u2197"}</a>}
@@ -691,18 +691,18 @@ export default function IntelligencePage() {
             {/* ══════════════════════════════════════════════════════════
                 COLUMN 2: SIGNALS, MOVERS, INSIDERS, SEAFOOD
                 ══════════════════════════════════════════════════════════ */}
-            <div style={{ borderRight: "1px solid #222", display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 80px)" }}>
+            <div style={{ borderRight: "1px solid #30363d", display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 80px)" }}>
               <div className="panel-scroll" style={{ flex: 1, minHeight: 0 }}>
 
                 {/* ── SECTOR HEATMAP ─────────────────────────────── */}
                 <SectionHeader title="SECTOR PERFORMANCE" count={filteredSectors.reduce((s, sec) => s + sec.stockCount, 0)} />
                 {sectorTradeDate && (
-                  <div style={{ fontSize: 8, color: "#555", padding: "2px 10px", background: "#0d0d0d" }}>
+                  <div style={{ fontSize: 8, color: "rgba(255,255,255,0.35)", padding: "2px 10px", background: "#0d1117" }}>
                     as of {new Date(sectorTradeDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: TZ })}
                   </div>
                 )}
                 {filteredSectors.length === 0 ? (
-                  <div style={{ padding: 16, textAlign: "center", color: "#555", fontSize: 10 }}>No sector data</div>
+                  <div style={{ padding: 16, textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: 10 }}>No sector data</div>
                 ) : (
                   filteredSectors.map(sec => {
                     const avg = sec.avgReturn;
@@ -716,20 +716,20 @@ export default function IntelligencePage() {
                           onClick={() => setExpandedSector(expanded ? null : sec.sector)}
                           style={{
                             display: "grid", gridTemplateColumns: "1fr 50px 50px 56px",
-                            padding: "5px 10px", borderBottom: "1px solid #1a1a1a",
+                            padding: "5px 10px", borderBottom: "1px solid #0d1117",
                             cursor: "pointer", background: bgColor, alignItems: "center",
                           }}
                         >
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <span style={{ fontSize: 10, fontWeight: 700, color: "#e5e5e5" }}>{sec.sector}</span>
-                            <span style={{ fontSize: 8, color: "#555" }}>{sec.stockCount}</span>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: "#fff" }}>{sec.sector}</span>
+                            <span style={{ fontSize: 8, color: "rgba(255,255,255,0.35)" }}>{sec.stockCount}</span>
                           </div>
-                          <div style={{ fontSize: 8, color: "#888", textAlign: "center" }}>
+                          <div style={{ fontSize: 8, color: "rgba(255,255,255,0.5)", textAlign: "center" }}>
                             <span style={{ color: "#4ade80" }}>{sec.upCount}</span>
-                            <span style={{ color: "#555" }}>/</span>
+                            <span style={{ color: "rgba(255,255,255,0.35)" }}>/</span>
                             <span style={{ color: "#f97316" }}>{sec.downCount}</span>
                           </div>
-                          <div style={{ fontSize: 8, color: "#666", textAlign: "center" }}>
+                          <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", textAlign: "center" }}>
                             {sec.bestTicker && <span style={{ color: "#4ade80" }}>{sec.bestTicker}</span>}
                           </div>
                           <span style={{ textAlign: "right", fontSize: 11, fontWeight: 700, color: barColor }}>
@@ -740,13 +740,13 @@ export default function IntelligencePage() {
                           <Link key={st.ticker} href={`/stocks/${st.ticker}`} className="intel-row" style={{
                             display: "grid", gridTemplateColumns: "60px 1fr auto 36px 56px",
                             padding: "3px 10px 3px 20px", textDecoration: "none", color: "inherit",
-                            borderBottom: "1px solid #111", background: "#0a0a0a", gap: 6,
+                            borderBottom: "1px solid #161b22", background: "#0a0a0a", gap: 6,
                           }}>
-                            <span style={{ fontSize: 9, fontWeight: 600, color: "#ccc" }}>{st.ticker}</span>
-                            <span style={{ fontSize: 9, color: "#555", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{st.name}</span>
-                            <span style={{ fontSize: 9, color: "#888", textAlign: "right" }}>{fmtPrice(st.lastClose)}</span>
-                            <span style={{ fontSize: 7, color: "#444", textAlign: "right" }}>{fmtUpdatedAt(st.updatedAt)}</span>
-                            <span style={{ textAlign: "right", fontSize: 10, fontWeight: 700, color: st.returnPct > 0 ? "#4ade80" : st.returnPct < 0 ? "#f97316" : "#666" }}>
+                            <span style={{ fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>{st.ticker}</span>
+                            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{st.name}</span>
+                            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", textAlign: "right" }}>{fmtPrice(st.lastClose)}</span>
+                            <span style={{ fontSize: 7, color: "rgba(255,255,255,0.3)", textAlign: "right" }}>{fmtUpdatedAt(st.updatedAt)}</span>
+                            <span style={{ textAlign: "right", fontSize: 10, fontWeight: 700, color: st.returnPct > 0 ? "#4ade80" : st.returnPct < 0 ? "#f97316" : "rgba(255,255,255,0.4)" }}>
                               {st.returnPct >= 0 ? "+" : ""}{st.returnPct.toFixed(2)}%
                             </span>
                           </Link>
@@ -760,16 +760,16 @@ export default function IntelligencePage() {
                 <SectionHeader title="TOP MOVERS" count={movers.gainers.length + movers.losers.length} />
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
                   {/* Gainers */}
-                  <div style={{ borderRight: "1px solid #1a1a1a" }}>
+                  <div style={{ borderRight: "1px solid #0d1117" }}>
                     <div style={{ fontSize: 8, fontWeight: 700, color: "#22c55e", padding: "3px 10px", background: "#22c55e08", letterSpacing: "0.06em" }}>GAINERS</div>
                     {movers.gainers.slice(0, 10).map(m => (
                       <Link key={m.ticker} href={`/stocks/${m.ticker}`} className="intel-row" style={{
                         display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: 6, padding: "3px 10px",
-                        textDecoration: "none", color: "inherit", borderBottom: "1px solid #111",
+                        textDecoration: "none", color: "inherit", borderBottom: "1px solid #161b22",
                       }}>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: "#e5e5e5" }}>{m.ticker}</span>
-                        <span style={{ fontSize: 9, color: "#888", alignSelf: "center" }}>{fmtPrice(m.lastClose)}</span>
-                        <span style={{ fontSize: 7, color: "#444", alignSelf: "center" }}>{fmtUpdatedAt(m.updatedAt)}</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: "#fff" }}>{m.ticker}</span>
+                        <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", alignSelf: "center" }}>{fmtPrice(m.lastClose)}</span>
+                        <span style={{ fontSize: 7, color: "rgba(255,255,255,0.3)", alignSelf: "center" }}>{fmtUpdatedAt(m.updatedAt)}</span>
                         <span style={{ fontSize: 10, fontWeight: 700, color: "#22c55e" }}>{fmtPctRaw(m.returnPct * 100, 1)}</span>
                       </Link>
                     ))}
@@ -780,11 +780,11 @@ export default function IntelligencePage() {
                     {movers.losers.slice(0, 10).map(m => (
                       <Link key={m.ticker} href={`/stocks/${m.ticker}`} className="intel-row" style={{
                         display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: 6, padding: "3px 10px",
-                        textDecoration: "none", color: "inherit", borderBottom: "1px solid #111",
+                        textDecoration: "none", color: "inherit", borderBottom: "1px solid #161b22",
                       }}>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: "#e5e5e5" }}>{m.ticker}</span>
-                        <span style={{ fontSize: 9, color: "#888", alignSelf: "center" }}>{fmtPrice(m.lastClose)}</span>
-                        <span style={{ fontSize: 7, color: "#444", alignSelf: "center" }}>{fmtUpdatedAt(m.updatedAt)}</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: "#fff" }}>{m.ticker}</span>
+                        <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", alignSelf: "center" }}>{fmtPrice(m.lastClose)}</span>
+                        <span style={{ fontSize: 7, color: "rgba(255,255,255,0.3)", alignSelf: "center" }}>{fmtUpdatedAt(m.updatedAt)}</span>
                         <span style={{ fontSize: 10, fontWeight: 700, color: "#ef4444" }}>{fmtPctRaw(m.returnPct * 100, 1)}</span>
                       </Link>
                     ))}
@@ -794,18 +794,18 @@ export default function IntelligencePage() {
                 {/* ── FX RATES ────────────────────────────────────── */}
                 <SectionHeader title="FX RATES" />
                 {fxRates.length === 0 ? (
-                  <div style={{ padding: 16, textAlign: "center", color: "#555", fontSize: 10 }}>No FX data</div>
+                  <div style={{ padding: 16, textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: 10 }}>No FX data</div>
                 ) : (
                   fxRates.map(fx => {
                     const spotData = fx.timeSeries?.spot?.map(s => s.value) || [];
-                    const sparkColor = spotData.length > 1 ? (spotData[spotData.length - 1] >= spotData[0] ? "#22c55e" : "#ef4444") : "#555";
+                    const sparkColor = spotData.length > 1 ? (spotData[spotData.length - 1] >= spotData[0] ? "#22c55e" : "#ef4444") : "rgba(255,255,255,0.35)";
                     const retColor = (fx.latest.simpleReturn ?? 0) >= 0 ? "#22c55e" : "#ef4444";
 
                     return (
-                      <div key={fx.pair} style={{ display: "grid", gridTemplateColumns: "68px 1fr auto auto auto", padding: "5px 10px", borderBottom: "1px solid #1a1a1a", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: "#e5e5e5" }}>{fx.pair}</span>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "#e5e5e5" }}>{fx.latest.spot.toFixed(4)}</span>
-                        <span style={{ fontSize: 7, color: "#444" }}>{fmtDateStamp(fx.latest.date)}</span>
+                      <div key={fx.pair} style={{ display: "grid", gridTemplateColumns: "68px 1fr auto auto auto", padding: "5px 10px", borderBottom: "1px solid #0d1117", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: "#fff" }}>{fx.pair}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#fff" }}>{fx.latest.spot.toFixed(4)}</span>
+                        <span style={{ fontSize: 7, color: "rgba(255,255,255,0.3)" }}>{fmtDateStamp(fx.latest.date)}</span>
                         <span style={{ fontSize: 10, fontWeight: 600, color: retColor }}>
                           {fx.latest.simpleReturn != null ? fmtPct(fx.latest.simpleReturn, 2) : "\u2014"}
                         </span>
@@ -818,7 +818,7 @@ export default function IntelligencePage() {
                 {/* ── INSIDER TRADES ──────────────────────────────── */}
                 <SectionHeader title="INSIDER TRADES" count={filteredInsiders.length} />
                 {filteredInsiders.length === 0 ? (
-                  <div style={{ padding: 16, textAlign: "center", color: "#555", fontSize: 10 }}>No insider trades found</div>
+                  <div style={{ padding: 16, textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: 10 }}>No insider trades found</div>
                 ) : (
                   filteredInsiders.slice(0, 15).map(trade => {
                     // Infer BUY/SELL from headline if structured data is missing
@@ -839,12 +839,12 @@ export default function IntelligencePage() {
                       .slice(0, 90);
                     return (
                       <div key={trade.id} className="intel-row" style={{
-                        padding: "5px 10px", borderBottom: "1px solid #1a1a1a",
+                        padding: "5px 10px", borderBottom: "1px solid #0d1117",
                       }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
                           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                             {trade.ticker && (
-                              <Link href={`/stocks/${trade.ticker}`} style={{ fontSize: 10, fontWeight: 700, color: "#e5e5e5", textDecoration: "none" }}>{trade.ticker}</Link>
+                              <Link href={`/stocks/${trade.ticker}`} style={{ fontSize: 10, fontWeight: 700, color: "#fff", textDecoration: "none" }}>{trade.ticker}</Link>
                             )}
                             <span style={{
                               fontSize: 7, fontWeight: 700, padding: "1px 4px", borderRadius: 2,
@@ -854,24 +854,24 @@ export default function IntelligencePage() {
                               {badgeLabel}
                             </span>
                             {trade.personName && (
-                              <span style={{ fontSize: 9, color: "#aaa" }}>
+                              <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)" }}>
                                 {trade.personName}{trade.personRole ? ` (${trade.personRole})` : ""}
                               </span>
                             )}
                           </div>
                           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                             {trade.totalValue != null && (
-                              <span style={{ fontSize: 10, fontWeight: 600, color: isBuy ? "#4ade80" : isSell ? "#f97316" : "#ccc" }}>
+                              <span style={{ fontSize: 10, fontWeight: 600, color: isBuy ? "#4ade80" : isSell ? "#f97316" : "rgba(255,255,255,0.7)" }}>
                                 NOK {fmtNum(trade.totalValue, true)}
                               </span>
                             )}
-                            <span style={{ fontSize: 9, color: "#555" }}>{timeAgo(trade.publishedAt)}</span>
+                            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)" }}>{timeAgo(trade.publishedAt)}</span>
                           </div>
                         </div>
                         {/* Headline as context */}
-                        <div style={{ fontSize: 9, color: "#777", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <div style={{ fontSize: 9, color: "rgba(255,255,255,0.45)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {trade.url ? (
-                            <a href={trade.url} target="_blank" rel="noopener noreferrer" style={{ color: "#777", textDecoration: "none" }}>{cleanHeadline}</a>
+                            <a href={trade.url} target="_blank" rel="noopener noreferrer" style={{ color: "rgba(255,255,255,0.45)", textDecoration: "none" }}>{cleanHeadline}</a>
                           ) : cleanHeadline}
                         </div>
                       </div>
@@ -885,9 +885,9 @@ export default function IntelligencePage() {
                   <div style={{ padding: "6px 10px" }}>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
                       {/* Salmon price */}
-                      <div style={{ background: "#111", borderRadius: 2, padding: "6px 8px", border: "1px solid #1a1a1a" }}>
-                        <div style={{ fontSize: 8, color: "#666", fontWeight: 600, letterSpacing: "0.06em" }}>SALMON</div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: "#e5e5e5" }}>
+                      <div style={{ background: "#0d1117", borderRadius: 4, padding: "6px 8px", border: "1px solid #21262d" }}>
+                        <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontWeight: 600, letterSpacing: "0.06em" }}>SALMON</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>
                           {seafood.salmonPrice ? `${seafood.salmonPrice.price.toFixed(2)}` : "\u2014"}
                         </div>
                         {seafood.salmonPrice?.changePct != null && (
@@ -897,31 +897,31 @@ export default function IntelligencePage() {
                         )}
                       </div>
                       {/* Lice */}
-                      <div style={{ background: "#111", borderRadius: 2, padding: "6px 8px", border: "1px solid #1a1a1a" }}>
-                        <div style={{ fontSize: 8, color: "#666", fontWeight: 600, letterSpacing: "0.06em" }}>AVG LICE</div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: seafood.industryAvgLice != null ? (seafood.industryAvgLice < 0.2 ? "#22c55e" : seafood.industryAvgLice < 0.5 ? "#f59e0b" : "#ef4444") : "#888" }}>
+                      <div style={{ background: "#0d1117", borderRadius: 4, padding: "6px 8px", border: "1px solid #21262d" }}>
+                        <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontWeight: 600, letterSpacing: "0.06em" }}>AVG LICE</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: seafood.industryAvgLice != null ? (seafood.industryAvgLice < 0.2 ? "#22c55e" : seafood.industryAvgLice < 0.5 ? "#f59e0b" : "#ef4444") : "rgba(255,255,255,0.5)" }}>
                           {seafood.industryAvgLice?.toFixed(3) ?? "\u2014"}
                         </div>
-                        <div style={{ fontSize: 9, color: "#666" }}>limit: {seafood.liceThreshold}</div>
+                        <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)" }}>limit: {seafood.liceThreshold}</div>
                       </div>
                       {/* Traffic lights */}
-                      <div style={{ background: "#111", borderRadius: 2, padding: "6px 8px", border: "1px solid #1a1a1a" }}>
-                        <div style={{ fontSize: 8, color: "#666", fontWeight: 600, letterSpacing: "0.06em" }}>TRAFFIC</div>
+                      <div style={{ background: "#0d1117", borderRadius: 4, padding: "6px 8px", border: "1px solid #21262d" }}>
+                        <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontWeight: 600, letterSpacing: "0.06em" }}>TRAFFIC</div>
                         <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
                           {(["green", "yellow", "red"] as const).map(c => (
                             <span key={c} style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11, fontWeight: 700 }}>
                               <span style={{ width: 8, height: 8, borderRadius: "50%", background: TRAFFIC_C[c] }} />
-                              <span style={{ color: "#e5e5e5" }}>{seafood.trafficLights[c]}</span>
+                              <span style={{ color: "#fff" }}>{seafood.trafficLights[c]}</span>
                             </span>
                           ))}
                         </div>
-                        <div style={{ fontSize: 9, color: "#666" }}>{seafood.activeDiseases} diseases</div>
+                        <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)" }}>{seafood.activeDiseases} diseases</div>
                       </div>
                     </div>
                     {/* Sparkline */}
                     {seafood.sparkline.length > 1 && (
                       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 0" }}>
-                        <span style={{ fontSize: 8, color: "#555" }}>90D</span>
+                        <span style={{ fontSize: 8, color: "rgba(255,255,255,0.35)" }}>90D</span>
                         <div dangerouslySetInnerHTML={{ __html: sparklineSvg(seafood.sparkline.map(s => s.price), 200, 20, "#06b6d4") }} />
                       </div>
                     )}
@@ -930,7 +930,7 @@ export default function IntelligencePage() {
                     </Link>
                   </div>
                 ) : (
-                  <div style={{ padding: 16, textAlign: "center", color: "#555", fontSize: 10 }}>No seafood data</div>
+                  <div style={{ padding: 16, textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: 10 }}>No seafood data</div>
                 )}
               </div>
             </div>
@@ -946,25 +946,25 @@ export default function IntelligencePage() {
                 {filteredCommodities.map(c => {
                   const retColor = (c.dayReturnPct ?? 0) >= 0 ? "#22c55e" : "#ef4444";
                   const histData = c.history?.map(h => h.close) || [];
-                  const sparkColor = histData.length > 1 ? (histData[histData.length - 1] >= histData[0] ? "#22c55e" : "#ef4444") : "#555";
+                  const sparkColor = histData.length > 1 ? (histData[histData.length - 1] >= histData[0] ? "#22c55e" : "#ef4444") : "rgba(255,255,255,0.35)";
                   const isSalmon = c.symbol === "SALMON";
 
                   return (
-                    <div key={c.symbol} style={{ borderBottom: "1px solid #1a1a1a" }}>
+                    <div key={c.symbol} style={{ borderBottom: "1px solid #0d1117" }}>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", padding: "5px 10px 2px", alignItems: "center", gap: 8 }}>
                         <div>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: "#e5e5e5" }}>{c.name}</div>
-                          <div style={{ fontSize: 8, color: "#555" }}>{isSalmon ? "NOK/kg" : c.symbol}</div>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "#fff" }}>{c.name}</div>
+                          <div style={{ fontSize: 8, color: "rgba(255,255,255,0.35)" }}>{isSalmon ? "NOK/kg" : c.symbol}</div>
                         </div>
                         <div style={{ textAlign: "right" }}>
                           {isSalmon ? (
                             <>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: "#e5e5e5" }}>{"\u20AC"}{c.eurClose?.toFixed(2) ?? "\u2013"} <span style={{ color: "#888", fontSize: 9 }}>NOK{fmtPrice(c.latest.close)}</span></div>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: "#fff" }}>{"\u20AC"}{c.eurClose?.toFixed(2) ?? "\u2013"} <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 9 }}>NOK{fmtPrice(c.latest.close)}</span></div>
                               <div style={{ fontSize: 10, fontWeight: 600, color: retColor }}>{fmtPctRaw(c.dayReturnPct, 1)}</div>
                             </>
                           ) : (
                             <>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: "#e5e5e5" }}>{c.currency === "USD" ? "$" : ""}{fmtPrice(c.latest.close)}</div>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: "#fff" }}>{c.currency === "USD" ? "$" : ""}{fmtPrice(c.latest.close)}</div>
                               <div style={{ fontSize: 10, fontWeight: 600, color: retColor }}>{fmtPctRaw(c.dayReturnPct, 1)}</div>
                             </>
                           )}
@@ -977,10 +977,10 @@ export default function IntelligencePage() {
                             <Link key={s.ticker} href={`/stocks/${s.ticker}`} style={{
                               fontSize: 9, padding: "1px 5px", borderRadius: 2, background: "transparent",
                               border: `1px solid ${s.beta > 0 ? "#22c55e33" : "#ef444433"}`,
-                              color: "#999", textDecoration: "none", fontWeight: 500,
+                              color: "rgba(255,255,255,0.5)", textDecoration: "none", fontWeight: 500,
                               display: "inline-flex", gap: 3, alignItems: "center",
                             }}>
-                              <span style={{ color: "#ccc", fontWeight: 700 }}>{s.ticker}</span>
+                              <span style={{ color: "rgba(255,255,255,0.7)", fontWeight: 700 }}>{s.ticker}</span>
                               <span style={{ color: s.beta > 0 ? "#22c55e" : "#ef4444" }}>{s.beta > 0 ? "+" : ""}{s.beta.toFixed(2)}</span>
                             </Link>
                           ))}
@@ -993,13 +993,13 @@ export default function IntelligencePage() {
                 {/* ── SHORT INTEREST ──────────────────────────────── */}
                 <SectionHeader title="SHORT INTEREST" count={filteredShorts.length} />
                 {filteredShorts.length === 0 ? (
-                  <div style={{ padding: 16, textAlign: "center", color: "#555", fontSize: 10 }}>No short data</div>
+                  <div style={{ padding: 16, textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: 10 }}>No short data</div>
                 ) : (
                   filteredShorts.slice(0, 15).map(s => {
-                    const changeColor = s.changePct == null ? "#555" : s.changePct > 0.2 ? "#ef4444" : s.changePct < -0.2 ? "#22c55e" : "#555";
-                    const siColor = s.shortPct >= 5 ? "#ef4444" : s.shortPct >= 3 ? "#f97316" : s.shortPct >= 1 ? "#f59e0b" : "#888";
+                    const changeColor = s.changePct == null ? "rgba(255,255,255,0.35)" : s.changePct > 0.2 ? "#ef4444" : s.changePct < -0.2 ? "#22c55e" : "rgba(255,255,255,0.35)";
+                    const siColor = s.shortPct >= 5 ? "#ef4444" : s.shortPct >= 3 ? "#f97316" : s.shortPct >= 1 ? "#f59e0b" : "rgba(255,255,255,0.5)";
                     const histData = s.history?.map(h => h.short_pct) || [];
-                    const sparkColor = histData.length > 1 ? (histData[histData.length - 1] > histData[0] ? "#ef4444" : "#22c55e") : "#555";
+                    const sparkColor = histData.length > 1 ? (histData[histData.length - 1] > histData[0] ? "#ef4444" : "#22c55e") : "rgba(255,255,255,0.35)";
                     const expanded = expandedShort === s.ticker;
                     const hi90 = histData.length > 0 ? Math.max(...histData) : s.shortPct;
                     const lo90 = histData.length > 0 ? Math.min(...histData) : s.shortPct;
@@ -1014,7 +1014,7 @@ export default function IntelligencePage() {
                     const barWidth = Math.min(s.shortPct / 10 * 100, 100);
 
                     return (
-                      <div key={s.ticker} style={{ borderBottom: "1px solid #111" }}>
+                      <div key={s.ticker} style={{ borderBottom: "1px solid #161b22" }}>
                         <div
                           onClick={() => setExpandedShort(expanded ? null : s.ticker)}
                           className="intel-row"
@@ -1022,9 +1022,9 @@ export default function IntelligencePage() {
                         >
                           {/* Row 1: Ticker, SI bar, change, sparkline */}
                           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-                            <span style={{ fontSize: 10, fontWeight: 700, color: "#e5e5e5", minWidth: 48 }}>{s.ticker}</span>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: "#fff", minWidth: 48 }}>{s.ticker}</span>
                             <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 4 }}>
-                              <div style={{ position: "relative", height: 10, flex: 1, background: "#1a1a1a", borderRadius: 2, overflow: "hidden" }}>
+                              <div style={{ position: "relative", height: 10, flex: 1, background: "#0d1117", borderRadius: 2, overflow: "hidden" }}>
                                 <div style={{ height: "100%", width: `${barWidth}%`, background: siColor, borderRadius: 2, opacity: 0.7 }} />
                               </div>
                               <span style={{ fontSize: 10, fontWeight: 700, color: siColor, minWidth: 40, textAlign: "right" }}>{s.shortPct.toFixed(1)}%</span>
@@ -1040,24 +1040,24 @@ export default function IntelligencePage() {
                           </div>
                           {/* Row 2: Name, holders count, days, sparkline */}
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <span style={{ fontSize: 8, color: "#666", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            <span style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                               {s.stockName || s.ticker}
                             </span>
-                            <span style={{ fontSize: 8, color: "#555" }} title="Active short holders">
+                            <span style={{ fontSize: 8, color: "rgba(255,255,255,0.35)" }} title="Active short holders">
                               {s.activePositions || s.holders?.length || 0} holders
                             </span>
-                            <span style={{ fontSize: 8, color: "#444" }}>{daysOnList}d</span>
+                            <span style={{ fontSize: 8, color: "rgba(255,255,255,0.3)" }}>{daysOnList}d</span>
                             <div dangerouslySetInnerHTML={{ __html: sparklineSvg(histData, 48, 12, sparkColor) }} />
                           </div>
                         </div>
                         {/* Expanded: holder breakdown + 90d range */}
                         {expanded && (
-                          <div style={{ padding: "4px 10px 8px", background: "#0d0d0d", borderTop: "1px solid #1a1a1a" }}>
+                          <div style={{ padding: "4px 10px 8px", background: "#0d1117", borderTop: "1px solid #21262d" }}>
                             {/* 90-day range bar */}
                             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                              <span style={{ fontSize: 8, color: "#555", minWidth: 42 }}>90D range</span>
-                              <span style={{ fontSize: 8, color: "#666" }}>{lo90.toFixed(1)}%</span>
-                              <div style={{ flex: 1, position: "relative", height: 6, background: "#1a1a1a", borderRadius: 3 }}>
+                              <span style={{ fontSize: 8, color: "rgba(255,255,255,0.35)", minWidth: 42 }}>90D range</span>
+                              <span style={{ fontSize: 8, color: "rgba(255,255,255,0.4)" }}>{lo90.toFixed(1)}%</span>
+                              <div style={{ flex: 1, position: "relative", height: 6, background: "#161b22", borderRadius: 3 }}>
                                 {hi90 > lo90 && (
                                   <div style={{
                                     position: "absolute",
@@ -1068,26 +1068,26 @@ export default function IntelligencePage() {
                                   }} />
                                 )}
                               </div>
-                              <span style={{ fontSize: 8, color: "#666" }}>{hi90.toFixed(1)}%</span>
+                              <span style={{ fontSize: 8, color: "rgba(255,255,255,0.4)" }}>{hi90.toFixed(1)}%</span>
                             </div>
                             {/* Holders list */}
                             {s.holders && s.holders.length > 0 ? (
                               <div>
-                                <div style={{ fontSize: 8, fontWeight: 700, color: "#555", marginBottom: 3, letterSpacing: "0.05em" }}>TOP SHORTERS</div>
+                                <div style={{ fontSize: 8, fontWeight: 700, color: "rgba(255,255,255,0.35)", marginBottom: 3, letterSpacing: "0.05em" }}>TOP SHORTERS</div>
                                 {s.holders.slice(0, 5).map((h, i) => (
                                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "2px 0" }}>
-                                    <span style={{ fontSize: 8, color: "#888", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    <span style={{ fontSize: 8, color: "rgba(255,255,255,0.5)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                       {h.holder}
                                     </span>
-                                    <div style={{ position: "relative", height: 4, width: 50, background: "#1a1a1a", borderRadius: 2, overflow: "hidden" }}>
+                                    <div style={{ position: "relative", height: 4, width: 50, background: "#161b22", borderRadius: 2, overflow: "hidden" }}>
                                       <div style={{ height: "100%", width: `${Math.min(h.pct / s.shortPct * 100, 100)}%`, background: "#ef4444", borderRadius: 2, opacity: 0.6 }} />
                                     </div>
-                                    <span style={{ fontSize: 8, fontWeight: 600, color: "#aaa", minWidth: 36, textAlign: "right" }}>{h.pct.toFixed(2)}%</span>
+                                    <span style={{ fontSize: 8, fontWeight: 600, color: "rgba(255,255,255,0.5)", minWidth: 36, textAlign: "right" }}>{h.pct.toFixed(2)}%</span>
                                   </div>
                                 ))}
                               </div>
                             ) : (
-                              <div style={{ fontSize: 8, color: "#444" }}>No holder breakdown available</div>
+                              <div style={{ fontSize: 8, color: "rgba(255,255,255,0.3)" }}>No holder breakdown available</div>
                             )}
                             {/* Link to stock page */}
                             <Link href={`/stocks/${s.ticker}`} style={{ display: "block", marginTop: 6, fontSize: 8, color: "#3b82f6", textDecoration: "none" }}>
