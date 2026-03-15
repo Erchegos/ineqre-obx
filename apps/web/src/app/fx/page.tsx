@@ -74,7 +74,7 @@ type PortfolioConfig = {
 /* ------------------------------------------------------------------ */
 
 const CCY_COLORS: Record<string, string> = {
-  USD: "#4CAF50",
+  USD: "#10b981",
   EUR: "#2196F3",
   GBP: "#9C27B0",
   SEK: "#FF9800",
@@ -91,31 +91,31 @@ const PAIR_LABELS: Record<string, string> = {
 };
 
 const S: Record<string, React.CSSProperties> = {
-  page: { background: "#0a0a0a", color: "#e5e5e5", minHeight: "100vh", fontFamily: "'Geist Mono', monospace", fontSize: 13 },
-  header: { padding: "20px 24px 12px", borderBottom: "1px solid #222" },
-  title: { fontSize: 20, fontWeight: 700, color: "#fff", letterSpacing: 2 },
-  subtitle: { fontSize: 12, color: "#888", marginTop: 2 },
-  tabs: { display: "flex", gap: 0, borderBottom: "1px solid #222", padding: "0 24px" },
-  tab: { padding: "10px 20px", cursor: "pointer", fontSize: 12, letterSpacing: 1, fontWeight: 600, color: "#888", borderBottom: "2px solid transparent", transition: "all 0.2s" },
-  tabActive: { color: "#f97316", borderBottomColor: "#f97316" },
-  content: { padding: "20px 24px" },
-  card: { background: "#111", border: "1px solid #222", borderRadius: 6, padding: 16, marginBottom: 12 },
-  cardTitle: { fontSize: 11, fontWeight: 600, color: "#888", letterSpacing: 1, textTransform: "uppercase" as const, marginBottom: 8 },
+  page: { background: "#0a0a0a", color: "#fff", minHeight: "100vh", fontFamily: "monospace", fontSize: 13 },
+  header: { padding: "20px 24px 12px", borderBottom: "1px solid #30363d" },
+  title: { fontSize: 22, fontWeight: 700, color: "#fff", letterSpacing: 2 },
+  subtitle: { fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 2 },
+  tabs: { display: "flex", gap: 0, borderBottom: "1px solid #30363d", padding: "0 24px" },
+  tab: { padding: "10px 20px", cursor: "pointer", fontSize: 12, letterSpacing: 1, fontWeight: 600, color: "rgba(255,255,255,0.5)", borderBottom: "2px solid transparent", transition: "all 0.2s", fontFamily: "monospace" },
+  tabActive: { color: "#3b82f6", borderBottomColor: "#3b82f6" },
+  content: { padding: "20px 24px", maxWidth: 1400, margin: "0 auto" },
+  card: { background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 16, marginBottom: 12 },
+  cardTitle: { fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", letterSpacing: "0.08em", textTransform: "uppercase" as const, marginBottom: 8, fontFamily: "monospace" },
   grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
   grid3: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 },
   grid5: { display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 },
-  accent: { color: "#f97316" },
-  green: { color: "#4CAF50" },
+  accent: { color: "#3b82f6" },
+  green: { color: "#10b981" },
   red: { color: "#ef4444" },
-  dim: { color: "#666" },
+  dim: { color: "rgba(255,255,255,0.5)" },
   badge: { display: "inline-block", padding: "2px 8px", borderRadius: 3, fontSize: 10, fontWeight: 700, letterSpacing: 0.5 },
-  table: { width: "100%", borderCollapse: "collapse" as const, fontSize: 12 },
-  th: { textAlign: "left" as const, padding: "8px 10px", borderBottom: "1px solid #333", color: "#888", fontWeight: 600, fontSize: 10, letterSpacing: 1, cursor: "pointer", userSelect: "none" as const },
-  td: { padding: "6px 10px", borderBottom: "1px solid #1a1a1a" },
-  input: { background: "#1a1a1a", border: "1px solid #333", borderRadius: 4, color: "#e5e5e5", padding: "6px 10px", fontSize: 12, fontFamily: "'Geist Mono', monospace" },
-  select: { background: "#1a1a1a", border: "1px solid #333", borderRadius: 4, color: "#e5e5e5", padding: "6px 10px", fontSize: 12, fontFamily: "'Geist Mono', monospace" },
-  button: { background: "#f97316", color: "#000", border: "none", borderRadius: 4, padding: "6px 14px", fontSize: 11, fontWeight: 700, cursor: "pointer", letterSpacing: 0.5 },
-  slider: { width: "100%", accentColor: "#f97316" },
+  table: { width: "100%", borderCollapse: "collapse" as const, fontSize: 11, fontFamily: "monospace" },
+  th: { textAlign: "left" as const, padding: "8px 6px", borderBottom: "1px solid #30363d", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: 9, letterSpacing: "0.05em", cursor: "pointer", userSelect: "none" as const, textTransform: "uppercase" as const },
+  td: { padding: "6px 6px", borderBottom: "1px solid #30363d" },
+  input: { background: "#0d1117", border: "1px solid #30363d", borderRadius: 5, color: "#fff", padding: "8px 10px", fontSize: 12, fontFamily: "monospace", boxSizing: "border-box" as const },
+  select: { background: "#0d1117", border: "1px solid #30363d", borderRadius: 5, color: "#fff", padding: "8px 10px", fontSize: 12, fontFamily: "monospace" },
+  button: { background: "linear-gradient(135deg, #3b82f6, #2563eb)", color: "#fff", border: "none", borderRadius: 6, padding: "8px 20px", fontSize: 11, fontWeight: 700, cursor: "pointer", letterSpacing: "0.05em", fontFamily: "monospace" },
+  slider: { width: "100%", accentColor: "#3b82f6" },
 };
 
 /* ------------------------------------------------------------------ */
@@ -138,8 +138,8 @@ function fmtBps(v: number | null): string {
 }
 
 function changeColor(v: number | null): string {
-  if (v == null) return "#666";
-  return v > 0 ? "#4CAF50" : v < 0 ? "#ef4444" : "#888";
+  if (v == null) return "rgba(255,255,255,0.4)";
+  return v > 0 ? "#10b981" : v < 0 ? "#ef4444" : "rgba(255,255,255,0.5)";
 }
 
 function sigStar(t: number): string {
@@ -154,11 +154,11 @@ function exposureColor(v: number): string {
   const abs = Math.abs(v);
   if (abs < 0.05) return "transparent";
   const intensity = Math.min(abs * 2, 1);
-  return v > 0 ? `rgba(76,175,80,${intensity * 0.4})` : `rgba(239,68,68,${intensity * 0.4})`;
+  return v > 0 ? `rgba(59,130,246,${intensity * 0.4})` : `rgba(239,68,68,${intensity * 0.4})`;
 }
 
 /* Mini SVG sparkline */
-function Sparkline({ data, width = 120, height = 32, color = "#f97316" }: { data: number[]; width?: number; height?: number; color?: string }) {
+function Sparkline({ data, width = 120, height = 32, color = "#3b82f6" }: { data: number[]; width?: number; height?: number; color?: string }) {
   if (data.length < 2) return null;
   const min = Math.min(...data);
   const max = Math.max(...data);
@@ -176,7 +176,7 @@ function Sparkline({ data, width = 120, height = 32, color = "#f97316" }: { data
 }
 
 /* Area sparkline with fill */
-function AreaSparkline({ data, width = 500, height = 140, color = "#f97316", currentValue }: { data: number[]; width?: number; height?: number; color?: string; currentValue?: number }) {
+function AreaSparkline({ data, width = 500, height = 140, color = "#3b82f6", currentValue }: { data: number[]; width?: number; height?: number; color?: string; currentValue?: number }) {
   if (data.length < 2) return null;
   const min = Math.min(...data);
   const max = Math.max(...data);
@@ -217,7 +217,7 @@ function AreaSparkline({ data, width = 500, height = 140, color = "#f97316", cur
 function SortHeader({ label, col, sort, onSort }: { label: string; col: string; sort: { col: string; asc: boolean }; onSort: (col: string) => void }) {
   const active = sort.col === col;
   return (
-    <th style={{ ...S.th, color: active ? "#f97316" : "#888" }} onClick={() => onSort(col)}>
+    <th style={{ ...S.th, color: active ? "#3b82f6" : "rgba(255,255,255,0.5)" }} onClick={() => onSort(col)}>
       {label} {active ? (sort.asc ? "\u25B2" : "\u25BC") : ""}
     </th>
   );
@@ -232,13 +232,13 @@ function HelpToggle({ id, label, children, showHelp, setShowHelp }: {
     <div style={{ marginTop: 4, marginBottom: open ? 10 : 4 }}>
       <span
         onClick={() => setShowHelp(p => ({ ...p, [id]: !p[id] }))}
-        style={{ fontSize: 10, color: "#555", cursor: "pointer", userSelect: "none" as const, display: "inline-flex", alignItems: "center", gap: 4 }}
+        style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", cursor: "pointer", userSelect: "none" as const, display: "inline-flex", alignItems: "center", gap: 4, fontFamily: "monospace" }}
       >
-        <span style={{ fontSize: 8, color: open ? "#f97316" : "#555", transition: "transform 0.15s", display: "inline-block", transform: open ? "rotate(90deg)" : "rotate(0deg)" }}>{"\u25B6"}</span>
+        <span style={{ fontSize: 8, color: open ? "#3b82f6" : "rgba(255,255,255,0.35)", transition: "transform 0.15s", display: "inline-block", transform: open ? "rotate(90deg)" : "rotate(0deg)" }}>{"\u25B6"}</span>
         {label || "What do these numbers mean?"}
       </span>
       {open && (
-        <div style={{ marginTop: 6, padding: 10, background: "#111", borderRadius: 4, border: "1px solid #222", fontSize: 11, color: "#666", lineHeight: 1.6 }}>
+        <div style={{ marginTop: 6, padding: 10, background: "#0d1117", borderRadius: 4, border: "1px solid #21262d", fontSize: 11, color: "rgba(255,255,255,0.5)", lineHeight: 1.6, fontFamily: "monospace" }}>
           {children}
         </div>
       )}
@@ -291,6 +291,11 @@ export default function FXTerminalPage() {
   const [savedConfigs, setSavedConfigs] = useState<PortfolioConfig[]>([]);
   const [configsLoading, setConfigsLoading] = useState(false);
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null);
+  const [normalizeWeights, setNormalizeWeights] = useState(true);
+  const [editingWeightIdx, setEditingWeightIdx] = useState<number | null>(null);
+  const [editingWeightVal, setEditingWeightVal] = useState("");
+  const [pfTickerSearch, setPfTickerSearch] = useState("");
+  const [pfSearchFocused, setPfSearchFocused] = useState(false);
 
   /* Portfolio auth state (for login modal) */
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -517,16 +522,7 @@ export default function FXTerminalPage() {
     const wStr = cfg.weights.map(w => w.toFixed(4)).join(",");
     setPfTickers(tStr);
     setPfWeights(wStr);
-    // auto-run analysis
-    setPfLoading(true);
-    fetch("/api/fx/portfolio", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tickers: cfg.tickers, weights: cfg.weights }),
-    })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data) setPfResult(data); setPfLoading(false); })
-      .catch(() => setPfLoading(false));
+    setPfResult(null);
   }
 
   /* Sorted sensitivity */
@@ -569,7 +565,7 @@ export default function FXTerminalPage() {
       insights.push({
         label: `NOK ${dir} vs EUR`,
         detail: `${fmtPct(eurCard.change1m, 1)} over 1M`,
-        color: eurCard.change1m > 0 ? "#4CAF50" : "#ef4444",
+        color: eurCard.change1m > 0 ? "#10b981" : "#ef4444",
       });
     }
 
@@ -601,7 +597,7 @@ export default function FXTerminalPage() {
       insights.push({
         label: "Carry advantage",
         detail: "NOK rates above USD/EUR - positive carry on FX hedges",
-        color: "#4CAF50",
+        color: "#10b981",
       });
     }
 
@@ -669,7 +665,7 @@ export default function FXTerminalPage() {
     return (
       <div style={S.page}>
         <div style={{ ...S.header, textAlign: "center", paddingTop: 80 }}>
-          <div style={{ ...S.title, color: "#f97316" }}>FX TERMINAL</div>
+          <div style={{ ...S.title, color: "#3b82f6" }}>FX TERMINAL</div>
           <div style={{ ...S.subtitle, marginTop: 20 }}>Loading currency data...</div>
         </div>
       </div>
@@ -682,7 +678,7 @@ export default function FXTerminalPage() {
         <div style={{ ...S.header, textAlign: "center", paddingTop: 80 }}>
           <div style={{ ...S.title, color: "#ef4444" }}>Error</div>
           <div style={{ ...S.subtitle, marginTop: 10 }}>{error}</div>
-          <Link href="/" style={{ color: "#f97316", marginTop: 20, display: "inline-block" }}>&larr; Back to Dashboard</Link>
+          <Link href="/" style={{ color: "#3b82f6", marginTop: 20, display: "inline-block" }}>&larr; Back to Dashboard</Link>
         </div>
       </div>
     );
@@ -703,15 +699,15 @@ export default function FXTerminalPage() {
       {/* Header */}
       <div style={S.header}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <Link href="/" style={{ color: "#888", textDecoration: "none", fontSize: 12 }}>&larr; HOME</Link>
+          <Link href="/" style={{ color: "rgba(255,255,255,0.5)", textDecoration: "none", fontSize: 12 }}>&larr; HOME</Link>
           <span style={S.title}>FX TERMINAL</span>
           {nokIndexCurrent && (
-            <span style={{ ...S.badge, background: "rgba(249,115,22,0.15)", color: "#f97316" }}>
+            <span style={{ ...S.badge, background: "rgba(59,130,246,0.15)", color: "#3b82f6" }}>
               NOK TWI: {nokIndexCurrent.index.toFixed(2)} ({fmtPct(nokIndexCurrent.change1d)})
             </span>
           )}
           {profile && (
-            <span style={{ ...S.badge, background: "rgba(76,175,80,0.15)", color: "#4CAF50", marginLeft: "auto" }}>
+            <span style={{ fontSize: 10, fontFamily: "monospace", fontWeight: 600, padding: "2px 8px", background: "rgba(59,130,246,0.1)", borderRadius: 3, border: "1px solid rgba(59,130,246,0.2)", color: "#3b82f6", marginLeft: "auto" }}>
               {profile}
             </span>
           )}
@@ -752,15 +748,15 @@ export default function FXTerminalPage() {
       <>
         {/* Market Summary */}
         {dashboardInsights.length > 0 && (
-          <div style={{ ...S.card, background: "#0d0d0d", border: "1px solid #1a1a1a", marginBottom: 16 }}>
-            <div style={{ ...S.cardTitle, color: "#f97316", fontSize: 12, marginBottom: 10 }}>MARKET SUMMARY</div>
+          <div style={{ ...S.card, background: "#0d1117", border: "1px solid #21262d", marginBottom: 16 }}>
+            <div style={{ ...S.cardTitle, color: "#3b82f6", fontSize: 12, marginBottom: 10 }}>MARKET SUMMARY</div>
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
               {dashboardInsights.map((ins, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", background: "#111", borderRadius: 4, border: "1px solid #222" }}>
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", background: "#0d1117", borderRadius: 4, border: "1px solid #21262d" }}>
                   <div style={{ width: 6, height: 6, borderRadius: "50%", background: ins.color, flexShrink: 0 }} />
                   <div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "#e5e5e5" }}>{ins.label}</div>
-                    <div style={{ fontSize: 10, color: "#888" }}>{ins.detail}</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#fff" }}>{ins.label}</div>
+                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>{ins.detail}</div>
                   </div>
                 </div>
               ))}
@@ -772,16 +768,16 @@ export default function FXTerminalPage() {
         <div style={S.grid5}>
           {rateCards.map((rc) => (
             <div key={rc.pair} style={S.card}>
-              <div style={{ fontSize: 10, color: "#888", letterSpacing: 1, marginBottom: 4 }}>
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", letterSpacing: 1, marginBottom: 4 }}>
                 {PAIR_LABELS[rc.pair] || rc.pair}
               </div>
               <div style={{ fontSize: 20, fontWeight: 700, color: "#fff" }}>
                 {fmtRate(rc.spot)}
               </div>
               <div style={{ fontSize: 11, color: changeColor(rc.change1d), marginTop: 2 }}>
-                {fmtPct(rc.change1d)} <span style={{ color: "#555" }}>1D</span>
+                {fmtPct(rc.change1d)} <span style={{ color: "rgba(255,255,255,0.35)" }}>1D</span>
               </div>
-              <div style={{ display: "flex", gap: 8, fontSize: 10, color: "#666", marginTop: 4, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: 8, fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 4, flexWrap: "wrap" }}>
                 <span>1W: <span style={{ color: changeColor(rc.change1w) }}>{fmtPct(rc.change1w, 1)}</span></span>
                 <span>1M: <span style={{ color: changeColor(rc.change1m) }}>{fmtPct(rc.change1m, 1)}</span></span>
                 <span>YTD: <span style={{ color: changeColor(rc.changeYtd) }}>{fmtPct(rc.changeYtd, 1)}</span></span>
@@ -789,12 +785,12 @@ export default function FXTerminalPage() {
               <div style={{ marginTop: 6 }}>
                 <Sparkline
                   data={rc.sparkline.map(s => s.rate)}
-                  color={CCY_COLORS[rc.pair.replace("NOK", "")] || "#f97316"}
+                  color={CCY_COLORS[rc.pair.replace("NOK", "")] || "#3b82f6"}
                   width={120}
                   height={28}
                 />
               </div>
-              <div style={{ display: "flex", gap: 8, fontSize: 9, color: "#555", marginTop: 4 }}>
+              <div style={{ display: "flex", gap: 8, fontSize: 9, color: "rgba(255,255,255,0.35)", marginTop: 4 }}>
                 <span>&sigma;20D: {rc.vol20d != null ? `${rc.vol20d.toFixed(1)}%` : "\u2014"}</span>
                 <span>&sigma;63D: {rc.vol63d != null ? `${rc.vol63d.toFixed(1)}%` : "\u2014"}</span>
               </div>
@@ -806,13 +802,13 @@ export default function FXTerminalPage() {
         {keyMetrics && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 12 }}>
             {[
-              { label: "STRONGEST (1M)", pair: keyMetrics.strongest?.pair, value: keyMetrics.strongest?.change1m, color: "#4CAF50" },
+              { label: "STRONGEST (1M)", pair: keyMetrics.strongest?.pair, value: keyMetrics.strongest?.change1m, color: "#10b981" },
               { label: "WEAKEST (1M)", pair: keyMetrics.weakest?.pair, value: keyMetrics.weakest?.change1m, color: "#ef4444" },
               { label: "HIGHEST VOL", pair: keyMetrics.highVol?.pair, value: keyMetrics.highVol?.vol20d, color: "#FF9800", suffix: "%" },
               { label: "LOWEST VOL", pair: keyMetrics.lowVol?.pair, value: keyMetrics.lowVol?.vol20d, color: "#2196F3", suffix: "%" },
             ].map((m) => (
               <div key={m.label} style={{ ...S.card, padding: 12 }}>
-                <div style={{ fontSize: 9, color: "#666", letterSpacing: 1 }}>{m.label}</div>
+                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", letterSpacing: 1 }}>{m.label}</div>
                 <div style={{ fontSize: 11, color: m.color, fontWeight: 600, marginTop: 2 }}>
                   {m.pair ? (PAIR_LABELS[m.pair] || m.pair.replace("NOK", "")) : "\u2014"}
                 </div>
@@ -833,7 +829,7 @@ export default function FXTerminalPage() {
                 data={nokIndex.map(p => p.index)}
                 width={500}
                 height={140}
-                color="#f97316"
+                color="#3b82f6"
                 currentValue={nokIndexCurrent?.index}
               />
             ) : (
@@ -850,7 +846,7 @@ export default function FXTerminalPage() {
                   <tr>
                     <th style={S.th}></th>
                     {Object.keys(correlationMatrix).map(p => (
-                      <th key={p} style={{ ...S.th, textAlign: "center", color: CCY_COLORS[p.replace("NOK", "")] || "#888" }}>
+                      <th key={p} style={{ ...S.th, textAlign: "center", color: CCY_COLORS[p.replace("NOK", "")] || "rgba(255,255,255,0.5)" }}>
                         {p.replace("NOK", "")}
                       </th>
                     ))}
@@ -859,7 +855,7 @@ export default function FXTerminalPage() {
                 <tbody>
                   {Object.entries(correlationMatrix).map(([p1, row]) => (
                     <tr key={p1}>
-                      <td style={{ ...S.td, fontWeight: 600, color: CCY_COLORS[p1.replace("NOK", "")] || "#888" }}>
+                      <td style={{ ...S.td, fontWeight: 600, color: CCY_COLORS[p1.replace("NOK", "")] || "rgba(255,255,255,0.5)" }}>
                         {p1.replace("NOK", "")}
                       </td>
                       {Object.values(row).map((v, i) => (
@@ -868,7 +864,7 @@ export default function FXTerminalPage() {
                           style={{
                             ...S.td,
                             textAlign: "center",
-                            background: `rgba(249,115,22,${Math.abs(v as number) * 0.3})`,
+                            background: `rgba(59,130,246,${Math.abs(v as number) * 0.3})`,
                             color: "#fff",
                           }}
                         >
@@ -887,13 +883,13 @@ export default function FXTerminalPage() {
 
         {/* What to Watch */}
         {whatToWatch.length > 0 && (
-          <div style={{ ...S.card, border: "1px solid rgba(249,115,22,0.2)", background: "rgba(249,115,22,0.03)" }}>
-            <div style={{ ...S.cardTitle, color: "#f97316" }}>WHAT TO WATCH</div>
+          <div style={{ ...S.card, border: "1px solid rgba(59,130,246,0.2)", background: "rgba(59,130,246,0.03)" }}>
+            <div style={{ ...S.cardTitle, color: "#3b82f6" }}>WHAT TO WATCH</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {whatToWatch.map((item, i) => (
                 <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                  <span style={{ color: "#f97316", fontWeight: 700, fontSize: 12, flexShrink: 0, marginTop: 1 }}>{i + 1}.</span>
-                  <span style={{ fontSize: 11, color: "#ccc", lineHeight: 1.5 }}>{item}</span>
+                  <span style={{ color: "#3b82f6", fontWeight: 700, fontSize: 12, flexShrink: 0, marginTop: 1 }}>{i + 1}.</span>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", lineHeight: 1.5 }}>{item}</span>
                 </div>
               ))}
             </div>
@@ -921,7 +917,7 @@ export default function FXTerminalPage() {
                     style={{ cursor: "pointer" }}
                     onClick={() => { setCompanyTicker(row.ticker); setTab("company"); }}
                   >
-                    <td style={{ ...S.td, fontWeight: 600, color: "#f97316" }}>{row.ticker}</td>
+                    <td style={{ ...S.td, fontWeight: 600, color: "#3b82f6" }}>{row.ticker}</td>
                     {(["usd", "eur", "gbp", "sek"] as const).map((ccy) => (
                       <td
                         key={ccy}
@@ -929,7 +925,7 @@ export default function FXTerminalPage() {
                           ...S.td,
                           textAlign: "center",
                           background: exposureColor(row[ccy]),
-                          color: row[ccy] > 0 ? "#4CAF50" : row[ccy] < 0 ? "#ef4444" : "#666",
+                          color: row[ccy] > 0 ? "#10b981" : row[ccy] < 0 ? "#ef4444" : "rgba(255,255,255,0.4)",
                           fontWeight: 600,
                         }}
                       >
@@ -957,7 +953,7 @@ export default function FXTerminalPage() {
       <>
         <div style={S.card}>
           <div style={S.cardTitle}>MULTI-CURRENCY FX BETAS (252D ROLLING REGRESSION)</div>
-          <div style={{ fontSize: 11, color: "#555", marginBottom: 6 }}>
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginBottom: 6 }}>
             How sensitive is each stock to currency moves? Click a row for detailed breakdown.
           </div>
           {sortedSensitivity.length > 0 ? (
@@ -979,10 +975,10 @@ export default function FXTerminalPage() {
                 {sortedSensitivity.map((row) => (
                   <tr
                     key={row.ticker}
-                    style={{ cursor: "pointer", background: selectedSensTicker === row.ticker ? "rgba(249,115,22,0.08)" : undefined }}
+                    style={{ cursor: "pointer", background: selectedSensTicker === row.ticker ? "rgba(59,130,246,0.08)" : undefined }}
                     onClick={() => setSelectedSensTicker(row.ticker)}
                   >
-                    <td style={{ ...S.td, fontWeight: 600, color: "#f97316" }}>{row.ticker}</td>
+                    <td style={{ ...S.td, fontWeight: 600, color: "#3b82f6" }}>{row.ticker}</td>
                     <td style={{ ...S.td, textAlign: "center", fontWeight: 700 }}>
                       {(Math.abs(row.betaUsd) + Math.abs(row.betaEur) + Math.abs(row.betaGbp) + Math.abs(row.betaSek)).toFixed(3)}
                     </td>
@@ -1012,12 +1008,12 @@ export default function FXTerminalPage() {
           {sortedSensitivity.length > 0 && (
             <HelpToggle id="sens-columns" label="Column guide" showHelp={showHelp} setShowHelp={setShowHelp}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 24px" }}>
-                <div><span style={{ color: "#888", fontWeight: 600 }}>FX SENSITIVITY</span> &mdash; Sum of absolute currency betas. Higher = more total FX exposure.</div>
-                <div><span style={{ color: "#888", fontWeight: 600 }}>MARKET</span> &mdash; Beta vs OBX index. 1.0 = stock moves 1:1 with the market.</div>
+                <div><span style={{ color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>FX SENSITIVITY</span> &mdash; Sum of absolute currency betas. Higher = more total FX exposure.</div>
+                <div><span style={{ color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>MARKET</span> &mdash; Beta vs OBX index. 1.0 = stock moves 1:1 with the market.</div>
                 <div><span style={{ color: CCY_COLORS.USD, fontWeight: 600 }}>USD</span> / <span style={{ color: CCY_COLORS.EUR, fontWeight: 600 }}>EUR</span> / <span style={{ color: CCY_COLORS.GBP, fontWeight: 600 }}>GBP</span> / <span style={{ color: CCY_COLORS.SEK, fontWeight: 600 }}>SEK</span> &mdash; Sensitivity to each currency pair vs NOK. Positive = stock rises when NOK weakens.</div>
-                <div><span style={{ color: "#888", fontWeight: 600 }}>FIT (R&sup2;)</span> &mdash; How much of the stock&apos;s movement is explained by market + currencies combined (0-100%).</div>
-                <div><span style={{ color: "#888", fontWeight: 600 }}>FX FIT</span> &mdash; How much is explained by currencies alone, excluding the market factor.</div>
-                <div><span style={{ color: "#888", fontWeight: 600 }}>Stars</span> &mdash; {"\u2605"} = likely real (95%), {"\u2605\u2605"} = strong (99%), {"\u2605\u2605\u2605"} = very strong (99.9%). No star = may be noise.</div>
+                <div><span style={{ color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>FIT (R&sup2;)</span> &mdash; How much of the stock&apos;s movement is explained by market + currencies combined (0-100%).</div>
+                <div><span style={{ color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>FX FIT</span> &mdash; How much is explained by currencies alone, excluding the market factor.</div>
+                <div><span style={{ color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>Stars</span> &mdash; {"\u2605"} = likely real (95%), {"\u2605\u2605"} = strong (99%), {"\u2605\u2605\u2605"} = very strong (99.9%). No star = may be noise.</div>
               </div>
             </HelpToggle>
           )}
@@ -1029,14 +1025,14 @@ export default function FXTerminalPage() {
             <div style={S.cardTitle}>{selectedSensTicker} &mdash; DETAILED FX SENSITIVITY</div>
 
             <HelpToggle id="sens-detail-intro" label="Statistical vs Fundamental — what's the difference?" showHelp={showHelp} setShowHelp={setShowHelp}>
-              <strong style={{ color: "#888" }}>Statistical</strong> = how the stock price actually moves with currencies (regression on 252 trading days).
-              <strong style={{ color: "#888" }}> Fundamental</strong> = where the company earns and spends money (from annual reports). Large gaps suggest active hedging or pricing power.
+              <strong style={{ color: "rgba(255,255,255,0.5)" }}>Statistical</strong> = how the stock price actually moves with currencies (regression on 252 trading days).
+              <strong style={{ color: "rgba(255,255,255,0.5)" }}> Fundamental</strong> = where the company earns and spends money (from annual reports). Large gaps suggest active hedging or pricing power.
             </HelpToggle>
             <div style={S.grid2}>
               {/* Statistical betas */}
               {sensDetail.statistical && (
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#888", marginBottom: 6 }}>STATISTICAL (REGRESSION)</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", marginBottom: 6 }}>STATISTICAL (REGRESSION)</div>
                   <table style={S.table}>
                     <thead>
                       <tr>
@@ -1052,7 +1048,7 @@ export default function FXTerminalPage() {
                         const tstat = sensDetail.statistical[`tstat${c}`];
                         return (
                           <tr key={c}>
-                            <td style={{ ...S.td, color: CCY_COLORS[c.toUpperCase()] || "#888", fontWeight: 600 }}>
+                            <td style={{ ...S.td, color: CCY_COLORS[c.toUpperCase()] || "rgba(255,255,255,0.5)", fontWeight: 600 }}>
                               {c === "Market" ? "OBX" : c.toUpperCase()}
                             </td>
                             <td style={S.td}>{beta?.toFixed(4)}</td>
@@ -1063,12 +1059,12 @@ export default function FXTerminalPage() {
                       })}
                     </tbody>
                   </table>
-                  <div style={{ marginTop: 8, fontSize: 11, color: "#666" }}>
+                  <div style={{ marginTop: 8, fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
                     R&sup2;: {(sensDetail.statistical.rSquared * 100).toFixed(1)}% | R&sup2; FX only: {(sensDetail.statistical.rSquaredFxOnly * 100).toFixed(1)}%
                   </div>
                   <HelpToggle id="sens-stat-help" showHelp={showHelp} setShowHelp={setShowHelp}>
-                    <strong style={{ color: "#888" }}>Beta</strong> = stock return per 1% currency move. <strong style={{ color: "#888" }}>T-stat</strong> = statistical reliability (higher is better, |t|&gt;2 is significant).
-                    <strong style={{ color: "#888" }}> R&sup2;</strong> = % of stock variance explained. <strong style={{ color: "#888" }}>R&sup2; FX only</strong> = portion explained by currencies after removing market effect.
+                    <strong style={{ color: "rgba(255,255,255,0.5)" }}>Beta</strong> = stock return per 1% currency move. <strong style={{ color: "rgba(255,255,255,0.5)" }}>T-stat</strong> = statistical reliability (higher is better, |t|&gt;2 is significant).
+                    <strong style={{ color: "rgba(255,255,255,0.5)" }}> R&sup2;</strong> = % of stock variance explained. <strong style={{ color: "rgba(255,255,255,0.5)" }}>R&sup2; FX only</strong> = portion explained by currencies after removing market effect.
                   </HelpToggle>
                 </div>
               )}
@@ -1076,7 +1072,7 @@ export default function FXTerminalPage() {
               {/* Fundamental exposure */}
               {sensDetail.fundamental && (
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#888", marginBottom: 6 }}>FUNDAMENTAL (ANNUAL REPORT)</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", marginBottom: 6 }}>FUNDAMENTAL (ANNUAL REPORT)</div>
                   <table style={S.table}>
                     <thead>
                       <tr>
@@ -1089,25 +1085,25 @@ export default function FXTerminalPage() {
                     <tbody>
                       {["usd", "eur", "gbp", "nok", "sek"].map((c) => (
                         <tr key={c}>
-                          <td style={{ ...S.td, color: CCY_COLORS[c.toUpperCase()] || "#888", fontWeight: 600 }}>
+                          <td style={{ ...S.td, color: CCY_COLORS[c.toUpperCase()] || "rgba(255,255,255,0.5)", fontWeight: 600 }}>
                             {c.toUpperCase()}
                           </td>
                           <td style={S.td}>{(sensDetail.fundamental.revenue[c] * 100).toFixed(0)}%</td>
                           <td style={S.td}>{(sensDetail.fundamental.cost[c] * 100).toFixed(0)}%</td>
-                          <td style={{ ...S.td, fontWeight: 600, color: (sensDetail.fundamental.revenue[c] - sensDetail.fundamental.cost[c]) > 0 ? "#4CAF50" : "#ef4444" }}>
+                          <td style={{ ...S.td, fontWeight: 600, color: (sensDetail.fundamental.revenue[c] - sensDetail.fundamental.cost[c]) > 0 ? "#10b981" : "#ef4444" }}>
                             {((sensDetail.fundamental.revenue[c] - sensDetail.fundamental.cost[c]) * 100).toFixed(0)}%
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                  <div style={{ marginTop: 8, fontSize: 11, color: "#666" }}>
+                  <div style={{ marginTop: 8, fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
                     Source: {sensDetail.fundamental.source} | FY{sensDetail.fundamental.fiscalYear}
                   </div>
                   <HelpToggle id="sens-fund-help" showHelp={showHelp} setShowHelp={setShowHelp}>
-                    <strong style={{ color: "#888" }}>Revenue</strong> = % of sales in each currency.
-                    <strong style={{ color: "#888" }}> Cost</strong> = % of expenses in each currency.
-                    <strong style={{ color: "#888" }}> Net</strong> = revenue minus cost &mdash; positive means a natural long position (weak NOK benefits earnings).
+                    <strong style={{ color: "rgba(255,255,255,0.5)" }}>Revenue</strong> = % of sales in each currency.
+                    <strong style={{ color: "rgba(255,255,255,0.5)" }}> Cost</strong> = % of expenses in each currency.
+                    <strong style={{ color: "rgba(255,255,255,0.5)" }}> Net</strong> = revenue minus cost &mdash; positive means a natural long position (weak NOK benefits earnings).
                   </HelpToggle>
                 </div>
               )}
@@ -1115,9 +1111,9 @@ export default function FXTerminalPage() {
 
             {/* Divergence alerts */}
             {sensDetail.divergences?.length > 0 && (
-              <div style={{ marginTop: 12, padding: 14, background: "rgba(249,115,22,0.06)", borderRadius: 4, border: "1px solid rgba(249,115,22,0.15)" }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#f97316", marginBottom: 2 }}>STATISTICAL vs FUNDAMENTAL GAPS</div>
-                <div style={{ fontSize: 10, color: "#666", marginBottom: 10 }}>
+              <div style={{ marginTop: 12, padding: 14, background: "rgba(59,130,246,0.06)", borderRadius: 4, border: "1px solid rgba(59,130,246,0.15)" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#3b82f6", marginBottom: 2 }}>STATISTICAL vs FUNDAMENTAL GAPS</div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 10 }}>
                   Comparing how the stock actually moves with currencies (regression) vs what the company reports (annual report).
                   Difference = beta minus reported net exposure. A positive difference means the market sees more sensitivity than the company reports.
                 </div>
@@ -1136,13 +1132,13 @@ export default function FXTerminalPage() {
                       const diff = d.difference ?? (d.statistical - d.fundamental);
                       return (
                         <tr key={d.currency}>
-                          <td style={{ ...S.td, color: CCY_COLORS[d.currency] || "#888", fontWeight: 600 }}>{d.currency}</td>
+                          <td style={{ ...S.td, color: CCY_COLORS[d.currency] || "rgba(255,255,255,0.5)", fontWeight: 600 }}>{d.currency}</td>
                           <td style={S.td}>{d.statistical >= 0 ? "+" : ""}{d.statistical.toFixed(3)}</td>
                           <td style={S.td}>{d.fundamental >= 0 ? "+" : ""}{(d.fundamental * 100).toFixed(0)}%</td>
-                          <td style={{ ...S.td, fontWeight: 600, color: Math.abs(diff) > 0.3 ? "#ef4444" : "#f97316" }}>
+                          <td style={{ ...S.td, fontWeight: 600, color: Math.abs(diff) > 0.3 ? "#ef4444" : "#3b82f6" }}>
                             {diff >= 0 ? "+" : ""}{diff.toFixed(3)}
                           </td>
-                          <td style={{ ...S.td, fontSize: 10, color: "#999" }}>
+                          <td style={{ ...S.td, fontSize: 10, color: "rgba(255,255,255,0.6)" }}>
                             {d.assessment || (Math.abs(d.statistical) < Math.abs(d.fundamental) ? "May be actively hedging" : "Market prices in more exposure")}
                           </td>
                         </tr>
@@ -1156,7 +1152,7 @@ export default function FXTerminalPage() {
             {/* Rolling beta sparklines */}
             {sensDetail.rollingHistory?.length > 2 && (
               <div style={{ marginTop: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#888", marginBottom: 2 }}>ROLLING BETAS (LAST 2Y)</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", marginBottom: 2 }}>ROLLING BETAS (LAST 2Y)</div>
                 <HelpToggle id="sens-rolling-help" showHelp={showHelp} setShowHelp={setShowHelp}>
                   How the currency sensitivity has changed over time. Stable lines = consistent exposure. Large swings = changing business mix, hedging changes, or regime shifts.
                 </HelpToggle>
@@ -1193,7 +1189,7 @@ export default function FXTerminalPage() {
       <>
         {/* Ticker selector */}
         <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 16 }}>
-          <span style={{ fontSize: 11, color: "#888" }}>TICKER:</span>
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>TICKER:</span>
           <select
             style={S.select}
             value={companyTicker}
@@ -1215,12 +1211,12 @@ export default function FXTerminalPage() {
                   const pct = exp.revenue[c] * 100;
                   return (
                     <div key={c} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                      <span style={{ width: 40, fontSize: 10, color: CCY_COLORS[c.toUpperCase()] || "#888", fontWeight: 600 }}>{c.toUpperCase()}</span>
-                      <div style={{ flex: 1, height: 16, background: "#1a1a1a", borderRadius: 2, overflow: "hidden" }}>
+                      <span style={{ width: 40, fontSize: 10, color: CCY_COLORS[c.toUpperCase()] || "rgba(255,255,255,0.5)", fontWeight: 600 }}>{c.toUpperCase()}</span>
+                      <div style={{ flex: 1, height: 16, background: "#0d1117", borderRadius: 2, overflow: "hidden" }}>
                         <div style={{
                           width: `${pct}%`,
                           height: "100%",
-                          background: CCY_COLORS[c.toUpperCase()] || "#555",
+                          background: CCY_COLORS[c.toUpperCase()] || "rgba(255,255,255,0.35)",
                           opacity: 0.7,
                         }} />
                       </div>
@@ -1236,12 +1232,12 @@ export default function FXTerminalPage() {
                   const pct = exp.cost[c] * 100;
                   return (
                     <div key={c} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                      <span style={{ width: 40, fontSize: 10, color: CCY_COLORS[c.toUpperCase()] || "#888", fontWeight: 600 }}>{c.toUpperCase()}</span>
-                      <div style={{ flex: 1, height: 16, background: "#1a1a1a", borderRadius: 2, overflow: "hidden" }}>
+                      <span style={{ width: 40, fontSize: 10, color: CCY_COLORS[c.toUpperCase()] || "rgba(255,255,255,0.5)", fontWeight: 600 }}>{c.toUpperCase()}</span>
+                      <div style={{ flex: 1, height: 16, background: "#0d1117", borderRadius: 2, overflow: "hidden" }}>
                         <div style={{
                           width: `${pct}%`,
                           height: "100%",
-                          background: CCY_COLORS[c.toUpperCase()] || "#555",
+                          background: CCY_COLORS[c.toUpperCase()] || "rgba(255,255,255,0.35)",
                           opacity: 0.5,
                         }} />
                       </div>
@@ -1262,19 +1258,19 @@ export default function FXTerminalPage() {
                   return (
                     <div key={c} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                       <span style={{ width: 40, fontSize: 10, color: CCY_COLORS[c.toUpperCase()], fontWeight: 600 }}>{c.toUpperCase()}</span>
-                      <div style={{ flex: 1, height: 16, background: "#1a1a1a", borderRadius: 2, position: "relative", overflow: "hidden" }}>
+                      <div style={{ flex: 1, height: 16, background: "#0d1117", borderRadius: 2, position: "relative", overflow: "hidden" }}>
                         <div style={{
                           position: "absolute",
                           left: net >= 0 ? "50%" : `${50 - pctAbs}%`,
                           width: `${pctAbs}%`,
                           height: "100%",
-                          background: net >= 0 ? "#4CAF50" : "#ef4444",
+                          background: net >= 0 ? "#10b981" : "#ef4444",
                           opacity: 0.5,
                           borderRadius: 2,
                         }} />
-                        <div style={{ position: "absolute", left: "50%", top: 0, width: 1, height: "100%", background: "#444" }} />
+                        <div style={{ position: "absolute", left: "50%", top: 0, width: 1, height: "100%", background: "#30363d" }} />
                       </div>
-                      <span style={{ width: 50, textAlign: "right", fontSize: 11, color: net >= 0 ? "#4CAF50" : "#ef4444", fontWeight: 600 }}>
+                      <span style={{ width: 50, textAlign: "right", fontSize: 11, color: net >= 0 ? "#10b981" : "#ef4444", fontWeight: 600 }}>
                         {net >= 0 ? "+" : ""}{(net * 100).toFixed(0)}%
                       </span>
                     </div>
@@ -1298,10 +1294,10 @@ export default function FXTerminalPage() {
                         <td style={{ ...S.td, color: CCY_COLORS[c.toUpperCase()], fontWeight: 600 }}>
                           {c.toUpperCase()}/NOK +10%
                         </td>
-                        <td style={{ ...S.td, color: exp.sensitivity[`ebitda${c}`] > 0 ? "#4CAF50" : "#ef4444" }}>
+                        <td style={{ ...S.td, color: exp.sensitivity[`ebitda${c}`] > 0 ? "#10b981" : "#ef4444" }}>
                           {fmtPct(exp.sensitivity[`ebitda${c}`] * 10, 1)}
                         </td>
-                        <td style={{ ...S.td, color: exp.sensitivity[`eps${c}`] > 0 ? "#4CAF50" : "#ef4444" }}>
+                        <td style={{ ...S.td, color: exp.sensitivity[`eps${c}`] > 0 ? "#10b981" : "#ef4444" }}>
                           {fmtPct(exp.sensitivity[`eps${c}`] * 10, 1)}
                         </td>
                       </tr>
@@ -1340,10 +1336,10 @@ export default function FXTerminalPage() {
                         <td style={{ ...S.td, fontWeight: 600 }}>{f.tenor}</td>
                         <td style={S.td}>{f.spot.toFixed(4)}</td>
                         <td style={S.td}>{f.forward.toFixed(4)}</td>
-                        <td style={{ ...S.td, color: f.forwardPointsBps > 0 ? "#4CAF50" : "#ef4444" }}>
+                        <td style={{ ...S.td, color: f.forwardPointsBps > 0 ? "#10b981" : "#ef4444" }}>
                           {f.forwardPointsBps >= 0 ? "+" : ""}{f.forwardPointsBps.toFixed(1)}
                         </td>
-                        <td style={{ ...S.td, color: f.annualizedCarryPct > 0 ? "#4CAF50" : "#ef4444" }}>
+                        <td style={{ ...S.td, color: f.annualizedCarryPct > 0 ? "#10b981" : "#ef4444" }}>
                           {fmtPct(f.annualizedCarryPct, 2)}
                         </td>
                         <td style={S.td}>{fmtBps(f.hedgeCostBps)}</td>
@@ -1357,29 +1353,29 @@ export default function FXTerminalPage() {
             {/* Hedge calculator */}
             <div style={S.card}>
               <div style={S.cardTitle}>HEDGE CALCULATOR &mdash; {companyTicker}</div>
-              <div style={{ fontSize: 12, color: "#888", marginBottom: 10, lineHeight: 1.6 }}>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 10, lineHeight: 1.6 }}>
                 {companyTicker} earns revenue in foreign currencies. If NOK strengthens, those earnings are worth less in NOK.
-                A <b style={{ color: "#ccc" }}>forward contract</b> lets the company lock in today&apos;s exchange rate for a future date, removing that uncertainty.
+                A <b style={{ color: "rgba(255,255,255,0.8)" }}>forward contract</b> lets the company lock in today&apos;s exchange rate for a future date, removing that uncertainty.
               </div>
               <HelpToggle id="hedge-calc" label="How to read this calculator" showHelp={showHelp} setShowHelp={setShowHelp}>
                 <div>
-                  <b style={{ color: "#ccc" }}>What you&apos;re simulating:</b> You have {hedgeNotional.toLocaleString("no-NO")} NOK of foreign currency exposure.
+                  <b style={{ color: "rgba(255,255,255,0.8)" }}>What you&apos;re simulating:</b> You have {hedgeNotional.toLocaleString("no-NO")} NOK of foreign currency exposure.
                   The hedge ratio controls how much of that exposure you protect with a forward contract.<br /><br />
-                  <b style={{ color: "#ccc" }}>The 4 metrics:</b><br />
-                  &bull; <b style={{ color: "#ccc" }}>FORWARD</b> — The locked-in exchange rate for your chosen tenor. If spot is 9.70 and forward is 9.73, you&apos;ll pay slightly more per USD, but you know the exact rate.<br />
-                  &bull; <b style={{ color: "#ccc" }}>COST (ANN BPS)</b> — The annualized cost of hedging in basis points. E.g., 38 bps means hedging costs ~0.38% per year. This comes from the interest rate difference between NOK and the foreign currency.<br />
-                  &bull; <b style={{ color: "#ccc" }}>BREAK-EVEN</b> — How much NOK must strengthen before the hedge saves you money. If break-even is +0.14%, the hedge only pays off if NOK moves more than that.<br />
-                  &bull; <b style={{ color: "#ccc" }}>VOL REDUCTION</b> — How much the hedge reduces your P&amp;L volatility. Higher = more stable cashflows.<br /><br />
-                  <b style={{ color: "#ccc" }}>The scenario table:</b><br />
-                  &bull; <b style={{ color: "#ccc" }}>FX MOVE</b> — Hypothetical NOK/{hedgeCurrency} change. Negative = NOK strengthens (bad for exporters), positive = NOK weakens (good for exporters).<br />
-                  &bull; <b style={{ color: "#ccc" }}>UNHEDGED P&amp;L</b> — Your gain/loss if you do nothing.<br />
-                  &bull; <b style={{ color: "#ccc" }}>HEDGED P&amp;L</b> — Your gain/loss with the forward contract in place.<br />
-                  &bull; <b style={{ color: "#ccc" }}>SAVINGS</b> — Difference. Green = the hedge helped. Red = you would have been better off unhedged (because NOK weakened in your favor).
+                  <b style={{ color: "rgba(255,255,255,0.8)" }}>The 4 metrics:</b><br />
+                  &bull; <b style={{ color: "rgba(255,255,255,0.8)" }}>FORWARD</b> — The locked-in exchange rate for your chosen tenor. If spot is 9.70 and forward is 9.73, you&apos;ll pay slightly more per USD, but you know the exact rate.<br />
+                  &bull; <b style={{ color: "rgba(255,255,255,0.8)" }}>COST (ANN BPS)</b> — The annualized cost of hedging in basis points. E.g., 38 bps means hedging costs ~0.38% per year. This comes from the interest rate difference between NOK and the foreign currency.<br />
+                  &bull; <b style={{ color: "rgba(255,255,255,0.8)" }}>BREAK-EVEN</b> — How much NOK must strengthen before the hedge saves you money. If break-even is +0.14%, the hedge only pays off if NOK moves more than that.<br />
+                  &bull; <b style={{ color: "rgba(255,255,255,0.8)" }}>VOL REDUCTION</b> — How much the hedge reduces your P&amp;L volatility. Higher = more stable cashflows.<br /><br />
+                  <b style={{ color: "rgba(255,255,255,0.8)" }}>The scenario table:</b><br />
+                  &bull; <b style={{ color: "rgba(255,255,255,0.8)" }}>FX MOVE</b> — Hypothetical NOK/{hedgeCurrency} change. Negative = NOK strengthens (bad for exporters), positive = NOK weakens (good for exporters).<br />
+                  &bull; <b style={{ color: "rgba(255,255,255,0.8)" }}>UNHEDGED P&amp;L</b> — Your gain/loss if you do nothing.<br />
+                  &bull; <b style={{ color: "rgba(255,255,255,0.8)" }}>HEDGED P&amp;L</b> — Your gain/loss with the forward contract in place.<br />
+                  &bull; <b style={{ color: "rgba(255,255,255,0.8)" }}>SAVINGS</b> — Difference. Green = the hedge helped. Red = you would have been better off unhedged (because NOK weakened in your favor).
                 </div>
               </HelpToggle>
               <div style={{ display: "flex", gap: 16, alignItems: "flex-end", marginBottom: 12, flexWrap: "wrap" }}>
                 <div>
-                  <div style={{ fontSize: 10, color: "#666", marginBottom: 4 }}>NOTIONAL (NOK)</div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>NOTIONAL (NOK)</div>
                   <input
                     type="number"
                     style={{ ...S.input, width: 130 }}
@@ -1388,7 +1384,7 @@ export default function FXTerminalPage() {
                   />
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, color: "#666", marginBottom: 4 }}>HEDGE RATIO: {hedgeRatio}%</div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>HEDGE RATIO: {hedgeRatio}%</div>
                   <input
                     type="range"
                     min={0}
@@ -1399,7 +1395,7 @@ export default function FXTerminalPage() {
                   />
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, color: "#666", marginBottom: 4 }}>TENOR</div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>TENOR</div>
                   <select style={S.select} value={hedgeTenor} onChange={(e) => setHedgeTenor(e.target.value)}>
                     <option value="1M">1M</option>
                     <option value="3M">3M</option>
@@ -1408,7 +1404,7 @@ export default function FXTerminalPage() {
                   </select>
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, color: "#666", marginBottom: 4 }}>CURRENCY</div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>CURRENCY</div>
                   <select style={S.select} value={hedgeCurrency} onChange={(e) => setHedgeCurrency(e.target.value)}>
                     <option value="USD">USD</option>
                     <option value="EUR">EUR</option>
@@ -1422,20 +1418,20 @@ export default function FXTerminalPage() {
                 <div>
                   <div style={{ display: "flex", gap: 24, marginBottom: 12 }}>
                     <div>
-                      <div style={{ fontSize: 10, color: "#666" }}>FORWARD</div>
+                      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>FORWARD</div>
                       <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{hedgeResult.forward?.toFixed(4)}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: 10, color: "#666" }}>COST (ANN BPS)</div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: "#f97316" }}>{hedgeResult.costBpsAnnualized?.toFixed(1)}</div>
+                      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>COST (ANN BPS)</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#3b82f6" }}>{hedgeResult.costBpsAnnualized?.toFixed(1)}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: 10, color: "#666" }}>BREAK-EVEN</div>
+                      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>BREAK-EVEN</div>
                       <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{fmtPct(hedgeResult.breakEvenPct, 2)}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: 10, color: "#666" }}>VOL REDUCTION</div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: "#4CAF50" }}>{hedgeResult.volReductionPct?.toFixed(1)}%</div>
+                      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>VOL REDUCTION</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#10b981" }}>{hedgeResult.volReductionPct?.toFixed(1)}%</div>
                     </div>
                   </div>
 
@@ -1453,13 +1449,13 @@ export default function FXTerminalPage() {
                       {hedgeResult.scenarios?.map((s: any) => (
                         <tr key={s.fxMovePct}>
                           <td style={{ ...S.td, fontWeight: 600 }}>{s.fxMovePct >= 0 ? "+" : ""}{s.fxMovePct}%</td>
-                          <td style={{ ...S.td, color: s.unhedgedPnl >= 0 ? "#4CAF50" : "#ef4444" }}>
+                          <td style={{ ...S.td, color: s.unhedgedPnl >= 0 ? "#10b981" : "#ef4444" }}>
                             {Math.round(s.unhedgedPnl).toLocaleString("no-NO")} NOK
                           </td>
-                          <td style={{ ...S.td, color: s.hedgedPnl >= 0 ? "#4CAF50" : "#ef4444" }}>
+                          <td style={{ ...S.td, color: s.hedgedPnl >= 0 ? "#10b981" : "#ef4444" }}>
                             {Math.round(s.hedgedPnl).toLocaleString("no-NO")} NOK
                           </td>
-                          <td style={{ ...S.td, color: s.savings > 0 ? "#4CAF50" : "#ef4444" }}>
+                          <td style={{ ...S.td, color: s.savings > 0 ? "#10b981" : "#ef4444" }}>
                             {Math.round(s.savings).toLocaleString("no-NO")} NOK
                           </td>
                         </tr>
@@ -1468,8 +1464,8 @@ export default function FXTerminalPage() {
                   </table>
 
                   {/* Plain-language summary */}
-                  <div style={{ marginTop: 12, padding: 10, background: "#111", borderRadius: 4, border: "1px solid #222", fontSize: 12, color: "#999", lineHeight: 1.6 }}>
-                    <b style={{ color: "#ccc" }}>Bottom line:</b>{" "}
+                  <div style={{ marginTop: 12, padding: 10, background: "#0d1117", borderRadius: 4, border: "1px solid #21262d", fontSize: 12, color: "rgba(255,255,255,0.6)", lineHeight: 1.6 }}>
+                    <b style={{ color: "rgba(255,255,255,0.8)" }}>Bottom line:</b>{" "}
                     {hedgeResult.costBpsAnnualized < 50
                       ? `Hedging ${hedgeRatio}% of your ${hedgeCurrency} exposure costs ~${hedgeResult.costBpsAnnualized?.toFixed(0)} bps/year. `
                       : `Hedging is relatively expensive at ${hedgeResult.costBpsAnnualized?.toFixed(0)} bps/year. `}
@@ -1513,21 +1509,21 @@ export default function FXTerminalPage() {
             onClick={() => setShowLoginModal(false)}
           >
             <form
-              style={{ ...S.card, padding: 28, width: 340, background: "#111" }}
+              style={{ ...S.card, padding: 28, width: 340, background: "#0d1117" }}
               onSubmit={(e) => { e.preventDefault(); handlePortfolioLogin(); }}
               onClick={(e) => e.stopPropagation()}
             >
               <div style={{ textAlign: "center", marginBottom: 20 }}>
-                <div style={{ fontSize: 16, fontWeight: 700, color: "#f97316" }}>Sign In</div>
-                <div style={{ fontSize: 10, color: "#666", marginTop: 4 }}>Sign in to load saved portfolios</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#3b82f6" }}>Sign In</div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 4 }}>Sign in to load saved portfolios</div>
               </div>
-              <div style={{ fontSize: 10, color: "#666", marginBottom: 4, letterSpacing: 1 }}>USERNAME</div>
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 4, letterSpacing: 1 }}>USERNAME</div>
               <input
                 type="text" value={authUser} onChange={(e) => setAuthUser(e.target.value)}
                 placeholder="Enter username" autoFocus autoComplete="username"
                 style={{ ...S.input, width: "100%", padding: "10px 12px", marginBottom: 12, boxSizing: "border-box" as const }}
               />
-              <div style={{ fontSize: 10, color: "#666", marginBottom: 4, letterSpacing: 1 }}>PASSWORD</div>
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 4, letterSpacing: 1 }}>PASSWORD</div>
               <input
                 type="password" value={authPass} onChange={(e) => setAuthPass(e.target.value)}
                 placeholder="Enter password" autoComplete="current-password"
@@ -1550,12 +1546,19 @@ export default function FXTerminalPage() {
             <div style={S.cardTitle}>PORTFOLIO FX RISK ANALYSIS</div>
             {token && profile ? (
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ ...S.badge, background: "rgba(76,175,80,0.15)", color: "#4CAF50" }}>{profile}</span>
-                <span style={{ fontSize: 10, color: "#888", cursor: "pointer", textDecoration: "underline" }} onClick={authLogout}>logout</span>
+                <span style={{ ...S.badge, background: "rgba(59,130,246,0.15)", color: "#10b981" }}>{profile}</span>
+                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", cursor: "pointer", textDecoration: "underline" }} onClick={() => {
+                  authLogout();
+                  setPfTickers("EQNR,MOWI,FRO,DNB");
+                  setPfWeights("0.3,0.25,0.25,0.2");
+                  setPfResult(null);
+                  setSelectedConfigId(null);
+                  setSavedConfigs([]);
+                }}>logout</span>
               </div>
             ) : (
               <button
-                style={{ ...S.button, background: "transparent", border: "1px solid #f97316", color: "#f97316", fontSize: 10 }}
+                style={{ ...S.button, background: "transparent", border: "1px solid #3b82f6", color: "#3b82f6", fontSize: 10 }}
                 onClick={() => setShowLoginModal(true)}
               >
                 SIGN IN TO LOAD PORTFOLIOS
@@ -1574,13 +1577,13 @@ export default function FXTerminalPage() {
                     onClick={() => selectConfig(cfg)}
                     style={{
                       padding: "8px 14px", minWidth: 120,
-                      background: active ? "rgba(249,115,22,0.12)" : "#1a1a1a",
-                      border: active ? "1px solid #f97316" : "1px solid #333",
+                      background: active ? "rgba(59,130,246,0.12)" : "#0d1117",
+                      border: active ? "1px solid #3b82f6" : "1px solid #30363d",
                       borderRadius: 4, cursor: "pointer", transition: "all 0.15s",
                     }}
                   >
-                    <div style={{ fontSize: 12, fontWeight: 700, color: active ? "#f97316" : "#e5e5e5" }}>{cfg.name}</div>
-                    <div style={{ fontSize: 9, color: "#666", marginTop: 2 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: active ? "#3b82f6" : "#fff" }}>{cfg.name}</div>
+                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>
                       {cfg.tickers.length} stocks{cfg.mode ? ` \u00B7 ${cfg.mode}` : ""}
                     </div>
                   </div>
@@ -1588,55 +1591,238 @@ export default function FXTerminalPage() {
               })}
             </div>
           )}
-          {token && configsLoading && <div style={{ fontSize: 11, color: "#666", marginBottom: 8 }}>Loading portfolios...</div>}
+          {token && configsLoading && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>Loading portfolios...</div>}
           {token && !configsLoading && savedConfigs.length === 0 && (
-            <div style={{ fontSize: 11, color: "#666", marginBottom: 8 }}>
-              No saved portfolios. <Link href="/portfolio" style={{ color: "#f97316" }}>Create one in the Portfolio Optimizer</Link>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>
+              No saved portfolios. <Link href="/portfolio" style={{ color: "#3b82f6" }}>Create one in the Portfolio Optimizer</Link>
             </div>
           )}
 
-          {/* Holdings table */}
-          {holdingTickers.length > 0 && (
-            <table style={{ ...S.table, marginTop: 4 }}>
-              <thead>
-                <tr>
-                  <th style={S.th}>TICKER</th>
-                  <th style={{ ...S.th, textAlign: "right" }}>WEIGHT</th>
-                  <th style={S.th}>ALLOCATION</th>
-                </tr>
-              </thead>
-              <tbody>
-                {holdingTickers.map((t, i) => {
-                  const w = holdingWeights[i] ?? 0;
-                  return (
-                    <tr key={t}>
-                      <td style={{ ...S.td, fontWeight: 600, color: "#f97316" }}>{t}</td>
-                      <td style={{ ...S.td, textAlign: "right", fontWeight: 600 }}>{(w * 100).toFixed(1)}%</td>
-                      <td style={S.td}>
-                        <div style={{ width: "100%", height: 12, background: "#1a1a1a", borderRadius: 2, overflow: "hidden" }}>
-                          <div style={{ width: `${Math.min(w * 100 * 2, 100)}%`, height: "100%", background: "#f97316", opacity: 0.5, borderRadius: 2 }} />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-                <tr>
-                  <td style={{ ...S.td, color: "#888", fontWeight: 600 }}>TOTAL</td>
-                  <td style={{ ...S.td, textAlign: "right", fontWeight: 700, color: Math.abs(holdingWeights.reduce((a, b) => a + b, 0) - 1) < 0.01 ? "#4CAF50" : "#ef4444" }}>
-                    {(holdingWeights.reduce((a, b) => a + b, 0) * 100).toFixed(1)}%
-                  </td>
-                  <td style={S.td} />
-                </tr>
-              </tbody>
-            </table>
-          )}
-
-          <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 10 }}>
-            <button style={S.button} onClick={runPortfolio} disabled={pfLoading || holdingTickers.length < 2}>
-              {pfLoading ? "ANALYZING..." : "ANALYZE FX RISK"}
-            </button>
-            {holdingTickers.length < 2 && <span style={{ fontSize: 10, color: "#666" }}>Select a portfolio or sign in to load saved portfolios</span>}
+          {/* Add ticker search */}
+          <div style={{ position: "relative", marginBottom: 10 }}>
+            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginBottom: 4, letterSpacing: "0.05em", textTransform: "uppercase" as const }}>ADD TICKER</div>
+            <input
+              type="text"
+              placeholder="Search ticker to add..."
+              value={pfTickerSearch}
+              onChange={(e) => setPfTickerSearch(e.target.value.toUpperCase())}
+              onFocus={() => setPfSearchFocused(true)}
+              onBlur={() => setTimeout(() => setPfSearchFocused(false), 200)}
+              style={{ ...S.input, width: 250, padding: "6px 10px" }}
+            />
+            {pfSearchFocused && pfTickerSearch.length >= 1 && (() => {
+              const available = exposureHeatmap
+                .map(r => r.ticker)
+                .filter(t => !holdingTickers.includes(t) && t.includes(pfTickerSearch))
+                .slice(0, 8);
+              if (available.length === 0) return null;
+              return (
+                <div style={{
+                  position: "absolute", top: "100%", left: 0, zIndex: 20, marginTop: 2,
+                  background: "#161b22", border: "1px solid #3b82f6", borderRadius: 6,
+                  maxHeight: 200, overflowY: "auto", width: 250,
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+                }}>
+                  {available.map(t => (
+                    <div
+                      key={t}
+                      style={{ padding: "6px 12px", fontSize: 11, fontFamily: "monospace", cursor: "pointer", borderBottom: "1px solid #21262d" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(59,130,246,0.08)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                      onMouseDown={() => {
+                        const newTickers = [...holdingTickers, t];
+                        const newWeight = normalizeWeights ? 0 : 0.1;
+                        const newWeights = [...holdingWeights, newWeight];
+                        if (normalizeWeights && newWeights.length > 1) {
+                          const eq = 1 / newWeights.length;
+                          for (let j = 0; j < newWeights.length; j++) newWeights[j] = eq;
+                        }
+                        setPfTickers(newTickers.join(","));
+                        setPfWeights(newWeights.map(v => v.toFixed(4)).join(","));
+                        setPfTickerSearch("");
+                        setPfResult(null);
+                      }}
+                    >
+                      {t}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
+
+          {/* Editable holdings table */}
+          {holdingTickers.length > 0 && (() => {
+            const applyWeight = (idx: number, pctVal: number) => {
+              const wArr = [...holdingWeights];
+              wArr[idx] = Math.max(0, pctVal / 100);
+              if (normalizeWeights) {
+                const total = wArr.reduce((a, b) => a + b, 0);
+                if (total > 1.0001) {
+                  const excess = total - 1;
+                  const others = wArr.filter((_, j) => j !== idx && wArr[j] > 0).length;
+                  if (others > 0) {
+                    const cut = excess / others;
+                    for (let j = 0; j < wArr.length; j++) {
+                      if (j !== idx) wArr[j] = Math.max(0, wArr[j] - cut);
+                    }
+                  }
+                }
+              }
+              setPfWeights(wArr.map(v => v.toFixed(4)).join(","));
+            };
+            const commitEdit = () => {
+              if (editingWeightIdx === null) return;
+              const parsed = parseFloat(editingWeightVal.replace(",", "."));
+              applyWeight(editingWeightIdx, isNaN(parsed) ? 0 : parsed);
+              setEditingWeightIdx(null);
+            };
+            return (
+            <>
+              <table style={{ ...S.table }}>
+                <thead>
+                  <tr>
+                    <th style={S.th}>TICKER</th>
+                    <th style={{ ...S.th, textAlign: "right", width: 90 }}>WEIGHT %</th>
+                    <th style={S.th}>ALLOCATION</th>
+                    <th style={{ ...S.th, width: 30 }} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {holdingTickers.map((t, i) => {
+                    const w = holdingWeights[i] ?? 0;
+                    const maxSlider = normalizeWeights ? 100 : 200;
+                    return (
+                      <tr key={t}>
+                        <td style={{ ...S.td, fontWeight: 600, color: "#3b82f6" }}>{t}</td>
+                        <td style={{ ...S.td, textAlign: "right" }}>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={editingWeightIdx === i ? editingWeightVal : (w * 100).toFixed(1)}
+                            onFocus={(e) => {
+                              setEditingWeightIdx(i);
+                              setEditingWeightVal((w * 100).toFixed(1));
+                              e.target.select();
+                            }}
+                            onBlur={commitEdit}
+                            onKeyDown={(e) => { if (e.key === "Enter") { e.currentTarget.blur(); } }}
+                            onChange={(e) => {
+                              setEditingWeightVal(e.target.value);
+                            }}
+                            style={{
+                              ...S.input,
+                              width: 70,
+                              textAlign: "right" as const,
+                              padding: "4px 6px",
+                              fontSize: 11,
+                            }}
+                          />
+                        </td>
+                        <td style={{ ...S.td, position: "relative" }}>
+                          <div style={{ position: "relative", height: 16 }}>
+                            <div style={{ position: "absolute", inset: 0, background: "#0d1117", borderRadius: 3, overflow: "hidden" }}>
+                              <div style={{
+                                width: `${Math.min((w * 100 / maxSlider) * 100, 100)}%`,
+                                height: "100%",
+                                background: "linear-gradient(90deg, rgba(59,130,246,0.3), rgba(59,130,246,0.6))",
+                                borderRadius: 3,
+                                transition: "width 0.25s ease-out",
+                              }} />
+                            </div>
+                            <input
+                              type="range"
+                              min={0}
+                              max={maxSlider}
+                              step={0.5}
+                              value={w * 100}
+                              onChange={(e) => applyWeight(i, parseFloat(e.target.value))}
+                              style={{
+                                position: "absolute", inset: 0, width: "100%", height: "100%",
+                                opacity: 0, cursor: "pointer", margin: 0,
+                              }}
+                            />
+                          </div>
+                        </td>
+                        <td style={{ ...S.td, textAlign: "center" }}>
+                          <span
+                            style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", cursor: "pointer", fontFamily: "monospace" }}
+                            onMouseEnter={(e) => (e.currentTarget.style.color = "#ef4444")}
+                            onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.3)")}
+                            onClick={() => {
+                              const newTickers = holdingTickers.filter((_, j) => j !== i);
+                              const newWeights = holdingWeights.filter((_, j) => j !== i);
+                              if (normalizeWeights && newTickers.length > 0) {
+                                const total = newWeights.reduce((a, b) => a + b, 0);
+                                if (total > 0) {
+                                  for (let j = 0; j < newWeights.length; j++) newWeights[j] /= total;
+                                }
+                              }
+                              setPfTickers(newTickers.join(","));
+                              setPfWeights(newWeights.map(v => v.toFixed(4)).join(","));
+                              setPfResult(null);
+                            }}
+                          >
+                            &times;
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  <tr>
+                    <td style={{ ...S.td, color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>TOTAL</td>
+                    <td style={{ ...S.td, textAlign: "right", fontWeight: 700, color: Math.abs(holdingWeights.reduce((a, b) => a + b, 0) - 1) < 0.01 ? "#10b981" : normalizeWeights ? "#ef4444" : "rgba(255,255,255,0.5)" }}>
+                      {(holdingWeights.reduce((a, b) => a + b, 0) * 100).toFixed(1)}%
+                    </td>
+                    <td style={S.td} />
+                    <td style={S.td} />
+                  </tr>
+                </tbody>
+              </table>
+
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10, flexWrap: "wrap" }}>
+                <button style={S.button} onClick={runPortfolio} disabled={pfLoading || holdingTickers.length < 2}>
+                  {pfLoading ? "ANALYZING..." : "ANALYZE FX RISK"}
+                </button>
+                <button
+                  style={{ ...S.button, background: "#21262d", border: "1px solid #30363d", color: "rgba(255,255,255,0.6)", padding: "6px 14px", fontSize: 10 }}
+                  onClick={() => {
+                    const n = holdingTickers.length;
+                    const eq = Array(n).fill(1 / n);
+                    setPfWeights(eq.map((v: number) => v.toFixed(4)).join(","));
+                  }}
+                >
+                  EQUAL WEIGHT
+                </button>
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", marginLeft: "auto" }}
+                  onClick={() => setNormalizeWeights(!normalizeWeights)}
+                >
+                  <div style={{
+                    width: 32, height: 16, borderRadius: 8,
+                    background: normalizeWeights ? "#3b82f6" : "#30363d",
+                    position: "relative", transition: "background 0.2s",
+                  }}>
+                    <div style={{
+                      width: 12, height: 12, borderRadius: 6,
+                      background: "#fff",
+                      position: "absolute", top: 2,
+                      left: normalizeWeights ? 18 : 2,
+                      transition: "left 0.2s",
+                    }} />
+                  </div>
+                  <span style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace" }}>
+                    CAP AT 100%
+                  </span>
+                </div>
+              </div>
+            </>
+          );})()}
+          {holdingTickers.length === 0 && (
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", padding: "12px 0" }}>
+              Add tickers above to build your portfolio
+            </div>
+          )}
         </div>
 
         {pfResult && (
@@ -1650,7 +1836,7 @@ export default function FXTerminalPage() {
                 { label: "1M VaR 99%", value: pfResult.fxVaR?.var99_1m, suffix: "%" },
               ].map((v) => (
                 <div key={v.label} style={S.card}>
-                  <div style={{ fontSize: 10, color: "#888" }}>{v.label}</div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>{v.label}</div>
                   <div style={{ fontSize: 20, fontWeight: 700, color: "#ef4444" }}>
                     {v.value != null ? `${v.value.toFixed(2)}${v.suffix}` : "\u2014"}
                   </div>
@@ -1668,17 +1854,17 @@ export default function FXTerminalPage() {
                   return (
                     <div key={c} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                       <span style={{ width: 40, fontSize: 10, color: CCY_COLORS[c.toUpperCase()], fontWeight: 600 }}>{c.toUpperCase()}</span>
-                      <div style={{ flex: 1, height: 16, background: "#1a1a1a", borderRadius: 2, position: "relative", overflow: "hidden" }}>
+                      <div style={{ flex: 1, height: 16, background: "#0d1117", borderRadius: 2, position: "relative", overflow: "hidden" }}>
                         <div style={{
                           position: "absolute",
                           left: v >= 0 ? "50%" : `${50 - pctAbs}%`,
                           width: `${pctAbs}%`,
                           height: "100%",
-                          background: v >= 0 ? "#4CAF50" : "#ef4444",
+                          background: v >= 0 ? "#10b981" : "#ef4444",
                           opacity: 0.5,
                         }} />
                       </div>
-                      <span style={{ width: 50, textAlign: "right", fontSize: 11, color: v >= 0 ? "#4CAF50" : "#ef4444" }}>
+                      <span style={{ width: 50, textAlign: "right", fontSize: 11, color: v >= 0 ? "#10b981" : "#ef4444" }}>
                         {(v * 100).toFixed(1)}%
                       </span>
                     </div>
@@ -1692,8 +1878,8 @@ export default function FXTerminalPage() {
                 {pfResult.fxVaR?.currencyContributions && Object.entries(pfResult.fxVaR.currencyContributions).map(([c, v]) => (
                   <div key={c} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                     <span style={{ width: 40, fontSize: 10, color: CCY_COLORS[c.toUpperCase()], fontWeight: 600 }}>{c.toUpperCase()}</span>
-                    <div style={{ flex: 1, height: 16, background: "#1a1a1a", borderRadius: 2, overflow: "hidden" }}>
-                      <div style={{ width: `${v as number}%`, height: "100%", background: CCY_COLORS[c.toUpperCase()] || "#888", opacity: 0.6 }} />
+                    <div style={{ flex: 1, height: 16, background: "#0d1117", borderRadius: 2, overflow: "hidden" }}>
+                      <div style={{ width: `${v as number}%`, height: "100%", background: CCY_COLORS[c.toUpperCase()] || "rgba(255,255,255,0.5)", opacity: 0.6 }} />
                     </div>
                     <span style={{ width: 40, textAlign: "right", fontSize: 11 }}>{(v as number).toFixed(0)}%</span>
                   </div>
@@ -1720,7 +1906,7 @@ export default function FXTerminalPage() {
                 <tbody>
                   {pfResult.perStock?.map((s: any) => (
                     <tr key={s.ticker}>
-                      <td style={{ ...S.td, fontWeight: 600, color: "#f97316" }}>{s.ticker}</td>
+                      <td style={{ ...S.td, fontWeight: 600, color: "#3b82f6" }}>{s.ticker}</td>
                       <td style={S.td}>{(s.weight * 100).toFixed(1)}%</td>
                       <td style={S.td}>{s.fxBetaTotal.toFixed(3)}</td>
                       <td style={{ ...S.td, fontWeight: 600 }}>{(s.riskContribution * 100).toFixed(2)}%</td>
@@ -1753,13 +1939,13 @@ export default function FXTerminalPage() {
                   {pfResult.stressScenarios?.map((s: any) => (
                     <tr key={s.scenario}>
                       <td style={{ ...S.td, fontWeight: 600 }}>{s.scenario}</td>
-                      <td style={{ ...S.td, color: s.usdImpact >= 0 ? "#4CAF50" : "#ef4444" }}>
+                      <td style={{ ...S.td, color: s.usdImpact >= 0 ? "#10b981" : "#ef4444" }}>
                         {fmtPct(s.usdImpact * 100, 1)}
                       </td>
-                      <td style={{ ...S.td, color: s.eurImpact >= 0 ? "#4CAF50" : "#ef4444" }}>
+                      <td style={{ ...S.td, color: s.eurImpact >= 0 ? "#10b981" : "#ef4444" }}>
                         {fmtPct(s.eurImpact * 100, 1)}
                       </td>
-                      <td style={{ ...S.td, fontWeight: 700, color: s.totalImpact >= 0 ? "#4CAF50" : "#ef4444" }}>
+                      <td style={{ ...S.td, fontWeight: 700, color: s.totalImpact >= 0 ? "#10b981" : "#ef4444" }}>
                         {fmtPct(s.totalImpact * 100, 1)}
                       </td>
                     </tr>
@@ -1782,16 +1968,16 @@ export default function FXTerminalPage() {
       <>
         {/* Pair selector */}
         <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 16 }}>
-          <span style={{ fontSize: 11, color: "#888" }}>PAIR:</span>
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>PAIR:</span>
           {["NOKUSD", "NOKEUR", "NOKGBP", "NOKSEK", "NOKDKK"].map((p) => (
             <div
               key={p}
               style={{
                 ...S.badge,
-                background: fwdPair === p ? "rgba(249,115,22,0.2)" : "#1a1a1a",
-                color: fwdPair === p ? "#f97316" : "#888",
+                background: fwdPair === p ? "rgba(59,130,246,0.2)" : "#0d1117",
+                color: fwdPair === p ? "#3b82f6" : "rgba(255,255,255,0.5)",
                 cursor: "pointer",
-                border: fwdPair === p ? "1px solid #f97316" : "1px solid #333",
+                border: fwdPair === p ? "1px solid #3b82f6" : "1px solid #30363d",
               }}
               onClick={() => setFwdPair(p)}
             >
@@ -1828,13 +2014,13 @@ export default function FXTerminalPage() {
                     <td style={{ ...S.td, fontWeight: 600 }}>{f.tenor}</td>
                     <td style={S.td}>{f.spot.toFixed(4)}</td>
                     <td style={{ ...S.td, fontWeight: 600 }}>{f.forward.toFixed(4)}</td>
-                    <td style={{ ...S.td, color: f.forwardPoints > 0 ? "#4CAF50" : "#ef4444" }}>
+                    <td style={{ ...S.td, color: f.forwardPoints > 0 ? "#10b981" : "#ef4444" }}>
                       {f.forwardPoints >= 0 ? "+" : ""}{f.forwardPoints.toFixed(4)}
                     </td>
-                    <td style={{ ...S.td, color: f.forwardPointsBps > 0 ? "#4CAF50" : "#ef4444" }}>
+                    <td style={{ ...S.td, color: f.forwardPointsBps > 0 ? "#10b981" : "#ef4444" }}>
                       {f.forwardPointsBps >= 0 ? "+" : ""}{f.forwardPointsBps.toFixed(1)}
                     </td>
-                    <td style={{ ...S.td, color: f.annualizedCarryPct > 0 ? "#4CAF50" : "#ef4444" }}>
+                    <td style={{ ...S.td, color: f.annualizedCarryPct > 0 ? "#10b981" : "#ef4444" }}>
                       {fmtPct(f.annualizedCarryPct)}
                     </td>
                     <td style={S.td}>{f.nokRate.toFixed(2)}%</td>
@@ -1868,13 +2054,13 @@ export default function FXTerminalPage() {
                     (rates as any[]).map((r, i) => (
                       <tr key={`${ccy}-${i}`}>
                         {i === 0 && (
-                          <td style={{ ...S.td, fontWeight: 600, color: CCY_COLORS[ccy] || "#888" }} rowSpan={rates.length}>
+                          <td style={{ ...S.td, fontWeight: 600, color: CCY_COLORS[ccy] || "rgba(255,255,255,0.5)" }} rowSpan={rates.length}>
                             {ccy}
                           </td>
                         )}
                         <td style={S.td}>{r.tenor}</td>
                         <td style={{ ...S.td, fontWeight: 600 }}>{r.rate.toFixed(2)}%</td>
-                        <td style={{ ...S.td, color: "#555" }}>{r.source}</td>
+                        <td style={{ ...S.td, color: "rgba(255,255,255,0.35)" }}>{r.source}</td>
                       </tr>
                     ))
                   )}
@@ -1899,60 +2085,60 @@ export default function FXTerminalPage() {
             {carryData ? (
               <>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 14 }}>
-                  <div style={{ padding: 10, background: "#111", borderRadius: 4, border: "1px solid #222" }}>
-                    <div style={{ fontSize: 10, color: "#666", marginBottom: 4 }}>ANNUALIZED CARRY</div>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: carryData.carry > 0 ? "#4CAF50" : "#ef4444" }}>
+                  <div style={{ padding: 10, background: "#0d1117", borderRadius: 4, border: "1px solid #21262d" }}>
+                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>ANNUALIZED CARRY</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: carryData.carry > 0 ? "#10b981" : "#ef4444" }}>
                       {fmtPct(carryData.carry)}
                     </div>
-                    <div style={{ fontSize: 9, color: "#555", marginTop: 2 }}>Interest rate differential</div>
+                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>Interest rate differential</div>
                   </div>
-                  <div style={{ padding: 10, background: "#111", borderRadius: 4, border: "1px solid #222" }}>
-                    <div style={{ fontSize: 10, color: "#666", marginBottom: 4 }}>CARRY SHARPE</div>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: (carryData.carrySharpe ?? 0) > 0.5 ? "#4CAF50" : (carryData.carrySharpe ?? 0) > 0 ? "#f97316" : "#ef4444" }}>
+                  <div style={{ padding: 10, background: "#0d1117", borderRadius: 4, border: "1px solid #21262d" }}>
+                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>CARRY SHARPE</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: (carryData.carrySharpe ?? 0) > 0.5 ? "#10b981" : (carryData.carrySharpe ?? 0) > 0 ? "#3b82f6" : "#ef4444" }}>
                       {carryData.carrySharpe?.toFixed(2)}
                     </div>
-                    <div style={{ fontSize: 9, color: "#555", marginTop: 2 }}>Carry / spot volatility</div>
+                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>Carry / spot volatility</div>
                   </div>
-                  <div style={{ padding: 10, background: "#111", borderRadius: 4, border: "1px solid #222" }}>
-                    <div style={{ fontSize: 10, color: "#666", marginBottom: 4 }}>SPOT VOLATILITY</div>
+                  <div style={{ padding: 10, background: "#0d1117", borderRadius: 4, border: "1px solid #21262d" }}>
+                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>SPOT VOLATILITY</div>
                     <div style={{ fontSize: 20, fontWeight: 700, color: "#fff" }}>
                       {carryData.spotVol?.toFixed(1)}%
                     </div>
-                    <div style={{ fontSize: 9, color: "#555", marginTop: 2 }}>Annualized FX volatility</div>
+                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>Annualized FX volatility</div>
                   </div>
-                  <div style={{ padding: 10, background: "#111", borderRadius: 4, border: "1px solid #222" }}>
-                    <div style={{ fontSize: 10, color: "#666", marginBottom: 4 }}>CARRY-TO-VOL</div>
+                  <div style={{ padding: 10, background: "#0d1117", borderRadius: 4, border: "1px solid #21262d" }}>
+                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>CARRY-TO-VOL</div>
                     <div style={{ fontSize: 20, fontWeight: 700, color: "#fff" }}>
                       {carryData.spotVol > 0 ? (Math.abs(carryData.carry) / carryData.spotVol * 100).toFixed(0) : "\u2014"}%
                     </div>
-                    <div style={{ fontSize: 9, color: "#555", marginTop: 2 }}>How much carry vs risk</div>
+                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>How much carry vs risk</div>
                   </div>
                 </div>
 
-                <div style={{ padding: 10, background: "#111", borderRadius: 4, border: "1px solid #222", marginBottom: 14 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#888", marginBottom: 6 }}>RATE DIFFERENTIAL BREAKDOWN</div>
+                <div style={{ padding: 10, background: "#0d1117", borderRadius: 4, border: "1px solid #21262d", marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", marginBottom: 6 }}>RATE DIFFERENTIAL BREAKDOWN</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                         <span style={{ fontSize: 12 }}>
                           <span style={{ color: "#F44336", fontWeight: 600 }}>NOK</span>
-                          <span style={{ color: "#888" }}> (3M Nibor)</span>
+                          <span style={{ color: "rgba(255,255,255,0.5)" }}> (3M Nibor)</span>
                         </span>
                         <span style={{ fontSize: 14, fontWeight: 700, color: "#F44336" }}>{carryData.rates?.nokRate?.toFixed(2)}%</span>
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                         <span style={{ fontSize: 12 }}>
-                          <span style={{ color: CCY_COLORS[fwdPair.replace("NOK", "")] || "#888", fontWeight: 600 }}>{fwdPair.replace("NOK", "")}</span>
-                          <span style={{ color: "#888" }}> (3M rate)</span>
+                          <span style={{ color: CCY_COLORS[fwdPair.replace("NOK", "")] || "rgba(255,255,255,0.5)", fontWeight: 600 }}>{fwdPair.replace("NOK", "")}</span>
+                          <span style={{ color: "rgba(255,255,255,0.5)" }}> (3M rate)</span>
                         </span>
-                        <span style={{ fontSize: 14, fontWeight: 700, color: CCY_COLORS[fwdPair.replace("NOK", "")] || "#888" }}>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: CCY_COLORS[fwdPair.replace("NOK", "")] || "rgba(255,255,255,0.5)" }}>
                           {carryData.rates?.foreignRate?.toFixed(2)}%
                         </span>
                       </div>
-                      <div style={{ height: 1, background: "#333", margin: "4px 0" }} />
+                      <div style={{ height: 1, background: "#30363d", margin: "4px 0" }} />
                       <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span style={{ fontSize: 12, color: "#888" }}>Carry (NOK - {fwdPair.replace("NOK", "")})</span>
-                        <span style={{ fontSize: 14, fontWeight: 700, color: carryData.rates?.differential > 0 ? "#4CAF50" : "#ef4444" }}>
+                        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>Carry (NOK - {fwdPair.replace("NOK", "")})</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: carryData.rates?.differential > 0 ? "#10b981" : "#ef4444" }}>
                           {fmtPct(carryData.rates?.differential, 2)}
                         </span>
                       </div>
@@ -1963,20 +2149,20 @@ export default function FXTerminalPage() {
                 {/* Cumulative P&L chart */}
                 {carryData.cumulativePnl?.length > 2 && (
                   <div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: "#888", marginBottom: 2 }}>CUMULATIVE P&amp;L (CARRY + SPOT RETURN)</div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", marginBottom: 2 }}>CUMULATIVE P&amp;L (CARRY + SPOT RETURN)</div>
                     <HelpToggle id="carry-pnl-help" label="How to read this chart" showHelp={showHelp} setShowHelp={setShowHelp}>
                       Orange line = total return from holding this carry position. Carry income is steady, but spot moves dominate short-term.
                     </HelpToggle>
                     <Sparkline
                       data={carryData.cumulativePnl.map((p: any) => p.total)}
-                      color="#f97316"
+                      color="#3b82f6"
                       width={400}
                       height={80}
                     />
                     <div style={{ display: "flex", gap: 20, fontSize: 11, marginTop: 6, padding: "6px 0" }}>
-                      <span><span style={{ display: "inline-block", width: 8, height: 8, background: "#4CAF50", borderRadius: 1, marginRight: 4 }} />Carry income: <span style={{ fontWeight: 600, color: "#4CAF50" }}>{fmtPct(carryData.cumulativePnl[carryData.cumulativePnl.length - 1]?.carry)}</span></span>
+                      <span><span style={{ display: "inline-block", width: 8, height: 8, background: "#10b981", borderRadius: 1, marginRight: 4 }} />Carry income: <span style={{ fontWeight: 600, color: "#10b981" }}>{fmtPct(carryData.cumulativePnl[carryData.cumulativePnl.length - 1]?.carry)}</span></span>
                       <span><span style={{ display: "inline-block", width: 8, height: 8, background: "#2196F3", borderRadius: 1, marginRight: 4 }} />Spot return: <span style={{ fontWeight: 600, color: "#2196F3" }}>{fmtPct(carryData.cumulativePnl[carryData.cumulativePnl.length - 1]?.spot)}</span></span>
-                      <span><span style={{ display: "inline-block", width: 8, height: 8, background: "#f97316", borderRadius: 1, marginRight: 4 }} />Total: <span style={{ fontWeight: 700, color: "#f97316" }}>{fmtPct(carryData.cumulativePnl[carryData.cumulativePnl.length - 1]?.total)}</span></span>
+                      <span><span style={{ display: "inline-block", width: 8, height: 8, background: "#3b82f6", borderRadius: 1, marginRight: 4 }} />Total: <span style={{ fontWeight: 700, color: "#3b82f6" }}>{fmtPct(carryData.cumulativePnl[carryData.cumulativePnl.length - 1]?.total)}</span></span>
                     </div>
                   </div>
                 )}
