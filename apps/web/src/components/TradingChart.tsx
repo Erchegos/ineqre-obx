@@ -156,12 +156,16 @@ export default function TradingChart({ data, height = 500, initialBars }: Tradin
       const bars = initialBars ? Math.min(initialBars, total) : total;
       setViewStart(Math.max(0, total - bars));
       setViewEnd(total);
+      setYOffset(0);
       prevDataLen.current = total;
     }
   }, [total, initialBars]);
 
+  // Y-axis offset for vertical panning (in price units)
+  const [yOffset, setYOffset] = useState(0);
+
   // Drag state
-  const dragRef = useRef<{ startX: number; origStart: number; origEnd: number } | null>(null);
+  const dragRef = useRef<{ startX: number; startY: number; origStart: number; origEnd: number; origYOffset: number } | null>(null);
 
   const toggle = useCallback((ind: Indicator) => {
     setIndicators(prev => { const n = new Set(prev); n.has(ind) ? n.delete(ind) : n.add(ind); return n; });
@@ -263,8 +267,8 @@ export default function TradingChart({ data, height = 500, initialBars }: Tradin
     }
     const pad = (mx - mn) * 0.05;
     const domainMin = showVol ? mn - pad - (mx - mn) * 0.18 : mn - pad;
-    return [domainMin, mx + pad];
-  }, [enriched, on, showVol]);
+    return [domainMin + yOffset, mx + pad + yOffset];
+  }, [enriched, on, showVol, yOffset]);
 
   const maxVol = useMemo(() => Math.max(...enriched.map(d => d.volume || 0), 1), [enriched]);
 
@@ -322,32 +326,39 @@ export default function TradingChart({ data, height = 500, initialBars }: Tradin
     return () => el.removeEventListener("wheel", handler);
   }, []); // stable — reads state via ref
 
-  // ─── Drag to pan ──────────────────────────────────────────────────────────
+  // ─── Drag to pan (X + Y) ─────────────────────────────────────────────────
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    // Only start drag on left button, not on info box
     if (e.button !== 0) return;
-    dragRef.current = { startX: e.clientX, origStart: viewStart, origEnd: viewEnd };
-  }, [viewStart, viewEnd]);
+    dragRef.current = { startX: e.clientX, startY: e.clientY, origStart: viewStart, origEnd: viewEnd, origYOffset: yOffset };
+  }, [viewStart, viewEnd, yOffset]);
+
+  const panFromDrag = useCallback((clientX: number, clientY: number) => {
+    if (!dragRef.current || !dims) return;
+    // Horizontal pan
+    const dx = clientX - dragRef.current.startX;
+    const barsPerPx = (dragRef.current.origEnd - dragRef.current.origStart) / dims.w;
+    const barShift = Math.round(-dx * barsPerPx);
+    const bars = dragRef.current.origEnd - dragRef.current.origStart;
+    let newStart = dragRef.current.origStart + barShift;
+    let newEnd = dragRef.current.origEnd + barShift;
+    if (newStart < 0) { newStart = 0; newEnd = bars; }
+    if (newEnd > total) { newEnd = total; newStart = total - bars; }
+    newStart = Math.max(0, newStart);
+    setViewStart(newStart);
+    setViewEnd(newEnd);
+
+    // Vertical pan — dragging up shifts prices down (reveals higher prices)
+    const dy = clientY - dragRef.current.startY;
+    const pricePerPx = (maxP - minP) / dims.h;
+    const priceShift = dy * pricePerPx;
+    setYOffset(dragRef.current.origYOffset + priceShift);
+  }, [dims, total, maxP, minP]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    // If dragging, pan the viewport
     if (dragRef.current && dims) {
-      const dx = e.clientX - dragRef.current.startX;
-      const barsPerPx = (dragRef.current.origEnd - dragRef.current.origStart) / dims.w;
-      const barShift = Math.round(-dx * barsPerPx);
-      const bars = dragRef.current.origEnd - dragRef.current.origStart;
-      let newStart = dragRef.current.origStart + barShift;
-      let newEnd = dragRef.current.origEnd + barShift;
-      // Clamp to data bounds
-      if (newStart < 0) { newStart = 0; newEnd = bars; }
-      if (newEnd > total) { newEnd = total; newStart = total - bars; }
-      newStart = Math.max(0, newStart);
-      setViewStart(newStart);
-      setViewEnd(newEnd);
-      // Don't update crosshair during drag
+      panFromDrag(e.clientX, e.clientY);
       return;
     }
-
     // Normal crosshair
     if (!dims || !enriched.length) return;
     const rect = containerRef.current?.getBoundingClientRect();
@@ -357,18 +368,76 @@ export default function TradingChart({ data, height = 500, initialBars }: Tradin
     const gap = dims.w / enriched.length;
     const idx = Math.min(Math.floor((x - dims.l) / gap), enriched.length - 1);
     setHoverIdx(idx >= 0 ? idx : null);
-  }, [dims, enriched, total]);
+  }, [dims, enriched, panFromDrag]);
 
   const handleMouseUp = useCallback(() => {
     dragRef.current = null;
   }, []);
 
+  // ─── Touch support for mobile ──────────────────────────────────────────────
+  const touchStateRef = useRef({ viewStart, viewEnd, yOffset, dims, total, maxP, minP });
+  touchStateRef.current = { viewStart, viewEnd, yOffset, dims, total, maxP, minP };
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const st = touchStateRef.current;
+      dragRef.current = { startX: t.clientX, startY: t.clientY, origStart: st.viewStart, origEnd: st.viewEnd, origYOffset: st.yOffset };
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!dragRef.current || e.touches.length !== 1) return;
+      e.preventDefault(); // prevent page scroll while dragging chart
+      const t = e.touches[0];
+      const st = touchStateRef.current;
+      const d = st.dims;
+      if (!d) return;
+
+      // Horizontal pan
+      const dx = t.clientX - dragRef.current.startX;
+      const barsPerPx = (dragRef.current.origEnd - dragRef.current.origStart) / d.w;
+      const barShift = Math.round(-dx * barsPerPx);
+      const bars = dragRef.current.origEnd - dragRef.current.origStart;
+      let newStart = dragRef.current.origStart + barShift;
+      let newEnd = dragRef.current.origEnd + barShift;
+      if (newStart < 0) { newStart = 0; newEnd = bars; }
+      if (newEnd > st.total) { newEnd = st.total; newStart = st.total - bars; }
+      newStart = Math.max(0, newStart);
+      setViewStart(newStart);
+      setViewEnd(newEnd);
+
+      // Vertical pan
+      const dy = t.clientY - dragRef.current.startY;
+      const priceRange = st.maxP - st.minP;
+      const pricePerPx = priceRange / d.h;
+      setYOffset(dragRef.current.origYOffset + dy * pricePerPx);
+    };
+
+    const handleTouchEnd = () => {
+      dragRef.current = null;
+    };
+
+    el.addEventListener("touchstart", handleTouchStart, { passive: true });
+    el.addEventListener("touchmove", handleTouchMove, { passive: false });
+    el.addEventListener("touchend", handleTouchEnd);
+    return () => {
+      el.removeEventListener("touchstart", handleTouchStart);
+      el.removeEventListener("touchmove", handleTouchMove);
+      el.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, []);
+
   // ─── Reset zoom button ───────────────────────────────────────────────────
-  const isZoomed = viewStart !== Math.max(0, total - defaultBars) || viewEnd !== total;
+  const isZoomed = viewStart !== Math.max(0, total - defaultBars) || viewEnd !== total || yOffset !== 0;
   const resetView = useCallback(() => {
     const bars = initialBars ? Math.min(initialBars, total) : total;
     setViewStart(Math.max(0, total - bars));
     setViewEnd(total);
+    setYOffset(0);
   }, [total, initialBars]);
 
   if (!data?.length) {
