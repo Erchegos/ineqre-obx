@@ -243,9 +243,26 @@ export default function TradingChart({ data, height = 500, initialBars }: Tradin
     }));
   }, [data]);
 
-  // Visible slice
-  const enriched = useMemo(() => enrichedAll.slice(viewStart, viewEnd), [enrichedAll, viewStart, viewEnd]);
+  // Visible slice — supports overscroll (viewStart < 0 or viewEnd > total)
   const visibleBars = viewEnd - viewStart;
+  const dataStart = Math.max(0, viewStart);
+  const dataEnd = Math.min(total, viewEnd);
+  const dataOffset = dataStart - viewStart; // empty bars before first data bar
+  const enriched = useMemo(() => enrichedAll.slice(dataStart, dataEnd), [enrichedAll, dataStart, dataEnd]);
+
+  // Padded data for Recharts (drives grid/axes across full width including empty space)
+  const paddedData = useMemo(() => {
+    const result: (typeof enrichedAll[0] | { date: string; close: number | null; open: number; high: number; low: number; volume: number })[] = [];
+    for (let i = 0; i < visibleBars; i++) {
+      const di = i - dataOffset;
+      if (di >= 0 && di < enriched.length) {
+        result.push(enriched[di]);
+      } else {
+        result.push({ date: "", close: null, open: 0, high: 0, low: 0, volume: 0 });
+      }
+    }
+    return result;
+  }, [enriched, visibleBars, dataOffset]);
 
   // Auto chart type based on visible bars
   const effectiveType = typeOverride ?? (visibleBars > 200 ? "line" : "candle");
@@ -311,11 +328,13 @@ export default function TradingChart({ data, height = 500, initialBars }: Tradin
       const newBars = newEnd - newStart;
       if (newBars < MIN_BARS) return;
       if (newBars > Math.min(t, MAX_BARS)) {
-        newStart = Math.max(0, newEnd - Math.min(t, MAX_BARS));
-        newEnd = Math.min(t, newStart + Math.min(t, MAX_BARS));
+        const maxB = Math.min(t, MAX_BARS);
+        newEnd = newStart + maxB;
       }
-      newStart = Math.max(0, newStart);
-      newEnd = Math.min(t, newEnd);
+      // Allow overscroll on zoom
+      const overscroll = Math.floor((newEnd - newStart) * 0.75);
+      newStart = Math.max(-overscroll, newStart);
+      newEnd = Math.min(t + overscroll, newEnd);
       if (newEnd - newStart < MIN_BARS) return;
 
       setViewStart(newStart);
@@ -334,16 +353,17 @@ export default function TradingChart({ data, height = 500, initialBars }: Tradin
 
   const panFromDrag = useCallback((clientX: number, clientY: number) => {
     if (!dragRef.current || !dims) return;
-    // Horizontal pan
+    // Horizontal pan — allow overscroll past data edges
     const dx = clientX - dragRef.current.startX;
-    const barsPerPx = (dragRef.current.origEnd - dragRef.current.origStart) / dims.w;
-    const barShift = Math.round(-dx * barsPerPx);
     const bars = dragRef.current.origEnd - dragRef.current.origStart;
+    const barsPerPx = bars / dims.w;
+    const barShift = Math.round(-dx * barsPerPx);
+    const overscroll = Math.floor(bars * 0.75);
     let newStart = dragRef.current.origStart + barShift;
     let newEnd = dragRef.current.origEnd + barShift;
-    if (newStart < 0) { newStart = 0; newEnd = bars; }
-    if (newEnd > total) { newEnd = total; newStart = total - bars; }
-    newStart = Math.max(0, newStart);
+    // Clamp: allow up to 75% empty space on either side
+    if (newStart < -overscroll) { newStart = -overscroll; newEnd = newStart + bars; }
+    if (newEnd > total + overscroll) { newEnd = total + overscroll; newStart = newEnd - bars; }
     setViewStart(newStart);
     setViewEnd(newEnd);
 
@@ -359,16 +379,21 @@ export default function TradingChart({ data, height = 500, initialBars }: Tradin
       panFromDrag(e.clientX, e.clientY);
       return;
     }
-    // Normal crosshair
+    // Normal crosshair — account for data offset in overscroll
     if (!dims || !enriched.length) return;
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
     const x = e.clientX - rect.left;
     if (x < dims.l || x > dims.l + dims.w) { setHoverIdx(null); return; }
-    const gap = dims.w / enriched.length;
-    const idx = Math.min(Math.floor((x - dims.l) / gap), enriched.length - 1);
-    setHoverIdx(idx >= 0 ? idx : null);
-  }, [dims, enriched, panFromDrag]);
+    const gap = dims.w / visibleBars;
+    const visIdx = Math.floor((x - dims.l) / gap);
+    const dataIdx = visIdx - dataOffset;
+    if (dataIdx >= 0 && dataIdx < enriched.length) {
+      setHoverIdx(dataIdx);
+    } else {
+      setHoverIdx(null);
+    }
+  }, [dims, enriched, visibleBars, dataOffset, panFromDrag]);
 
   const handleMouseUp = useCallback(() => {
     dragRef.current = null;
@@ -397,16 +422,16 @@ export default function TradingChart({ data, height = 500, initialBars }: Tradin
       const d = st.dims;
       if (!d) return;
 
-      // Horizontal pan
+      // Horizontal pan — allow overscroll
       const dx = t.clientX - dragRef.current.startX;
-      const barsPerPx = (dragRef.current.origEnd - dragRef.current.origStart) / d.w;
-      const barShift = Math.round(-dx * barsPerPx);
       const bars = dragRef.current.origEnd - dragRef.current.origStart;
+      const barsPerPx = bars / d.w;
+      const barShift = Math.round(-dx * barsPerPx);
+      const overscroll = Math.floor(bars * 0.75);
       let newStart = dragRef.current.origStart + barShift;
       let newEnd = dragRef.current.origEnd + barShift;
-      if (newStart < 0) { newStart = 0; newEnd = bars; }
-      if (newEnd > st.total) { newEnd = st.total; newStart = st.total - bars; }
-      newStart = Math.max(0, newStart);
+      if (newStart < -overscroll) { newStart = -overscroll; newEnd = newStart + bars; }
+      if (newEnd > st.total + overscroll) { newEnd = st.total + overscroll; newStart = newEnd - bars; }
       setViewStart(newStart);
       setViewEnd(newEnd);
 
@@ -452,12 +477,12 @@ export default function TradingChart({ data, height = 500, initialBars }: Tradin
   const renderOverlay = () => {
     if (!dims || !enriched.length) return null;
     const { w, h: ch, l, t } = dims;
-    const n = enriched.length;
-    const gap = w / n;
+    const gap = w / visibleBars;
     const candleW = Math.max(Math.min(gap * 0.65, 10), 1);
     const priceRange = maxP - minP;
     const yS = (p: number) => t + ch * (1 - (p - minP) / priceRange);
-    const xC = (i: number) => l + (i + 0.5) * gap;
+    // xC maps data index → pixel position, accounting for overscroll offset
+    const xC = (i: number) => l + (dataOffset + i + 0.5) * gap;
 
     const linePath = (values: (number | null)[]) => {
       let d = "";
@@ -592,7 +617,7 @@ export default function TradingChart({ data, height = 500, initialBars }: Tradin
           )}
           <span style={{ fontSize: 8, color: DIM, opacity: 0.6 }}>
             {enriched.length > 0 ? `${enriched[0]?.date?.slice(5)} — ${enriched[enriched.length - 1]?.date?.slice(5)}` : ""}
-            {` (${visibleBars}d)`}
+            {` (${enriched.length}d)`}
           </span>
         </div>
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
@@ -652,7 +677,7 @@ export default function TradingChart({ data, height = 500, initialBars }: Tradin
 
         {/* Recharts base (grid + axes only) */}
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={enriched} margin={MARGIN}>
+          <ComposedChart data={paddedData} margin={MARGIN}>
             <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
             <XAxis dataKey="date" stroke={DIM} fontSize={9} tickFormatter={fmtDate} minTickGap={60} tickMargin={4} axisLine={{ stroke: "rgba(255,255,255,0.08)" }} tickLine={false} />
             <YAxis stroke={DIM} fontSize={9} domain={[minP, maxP]} tickFormatter={fmtP} width={55} orientation="right" axisLine={false} tickLine={false} tickCount={8} />
@@ -668,8 +693,8 @@ export default function TradingChart({ data, height = 500, initialBars }: Tradin
       {showRSI && dims && enriched.length > 0 && (() => {
         const { w, l } = dims;
         const n = enriched.length;
-        const gap = w / n;
-        const xC = (i: number) => l + (i + 0.5) * gap;
+        const gap = w / visibleBars;
+        const xC = (i: number) => l + (dataOffset + i + 0.5) * gap;
         const rsiPad = 6; // top/bottom padding in px
         const rsiChartH = rsiH - 24; // subtract label row height
         const yR = (v: number) => rsiPad + (rsiChartH - 2 * rsiPad) * (1 - v / 100);
