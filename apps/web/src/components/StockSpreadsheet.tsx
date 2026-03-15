@@ -28,6 +28,7 @@ export default function StockSpreadsheet({ ticker, token, profileName, authReady
   const [hasServerFile, setHasServerFile] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
+  const [tabCtxMenu, setTabCtxMenu] = useState<{ x: number; y: number; sheetIndex: number; sheetName: string } | null>(null);
   const workbookRef = useRef<WorkbookInstance>(null);
   const baseSheets = useRef<Sheet[] | null>(null);
   const prevToken = useRef<string | null>(token);
@@ -83,7 +84,7 @@ export default function StockSpreadsheet({ ticker, token, profileName, authReady
       return;
     }
 
-    async function load() {
+    const load = async () => {
       setLoading(true);
       setError(null);
       setSheets(null);
@@ -452,12 +453,12 @@ export default function StockSpreadsheet({ ticker, token, profileName, authReady
 
   // Ctrl+S / Cmd+S
   useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
+    const onKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") {
         e.preventDefault();
         handleSave();
       }
-    }
+    };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [handleSave]);
@@ -499,6 +500,72 @@ export default function StockSpreadsheet({ ticker, token, profileName, authReady
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
   }, [sheets]);
+
+  // Attach native contextmenu handler to sheet tab area (Fortune-Sheet's built-in tab menu is suppressed)
+  useEffect(() => {
+    const wrapper = sheetWrapperRef.current;
+    if (!wrapper) return;
+    const timer = setTimeout(() => {
+      const sheetArea = wrapper.querySelector(".luckysheet-sheet-area");
+      if (!sheetArea) return;
+      const handler = (e: Event) => {
+        const me = e as MouseEvent;
+        const target = me.target as HTMLElement;
+        const tabEl = target.closest(".luckysheet-sheets-item") as HTMLElement | null;
+        if (!tabEl) return;
+        me.preventDefault();
+        me.stopPropagation();
+        const allTabs = wrapper.querySelectorAll(".luckysheet-sheets-item");
+        const sheetIndex = Array.from(allTabs).indexOf(tabEl);
+        const nameEl = tabEl.querySelector(".luckysheet-sheets-item-name") || tabEl;
+        const sheetName = nameEl.textContent?.trim() || `Sheet${sheetIndex + 1}`;
+        setTabCtxMenu({ x: me.clientX, y: me.clientY, sheetIndex, sheetName });
+        setCtxMenu(null);
+        setShowSettings(false);
+      };
+      sheetArea.addEventListener("contextmenu", handler);
+      // eslint-disable-next-line consistent-return
+      return () => sheetArea.removeEventListener("contextmenu", handler);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [sheets, mountKey]);
+
+  // Sheet tab operations (use getAllSheets + applySheets to remount with new structure)
+  const sheetOps = (() => {
+    const getAll = () => {
+      try { return (workbookRef.current as any)?.getAllSheets?.() ?? null; } catch { return null; }
+    };
+    const deleteSheet = (idx: number) => {
+      const all = getAll(); if (!all || all.length <= 1) return;
+      applySheets(ensureCelldata(all.filter((_: any, i: number) => i !== idx)));
+      if (!hasChanges) setHasChanges(true);
+    };
+    const renameSheet = (idx: number) => {
+      const all = getAll(); if (!all) return;
+      const cur = all[idx]?.name || `Sheet${idx + 1}`;
+      const next = window.prompt("Rename sheet:", cur);
+      if (!next || next === cur) return;
+      const updated = all.map((s: any, i: number) => i === idx ? { ...s, name: next } : s);
+      applySheets(ensureCelldata(updated));
+      if (!hasChanges) setHasChanges(true);
+    };
+    const insertSheet = (atIdx: number) => {
+      const all = getAll(); if (!all) return;
+      const newSheet = { name: `Sheet${all.length + 1}`, id: `sh_${Date.now()}`, order: atIdx, status: 0, celldata: [] };
+      const updated = [...all.slice(0, atIdx), newSheet, ...all.slice(atIdx)];
+      applySheets(ensureCelldata(updated));
+      if (!hasChanges) setHasChanges(true);
+    };
+    const duplicateSheet = (idx: number, name: string) => {
+      const all = getAll(); if (!all) return;
+      const clone = JSON.parse(JSON.stringify(all[idx]));
+      clone.name = `${name} (2)`; clone.id = `sh_${Date.now()}`; clone.status = 0;
+      const updated = [...all.slice(0, idx + 1), clone, ...all.slice(idx + 1)];
+      applySheets(ensureCelldata(updated));
+      if (!hasChanges) setHasChanges(true);
+    };
+    return { deleteSheet, renameSheet, insertSheet, duplicateSheet };
+  })();
 
   if (loading) {
     return (
@@ -660,9 +727,11 @@ export default function StockSpreadsheet({ ticker, token, profileName, authReady
       {/* Spreadsheet — blurred teaser when locked */}
       <div ref={sheetWrapperRef} className="stock-sheet-wrapper" onContextMenu={(e) => {
         if (isLocked) return;
+        // Tab right-clicks are handled by the native listener above
+        const target = e.target as HTMLElement;
+        if (target.closest(".luckysheet-sheets-item") || target.closest(".luckysheet-sheet-area")) return;
         e.preventDefault();
         e.stopPropagation();
-        // Position relative to viewport for fixed positioning
         setCtxMenu({ x: e.clientX, y: e.clientY });
         setShowSettings(false);
       }} style={{
@@ -758,6 +827,62 @@ export default function StockSpreadsheet({ ticker, token, profileName, authReady
                     style={{ display: "block", width: "100%", textAlign: "left", padding: "5px 16px", background: "transparent", border: "none", color: "#d4d4d4", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
                     onMouseEnter={e => { e.currentTarget.style.background = "#264f78"; e.currentTarget.style.color = "#fff"; }}
                     onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#d4d4d4"; }}>
+                    {item.label}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        );
+      })()}
+
+      {/* Sheet tab context menu */}
+      {tabCtxMenu && !isLocked && (() => {
+        const { x, y, sheetIndex, sheetName } = tabCtxMenu;
+        const close = () => setTabCtxMenu(null);
+        const totalSheets = (() => {
+          try { return (workbookRef.current as any)?.getAllSheets?.()?.length ?? 1; } catch { return 1; }
+        })();
+        const tabItems: { label: string; section?: string; disabled?: boolean; danger?: boolean; action: () => void }[] = [
+          { label: "Rename Sheet",     section: "SHEET", action: () => sheetOps.renameSheet(sheetIndex) },
+          { label: "Insert Sheet Left",              action: () => sheetOps.insertSheet(sheetIndex) },
+          { label: "Insert Sheet Right",             action: () => sheetOps.insertSheet(sheetIndex + 1) },
+          { label: "Duplicate Sheet",                action: () => sheetOps.duplicateSheet(sheetIndex, sheetName) },
+          { label: "Delete Sheet", section: "DANGER", danger: true, disabled: totalSheets <= 1, action: () => {
+            if (totalSheets <= 1) return;
+            if (!confirm(`Delete "${sheetName}"? This cannot be undone.`)) return;
+            sheetOps.deleteSheet(sheetIndex);
+          }},
+        ];
+        return (
+          <>
+            <div onClick={close} onContextMenu={(e) => { e.preventDefault(); close(); }}
+              style={{ position: "fixed", inset: 0, zIndex: 9999, background: "transparent" }} />
+            <div style={{
+              position: "fixed", top: y, left: x, zIndex: 10000,
+              background: "#1e1e1e", border: "1px solid #555", borderRadius: 6,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.7)", padding: "4px 0", minWidth: 200,
+              fontFamily: "'Calibri', 'Segoe UI', sans-serif", fontSize: 13,
+            }}>
+              <div style={{ padding: "4px 12px 6px", color: "#888", fontSize: 10, fontFamily: "'Geist Mono', monospace", borderBottom: "1px solid #333", marginBottom: 2 }}>
+                {sheetName}
+              </div>
+              {tabItems.map((item, i) => (
+                <div key={i}>
+                  {item.section === "DANGER" && <div style={{ borderTop: "1px solid #333", margin: "4px 8px" }} />}
+                  <button
+                    onClick={() => { if (!item.disabled) { item.action(); close(); } }}
+                    disabled={item.disabled}
+                    style={{
+                      display: "block", width: "100%", textAlign: "left",
+                      padding: "5px 16px", background: "transparent", border: "none",
+                      color: item.disabled ? "#555" : item.danger ? "#f87171" : "#d4d4d4",
+                      fontSize: 13, cursor: item.disabled ? "not-allowed" : "pointer",
+                      fontFamily: "inherit",
+                    }}
+                    onMouseEnter={e => { if (!item.disabled) { e.currentTarget.style.background = item.danger ? "#4a1f1f" : "#264f78"; e.currentTarget.style.color = item.danger ? "#fca5a5" : "#fff"; } }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = item.disabled ? "#555" : item.danger ? "#f87171" : "#d4d4d4"; }}
+                  >
                     {item.label}
                   </button>
                 </div>
