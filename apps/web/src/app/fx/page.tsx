@@ -154,7 +154,8 @@ function sigStar(t: number): string {
 function sigStarChecked(t: number, fundamentalNetExposure: number | undefined): { stars: string; spurious: boolean } {
   const stars = sigStar(t);
   // If statistically significant but company has ~0% fundamental exposure, flag as likely spurious
-  const spurious = stars.length > 0 && fundamentalNetExposure !== undefined && Math.abs(fundamentalNetExposure) < 2;
+  // Exposure values are decimals (0.55 = 55%), so 0.02 = 2% threshold
+  const spurious = stars.length > 0 && fundamentalNetExposure !== undefined && Math.abs(fundamentalNetExposure) < 0.02;
   return { stars, spurious };
 }
 
