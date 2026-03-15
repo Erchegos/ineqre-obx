@@ -101,9 +101,9 @@ const S: Record<string, React.CSSProperties> = {
   content: { padding: "20px 24px", maxWidth: 1400, margin: "0 auto" },
   card: { background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 16, marginBottom: 12 },
   cardTitle: { fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", letterSpacing: "0.08em", textTransform: "uppercase" as const, marginBottom: 8, fontFamily: "monospace" },
-  grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
-  grid3: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 },
-  grid5: { display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 },
+  grid2: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 12 },
+  grid3: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 },
+  grid5: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 },
   accent: { color: "#3b82f6" },
   green: { color: "#10b981" },
   red: { color: "#ef4444" },
@@ -178,13 +178,13 @@ function Sparkline({ data, width = 120, height = 32, color = "#3b82f6" }: { data
     return `${x},${y}`;
   }).join(" ");
   return (
-    <svg width={width} height={height} style={{ display: "block" }}>
-      <polyline points={points} fill="none" stroke={color} strokeWidth={1.5} />
+    <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ display: "block", width: "100%", height }}>
+      <polyline points={points} fill="none" stroke={color} strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
     </svg>
   );
 }
 
-/* Area sparkline with fill */
+/* Area sparkline with fill — uses viewBox for responsive width */
 function AreaSparkline({ data, width = 500, height = 140, color = "#3b82f6", currentValue }: { data: number[]; width?: number; height?: number; color?: string; currentValue?: number }) {
   if (data.length < 2) return null;
   const min = Math.min(...data);
@@ -199,7 +199,7 @@ function AreaSparkline({ data, width = 500, height = 140, color = "#3b82f6", cur
   const areaPoints = `0,${height} ${linePoints} ${width},${height}`;
   const lastPt = pts[pts.length - 1];
   return (
-    <svg width={width} height={height} style={{ display: "block" }}>
+    <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ display: "block", width: "100%", height }}>
       <defs>
         <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity={0.3} />
@@ -207,12 +207,12 @@ function AreaSparkline({ data, width = 500, height = 140, color = "#3b82f6", cur
         </linearGradient>
       </defs>
       <polygon points={areaPoints} fill="url(#areaGrad)" />
-      <polyline points={linePoints} fill="none" stroke={color} strokeWidth={2} />
+      <polyline points={linePoints} fill="none" stroke={color} strokeWidth={2} vectorEffect="non-scaling-stroke" />
       {lastPt && (
         <>
           <circle cx={lastPt.x} cy={lastPt.y} r={4} fill={color} />
           {currentValue != null && (
-            <text x={lastPt.x - 8} y={lastPt.y - 10} fill={color} fontSize={11} fontWeight={700} fontFamily="'Geist Mono', monospace" textAnchor="end">
+            <text x={lastPt.x - 8} y={lastPt.y - 10} fill={color} fontSize={11} fontWeight={700} fontFamily="monospace" textAnchor="end">
               {currentValue.toFixed(2)}
             </text>
           )}
@@ -809,7 +809,7 @@ export default function FXTerminalPage() {
 
         {/* Key Metrics row */}
         {keyMetrics && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 12 }}>
             {[
               { label: "STRONGEST (1M)", pair: keyMetrics.strongest?.pair, value: keyMetrics.strongest?.change1m, color: "#10b981" },
               { label: "WEAKEST (1M)", pair: keyMetrics.weakest?.pair, value: keyMetrics.weakest?.change1m, color: "#ef4444" },
@@ -850,6 +850,7 @@ export default function FXTerminalPage() {
           <div style={S.card}>
             <div style={S.cardTitle}>63-DAY CORRELATION MATRIX</div>
             {Object.keys(correlationMatrix).length > 0 ? (
+              <div style={{ overflowX: "auto" }}>
               <table style={S.table}>
                 <thead>
                   <tr>
@@ -890,6 +891,7 @@ export default function FXTerminalPage() {
                   })}
                 </tbody>
               </table>
+              </div>
             ) : (
               <div style={S.dim}>No correlation data</div>
             )}
@@ -972,6 +974,7 @@ export default function FXTerminalPage() {
             How sensitive is each stock to currency moves? Click a row for detailed breakdown.
           </div>
           {sortedSensitivity.length > 0 ? (
+            <div style={{ overflowX: "auto" }}>
             <table style={S.table}>
               <thead>
                 <tr>
@@ -1023,13 +1026,14 @@ export default function FXTerminalPage() {
                 })}
               </tbody>
             </table>
+            </div>
           ) : (
             <div style={S.dim}>Run calculate-fx-regressions.ts to populate regression data</div>
           )}
 
           {sortedSensitivity.length > 0 && (
             <HelpToggle id="sens-columns" label="Column guide" showHelp={showHelp} setShowHelp={setShowHelp}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 24px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "4px 24px" }}>
                 <div><span style={{ color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>FX SENSITIVITY</span> &mdash; Sum of absolute currency betas. Higher = more total FX exposure.</div>
                 <div><span style={{ color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>MARKET</span> &mdash; Beta vs OBX index. 1.0 = stock moves 1:1 with the market.</div>
                 <div><span style={{ color: CCY_COLORS.USD, fontWeight: 600 }}>USD</span> / <span style={{ color: CCY_COLORS.EUR, fontWeight: 600 }}>EUR</span> / <span style={{ color: CCY_COLORS.GBP, fontWeight: 600 }}>GBP</span> / <span style={{ color: CCY_COLORS.SEK, fontWeight: 600 }}>SEK</span> &mdash; Sensitivity to each currency pair vs NOK. Positive = stock rises when NOK weakens.</div>
@@ -1185,7 +1189,7 @@ export default function FXTerminalPage() {
                 <HelpToggle id="sens-rolling-help" showHelp={showHelp} setShowHelp={setShowHelp}>
                   How the currency sensitivity has changed over time. Stable lines = consistent exposure. Large swings = changing business mix, hedging changes, or regime shifts.
                 </HelpToggle>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
                   {(["Usd", "Eur", "Gbp", "Sek"] as const).map((c) => (
                     <div key={c}>
                       <div style={{ fontSize: 10, color: CCY_COLORS[c.toUpperCase()], marginBottom: 4 }}>{c.toUpperCase()}</div>
@@ -1489,7 +1493,7 @@ export default function FXTerminalPage() {
 
                   {/* ===== RECOMMENDED PRODUCT ===== */}
                   {hedgeResult.execution && (
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12, marginBottom: 16 }}>
                       <div style={{ background: "#0d1117", borderRadius: 6, padding: 14, border: "1px solid #21262d" }}>
                         <div style={{ fontSize: 10, fontWeight: 700, color: "#10b981", letterSpacing: "0.05em", marginBottom: 6 }}>RECOMMENDED</div>
                         <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 4 }}>{hedgeResult.execution.recommendedProduct}</div>
@@ -1929,7 +1933,7 @@ export default function FXTerminalPage() {
         {pfResult && (
           <>
             {/* FX VaR cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 12 }}>
               {[
                 { label: "1D VaR 95%", value: pfResult.fxVaR?.var95_1d, suffix: "%" },
                 { label: "1D VaR 99%", value: pfResult.fxVaR?.var99_1d, suffix: "%" },
@@ -2185,7 +2189,7 @@ export default function FXTerminalPage() {
             </HelpToggle>
             {carryData ? (
               <>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 14 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
                   <div style={{ padding: 10, background: "#0d1117", borderRadius: 4, border: "1px solid #21262d" }}>
                     <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>ANNUALIZED CARRY</div>
                     <div style={{ fontSize: 20, fontWeight: 700, color: carryData.carry > 0 ? "#10b981" : "#ef4444" }}>
