@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 
 type SystemStats = {
   securities: number;
@@ -18,7 +18,7 @@ function useCountUp(target: number, duration = 1500, enabled = false) {
     const step = (ts: number) => {
       if (!start) start = ts;
       const progress = Math.min((ts - start) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
       setValue(Math.round(eased * target));
       if (progress < 1) requestAnimationFrame(step);
     };
@@ -49,17 +49,15 @@ export default function HomePage() {
   const [heroVisible, setHeroVisible] = useState(false);
 
   useEffect(() => {
-    // Trigger hero animation on mount
     requestAnimationFrame(() => setHeroVisible(true));
-
-    async function fetchStats() {
+    const fetchStats = async () => {
       try {
         const res = await fetch("/api/stats", { method: "GET" });
         if (res.ok) setStats(await res.json());
       } catch (e) {
         console.error("Failed to fetch stats:", e);
       }
-    }
+    };
     fetchStats();
   }, []);
 
@@ -91,17 +89,13 @@ export default function HomePage() {
           0%, 100% { opacity: 1; transform: scale(1); }
           50% { opacity: 0.6; transform: scale(1.3); }
         }
-        @keyframes shimmer {
-          0% { background-position: -200% 0; }
-          100% { background-position: 200% 0; }
-        }
         .feature-card {
           transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
           cursor: pointer;
         }
         .feature-card:hover {
           transform: translateY(-3px);
-          border-color: var(--accent) !important;
+          border-color: #3b82f6 !important;
           box-shadow: 0 8px 24px rgba(59, 130, 246, 0.12);
         }
         .cap-card {
@@ -109,14 +103,41 @@ export default function HomePage() {
         }
         .cap-card:hover {
           transform: translateY(-2px);
-          border-color: var(--accent) !important;
+          border-color: #3b82f6 !important;
           box-shadow: 0 4px 16px rgba(59, 130, 246, 0.08);
         }
       `}</style>
 
+      {/* Fixed background: deep navy + atmospheric blobs + fine grid */}
+      <div style={{ position: "fixed", inset: 0, zIndex: 0, background: "#05080d", pointerEvents: "none" }}>
+        {/* Fine grid */}
+        <div style={{
+          position: "absolute", inset: 0,
+          backgroundImage: `linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px)`,
+          backgroundSize: "18px 18px",
+        }} />
+        {/* Atmospheric color blobs */}
+        <div style={{
+          position: "absolute", top: "-15%", left: "-5%", width: "55%", height: "60%",
+          background: "radial-gradient(ellipse at 40% 40%, rgba(0,200,120,0.18) 0%, rgba(0,140,90,0.07) 45%, transparent 70%)",
+          filter: "blur(60px)",
+        }} />
+        <div style={{
+          position: "absolute", top: "-10%", right: "-5%", width: "50%", height: "55%",
+          background: "radial-gradient(ellipse at 60% 35%, rgba(0,130,220,0.16) 0%, rgba(0,80,180,0.06) 45%, transparent 70%)",
+          filter: "blur(70px)",
+        }} />
+        <div style={{
+          position: "absolute", top: "15%", left: "30%", width: "44%", height: "45%",
+          background: "radial-gradient(ellipse at 50% 40%, rgba(100,50,220,0.10) 0%, transparent 65%)",
+          filter: "blur(80px)",
+        }} />
+      </div>
+
       <main style={{
         minHeight: "100vh",
-        background: "#0d1117",
+        position: "relative",
+        zIndex: 1,
         color: "#e6edf3",
         padding: "32px 16px"
       }}>
@@ -199,12 +220,7 @@ export default function HomePage() {
             }}>
               Active Stock Research
             </h2>
-
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-              gap: 16
-            }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
               <FeatureCard
                 href="/stocks"
                 title="Stock Screener & Analytics"
@@ -259,12 +275,7 @@ export default function HomePage() {
             }}>
               Quantitative Analytics & Portfolio Tools
             </h2>
-
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-              gap: 16
-            }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
               <FeatureCard
                 href="/volatility/obx"
                 title="OBX Volatility Dashboard"
@@ -342,12 +353,7 @@ export default function HomePage() {
             }}>
               Sector Intelligence
             </h2>
-
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-              gap: 16
-            }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
               <FeatureCard
                 href="/seafood"
                 title="Seafood Intelligence"
@@ -390,12 +396,7 @@ export default function HomePage() {
             }}>
               Analytics Engine
             </h2>
-
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-              gap: 16
-            }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
               {[
                 { title: "Volatility Estimation", accent: "#3b82f6", text: "Yang-Zhang, Rogers-Satchell, Parkinson & Garman-Klass estimators. Rolling windows (20/60/120-day), EWMA smoothing, historical percentile ranking, and regime detection." },
                 { title: "Monte Carlo Simulation", accent: "#06b6d4", text: "10,000-path GBM with configurable drift and volatility. Percentile bands (5th–95th), probability cones, and statistical scenario testing." },
@@ -435,12 +436,7 @@ export default function HomePage() {
             }}>
               Upcoming
             </h2>
-
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-              gap: 16
-            }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
               {[
                 { title: "DCC-GARCH Correlation", accent: "#3b82f6", text: "Dynamic conditional correlation for time-varying co-movement. Copula models (Gaussian, Student-t) for tail dependence. VaR/CVaR and systemic risk indicators." },
                 { title: "Additional Research Sources", accent: "#10b981", text: "Redeye commissioned research, Arctic Securities, ABG Sundal Collier. Automated web scraping with OSE-only filtering and AI summarization." },
@@ -541,14 +537,13 @@ function StatBox({ label, value, suffix, live }: { label: string; value: string 
   );
 }
 
-function FeatureCard({ href, title, description, tags, visible, delay, children }: {
+function FeatureCard({ href, title, description, tags, visible, delay }: {
   href: string;
   title: string;
   description: string;
   tags: { label: string; color: string }[];
   visible: boolean;
   delay: number;
-  children?: React.ReactNode;
 }) {
   return (
     <Link
@@ -585,7 +580,6 @@ function FeatureCard({ href, title, description, tags, visible, delay, children 
       <p style={{ fontSize: 13, color: "#8b949e", lineHeight: 1.65, fontFamily: "system-ui, -apple-system, sans-serif" }}>
         {description}
       </p>
-      {children}
     </Link>
   );
 }
@@ -628,7 +622,6 @@ function CapabilityCard({ title, accent, children, visible, delay }: {
   );
 }
 
-// Map CSS var names to hex colors for reliable tag rendering
 const COLOR_MAP: Record<string, string> = {
   "#3b82f6": "#3b82f6",
   "#10b981": "#10b981",
