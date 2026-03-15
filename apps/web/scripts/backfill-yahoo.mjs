@@ -353,12 +353,30 @@ function parseChartData(json, ticker) {
     // Skip if close is null/undefined (market was closed)
     if (close == null) continue;
 
+    // Sanitize OHLC: clamp erroneous wicks where high/low is far from both open AND close
+    let h = high ?? close;
+    let l = low ?? close;
+    const o = open ?? close;
+    const bodyTop = Math.max(o, close);
+    const bodyBot = Math.min(o, close);
+    const bodyPct = Math.abs(close - o) / Math.max(o, close);
+
+    // Only clamp if body is small (< 15%) and wick is extreme (> 20% beyond body)
+    if (bodyPct < 0.15) {
+      if (h > bodyTop * 1.20 && h > o * 1.20 && h > close * 1.20) {
+        h = bodyTop * 1.02; // Clamp to 2% above body top
+      }
+      if (l < bodyBot * 0.80 && l < o * 0.80 && l < close * 0.80) {
+        l = bodyBot * 0.98; // Clamp to 2% below body bottom
+      }
+    }
+
     prices.push({
       ticker,
       date,
-      open: open ?? close,
-      high: high ?? close,
-      low: low ?? close,
+      open: o,
+      high: h,
+      low: l,
       close,
       adj_close: adj,
       volume

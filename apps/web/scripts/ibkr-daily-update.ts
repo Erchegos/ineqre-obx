@@ -67,6 +67,21 @@ async function updateTicker(
       return { success: false, error: "No price data" };
     }
 
+    // Sanitize OHLC: clamp erroneous wicks before upserting
+    for (const price of prices) {
+      const bodyTop = Math.max(price.open, price.close);
+      const bodyBot = Math.min(price.open, price.close);
+      const bodyPct = Math.abs(price.close - price.open) / Math.max(price.open, price.close);
+      if (bodyPct < 0.15 && price.close > 0) {
+        if (price.high > bodyTop * 1.20 && price.high > price.open * 1.20 && price.high > price.close * 1.20) {
+          price.high = bodyTop * 1.02;
+        }
+        if (price.low < bodyBot * 0.80 && price.low < price.open * 0.80 && price.low < price.close * 0.80) {
+          price.low = bodyBot * 0.98;
+        }
+      }
+    }
+
     // Upsert ALL bars from the last 5 days to backfill missing data
     for (const price of prices) {
       await upsertPrice(db, price);

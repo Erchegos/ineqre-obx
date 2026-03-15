@@ -80,7 +80,9 @@
     "harvest:seed": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/seed-harvest-data.ts",
     "harvest:lookup-mmsi": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/lookup-harvest-mmsi.ts",
     "harvest:track": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-harvest-positions.ts",
-    "harvest:aggregate": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/aggregate-harvest-estimates.ts"
+    "harvest:aggregate": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/aggregate-harvest-estimates.ts",
+    "data:fix-spikes": "node scripts/fix-ohlc-spikes.mjs",
+    "data:fix-spikes:fix": "node scripts/fix-ohlc-spikes.mjs --fix"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

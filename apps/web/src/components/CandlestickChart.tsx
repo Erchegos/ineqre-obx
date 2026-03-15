@@ -50,14 +50,41 @@ export default function CandlestickChart({
 
   const [crosshair, setCrosshair] = useState<{ x: number; y: number; dataIndex: number } | null>(null);
 
+  // Sanitize OHLC: clamp spikes from bad data
+  const saneData = useMemo(() => {
+    if (!data?.length) return data;
+    const bodyRanges: number[] = [];
+    for (const d of data) {
+      if (d.close > 0 && d.open != null && d.open > 0) {
+        bodyRanges.push(Math.abs(d.close - d.open) / d.close);
+      }
+    }
+    bodyRanges.sort((a, b) => a - b);
+    const medianBody = bodyRanges.length > 0 ? bodyRanges[Math.floor(bodyRanges.length / 2)] : 0.02;
+    const wickCap = Math.min(0.20, Math.max(0.05, medianBody * 4));
+    return data.map(d => {
+      const cl = d.close;
+      const op = d.open ?? cl;
+      const bodyTop = Math.max(cl, op);
+      const bodyBot = Math.min(cl, op);
+      const maxHigh = bodyTop * (1 + wickCap);
+      const minLow = bodyBot * (1 - wickCap);
+      return {
+        ...d,
+        high: d.high != null && d.high >= bodyTop ? Math.min(d.high, maxHigh) : bodyTop,
+        low: d.low != null && d.low <= bodyBot ? Math.max(d.low, minLow) : bodyBot,
+      };
+    });
+  }, [data]);
+
   // Calculate domain with padding
   const [minPrice, maxPrice] = useMemo(() => {
-    if (!data || data.length === 0) return [0, 100];
+    if (!saneData || saneData.length === 0) return [0, 100];
 
     let min = Infinity;
     let max = -Infinity;
 
-    for (const d of data) {
+    for (const d of saneData) {
       const low = d.low ?? d.close;
       const high = d.high ?? d.close;
       if (low < min) min = low;
@@ -78,7 +105,7 @@ export default function CandlestickChart({
 
     const padding = (max - min) * 0.05;
     return [min - padding, max + padding];
-  }, [data, showStdChannel, showDeviation1, showDeviation2]);
+  }, [saneData, showStdChannel, showDeviation1, showDeviation2]);
 
   // Measure the chart area after render
   useEffect(() => {
@@ -126,7 +153,7 @@ export default function CandlestickChart({
     };
   }, [data]);
 
-  if (!data || data.length === 0) {
+  if (!saneData || saneData.length === 0) {
     return (
       <div style={{ height, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted)" }}>
         No OHLC data available
@@ -136,7 +163,7 @@ export default function CandlestickChart({
 
   // Mouse move handler for crosshair
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!chartDimensions || !data.length) return;
+    if (!chartDimensions || !saneData.length) return;
 
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -152,10 +179,10 @@ export default function CandlestickChart({
     }
 
     // Find nearest candle
-    const candleGap = width / data.length;
+    const candleGap = width / saneData.length;
     const dataIndex = Math.floor((x - left) / candleGap);
 
-    if (dataIndex >= 0 && dataIndex < data.length) {
+    if (dataIndex >= 0 && dataIndex < saneData.length) {
       setCrosshair({ x, y, dataIndex });
     }
   };
@@ -172,7 +199,7 @@ export default function CandlestickChart({
       onMouseLeave={handleMouseLeave}
     >
       <ResponsiveContainer>
-        <ComposedChart data={data} margin={{ top: 10, right: 10, bottom: 5, left: 0 }}>
+        <ComposedChart data={saneData} margin={{ top: 10, right: 10, bottom: 5, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
 
           <XAxis
@@ -328,23 +355,23 @@ export default function CandlestickChart({
           {/* STD Channel Bands */}
           {showStdChannel && (() => {
             const { width, height: chartHeight, left, top } = chartDimensions;
-            const candleGap = width / data.length;
+            const candleGap = width / saneData.length;
 
             const yScale = (price: number): number => {
               return top + chartHeight - ((price - minPrice) / (maxPrice - minPrice)) * chartHeight;
             };
 
             // REQUIREMENT: Must have channel data to render
-            const channelDataCount = data.filter(d =>
+            const channelDataCount = saneData.filter(d =>
               d.midLine != null && d.upperBand1 != null && d.lowerBand1 != null
             ).length;
 
             console.log('[STD Channel Debug]', {
-              totalDataPoints: data.length,
+              totalDataPoints: saneData.length,
               pointsWithChannelData: channelDataCount,
               showDeviation1,
               showDeviation2,
-              sampleData: data.slice(-5).map(d => ({
+              sampleData: saneData.slice(-5).map(d => ({
                 date: d.date,
                 close: d.close,
                 midLine: d.midLine,
@@ -361,7 +388,7 @@ export default function CandlestickChart({
             // Generate path for each band line
             const createPath = (valueKey: keyof OHLCData): string => {
               const points: string[] = [];
-              data.forEach((d, i) => {
+              saneData.forEach((d, i) => {
                 const value = d[valueKey];
                 if (value != null && typeof value === 'number') {
                   const x = left + (i + 0.5) * candleGap;
@@ -377,7 +404,7 @@ export default function CandlestickChart({
               const points: string[] = [];
 
               // Forward pass (upper line)
-              data.forEach((d, i) => {
+              saneData.forEach((d, i) => {
                 const upper = d[upperKey];
                 if (upper != null && typeof upper === 'number') {
                   const x = left + (i + 0.5) * candleGap;
@@ -387,8 +414,8 @@ export default function CandlestickChart({
               });
 
               // Backward pass (lower line)
-              for (let i = data.length - 1; i >= 0; i--) {
-                const d = data[i];
+              for (let i = saneData.length - 1; i >= 0; i--) {
+                const d = saneData[i];
                 const lower = d[lowerKey];
                 if (lower != null && typeof lower === 'number') {
                   const x = left + (i + 0.5) * candleGap;
@@ -506,7 +533,7 @@ export default function CandlestickChart({
           })()}
 
           {/* Candlesticks */}
-          {data.map((d, index) => {
+          {saneData.map((d, index) => {
             const open = d.open ?? d.close;
             const high = d.high ?? d.close;
             const low = d.low ?? d.close;
@@ -520,7 +547,7 @@ export default function CandlestickChart({
             // Calculate positions
             const { width, height: chartHeight, left, top } = chartDimensions;
 
-            const candleGap = width / data.length;
+            const candleGap = width / saneData.length;
             const candleWidth = Math.max(Math.min(candleGap * 0.7, 8), 1);
             const centerX = left + (index + 0.5) * candleGap;
 
@@ -575,7 +602,7 @@ export default function CandlestickChart({
           {/* Crosshair */}
           {crosshair && (() => {
             const { width, height: chartHeight, left, top } = chartDimensions;
-            const d = data[crosshair.dataIndex];
+            const d = saneData[crosshair.dataIndex];
             if (!d) return null;
 
             const yScale = (price: number): number => {
@@ -661,7 +688,7 @@ export default function CandlestickChart({
 
       {/* Floating price panel (TradingView style) */}
       {crosshair && (() => {
-        const d = data[crosshair.dataIndex];
+        const d = saneData[crosshair.dataIndex];
         if (!d) return null;
 
         const open = d.open ?? d.close;

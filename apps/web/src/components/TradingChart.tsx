@@ -199,14 +199,30 @@ export default function TradingChart({ data, height = 500, initialBars }: Tradin
   // ─── Enriched data (computed on full dataset for indicator lookback) ───────
   const enrichedAll = useMemo(() => {
     if (!data?.length) return [];
-    // Sanitize OHLC: clamp bad Yahoo data where low/high/open spike far from close
+    // Sanitize OHLC: clamp bad data where high/low spike far beyond body
+    // Step 1: compute median body range to set adaptive wick cap
+    const bodyRanges: number[] = [];
+    for (const d of data) {
+      if (d.close > 0 && d.open > 0) {
+        bodyRanges.push(Math.abs(d.close - d.open) / d.close);
+      }
+    }
+    bodyRanges.sort((a, b) => a - b);
+    const medianBody = bodyRanges.length > 0 ? bodyRanges[Math.floor(bodyRanges.length / 2)] : 0.02;
+    // Max wick = 4x median body range, minimum 5%, maximum 20%
+    const wickCap = Math.min(0.20, Math.max(0.05, medianBody * 4));
+
     const sane = data.map(d => {
       const cl = d.close;
+      const bodyTop = Math.max(cl, d.open || cl);
+      const bodyBot = Math.min(cl, d.open || cl);
+      const maxHigh = bodyTop * (1 + wickCap);
+      const minLow = bodyBot * (1 - wickCap);
       return {
         ...d,
-        open: (d.open > 0 && d.open > cl * 0.4 && d.open < cl * 2.5) ? d.open : cl,
-        high: (d.high > 0 && d.high >= cl && d.high < cl * 2.5) ? d.high : Math.max(cl, d.open || cl),
-        low: (d.low > 0 && d.low <= cl && d.low > cl * 0.4) ? d.low : Math.min(cl, d.open || cl),
+        open: (d.open > 0 && d.open > cl * 0.5 && d.open < cl * 2) ? d.open : cl,
+        high: (d.high > 0 && d.high >= bodyTop) ? Math.min(d.high, maxHigh) : bodyTop,
+        low: (d.low > 0 && d.low <= bodyBot) ? Math.max(d.low, minLow) : bodyBot,
       };
     });
     const c = sane.map(d => d.close);
