@@ -52,13 +52,19 @@ export async function GET(req: NextRequest) {
         (ARRAY_AGG(p.adj_close ORDER BY p.date DESC))[1] as last_adj_close,
         MIN(p.date) as start_date,
         MAX(p.date) as end_date,
-        COUNT(*) as rows
+        COUNT(*) as rows,
+        ff.mktcap
       FROM stocks s
       INNER JOIN prices_daily p ON s.ticker = p.ticker
+      LEFT JOIN LATERAL (
+        SELECT mktcap FROM factor_fundamentals
+        WHERE ticker = s.ticker AND mktcap IS NOT NULL
+        ORDER BY date DESC LIMIT 1
+      ) ff ON true
       WHERE p.close IS NOT NULL
         AND p.close > 0
         AND s.asset_type = ANY($1)
-      GROUP BY s.ticker, s.name, s.asset_type, s.sector, s.currency
+      GROUP BY s.ticker, s.name, s.asset_type, s.sector, s.currency, ff.mktcap
       HAVING COUNT(*) >= 100
       ORDER BY s.ticker
     `;
@@ -82,6 +88,7 @@ export async function GET(req: NextRequest) {
         ? row.end_date.toISOString().slice(0, 10)
         : String(row.end_date).slice(0, 10),
       rows: Number(row.rows),
+      mktcap: row.mktcap ? Number(row.mktcap) : null,
     }));
 
     return secureJsonResponse(stocks, {

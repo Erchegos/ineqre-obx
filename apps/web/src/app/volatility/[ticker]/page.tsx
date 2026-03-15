@@ -250,36 +250,36 @@ export default function VolatilityPage() {
           <Link
             href="/stocks"
             style={{
-              fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)",
+              fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.5)",
               textDecoration: "none", fontFamily: "monospace",
             }}
           >
             ← Asset List
           </Link>
-          <span style={{ color: "var(--border)" }}>|</span>
+          <span style={{ color: "#30363d" }}>|</span>
           <Link
             href="/volatility/obx"
             style={{
-              fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)",
+              fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.5)",
               textDecoration: "none", fontFamily: "monospace",
             }}
           >
             OBX Dashboard
           </Link>
-          <span style={{ color: "var(--border)" }}>|</span>
-          <span style={{ fontSize: 24, fontWeight: 700, fontFamily: "monospace", color: "var(--foreground)" }}>
+          <span style={{ color: "#30363d" }}>|</span>
+          <span style={{ fontSize: 24, fontWeight: 700, fontFamily: "monospace", color: "#fff" }}>
             {ticker}
           </span>
-          <span style={{ fontSize: 14, color: "var(--muted-foreground)", fontFamily: "monospace" }}>
+          <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", fontFamily: "monospace" }}>
             Volatility Analysis
           </span>
-          <span style={{ fontSize: 11, color: "var(--muted-foreground)", fontFamily: "monospace" }}>
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontFamily: "monospace" }}>
             ({data.count}d)
           </span>
         </div>
 
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <div style={{ display: "flex", background: "var(--card-bg)", borderRadius: 4, border: "1px solid var(--border)", padding: 2 }}>
+          <div style={{ display: "flex", background: "#161b22", borderRadius: 4, border: "1px solid #30363d", padding: 2 }}>
             {[{ label: "Raw", val: false }, { label: "Total Return", val: true }].map((opt) => {
               const isActive = isAdjusted === opt.val;
               return (
@@ -288,8 +288,8 @@ export default function VolatilityPage() {
                   onClick={() => setIsAdjusted(opt.val)}
                   style={{
                     padding: "4px 10px", fontSize: 11, fontWeight: 600, borderRadius: 3, border: "none",
-                    background: isActive ? "var(--accent)" : "transparent",
-                    color: isActive ? "#fff" : "var(--muted-foreground)",
+                    background: isActive ? "#3b82f6" : "transparent",
+                    color: isActive ? "#fff" : "rgba(255,255,255,0.5)",
                     cursor: "pointer", fontFamily: "monospace", transition: "all 0.15s",
                   }}
                 >
@@ -311,9 +311,9 @@ export default function VolatilityPage() {
                   onClick={() => setLimit(tf.v)}
                   style={{
                     padding: "4px 10px", borderRadius: 3, fontSize: 11, fontWeight: 600,
-                    border: `1px solid ${isActive ? "var(--accent)" : "var(--border)"}`,
-                    background: isActive ? "var(--accent)" : "transparent",
-                    color: isActive ? "#fff" : "var(--muted-foreground)",
+                    border: `1px solid ${isActive ? "#3b82f6" : "#30363d"}`,
+                    background: isActive ? "#3b82f6" : "transparent",
+                    color: isActive ? "#fff" : "rgba(255,255,255,0.5)",
                     cursor: "pointer", fontFamily: "monospace", transition: "all 0.15s",
                   }}
                 >
@@ -394,20 +394,20 @@ export default function VolatilityPage() {
       {/* ═══ 6. VOLATILITY TIME SERIES ═══ */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <h2 style={{ fontSize: 14, fontWeight: 700, color: "var(--foreground)", fontFamily: "monospace", margin: 0 }}>
+          <h2 style={{ fontSize: 14, fontWeight: 700, color: "#fff", fontFamily: "monospace", margin: 0 }}>
             Volatility Time Series
           </h2>
-          <div style={{ display: "flex", gap: 12, fontSize: 11, fontFamily: "monospace", color: "var(--muted-foreground)" }}>
+          <div style={{ display: "flex", gap: 12, fontSize: 11, fontFamily: "monospace", color: "rgba(255,255,255,0.5)" }}>
             <span style={{ color: "#3b82f6" }}>● 20d: {fmtPct(data.current.rolling20)}</span>
             <span style={{ color: "#10b981" }}>● 60d: {fmtPct(data.current.rolling60)}</span>
             <span style={{ color: "#6366f1" }}>● EWMA: {fmtPct(data.current.ewma94)}</span>
           </div>
         </div>
-        <div style={{ padding: 16, borderRadius: 6, border: "1px solid var(--border)", borderBottom: marketData ? "none" : undefined, borderBottomLeftRadius: marketData ? 0 : 6, borderBottomRightRadius: marketData ? 0 : 6, background: "var(--card-bg)" }}>
+        <div style={{ padding: 16, borderRadius: 6, border: "1px solid #30363d", borderBottom: marketData ? "none" : undefined, borderBottomLeftRadius: marketData ? 0 : 6, borderBottomRightRadius: marketData ? 0 : 6, background: "#161b22" }}>
           <VolatilityChart data={data.series} selectedMeasures={selectedMeasures} height={300} />
         </div>
         {marketData && (
-          <div style={{ padding: 16, borderRadius: "0 0 6px 6px", border: "1px solid var(--border)", borderTop: "1px dashed var(--border)", background: "var(--card-bg)" }}>
+          <div style={{ padding: 16, borderRadius: "0 0 6px 6px", border: "1px solid #30363d", borderTop: "1px dashed #30363d", background: "#161b22" }}>
             <VolatilityCorrelationChart
               stockData={data.series}
               marketData={marketData.series}
@@ -435,13 +435,13 @@ export default function VolatilityPage() {
       )}
 
       {/* Data Sources */}
-      <div style={{ borderTop: "1px solid var(--border)", marginTop: 16, padding: "12px 16px", fontSize: 9, color: "var(--muted-foreground)", lineHeight: 1.8 }}>
+      <div style={{ borderTop: "1px solid #30363d", marginTop: 16, padding: "12px 16px", fontSize: 9, color: "rgba(255,255,255,0.5)", lineHeight: 1.8 }}>
         <span style={{ fontWeight: 700, letterSpacing: "0.06em" }}>DATA SOURCES</span>
         <div style={{ marginTop: 4 }}>
-          <span style={{ color: "var(--foreground)", opacity: 0.5 }}>Prices:</span> Interactive Brokers TWS API, Yahoo Finance &middot;{" "}
-          <span style={{ color: "var(--foreground)", opacity: 0.5 }}>Volatility Estimators:</span> Yang-Zhang, Rogers-Satchell, Parkinson, Garman-Klass, EWMA &middot;{" "}
-          <span style={{ color: "var(--foreground)", opacity: 0.5 }}>GARCH/Regime:</span> Python ML service (arch, hmmlearn) &middot;{" "}
-          <span style={{ color: "var(--foreground)", opacity: 0.5 }}>VaR:</span> Historical, Parametric, GARCH-based
+          <span style={{ color: "#fff", opacity: 0.5 }}>Prices:</span> Interactive Brokers TWS API, Yahoo Finance &middot;{" "}
+          <span style={{ color: "#fff", opacity: 0.5 }}>Volatility Estimators:</span> Yang-Zhang, Rogers-Satchell, Parkinson, Garman-Klass, EWMA &middot;{" "}
+          <span style={{ color: "#fff", opacity: 0.5 }}>GARCH/Regime:</span> Python ML service (arch, hmmlearn) &middot;{" "}
+          <span style={{ color: "#fff", opacity: 0.5 }}>VaR:</span> Historical, Parametric, GARCH-based
         </div>
       </div>
     </main>
@@ -460,10 +460,10 @@ function VolDecompositionPanel({ decomp, ticker }: {
 
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted-foreground)", fontFamily: "monospace", marginBottom: 8 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(255,255,255,0.5)", fontFamily: "monospace", marginBottom: 8 }}>
         Volatility Decomposition
       </div>
-      <div style={{ padding: 16, borderRadius: 6, border: "1px solid var(--border)", background: "var(--background)", height: "100%", boxSizing: "border-box" }}>
+      <div style={{ padding: 16, borderRadius: 6, border: "1px solid #30363d", background: "#0a0a0a", height: "100%", boxSizing: "border-box" }}>
         {/* Stacked bar */}
         <div style={{ display: "flex", height: 20, borderRadius: 4, overflow: "hidden", marginBottom: 16 }}>
           <div
@@ -485,14 +485,14 @@ function VolDecompositionPanel({ decomp, ticker }: {
           <DecompRow label="Total Vol" value={fmtPct(decomp.totalVol)} bold />
           <DecompRow label="Systematic (β × σ_m)" value={fmtPct(decomp.systematicVol)} color="#6366f1" />
           <DecompRow label="Idiosyncratic" value={fmtPct(decomp.idiosyncraticVol)} color="#f59e0b" />
-          <div style={{ borderTop: "1px solid var(--border)", marginTop: 4, paddingTop: 6 }}>
+          <div style={{ borderTop: "1px solid #30363d", marginTop: 4, paddingTop: 6 }}>
             <DecompRow label={`Beta vs OBX`} value={decomp.beta?.toFixed(2) ?? "—"} />
             <DecompRow label="OBX Vol" value={fmtPct(decomp.marketVol)} />
           </div>
         </div>
 
         {/* Interpretation */}
-        <div style={{ marginTop: 12, fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.5, fontFamily: "monospace" }}>
+        <div style={{ marginTop: 12, fontSize: 10, color: "rgba(255,255,255,0.5)", lineHeight: 1.5, fontFamily: "monospace" }}>
           {sysPct > 60
             ? `${ticker} risk is dominated by market movements. Hedging with OBX index is effective.`
             : sysPct > 35
@@ -507,11 +507,11 @@ function VolDecompositionPanel({ decomp, ticker }: {
 function DecompRow({ label, value, color, bold }: { label: string; value: string; color?: string; bold?: boolean }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "monospace", fontSize: 12 }}>
-      <span style={{ color: color || "var(--muted-foreground)", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
+      <span style={{ color: color || "rgba(255,255,255,0.5)", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
         {color && <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, display: "inline-block" }} />}
         {label}
       </span>
-      <span style={{ fontWeight: bold ? 700 : 600, fontSize: bold ? 14 : 12, color: color || "var(--foreground)" }}>
+      <span style={{ fontWeight: bold ? 700 : 600, fontSize: bold ? 14 : 12, color: color || "#fff" }}>
         {value}
       </span>
     </div>
@@ -530,7 +530,7 @@ function MlSection({ title, loading, hasData, children }: {
     <div style={{ marginBottom: 24 }}>
       <div style={{
         fontSize: 11, fontWeight: 700, textTransform: "uppercase",
-        letterSpacing: "0.08em", color: "var(--muted-foreground)",
+        letterSpacing: "0.08em", color: "rgba(255,255,255,0.5)",
         fontFamily: "monospace", marginBottom: 10,
       }}>
         {title}
@@ -538,9 +538,9 @@ function MlSection({ title, loading, hasData, children }: {
       {loading && !hasData ? (
         <div style={{
           padding: "32px 20px", borderRadius: 6,
-          border: "1px solid var(--border)", background: "var(--card-bg)",
+          border: "1px solid #30363d", background: "#161b22",
           textAlign: "center", fontFamily: "monospace", fontSize: 12,
-          color: "var(--muted-foreground)",
+          color: "rgba(255,255,255,0.5)",
         }}>
           <span style={{ display: "inline-block", animation: "spin 1s linear infinite", marginRight: 8 }}>◐</span>
           Fitting {title.toLowerCase()}...
@@ -549,7 +549,7 @@ function MlSection({ title, loading, hasData, children }: {
       ) : (
         <div style={{
           padding: 20, borderRadius: 6,
-          border: "1px solid var(--border)", background: "var(--card-bg)",
+          border: "1px solid #30363d", background: "#161b22",
         }}>
           {children}
         </div>
@@ -575,21 +575,21 @@ function EstimatorsCollapsible({ series, selectedMeasures, toggleMeasure, garchD
         style={{
           width: "100%", padding: "10px 16px",
           borderRadius: isOpen ? "6px 6px 0 0" : 6,
-          border: "1px solid var(--border)", background: "var(--card-bg)",
-          color: "var(--foreground)", fontSize: 12, fontWeight: 700,
+          border: "1px solid #30363d", background: "#161b22",
+          color: "#fff", fontSize: 12, fontWeight: 700,
           cursor: "pointer", display: "flex", alignItems: "center",
           justifyContent: "space-between", fontFamily: "monospace",
         }}
       >
         Estimators, GARCH & Seasonality
-        <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
+        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
           {isOpen ? "▲" : "▼"}
         </span>
       </button>
       {isOpen && (
         <div style={{
-          padding: 20, border: "1px solid var(--border)", borderTop: "none",
-          borderRadius: "0 0 6px 6px", background: "var(--card-bg)",
+          padding: 20, border: "1px solid #30363d", borderTop: "none",
+          borderRadius: "0 0 6px 6px", background: "#161b22",
         }}>
           {/* GARCH Parameters */}
           {garchData && (
@@ -608,9 +608,9 @@ function EstimatorsCollapsible({ series, selectedMeasures, toggleMeasure, garchD
                   onClick={() => toggleMeasure(config.key)}
                   style={{
                     padding: "4px 10px", borderRadius: 12, fontSize: 11, fontWeight: 600,
-                    border: `1px solid ${isSelected ? config.color : "var(--border)"}`,
+                    border: `1px solid ${isSelected ? config.color : "#30363d"}`,
                     background: isSelected ? `${config.color}15` : "transparent",
-                    color: isSelected ? config.color : "var(--muted-foreground)",
+                    color: isSelected ? config.color : "rgba(255,255,255,0.5)",
                     cursor: "pointer", fontFamily: "monospace", transition: "all 0.15s",
                     display: "flex", alignItems: "center", gap: 5,
                   }}
@@ -622,21 +622,21 @@ function EstimatorsCollapsible({ series, selectedMeasures, toggleMeasure, garchD
             })}
           </div>
 
-          <div style={{ padding: 16, borderRadius: 6, border: "1px solid var(--border)", background: "var(--background)", marginBottom: 24 }}>
+          <div style={{ padding: 16, borderRadius: 6, border: "1px solid #30363d", background: "#0a0a0a", marginBottom: 24 }}>
             <VolatilityChart data={series} selectedMeasures={selectedMeasures} height={380} />
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 20 }}>
             <div>
-              <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, fontFamily: "monospace", color: "var(--foreground)" }}>
+              <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, fontFamily: "monospace", color: "#fff" }}>
                 Monthly Seasonality
               </h3>
-              <div style={{ padding: 16, borderRadius: 6, border: "1px solid var(--border)", background: "var(--background)", height: 260 }}>
+              <div style={{ padding: 16, borderRadius: 6, border: "1px solid #30363d", background: "#0a0a0a", height: 260 }}>
                 <SeasonalityChart data={series} />
               </div>
             </div>
             <div>
-              <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, fontFamily: "monospace", color: "var(--foreground)" }}>
+              <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, fontFamily: "monospace", color: "#fff" }}>
                 Estimator Reference
               </h3>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -659,11 +659,11 @@ function EstimatorBox({ color, name, desc }: { color: string; name: string; desc
   return (
     <div style={{
       padding: "6px 10px", borderRadius: 4,
-      border: "1px solid var(--border)",
+      border: "1px solid #30363d",
       borderLeft: `3px solid ${color}`,
     }}>
       <div style={{ fontSize: 11, fontWeight: 700, color, fontFamily: "monospace", marginBottom: 1 }}>{name}</div>
-      <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.4 }}>{desc}</div>
+      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", lineHeight: 1.4 }}>{desc}</div>
     </div>
   );
 }

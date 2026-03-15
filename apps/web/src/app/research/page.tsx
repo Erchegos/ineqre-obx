@@ -107,7 +107,7 @@ export default function ResearchPortalPage() {
             gap: 12,
             marginBottom: compact ? 8 : 12,
             paddingBottom: compact ? 8 : 10,
-            borderBottom: '1px solid var(--border)',
+            borderBottom: '1px solid #30363d',
           }}>
             {parts.map((part, j) => {
               const match = part.match(/\*\*(.+?):\*\*\s*(.*)/);
@@ -115,7 +115,7 @@ export default function ResearchPortalPage() {
               const [, label, value] = match;
               const color = label === 'Rating'
                 ? (value.toLowerCase().includes('buy') ? '#22c55e' : value.toLowerCase().includes('sell') ? '#ef4444' : '#f59e0b')
-                : 'var(--foreground)';
+                : '#fff';
               return (
                 <span key={j} style={{ fontSize: compact ? 12 : 13, whiteSpace: 'nowrap' }}>
                   <span style={{ color: '#888', fontWeight: 500 }}>{label}: </span>
@@ -155,7 +155,7 @@ export default function ResearchPortalPage() {
                 }}>
                   Market Overview
                 </div>
-                <div style={{ fontSize: compact ? 12 : 13, lineHeight: 1.5, color: 'var(--foreground)' }}>
+                <div style={{ fontSize: compact ? 12 : 13, lineHeight: 1.5, color: '#fff' }}>
                   {rest}
                 </div>
               </div>
@@ -184,7 +184,7 @@ export default function ResearchPortalPage() {
                 }}>
                   Key Observations
                 </div>
-                {rest && <div style={{ fontSize: compact ? 12 : 13, lineHeight: 1.5, color: 'var(--foreground)' }}>{rest}</div>}
+                {rest && <div style={{ fontSize: compact ? 12 : 13, lineHeight: 1.5, color: '#fff' }}>{rest}</div>}
               </div>
             );
             continue;
@@ -231,7 +231,7 @@ export default function ResearchPortalPage() {
               <p key={i} style={{
                 fontSize: compact ? 12 : 13,
                 lineHeight: 1.5,
-                color: 'var(--muted)',
+                color: 'rgba(255,255,255,0.5)',
                 margin: compact ? '8px 0' : '10px 0',
                 padding: compact ? '8px 10px' : '10px 14px',
                 background: 'rgba(255,255,255,0.03)',
@@ -247,7 +247,7 @@ export default function ResearchPortalPage() {
               <p key={i} style={{
                 fontSize: compact ? 13 : 14,
                 lineHeight: 1.6,
-                color: 'var(--foreground)',
+                color: '#fff',
                 margin: compact ? '0 0 6px' : '0 0 8px',
                 fontStyle: 'italic',
               }}>
@@ -274,7 +274,7 @@ export default function ResearchPortalPage() {
             marginBottom: 4,
             fontSize: compact ? 11 : 12,
           }}>
-            <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{company.trim()}</span>
+            <span style={{ fontWeight: 600, color: '#fff' }}>{company.trim()}</span>
             <span style={{
               fontSize: compact ? 9 : 10,
               fontWeight: 600,
@@ -333,7 +333,7 @@ export default function ResearchPortalPage() {
                 flexShrink: 0,
               }}>{broker}</span>
             )}
-            <span style={{ color: 'var(--foreground)', flex: 1 }}>{action}</span>
+            <span style={{ color: '#fff', flex: 1 }}>{action}</span>
             {ratingText && ratingColor && (
               <span style={{
                 fontSize: compact ? 10 : 11,
@@ -361,7 +361,7 @@ export default function ResearchPortalPage() {
             gap: 8,
             fontSize: compact ? 12 : 13,
             lineHeight: 1.5,
-            color: 'var(--foreground)',
+            color: '#fff',
             marginBottom: 3,
             paddingLeft: 2,
           }}>
@@ -381,7 +381,7 @@ export default function ResearchPortalPage() {
         );
       } else {
         elements.push(
-          <p key={i} style={{ fontSize: compact ? 13 : 14, lineHeight: 1.6, margin: '0 0 6px', color: 'var(--foreground)' }}>
+          <p key={i} style={{ fontSize: compact ? 13 : 14, lineHeight: 1.6, margin: '0 0 6px', color: '#fff' }}>
             {line}
           </p>
         );
@@ -836,21 +836,21 @@ export default function ResearchPortalPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'var(--background)'
+        background: '#0a0a0a'
       }}>
         <div style={{
           width: '100%',
           maxWidth: 400,
           padding: 32,
-          border: '1px solid var(--border)',
+          border: '1px solid #30363d',
           borderRadius: 12,
-          background: 'var(--card-bg)',
+          background: '#161b22',
           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
         }}>
           <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, textAlign: 'center' }}>
             Research Portal
           </h1>
-          <p style={{ fontSize: 14, color: 'var(--muted-foreground)', marginBottom: 24, textAlign: 'center' }}>
+          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginBottom: 24, textAlign: 'center' }}>
             Pareto Securities & Analyst Reports
           </p>
 
@@ -861,7 +861,7 @@ export default function ResearchPortalPage() {
                 fontSize: 13,
                 fontWeight: 500,
                 marginBottom: 8,
-                color: 'var(--foreground)'
+                color: '#fff'
               }}>
                 Access Password
               </label>
@@ -873,10 +873,10 @@ export default function ResearchPortalPage() {
                 style={{
                   width: '100%',
                   padding: '10px 12px',
-                  border: '1px solid var(--input-border)',
+                  border: '1px solid #30363d',
                   borderRadius: 6,
-                  background: 'var(--input-bg)',
-                  color: 'var(--foreground)',
+                  background: '#0d1117',
+                  color: '#fff',
                   fontSize: 14,
                 }}
                 disabled={isLoading}
@@ -922,7 +922,7 @@ export default function ResearchPortalPage() {
   }
 
   return (
-    <main style={{ maxWidth: 1400, margin: '0 auto', padding: 20, background: 'var(--background)', minHeight: '100vh' }}>
+    <main style={{ maxWidth: 1400, margin: '0 auto', padding: 20, background: '#0a0a0a', minHeight: '100vh' }}>
       {/* Header */}
       <div style={{
         display: 'flex',
@@ -930,11 +930,11 @@ export default function ResearchPortalPage() {
         alignItems: 'center',
         marginBottom: 32,
         paddingBottom: 16,
-        borderBottom: '2px solid var(--border)'
+        borderBottom: '2px solid #30363d'
       }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
-            <h1 style={{ fontSize: 32, fontWeight: 700, color: 'var(--foreground)' }}>
+            <h1 style={{ fontSize: 32, fontWeight: 700, color: '#fff' }}>
               Research Portal
             </h1>
             <span style={{
@@ -949,7 +949,7 @@ export default function ResearchPortalPage() {
               Data from 2026
             </span>
           </div>
-          <p style={{ fontSize: 14, color: 'var(--muted-foreground)' }}>
+          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>
             {documents.length} documents • {filteredDocuments.length} shown
           </p>
         </div>
@@ -961,14 +961,14 @@ export default function ResearchPortalPage() {
             style={{
               padding: '8px 16px',
               background: 'transparent',
-              border: '1px solid var(--border)',
+              border: '1px solid #30363d',
               borderRadius: 6,
-              color: 'var(--foreground)',
+              color: '#fff',
               fontSize: 14,
               cursor: 'pointer',
               transition: 'all 0.2s',
             }}
-            onMouseOver={(e) => e.currentTarget.style.background = 'var(--hover-bg)'}
+            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(59,130,246,0.08)'}
             onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
           >
             Home
@@ -978,14 +978,14 @@ export default function ResearchPortalPage() {
             style={{
               padding: '8px 16px',
               background: 'transparent',
-              border: '1px solid var(--border)',
+              border: '1px solid #30363d',
               borderRadius: 6,
-              color: 'var(--foreground)',
+              color: '#fff',
               fontSize: 14,
               cursor: 'pointer',
               transition: 'all 0.2s',
             }}
-            onMouseOver={(e) => e.currentTarget.style.background = 'var(--hover-bg)'}
+            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(59,130,246,0.08)'}
             onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
           >
             Logout
@@ -1006,10 +1006,10 @@ export default function ResearchPortalPage() {
               flex: 1,
               minWidth: 280,
               padding: '10px 14px',
-              border: '1px solid var(--input-border)',
+              border: '1px solid #30363d',
               borderRadius: 8,
-              background: 'var(--input-bg)',
-              color: 'var(--foreground)',
+              background: '#0d1117',
+              color: '#fff',
               fontSize: 14,
             }}
           />
@@ -1019,10 +1019,10 @@ export default function ResearchPortalPage() {
             onChange={(e) => setSelectedTicker(e.target.value)}
             style={{
               padding: '10px 14px',
-              border: '1px solid var(--input-border)',
+              border: '1px solid #30363d',
               borderRadius: 8,
-              background: 'var(--input-bg)',
-              color: 'var(--foreground)',
+              background: '#0d1117',
+              color: '#fff',
               fontSize: 14,
               cursor: 'pointer',
               minWidth: 160,
@@ -1039,10 +1039,10 @@ export default function ResearchPortalPage() {
             onChange={(e) => setSelectedSource(e.target.value)}
             style={{
               padding: '10px 14px',
-              border: '1px solid var(--input-border)',
+              border: '1px solid #30363d',
               borderRadius: 8,
-              background: 'var(--input-bg)',
-              color: 'var(--foreground)',
+              background: '#0d1117',
+              color: '#fff',
               fontSize: 14,
               cursor: 'pointer',
               minWidth: 160,
@@ -1073,10 +1073,10 @@ export default function ResearchPortalPage() {
                   padding: '6px 14px',
                   fontSize: 13,
                   fontWeight: isActive ? 600 : 400,
-                  border: `1px solid ${isActive ? '#0066CC' : 'var(--border)'}`,
+                  border: `1px solid ${isActive ? '#0066CC' : '#30363d'}`,
                   borderRadius: 20,
                   background: isActive ? 'rgba(0, 102, 204, 0.1)' : 'transparent',
-                  color: isActive ? '#3b82f6' : 'var(--muted-foreground)',
+                  color: isActive ? '#3b82f6' : 'rgba(255,255,255,0.5)',
                   cursor: 'pointer',
                   transition: 'all 0.15s',
                 }}
@@ -1086,7 +1086,7 @@ export default function ResearchPortalPage() {
             );
           })}
 
-          <span style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 4px' }} />
+          <span style={{ width: 1, height: 20, background: '#30363d', margin: '0 4px' }} />
 
           {(() => {
             const isActive = selectedCategory === 'commissioned';
@@ -1098,10 +1098,10 @@ export default function ResearchPortalPage() {
                   padding: '6px 14px',
                   fontSize: 13,
                   fontWeight: isActive ? 600 : 400,
-                  border: `1px solid ${isActive ? '#8B5CF6' : 'var(--border)'}`,
+                  border: `1px solid ${isActive ? '#8B5CF6' : '#30363d'}`,
                   borderRadius: 20,
                   background: isActive ? 'rgba(139, 92, 246, 0.1)' : 'transparent',
-                  color: isActive ? '#8B5CF6' : 'var(--muted-foreground)',
+                  color: isActive ? '#8B5CF6' : 'rgba(255,255,255,0.5)',
                   cursor: 'pointer',
                   transition: 'all 0.15s',
                 }}
@@ -1111,7 +1111,7 @@ export default function ResearchPortalPage() {
             );
           })()}
 
-          <span style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 4px' }} />
+          <span style={{ width: 1, height: 20, background: '#30363d', margin: '0 4px' }} />
 
           {[
             { key: 'Buy', label: 'Buy', color: '#22c55e' },
@@ -1128,10 +1128,10 @@ export default function ResearchPortalPage() {
                   padding: '6px 14px',
                   fontSize: 13,
                   fontWeight: isActive ? 600 : 400,
-                  border: `1px solid ${isActive ? chip.color : 'var(--border)'}`,
+                  border: `1px solid ${isActive ? chip.color : '#30363d'}`,
                   borderRadius: 20,
                   background: isActive ? `${chip.color}18` : 'transparent',
-                  color: isActive ? chip.color : 'var(--muted-foreground)',
+                  color: isActive ? chip.color : 'rgba(255,255,255,0.5)',
                   cursor: 'pointer',
                   transition: 'all 0.15s',
                 }}
@@ -1149,10 +1149,10 @@ export default function ResearchPortalPage() {
         <div style={{
           padding: 60,
           textAlign: 'center',
-          color: 'var(--muted)',
-          border: '1px dashed var(--border)',
+          color: 'rgba(255,255,255,0.5)',
+          border: '1px dashed #30363d',
           borderRadius: 12,
-          background: 'var(--card-bg)',
+          background: '#161b22',
         }}>
           <p style={{ fontSize: 18, marginBottom: 8, fontWeight: 500 }}>No documents found</p>
           <p style={{ fontSize: 14 }}>
@@ -1166,9 +1166,9 @@ export default function ResearchPortalPage() {
               key={doc.id}
               style={{
                 padding: 24,
-                border: '1px solid var(--border)',
+                border: '1px solid #30363d',
                 borderRadius: 12,
-                background: 'var(--card-bg)',
+                background: '#161b22',
                 boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
                 transition: 'all 0.2s',
               }}
@@ -1226,9 +1226,9 @@ export default function ResearchPortalPage() {
                     })()}
                     <span style={{
                       fontSize: 12,
-                      color: 'var(--muted-foreground)',
+                      color: 'rgba(255,255,255,0.5)',
                       padding: '4px 10px',
-                      background: 'var(--hover-bg)',
+                      background: 'rgba(59,130,246,0.08)',
                       borderRadius: 6,
                     }}>
                       {doc.source}
@@ -1271,7 +1271,7 @@ export default function ResearchPortalPage() {
                         {doc.rating}
                       </span>
                     )}
-                    <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>
+                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
                       {new Date(doc.received_date).toLocaleDateString('en-US', {
                         year: 'numeric',
                         month: 'short',
@@ -1282,7 +1282,7 @@ export default function ResearchPortalPage() {
                       })}
                     </span>
                   </div>
-                  <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 0, color: 'var(--foreground)', lineHeight: 1.4 }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 0, color: '#fff', lineHeight: 1.4 }}>
                     {highlightText(doc.subject, searchTerm)}
                   </h3>
                 </div>
@@ -1292,7 +1292,7 @@ export default function ResearchPortalPage() {
               {(doc.ai_summary || doc.body_text) && (
                 <div style={{
                   padding: 16,
-                  background: 'var(--hover-bg)',
+                  background: 'rgba(59,130,246,0.08)',
                   borderLeft: `3px solid ${doc.ai_summary ? '#10B981' : '#0066CC'}`,
                   borderRadius: 6,
                   marginBottom: 16,
@@ -1301,7 +1301,7 @@ export default function ResearchPortalPage() {
                     <div style={{
                       fontSize: 14,
                       lineHeight: 1.6,
-                      color: 'var(--foreground)',
+                      color: '#fff',
                     }}>
                       {renderSummary(doc.ai_summary, true)}
                     </div>
@@ -1310,7 +1310,7 @@ export default function ResearchPortalPage() {
                       <p style={{
                         fontSize: 14,
                         lineHeight: 1.6,
-                        color: 'var(--foreground)',
+                        color: '#fff',
                         margin: 0,
                         display: '-webkit-box',
                         WebkitLineClamp: expandedDocs.has(doc.id) ? 'unset' : 3,
@@ -1326,7 +1326,7 @@ export default function ResearchPortalPage() {
                             marginTop: 12,
                             padding: '6px 12px',
                             background: 'transparent',
-                            border: '1px solid var(--border)',
+                            border: '1px solid #30363d',
                             borderRadius: 6,
                             color: '#0066CC',
                             fontSize: 13,
@@ -1456,7 +1456,7 @@ export default function ResearchPortalPage() {
                 <div style={{
                   marginTop: 20,
                   paddingTop: 20,
-                  borderTop: '2px solid var(--border)',
+                  borderTop: '2px solid #30363d',
                 }}>
                   {/* AI Summary if available */}
                   {doc.ai_summary && (
@@ -1481,7 +1481,7 @@ export default function ResearchPortalPage() {
                       <div style={{
                         fontSize: 14,
                         lineHeight: 1.7,
-                        color: 'var(--foreground)',
+                        color: '#fff',
                       }}>
                         {renderSummary(doc.ai_summary, false)}
                       </div>
@@ -1492,8 +1492,8 @@ export default function ResearchPortalPage() {
                   {doc.body_text && (
                     <div style={{
                       padding: 20,
-                      background: 'var(--background)',
-                      border: '1px solid var(--border)',
+                      background: '#0a0a0a',
+                      border: '1px solid #30363d',
                       borderRadius: 8,
                       maxHeight: 600,
                       overflow: 'auto',
@@ -1501,7 +1501,7 @@ export default function ResearchPortalPage() {
                       <h4 style={{
                         fontSize: 12,
                         fontWeight: 600,
-                        color: 'var(--muted-foreground)',
+                        color: 'rgba(255,255,255,0.5)',
                         marginBottom: 16,
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em'
@@ -1511,7 +1511,7 @@ export default function ResearchPortalPage() {
                       <div style={{
                         fontSize: 14,
                         lineHeight: 1.7,
-                        color: 'var(--foreground)',
+                        color: '#fff',
                         whiteSpace: 'pre-wrap',
                         fontFamily: 'monospace',
                       }}>

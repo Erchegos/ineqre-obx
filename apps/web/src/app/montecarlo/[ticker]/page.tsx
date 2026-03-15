@@ -173,30 +173,30 @@ export default function MonteCarloPage() {
     <main style={{ padding: 24, maxWidth: 1400, margin: "0 auto" }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
-        <h1 style={{ fontSize: 32, fontWeight: 600, margin: 0, letterSpacing: "-0.02em", color: "var(--foreground)" }}>
+        <h1 style={{ fontSize: 32, fontWeight: 600, margin: 0, letterSpacing: "-0.02em", color: "#fff" }}>
           {ticker || "?"} - Monte Carlo Simulation
         </h1>
         <Link
           href={`/stocks/${ticker}`}
           style={{
             display: "inline-block",
-            color: "var(--foreground)",
+            color: "#fff",
             textDecoration: "none",
             fontSize: 14,
             fontWeight: 600,
             padding: "8px 16px",
-            border: "1px solid var(--border)",
+            border: "1px solid #30363d",
             borderRadius: 2,
-            background: "var(--card-bg)",
+            background: "#161b22",
             transition: "all 0.15s ease"
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = "var(--foreground)";
-            e.currentTarget.style.background = "var(--hover-bg)";
+            e.currentTarget.style.borderColor = "#fff";
+            e.currentTarget.style.background = "rgba(59,130,246,0.08)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = "var(--border)";
-            e.currentTarget.style.background = "var(--card-bg)";
+            e.currentTarget.style.borderColor = "#30363d";
+            e.currentTarget.style.background = "#161b22";
           }}
         >
           {ticker} Analysis
@@ -207,9 +207,9 @@ export default function MonteCarloPage() {
           style={{
             padding: "6px 12px",
             borderRadius: 4,
-            border: "1px solid var(--border)",
-            background: showInfo ? "var(--hover-bg)" : "transparent",
-            color: "var(--muted-foreground)",
+            border: "1px solid #30363d",
+            background: showInfo ? "rgba(59,130,246,0.08)" : "transparent",
+            color: "rgba(255,255,255,0.5)",
             fontSize: 12,
             cursor: "pointer",
             display: "flex",
@@ -227,11 +227,11 @@ export default function MonteCarloPage() {
         <div style={{
           marginBottom: 16,
           padding: 16,
-          background: "var(--hover-bg)",
-          border: "1px solid var(--border)",
+          background: "rgba(59,130,246,0.08)",
+          border: "1px solid #30363d",
           borderRadius: 8,
           fontSize: 13,
-          color: "var(--muted-foreground)",
+          color: "rgba(255,255,255,0.5)",
           lineHeight: 1.6,
         }}>
           <p style={{ margin: 0, marginBottom: 8 }}>
@@ -250,15 +250,15 @@ export default function MonteCarloPage() {
       )}
 
       {loading && (
-        <div style={{ padding: 20, borderRadius: 4, border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--muted)", fontSize: 14 }}>
+        <div style={{ padding: 20, borderRadius: 4, border: "1px solid #30363d", background: "#161b22", color: "rgba(255,255,255,0.5)", fontSize: 14 }}>
           Loading stock data...
         </div>
       )}
 
       {!loading && error && (
-        <div style={{ padding: 20, borderRadius: 4, border: "1px solid var(--danger)", background: "var(--card-bg)" }}>
-          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6, color: "var(--danger)" }}>Error</div>
-          <div style={{ fontSize: 13, color: "var(--muted)" }}>{error}</div>
+        <div style={{ padding: 20, borderRadius: 4, border: "1px solid #ef4444", background: "#161b22" }}>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6, color: "#ef4444" }}>Error</div>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>{error}</div>
         </div>
       )}
 
@@ -268,11 +268,11 @@ export default function MonteCarloPage() {
           <div style={{
             marginBottom: 24,
             padding: 20,
-            background: "var(--card-bg)",
-            border: "1px solid var(--border)",
+            background: "#161b22",
+            border: "1px solid #30363d",
             borderRadius: 8,
           }}>
-            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: "var(--foreground)" }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: "#fff" }}>
               Simulation Parameters
             </h2>
 
@@ -286,7 +286,7 @@ export default function MonteCarloPage() {
                 <label style={{
                   display: "block",
                   fontSize: 12,
-                  color: "var(--muted)",
+                  color: "rgba(255,255,255,0.5)",
                   marginBottom: 6,
                   fontWeight: 500,
                 }}>
@@ -299,9 +299,9 @@ export default function MonteCarloPage() {
                     width: "100%",
                     padding: "8px 12px",
                     borderRadius: 4,
-                    border: "1px solid var(--border)",
-                    background: "var(--input-bg)",
-                    color: "var(--foreground)",
+                    border: "1px solid #30363d",
+                    background: "#0d1117",
+                    color: "#fff",
                     fontSize: 14,
                     cursor: "pointer",
                   }}
@@ -318,7 +318,7 @@ export default function MonteCarloPage() {
                 <label style={{
                   display: "block",
                   fontSize: 12,
-                  color: "var(--muted)",
+                  color: "rgba(255,255,255,0.5)",
                   marginBottom: 6,
                   fontWeight: 500,
                 }}>
@@ -331,9 +331,9 @@ export default function MonteCarloPage() {
                     width: "100%",
                     padding: "8px 12px",
                     borderRadius: 4,
-                    border: "1px solid var(--border)",
-                    background: "var(--input-bg)",
-                    color: "var(--foreground)",
+                    border: "1px solid #30363d",
+                    background: "#0d1117",
+                    color: "#fff",
                     fontSize: 14,
                     cursor: "pointer",
                   }}
@@ -350,7 +350,7 @@ export default function MonteCarloPage() {
                 <label style={{
                   display: "block",
                   fontSize: 12,
-                  color: "var(--muted)",
+                  color: "rgba(255,255,255,0.5)",
                   marginBottom: 6,
                   fontWeight: 500,
                 }}>
@@ -369,14 +369,14 @@ export default function MonteCarloPage() {
                     width: "100%",
                     padding: "8px 12px",
                     borderRadius: 4,
-                    border: "1px solid var(--border)",
-                    background: customDrift !== null ? "var(--input-bg)" : "var(--card-bg)",
-                    color: "var(--foreground)",
+                    border: "1px solid #30363d",
+                    background: customDrift !== null ? "#0d1117" : "#161b22",
+                    color: "#fff",
                     fontSize: 14,
                     fontFamily: "monospace",
                   }}
                 />
-                <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginTop: 4 }}>
                   Annualized: {(simulation.annualizedDrift * 100).toFixed(2)}%
                 </div>
                 <button
@@ -384,7 +384,7 @@ export default function MonteCarloPage() {
                   style={{
                     marginTop: 4,
                     fontSize: 10,
-                    color: "var(--muted)",
+                    color: "rgba(255,255,255,0.5)",
                     background: "none",
                     border: "none",
                     cursor: "pointer",
@@ -400,7 +400,7 @@ export default function MonteCarloPage() {
                 <label style={{
                   display: "block",
                   fontSize: 12,
-                  color: "var(--muted)",
+                  color: "rgba(255,255,255,0.5)",
                   marginBottom: 6,
                   fontWeight: 500,
                 }}>
@@ -419,14 +419,14 @@ export default function MonteCarloPage() {
                     width: "100%",
                     padding: "8px 12px",
                     borderRadius: 4,
-                    border: "1px solid var(--border)",
-                    background: customVolatility !== null ? "var(--input-bg)" : "var(--card-bg)",
-                    color: "var(--foreground)",
+                    border: "1px solid #30363d",
+                    background: customVolatility !== null ? "#0d1117" : "#161b22",
+                    color: "#fff",
                     fontSize: 14,
                     fontFamily: "monospace",
                   }}
                 />
-                <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginTop: 4 }}>
                   Annualized: {(simulation.annualizedVolatility * 100).toFixed(2)}%
                 </div>
                 <button
@@ -434,7 +434,7 @@ export default function MonteCarloPage() {
                   style={{
                     marginTop: 4,
                     fontSize: 10,
-                    color: "var(--muted)",
+                    color: "rgba(255,255,255,0.5)",
                     background: "none",
                     border: "none",
                     cursor: "pointer",
@@ -450,8 +450,8 @@ export default function MonteCarloPage() {
           {/* Chart */}
           <div style={{
             padding: 20,
-            background: "var(--card-bg)",
-            border: "1px solid var(--border)",
+            background: "#161b22",
+            border: "1px solid #30363d",
             borderRadius: 8,
           }}>
             <MonteCarloChart

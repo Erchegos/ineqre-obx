@@ -101,7 +101,7 @@ export default function HomePage() {
         }
         .feature-card:hover {
           transform: translateY(-3px);
-          border-color: var(--accent) !important;
+          border-color: #3b82f6 !important;
           box-shadow: 0 8px 24px rgba(59, 130, 246, 0.12);
         }
         .cap-card {
@@ -109,15 +109,15 @@ export default function HomePage() {
         }
         .cap-card:hover {
           transform: translateY(-2px);
-          border-color: var(--accent) !important;
+          border-color: #3b82f6 !important;
           box-shadow: 0 4px 16px rgba(59, 130, 246, 0.08);
         }
       `}</style>
 
       <main style={{
         minHeight: "100vh",
-        background: "var(--background)",
-        color: "var(--foreground)",
+        background: "#0a0a0a",
+        color: "#fff",
         padding: "48px 32px"
       }}>
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
@@ -125,13 +125,13 @@ export default function HomePage() {
           {/* Hero */}
           <header style={{
             marginBottom: 48,
-            borderBottom: "1px solid var(--border)",
+            borderBottom: "1px solid #30363d",
             paddingBottom: 32,
           }}>
             <div style={{
               fontSize: 11,
               fontFamily: "monospace",
-              color: "var(--muted-foreground)",
+              color: "rgba(255,255,255,0.5)",
               marginBottom: 16,
               letterSpacing: "0.1em",
               textTransform: "uppercase",
@@ -145,9 +145,9 @@ export default function HomePage() {
               fontSize: 42,
               fontWeight: 700,
               marginBottom: 16,
-              color: "var(--foreground)",
+              color: "#fff",
               letterSpacing: "-0.03em",
-              fontFamily: "system-ui, -apple-system, sans-serif",
+              fontFamily: "monospace",
               opacity: heroVisible ? 1 : 0,
               transform: heroVisible ? "translateY(0)" : "translateY(20px)",
               transition: "all 0.7s cubic-bezier(0.4, 0, 0.2, 1) 0.1s",
@@ -156,7 +156,7 @@ export default function HomePage() {
             </h1>
             <p style={{
               fontSize: 15,
-              color: "var(--muted-foreground)",
+              color: "rgba(255,255,255,0.5)",
               lineHeight: 1.7,
               maxWidth: 720,
               opacity: heroVisible ? 1 : 0,
@@ -188,7 +188,7 @@ export default function HomePage() {
             <h2 style={{
               fontWeight: 700,
               marginBottom: 24,
-              color: "var(--foreground)",
+              color: "#fff",
               textTransform: "uppercase",
               letterSpacing: "0.08em",
               fontSize: 12,
@@ -209,9 +209,9 @@ export default function HomePage() {
                 title="Stock Screener & Analytics"
                 description="Browse 225+ OSE securities with interactive price charts, candlestick patterns, volatility models, Monte Carlo simulations, and ML predictions. Upload Excel financial models for full-screen editing with persistent cloud storage."
                 tags={[
-                  { label: "Charts", color: "var(--accent)" },
-                  { label: "Excel Models", color: "var(--success)" },
-                  { label: "ML", color: "var(--info)" },
+                  { label: "Charts", color: "#3b82f6" },
+                  { label: "Excel Models", color: "#10b981" },
+                  { label: "ML", color: "#06b6d4" },
                 ]}
                 visible={modulesReveal.visible}
                 delay={0}
@@ -221,9 +221,9 @@ export default function HomePage() {
                 title="Research Portal"
                 description="AI-summarized broker research from Pareto Securities, DNB Carnegie, DNB Markets, Redeye, and Xtrainvestor. Full-text search across 1,500+ reports with PDF viewer. Automated email ingestion, web scraping, and Claude-powered English summaries."
                 tags={[
-                  { label: "AI Summaries", color: "var(--success)" },
-                  { label: "PDF", color: "var(--warning)" },
-                  { label: "6 Sources", color: "var(--info)" },
+                  { label: "AI Summaries", color: "#10b981" },
+                  { label: "PDF", color: "#f59e0b" },
+                  { label: "6 Sources", color: "#06b6d4" },
                 ]}
                 visible={modulesReveal.visible}
                 delay={1}
@@ -233,9 +233,9 @@ export default function HomePage() {
                 title="Intelligence Terminal"
                 description="Real-time market intelligence hub. AI-classified NewsWeb filings with sentiment analysis, Finanstilsynet short positions with sparklines, commodity prices (Brent, gas, metals) with stock sensitivity betas."
                 tags={[
-                  { label: "Shorts", color: "var(--danger)" },
-                  { label: "Commodities", color: "var(--warning)" },
-                  { label: "Live", color: "var(--success)" },
+                  { label: "Shorts", color: "#ef4444" },
+                  { label: "Commodities", color: "#f59e0b" },
+                  { label: "Live", color: "#10b981" },
                 ]}
                 visible={modulesReveal.visible}
                 delay={2}
@@ -248,7 +248,7 @@ export default function HomePage() {
             <h2 style={{
               fontWeight: 700,
               marginBottom: 24,
-              color: "var(--foreground)",
+              color: "#fff",
               textTransform: "uppercase",
               letterSpacing: "0.08em",
               fontSize: 12,
@@ -269,9 +269,9 @@ export default function HomePage() {
                 title="OBX Volatility Dashboard"
                 description="Index-level volatility intelligence with 6-regime classification (Crisis to Low & Stable). Constituent heatmap, vol cone (5th-95th percentile), systemic risk via rolling correlation, GARCH/MSGARCH models."
                 tags={[
-                  { label: "Regime", color: "var(--warning)" },
-                  { label: "GARCH", color: "var(--accent)" },
-                  { label: "Systemic", color: "var(--info)" },
+                  { label: "Regime", color: "#f59e0b" },
+                  { label: "GARCH", color: "#3b82f6" },
+                  { label: "Systemic", color: "#06b6d4" },
                 ]}
                 visible={modulesReveal.visible}
                 delay={3}
@@ -281,8 +281,8 @@ export default function HomePage() {
                 title="Correlation Matrix"
                 description="Interactive cross-sectional heatmap with configurable lookback windows (30d-2y). Rolling correlation time series, sector-level co-movement analysis, and pairwise regime-conditional correlations."
                 tags={[
-                  { label: "Heatmap", color: "var(--info)" },
-                  { label: "Rolling", color: "var(--accent)" },
+                  { label: "Heatmap", color: "#06b6d4" },
+                  { label: "Rolling", color: "#3b82f6" },
                 ]}
                 visible={modulesReveal.visible}
                 delay={4}
@@ -292,9 +292,9 @@ export default function HomePage() {
                 title="Options Analytics"
                 description="Black-Scholes pricing with full Greeks chain for US-listed OSE stocks. IV skew visualization, open interest distribution, max pain, put/call ratios, and a multi-leg P&L strategy builder with preset strategies."
                 tags={[
-                  { label: "Greeks", color: "var(--success)" },
-                  { label: "P&L Builder", color: "var(--accent)" },
-                  { label: "IV Skew", color: "var(--warning)" },
+                  { label: "Greeks", color: "#10b981" },
+                  { label: "P&L Builder", color: "#3b82f6" },
+                  { label: "IV Skew", color: "#f59e0b" },
                 ]}
                 visible={modulesReveal.visible}
                 delay={5}
@@ -304,9 +304,9 @@ export default function HomePage() {
                 title="Portfolio Optimizer"
                 description="Markowitz mean-variance optimization with 5 modes (EW, MinVar, MaxSharpe, RiskParity, MaxDiv). Efficient frontier, Ledoit-Wolf covariance, risk decomposition, 6-source alpha signals, and regime-aware stress scenarios."
                 tags={[
-                  { label: "Optimization", color: "var(--success)" },
-                  { label: "ML Signals", color: "var(--accent)" },
-                  { label: "Risk", color: "var(--warning)" },
+                  { label: "Optimization", color: "#10b981" },
+                  { label: "ML Signals", color: "#3b82f6" },
+                  { label: "Risk", color: "#f59e0b" },
                 ]}
                 visible={modulesReveal.visible}
                 delay={6}
@@ -316,9 +316,9 @@ export default function HomePage() {
                 title="FX Terminal"
                 description="Currency risk terminal for NOK portfolios. Multi-currency regression betas, forward curves via IRP, revenue/cost exposure decomposition, portfolio FX VaR, carry trade analytics, and interactive hedge calculators."
                 tags={[
-                  { label: "NOK/FX", color: "var(--warning)" },
-                  { label: "IRP", color: "var(--accent)" },
-                  { label: "Hedging", color: "var(--success)" },
+                  { label: "NOK/FX", color: "#f59e0b" },
+                  { label: "IRP", color: "#3b82f6" },
+                  { label: "Hedging", color: "#10b981" },
                 ]}
                 visible={modulesReveal.visible}
                 delay={7}
@@ -331,7 +331,7 @@ export default function HomePage() {
             <h2 style={{
               fontWeight: 700,
               marginBottom: 24,
-              color: "var(--foreground)",
+              color: "#fff",
               textTransform: "uppercase",
               letterSpacing: "0.08em",
               fontSize: 12,
@@ -352,9 +352,9 @@ export default function HomePage() {
                 title="Seafood Intelligence"
                 description="Norwegian aquaculture dashboard. Salmon spot/forward prices, sea lice monitoring, production area traffic lights, disease outbreaks, company risk matrix, biomass tracking, and live wellboat harvest detection via AIS."
                 tags={[
-                  { label: "Salmon", color: "var(--warning)" },
-                  { label: "Lice", color: "var(--danger)" },
-                  { label: "Harvest", color: "var(--success)" },
+                  { label: "Salmon", color: "#f59e0b" },
+                  { label: "Lice", color: "#ef4444" },
+                  { label: "Harvest", color: "#10b981" },
                 ]}
                 visible={modulesReveal.visible}
                 delay={8}
@@ -364,9 +364,9 @@ export default function HomePage() {
                 title="Shipping Intelligence"
                 description="OSE shipping terminal. Fleet tracking on global map with vessel-level charter rates, BDI/BDTI/BCTI indices, rate exposure matrix, contract expiry tracking, and quarterly TCE comparison across 10 companies."
                 tags={[
-                  { label: "Fleet Map", color: "var(--info)" },
-                  { label: "Rates", color: "var(--warning)" },
-                  { label: "10 Companies", color: "var(--success)" },
+                  { label: "Fleet Map", color: "#06b6d4" },
+                  { label: "Rates", color: "#f59e0b" },
+                  { label: "10 Companies", color: "#10b981" },
                 ]}
                 visible={modulesReveal.visible}
                 delay={9}
@@ -379,7 +379,7 @@ export default function HomePage() {
             <h2 style={{
               fontWeight: 700,
               marginBottom: 24,
-              color: "var(--foreground)",
+              color: "#fff",
               textTransform: "uppercase",
               letterSpacing: "0.08em",
               fontSize: 12,
@@ -396,15 +396,15 @@ export default function HomePage() {
               gap: 16
             }}>
               {[
-                { title: "Volatility Estimation", accent: "var(--accent)", text: "Yang-Zhang, Rogers-Satchell, Parkinson & Garman-Klass estimators. Rolling windows (20/60/120-day), EWMA smoothing, historical percentile ranking, and regime detection." },
-                { title: "Monte Carlo Simulation", accent: "var(--info)", text: "10,000-path GBM with configurable drift and volatility. Percentile bands (5th–95th), probability cones, and statistical scenario testing." },
-                { title: "Risk Metrics", accent: "var(--danger)", text: "Max drawdown with recovery tracking, Sharpe ratio, market beta vs OBX, expected daily/weekly moves (1σ), and rolling benchmark correlation." },
-                { title: "Std Deviation Channels", accent: "var(--success)", text: "Linear regression channels with ±1σ/±2σ bands. Auto-optimized windows (255–1530 bars) by R². Position classification and mean-reversion signals." },
-                { title: "ML Price Predictions", accent: "var(--warning)", text: "GB/RF ensemble on 19 factors (momentum, volatility, fundamentals). Walk-forward validation across 200+ stocks, confidence scoring, and probability-weighted return forecasts." },
-                { title: "Factor Backtesting", accent: "var(--accent)", text: "Strategy backtesting with signal thresholds and holding periods. Factor attribution, cumulative returns, hit rates, and per-ticker trade detail." },
-                { title: "Time Series Analysis", accent: "var(--info)", text: "Log-return decomposition, ACF diagnostics, monthly seasonality patterns, and 30-day rolling volatility correlation with OBX index." },
-                { title: "Research Aggregation", accent: "var(--success)", text: "Claude AI summarization via Anthropic API. IMAP ingestion from 6 brokers, web scraping from DNB Carnegie, DNB Markets & Redeye. PDF text extraction, document deduplication, and full-text search." },
-                { title: "Options Analytics", accent: "var(--warning)", text: "Black-Scholes pricing, IV solver, multi-leg P&L with time decay. Max pain, put/call ratios, IV term structure. Editable positions with strike stepping." },
+                { title: "Volatility Estimation", accent: "#3b82f6", text: "Yang-Zhang, Rogers-Satchell, Parkinson & Garman-Klass estimators. Rolling windows (20/60/120-day), EWMA smoothing, historical percentile ranking, and regime detection." },
+                { title: "Monte Carlo Simulation", accent: "#06b6d4", text: "10,000-path GBM with configurable drift and volatility. Percentile bands (5th–95th), probability cones, and statistical scenario testing." },
+                { title: "Risk Metrics", accent: "#ef4444", text: "Max drawdown with recovery tracking, Sharpe ratio, market beta vs OBX, expected daily/weekly moves (1σ), and rolling benchmark correlation." },
+                { title: "Std Deviation Channels", accent: "#10b981", text: "Linear regression channels with ±1σ/±2σ bands. Auto-optimized windows (255–1530 bars) by R². Position classification and mean-reversion signals." },
+                { title: "ML Price Predictions", accent: "#f59e0b", text: "GB/RF ensemble on 19 factors (momentum, volatility, fundamentals). Walk-forward validation across 200+ stocks, confidence scoring, and probability-weighted return forecasts." },
+                { title: "Factor Backtesting", accent: "#3b82f6", text: "Strategy backtesting with signal thresholds and holding periods. Factor attribution, cumulative returns, hit rates, and per-ticker trade detail." },
+                { title: "Time Series Analysis", accent: "#06b6d4", text: "Log-return decomposition, ACF diagnostics, monthly seasonality patterns, and 30-day rolling volatility correlation with OBX index." },
+                { title: "Research Aggregation", accent: "#10b981", text: "Claude AI summarization via Anthropic API. IMAP ingestion from 6 brokers, web scraping from DNB Carnegie, DNB Markets & Redeye. PDF text extraction, document deduplication, and full-text search." },
+                { title: "Options Analytics", accent: "#f59e0b", text: "Black-Scholes pricing, IV solver, multi-leg P&L with time decay. Max pain, put/call ratios, IV term structure. Editable positions with strike stepping." },
               ].map((cap, i) => (
                 <CapabilityCard
                   key={cap.title}
@@ -424,7 +424,7 @@ export default function HomePage() {
             <h2 style={{
               fontWeight: 700,
               marginBottom: 24,
-              color: "var(--foreground)",
+              color: "#fff",
               textTransform: "uppercase",
               letterSpacing: "0.08em",
               fontSize: 12,
@@ -441,9 +441,9 @@ export default function HomePage() {
               gap: 16
             }}>
               {[
-                { title: "DCC-GARCH Correlation", accent: "var(--accent)", text: "Dynamic conditional correlation for time-varying co-movement. Copula models (Gaussian, Student-t) for tail dependence. VaR/CVaR and systemic risk indicators." },
-                { title: "Additional Research Sources", accent: "var(--success)", text: "Redeye commissioned research, Arctic Securities, ABG Sundal Collier. Automated web scraping with OSE-only filtering and AI summarization." },
-                { title: "CNN Signal Models", accent: "var(--warning)", text: "Convolutional neural network for pattern recognition on OHLCV data. Multi-timeframe signal generation and ensemble with existing ML predictions." },
+                { title: "DCC-GARCH Correlation", accent: "#3b82f6", text: "Dynamic conditional correlation for time-varying co-movement. Copula models (Gaussian, Student-t) for tail dependence. VaR/CVaR and systemic risk indicators." },
+                { title: "Additional Research Sources", accent: "#10b981", text: "Redeye commissioned research, Arctic Securities, ABG Sundal Collier. Automated web scraping with OSE-only filtering and AI summarization." },
+                { title: "CNN Signal Models", accent: "#f59e0b", text: "Convolutional neural network for pattern recognition on OHLCV data. Multi-timeframe signal generation and ensemble with existing ML predictions." },
               ].map((cap, i) => (
                 <CapabilityCard
                   key={cap.title}
@@ -461,22 +461,22 @@ export default function HomePage() {
           {/* Tech Stack Footer */}
           <footer style={{
             paddingTop: 28,
-            borderTop: "1px solid var(--border)",
+            borderTop: "1px solid #30363d",
             fontSize: 11.5,
-            color: "var(--muted-foreground)",
+            color: "rgba(255,255,255,0.5)",
             fontFamily: "monospace"
           }}>
             <p style={{ marginBottom: 8, lineHeight: 1.6 }}>
-              <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Tech Stack:</strong> Next.js 15 · TypeScript · PostgreSQL 17 · Drizzle ORM · Python · scikit-learn · Interactive Brokers TWS API · Anthropic Claude API
+              <strong style={{ color: "#fff", fontWeight: 700 }}>Tech Stack:</strong> Next.js 15 · TypeScript · PostgreSQL 17 · Drizzle ORM · Python · scikit-learn · Interactive Brokers TWS API · Anthropic Claude API
             </p>
             <p style={{ marginBottom: 8, lineHeight: 1.6 }}>
-              <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Architecture:</strong> Server-side compute · Connection pooling · Transaction pooler (Supabase) · JWT authentication · Vercel edge deployment
+              <strong style={{ color: "#fff", fontWeight: 700 }}>Architecture:</strong> Server-side compute · Connection pooling · Transaction pooler (Supabase) · JWT authentication · Vercel edge deployment
             </p>
             <p style={{ marginBottom: 8, lineHeight: 1.6 }}>
-              <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Data:</strong> Real-time OHLCV ingestion via IBKR · 225+ securities · 300K+ daily data points · Supabase storage for PDF attachments
+              <strong style={{ color: "#fff", fontWeight: 700 }}>Data:</strong> Real-time OHLCV ingestion via IBKR · 225+ securities · 300K+ daily data points · Supabase storage for PDF attachments
             </p>
             <p style={{ lineHeight: 1.6 }}>
-              <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Sources:</strong> Interactive Brokers TWS API · Yahoo Finance · Norges Bank (FX rates) · Pareto Securities · DNB Markets · DNB Carnegie · Redeye · Xtrainvestor · Finanstilsynet · BarentsWatch · Oslo Stock Exchange
+              <strong style={{ color: "#fff", fontWeight: 700 }}>Sources:</strong> Interactive Brokers TWS API · Yahoo Finance · Norges Bank (FX rates) · Pareto Securities · DNB Markets · DNB Carnegie · Redeye · Xtrainvestor · Finanstilsynet · BarentsWatch · Oslo Stock Exchange
             </p>
           </footer>
 
@@ -491,14 +491,14 @@ export default function HomePage() {
 function StatBox({ label, value, suffix, live }: { label: string; value: string | number; suffix: string; live?: boolean }) {
   return (
     <div style={{
-      background: "var(--card-bg)",
-      border: "1px solid var(--border)",
+      background: "#161b22",
+      border: "1px solid #30363d",
       borderRadius: 4,
       padding: "18px 20px"
     }}>
       <div style={{
         fontSize: 10,
-        color: "var(--muted-foreground)",
+        color: "rgba(255,255,255,0.5)",
         textTransform: "uppercase",
         letterSpacing: "0.08em",
         marginBottom: 10,
@@ -514,7 +514,7 @@ function StatBox({ label, value, suffix, live }: { label: string; value: string 
             width: 6,
             height: 6,
             borderRadius: "50%",
-            background: "var(--success)",
+            background: "#10b981",
             display: "inline-block",
             animation: "pulse 2s ease-in-out infinite",
           }} />
@@ -523,7 +523,7 @@ function StatBox({ label, value, suffix, live }: { label: string; value: string 
       <div style={{
         fontSize: 28,
         fontWeight: 700,
-        color: "var(--foreground)",
+        color: "#fff",
         fontFamily: "monospace",
         display: "flex",
         alignItems: "baseline",
@@ -531,7 +531,7 @@ function StatBox({ label, value, suffix, live }: { label: string; value: string 
       }}>
         {value}
         {suffix && (
-          <span style={{ fontSize: 12, color: "var(--muted-foreground)", fontWeight: 500 }}>
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 500 }}>
             {suffix}
           </span>
         )}
@@ -555,8 +555,8 @@ function FeatureCard({ href, title, description, tags, visible, delay, children 
       className="feature-card"
       style={{
         display: "block",
-        background: "var(--card-bg)",
-        border: "1px solid var(--border)",
+        background: "#161b22",
+        border: "1px solid #30363d",
         borderRadius: 6,
         padding: "22px 24px",
         textDecoration: "none",
@@ -575,13 +575,13 @@ function FeatureCard({ href, title, description, tags, visible, delay, children 
         fontSize: 16,
         fontWeight: 700,
         marginBottom: 8,
-        color: "var(--foreground)",
+        color: "#fff",
         fontFamily: "monospace",
         letterSpacing: "0.01em"
       }}>
         {title}
       </h3>
-      <p style={{ fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.65 }}>
+      <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", lineHeight: 1.65 }}>
         {description}
       </p>
       {children}
@@ -600,8 +600,8 @@ function CapabilityCard({ title, accent, children, visible, delay }: {
     <div
       className="cap-card"
       style={{
-        background: "var(--card-bg)",
-        border: "1px solid var(--border)",
+        background: "#161b22",
+        border: "1px solid #30363d",
         borderRadius: 4,
         padding: "14px 16px",
         borderLeft: `3px solid ${accent}`,
@@ -614,13 +614,13 @@ function CapabilityCard({ title, accent, children, visible, delay }: {
         fontSize: 12,
         fontWeight: 700,
         marginBottom: 10,
-        color: "var(--foreground)",
+        color: "#fff",
         fontFamily: "monospace",
         letterSpacing: "0.03em"
       }}>
         {title}
       </h4>
-      <p style={{ fontSize: 12.5, color: "var(--muted-foreground)", lineHeight: 1.65 }}>
+      <p style={{ fontSize: 12.5, color: "rgba(255,255,255,0.5)", lineHeight: 1.65 }}>
         {children}
       </p>
     </div>
@@ -629,11 +629,11 @@ function CapabilityCard({ title, accent, children, visible, delay }: {
 
 // Map CSS var names to hex colors for reliable tag rendering
 const COLOR_MAP: Record<string, string> = {
-  "var(--accent)": "#3b82f6",
-  "var(--success)": "#10b981",
-  "var(--warning)": "#f59e0b",
-  "var(--danger)": "#ef4444",
-  "var(--info)": "#06b6d4",
+  "#3b82f6": "#3b82f6",
+  "#10b981": "#10b981",
+  "#f59e0b": "#f59e0b",
+  "#ef4444": "#ef4444",
+  "#06b6d4": "#06b6d4",
 };
 
 function TagPill({ label, color }: { label: string; color: string }) {

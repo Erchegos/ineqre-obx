@@ -167,11 +167,11 @@ export default function PredictionsPage() {
   return (
     <div
       style={{
-        maxWidth: 1600,
+        maxWidth: 1400,
         margin: "0 auto",
-        padding: "16px",
-        fontFamily: "system-ui, -apple-system, sans-serif",
-        background: "var(--background)",
+        padding: "20px 24px",
+        fontFamily: "monospace",
+        background: "#0a0a0a",
       }}
     >
       {/* Terminal-style Header */}
@@ -179,8 +179,8 @@ export default function PredictionsPage() {
         style={{
           marginBottom: 16,
           padding: "12px 16px",
-          background: "var(--terminal-bg)",
-          border: "1px solid var(--terminal-border)",
+          background: "#161b22",
+          border: "1px solid #30363d",
           borderRadius: 2,
         }}
       >
@@ -191,7 +191,7 @@ export default function PredictionsPage() {
                 style={{
                   fontSize: 18,
                   fontWeight: 700,
-                  color: "var(--foreground)",
+                  color: "#fff",
                   fontFamily: "monospace",
                   letterSpacing: "0.5px",
                 }}
@@ -204,7 +204,7 @@ export default function PredictionsPage() {
                   fontWeight: 700,
                   fontFamily: "monospace",
                   padding: "3px 10px",
-                  background: "var(--accent)",
+                  background: "#3b82f6",
                   color: "#ffffff",
                   borderRadius: 2,
                 }}
@@ -218,7 +218,7 @@ export default function PredictionsPage() {
                 onChange={setMode}
                 hasOptimized={hasOptimized}
               />
-              <div style={{ fontSize: 10, color: "var(--muted)", fontFamily: "monospace" }}>
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace" }}>
                 {mode === "optimized" && optimizerData?.config
                   ? `OPTIMIZED • ${optimizerData.config.n_factors} FACTORS • ${Math.round(optimizerData.config.gb_weight * 100)}% GB + ${Math.round(optimizerData.config.rf_weight * 100)}% RF`
                   : "MACHINE LEARNING FORECASTS • ENSEMBLE MODELS • FACTOR ANALYSIS"}
@@ -230,14 +230,14 @@ export default function PredictionsPage() {
               href={`/stocks/${ticker}`}
               style={{
                 fontSize: 10,
-                color: "var(--accent)",
+                color: "#3b82f6",
                 textDecoration: "none",
                 fontFamily: "monospace",
                 fontWeight: 600,
                 padding: "6px 12px",
-                border: "1px solid var(--accent)",
+                border: "1px solid #3b82f6",
                 borderRadius: 2,
-                background: "var(--input-bg)",
+                background: "#0d1117",
               }}
             >
               &larr; BACK TO STOCK
@@ -246,14 +246,14 @@ export default function PredictionsPage() {
               href={`/backtest/${ticker}`}
               style={{
                 fontSize: 10,
-                color: "var(--success)",
+                color: "#10b981",
                 textDecoration: "none",
                 fontFamily: "monospace",
                 fontWeight: 600,
                 padding: "6px 12px",
-                border: "1px solid var(--success)",
+                border: "1px solid #10b981",
                 borderRadius: 2,
-                background: "var(--input-bg)",
+                background: "#0d1117",
               }}
             >
               BACKTEST &rarr;
@@ -262,14 +262,14 @@ export default function PredictionsPage() {
               href="/backtest"
               style={{
                 fontSize: 10,
-                color: "var(--muted)",
+                color: "rgba(255,255,255,0.5)",
                 textDecoration: "none",
                 fontFamily: "monospace",
                 fontWeight: 600,
                 padding: "6px 12px",
-                border: "1px solid var(--border)",
+                border: "1px solid #30363d",
                 borderRadius: 2,
-                background: "var(--input-bg)",
+                background: "#0d1117",
               }}
             >
               BACKTEST ALL STOCKS
@@ -284,8 +284,8 @@ export default function PredictionsPage() {
           style={{
             padding: 32,
             borderRadius: 2,
-            border: "1px solid var(--warning)",
-            background: "var(--warning-bg)",
+            border: "1px solid #f59e0b",
+            background: "rgba(245,158,11,0.08)",
             textAlign: "center",
             marginBottom: 16,
           }}
@@ -295,13 +295,13 @@ export default function PredictionsPage() {
               fontSize: 14,
               fontWeight: 700,
               marginBottom: 12,
-              color: "var(--warning)",
+              color: "#f59e0b",
               fontFamily: "monospace",
             }}
           >
             INCOMPLETE FACTOR DATA
           </div>
-          <div style={{ fontSize: 12, color: "var(--muted)", fontFamily: "monospace", lineHeight: 1.8, maxWidth: 600, margin: "0 auto" }}>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", lineHeight: 1.8, maxWidth: 600, margin: "0 auto" }}>
             <div style={{ marginBottom: 8 }}>
               {ticker} is missing key factors required for the 19-factor prediction model
               (beta, IVOL, fundamentals, or NOK volume).
@@ -314,14 +314,14 @@ export default function PredictionsPage() {
               style={{
                 display: "inline-block",
                 fontSize: 11,
-                color: "var(--accent)",
+                color: "#3b82f6",
                 textDecoration: "none",
                 fontFamily: "monospace",
                 fontWeight: 600,
                 padding: "8px 16px",
-                border: "1px solid var(--accent)",
+                border: "1px solid #3b82f6",
                 borderRadius: 2,
-                background: "var(--input-bg)",
+                background: "#0d1117",
               }}
             >
               ← BACK TO {ticker}
@@ -362,8 +362,8 @@ export default function PredictionsPage() {
           style={{
             padding: 12,
             borderRadius: 2,
-            border: mode === "optimized" ? "1px solid #f59e0b" : "1px solid var(--terminal-border)",
-            background: "var(--terminal-bg)",
+            border: mode === "optimized" ? "1px solid #f59e0b" : "1px solid #30363d",
+            background: "#161b22",
           }}
         >
           <div
@@ -371,31 +371,31 @@ export default function PredictionsPage() {
               fontSize: 10,
               fontWeight: 700,
               marginBottom: 10,
-              color: mode === "optimized" ? "#f59e0b" : "var(--foreground)",
+              color: mode === "optimized" ? "#f59e0b" : "#fff",
               fontFamily: "monospace",
             }}
           >
             {mode === "optimized" ? "OPTIMIZED CONFIG" : "METHODOLOGY"}
           </div>
           {mode === "optimized" && optimizerData?.config ? (
-            <div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "monospace", lineHeight: 1.7 }}>
+            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", lineHeight: 1.7 }}>
               <div style={{ marginBottom: 6 }}>
-                <span style={{ color: "var(--foreground)", fontWeight: 600 }}>ENSEMBLE:</span>{" "}
+                <span style={{ color: "#fff", fontWeight: 600 }}>ENSEMBLE:</span>{" "}
                 GB {Math.round(optimizerData.config.gb_weight * 100)}% + RF {Math.round(optimizerData.config.rf_weight * 100)}%
               </div>
               <div style={{ marginBottom: 6 }}>
-                <span style={{ color: "var(--foreground)", fontWeight: 600 }}>FACTORS ({optimizerData.config.n_factors}):</span>{" "}
+                <span style={{ color: "#fff", fontWeight: 600 }}>FACTORS ({optimizerData.config.n_factors}):</span>{" "}
                 {optimizerData.config.factors.map((f) => FACTOR_LABELS[f] || f).join(", ")}
               </div>
               <div style={{ marginBottom: 6 }}>
-                <span style={{ color: "var(--foreground)", fontWeight: 600 }}>DROPPED:</span>{" "}
+                <span style={{ color: "#fff", fontWeight: 600 }}>DROPPED:</span>{" "}
                 <span style={{ opacity: 0.6 }}>
                   {optimizerData.factor_changes?.dropped.slice(0, 6).map((f) => FACTOR_LABELS[f] || f).join(", ")}
                   {(optimizerData.factor_changes?.dropped.length ?? 0) > 6 && "..."}
                 </span>
               </div>
               <div style={{ marginBottom: 6 }}>
-                <span style={{ color: "var(--foreground)", fontWeight: 600 }}>METHOD:</span>{" "}
+                <span style={{ color: "#fff", fontWeight: 600 }}>METHOD:</span>{" "}
                 {optimizerData.config.optimization_method.replace("_", " ").toUpperCase()}
               </div>
               {optimizerData.performance && (
@@ -403,32 +403,32 @@ export default function PredictionsPage() {
                   <span style={{ color: "#f59e0b", fontWeight: 700 }}>
                     +{optimizerData.performance.improvement.hit_rate_delta.toFixed(1)}% HIT RATE
                   </span>
-                  <span style={{ color: "var(--muted)", marginLeft: 8 }}>
+                  <span style={{ color: "rgba(255,255,255,0.5)", marginLeft: 8 }}>
                     vs default ({optimizerData.performance.default_baseline.hit_rate.toFixed(1)}% → {optimizerData.performance.optimized.hit_rate.toFixed(1)}%)
                   </span>
                 </div>
               )}
             </div>
           ) : (
-            <div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "monospace", lineHeight: 1.7 }}>
+            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", lineHeight: 1.7 }}>
               <div style={{ marginBottom: 6 }}>
-                <span style={{ color: "var(--foreground)", fontWeight: 600 }}>MODELS:</span> Gradient Boosting
+                <span style={{ color: "#fff", fontWeight: 600 }}>MODELS:</span> Gradient Boosting
                 (60%) + Random Forest (40%) ensemble
               </div>
               <div style={{ marginBottom: 6 }}>
-                <span style={{ color: "var(--foreground)", fontWeight: 600 }}>TRAINING:</span> Historical Oslo
+                <span style={{ color: "#fff", fontWeight: 600 }}>TRAINING:</span> Historical Oslo
                 Børs data (2018-2024)
               </div>
               <div style={{ marginBottom: 6 }}>
-                <span style={{ color: "var(--foreground)", fontWeight: 600 }}>FACTORS:</span> 19 research-backed
+                <span style={{ color: "#fff", fontWeight: 600 }}>FACTORS:</span> 19 research-backed
                 predictors (momentum, volatility, fundamentals, seasonality)
               </div>
               <div style={{ marginBottom: 6 }}>
-                <span style={{ color: "var(--foreground)", fontWeight: 600 }}>TARGET:</span> 1-month forward
+                <span style={{ color: "#fff", fontWeight: 600 }}>TARGET:</span> 1-month forward
                 returns with probability distributions
               </div>
               <div>
-                <span style={{ color: "var(--foreground)", fontWeight: 600 }}>CONFIDENCE:</span> Percentiles
+                <span style={{ color: "#fff", fontWeight: 600 }}>CONFIDENCE:</span> Percentiles
                 estimated from ensemble tree variance
               </div>
             </div>
@@ -440,8 +440,8 @@ export default function PredictionsPage() {
           style={{
             padding: 12,
             borderRadius: 2,
-            border: "1px solid var(--terminal-border)",
-            background: "var(--terminal-bg)",
+            border: "1px solid #30363d",
+            background: "#161b22",
           }}
         >
           <div
@@ -449,15 +449,15 @@ export default function PredictionsPage() {
               fontSize: 10,
               fontWeight: 700,
               marginBottom: 10,
-              color: "var(--foreground)",
+              color: "#fff",
               fontFamily: "monospace",
             }}
           >
             ACADEMIC REFERENCES
           </div>
-          <div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "monospace", lineHeight: 1.6 }}>
+          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", lineHeight: 1.6 }}>
             <div style={{ marginBottom: 10 }}>
-              <div style={{ color: "var(--foreground)", fontWeight: 600, marginBottom: 2 }}>
+              <div style={{ color: "#fff", fontWeight: 600, marginBottom: 2 }}>
                 Gu, Kelly & Xiu (2020)
               </div>
               <div style={{ fontStyle: "italic", marginBottom: 2 }}>
@@ -466,12 +466,12 @@ export default function PredictionsPage() {
               <div style={{ fontSize: 8 }}>
                 Review of Financial Studies, 33(5), 2223-2273
               </div>
-              <div style={{ fontSize: 8, color: "var(--accent)", marginTop: 2 }}>
+              <div style={{ fontSize: 8, color: "#3b82f6", marginTop: 2 }}>
                 → 19-factor specification, ML ensemble methodology
               </div>
             </div>
             <div>
-              <div style={{ color: "var(--foreground)", fontWeight: 600, marginBottom: 2 }}>
+              <div style={{ color: "#fff", fontWeight: 600, marginBottom: 2 }}>
                 Medhat & Schmeling (2021)
               </div>
               <div style={{ fontStyle: "italic", marginBottom: 2 }}>
@@ -480,7 +480,7 @@ export default function PredictionsPage() {
               <div style={{ fontSize: 8 }}>
                 Review of Financial Studies, 35(3), 1480-1526
               </div>
-              <div style={{ fontSize: 8, color: "var(--accent)", marginTop: 2 }}>
+              <div style={{ fontSize: 8, color: "#3b82f6", marginTop: 2 }}>
                 → Turnover interactions, size-conditional effects
               </div>
             </div>
@@ -492,8 +492,8 @@ export default function PredictionsPage() {
           style={{
             padding: 12,
             borderRadius: 2,
-            border: "1px solid var(--warning)",
-            background: "var(--warning-bg)",
+            border: "1px solid #f59e0b",
+            background: "rgba(245,158,11,0.08)",
           }}
         >
           <div
@@ -501,13 +501,13 @@ export default function PredictionsPage() {
               fontSize: 10,
               fontWeight: 700,
               marginBottom: 10,
-              color: "var(--warning)",
+              color: "#f59e0b",
               fontFamily: "monospace",
             }}
           >
             ⚠ RISK DISCLAIMER
           </div>
-          <div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "monospace", lineHeight: 1.7 }}>
+          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", lineHeight: 1.7 }}>
             <div style={{ marginBottom: 4 }}>
               FOR RESEARCH PURPOSES ONLY
             </div>
@@ -527,13 +527,13 @@ export default function PredictionsPage() {
       )}
 
       {/* Data Sources */}
-      <div style={{ borderTop: "1px solid var(--border)", marginTop: 16, padding: "12px 16px", fontSize: 9, color: "var(--muted-foreground)", lineHeight: 1.8 }}>
+      <div style={{ borderTop: "1px solid #30363d", marginTop: 16, padding: "12px 16px", fontSize: 9, color: "rgba(255,255,255,0.5)", lineHeight: 1.8 }}>
         <span style={{ fontWeight: 700, letterSpacing: "0.06em" }}>DATA SOURCES</span>
         <div style={{ marginTop: 4 }}>
-          <span style={{ color: "var(--foreground)", opacity: 0.5 }}>Factors:</span> 19 technical & fundamental factors (momentum, volatility, beta, IVOL, B/M, E/P, DY) &middot;{" "}
-          <span style={{ color: "var(--foreground)", opacity: 0.5 }}>Model:</span> Ridge regression ensemble (60% Gradient Boosting + 40% Random Forest) &middot;{" "}
-          <span style={{ color: "var(--foreground)", opacity: 0.5 }}>Prices:</span> Interactive Brokers TWS API, Yahoo Finance &middot;{" "}
-          <span style={{ color: "var(--foreground)", opacity: 0.5 }}>Fundamentals:</span> Yahoo Finance
+          <span style={{ color: "#fff", opacity: 0.5 }}>Factors:</span> 19 technical & fundamental factors (momentum, volatility, beta, IVOL, B/M, E/P, DY) &middot;{" "}
+          <span style={{ color: "#fff", opacity: 0.5 }}>Model:</span> Ridge regression ensemble (60% Gradient Boosting + 40% Random Forest) &middot;{" "}
+          <span style={{ color: "#fff", opacity: 0.5 }}>Prices:</span> Interactive Brokers TWS API, Yahoo Finance &middot;{" "}
+          <span style={{ color: "#fff", opacity: 0.5 }}>Fundamentals:</span> Yahoo Finance
         </div>
       </div>
     </div>

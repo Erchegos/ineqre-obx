@@ -80,13 +80,13 @@ type OptimizerData = {
 const cardStyle = {
   padding: 10,
   borderRadius: 2,
-  background: "var(--card-bg)",
-  border: "1px solid var(--terminal-border)",
+  background: "#161b22",
+  border: "1px solid #30363d",
 };
 
 const labelStyle = {
   fontSize: 9,
-  color: "var(--muted)",
+  color: "rgba(255,255,255,0.5)",
   marginBottom: 2,
   fontFamily: "monospace" as const,
   fontWeight: 600,
@@ -100,15 +100,15 @@ const valueStyle = {
 
 const subLabelStyle = {
   fontSize: 8,
-  color: "var(--muted)",
+  color: "rgba(255,255,255,0.5)",
   marginTop: 2,
   fontFamily: "monospace" as const,
   fontWeight: 600,
 };
 
 const tooltipStyle = {
-  background: "var(--terminal-bg)",
-  border: "1px solid var(--accent)",
+  background: "#161b22",
+  border: "1px solid #3b82f6",
   borderRadius: 4,
   boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
   fontSize: 11,
@@ -119,22 +119,22 @@ const tooltipStyle = {
 const chartCardStyle = {
   padding: 12,
   borderRadius: 2,
-  border: "1px solid var(--terminal-border)",
-  background: "var(--terminal-bg)",
+  border: "1px solid #30363d",
+  background: "#161b22",
 };
 
 const sectionStyle = {
   padding: 12,
   borderRadius: 2,
-  border: "1px solid var(--terminal-border)",
-  background: "var(--terminal-bg)",
+  border: "1px solid #30363d",
+  background: "#161b22",
 };
 
 const sectionTitle = {
   fontSize: 10,
   fontWeight: 700,
   marginBottom: 10,
-  color: "var(--foreground)",
+  color: "#fff",
   fontFamily: "monospace" as const,
 };
 
@@ -215,7 +215,7 @@ export default function TickerBacktestPage() {
           margin: "0 auto",
           padding: "100px 16px 16px",
           fontFamily: "monospace",
-          color: "var(--muted)",
+          color: "rgba(255,255,255,0.5)",
           textAlign: "center",
         }}
       >
@@ -239,8 +239,8 @@ export default function TickerBacktestPage() {
         <div
           style={{
             padding: "24px 32px",
-            background: "var(--terminal-bg)",
-            border: "1px solid var(--warning)",
+            background: "#161b22",
+            border: "1px solid #f59e0b",
             borderRadius: 2,
             marginBottom: 24,
             textAlign: "center",
@@ -250,7 +250,7 @@ export default function TickerBacktestPage() {
             style={{
               fontSize: 14,
               fontWeight: 700,
-              color: "var(--warning)",
+              color: "#f59e0b",
               marginBottom: 8,
             }}
           >
@@ -259,7 +259,7 @@ export default function TickerBacktestPage() {
           <div
             style={{
               fontSize: 11,
-              color: "var(--muted)",
+              color: "rgba(255,255,255,0.5)",
               lineHeight: 1.6,
               maxWidth: 600,
               margin: "0 auto",
@@ -279,13 +279,13 @@ export default function TickerBacktestPage() {
               href={`/predictions/${ticker}`}
               style={{
                 fontSize: 10,
-                color: "var(--accent)",
+                color: "#3b82f6",
                 textDecoration: "none",
                 fontWeight: 600,
                 padding: "6px 14px",
-                border: "1px solid var(--accent)",
+                border: "1px solid #3b82f6",
                 borderRadius: 2,
-                background: "var(--input-bg)",
+                background: "#0d1117",
               }}
             >
               VIEW {ticker} PREDICTIONS
@@ -294,13 +294,13 @@ export default function TickerBacktestPage() {
               href="/backtest"
               style={{
                 fontSize: 10,
-                color: "var(--success)",
+                color: "#10b981",
                 textDecoration: "none",
                 fontWeight: 600,
                 padding: "6px 14px",
-                border: "1px solid var(--success)",
+                border: "1px solid #10b981",
                 borderRadius: 2,
-                background: "var(--input-bg)",
+                background: "#0d1117",
               }}
             >
               AGGREGATE BACKTEST
@@ -313,8 +313,8 @@ export default function TickerBacktestPage() {
           <div
             style={{
               padding: 16,
-              background: "var(--terminal-bg)",
-              border: "1px solid var(--terminal-border)",
+              background: "#161b22",
+              border: "1px solid #30363d",
               borderRadius: 2,
             }}
           >
@@ -322,7 +322,7 @@ export default function TickerBacktestPage() {
               style={{
                 fontSize: 10,
                 fontWeight: 700,
-                color: "var(--foreground)",
+                color: "#fff",
                 marginBottom: 4,
               }}
             >
@@ -331,7 +331,7 @@ export default function TickerBacktestPage() {
             <div
               style={{
                 fontSize: 9,
-                color: "var(--muted)",
+                color: "rgba(255,255,255,0.5)",
                 marginBottom: 12,
               }}
             >
@@ -356,16 +356,16 @@ export default function TickerBacktestPage() {
                     textDecoration: "none",
                     background:
                       t === ticker
-                        ? "var(--danger)"
-                        : "var(--card-bg)",
+                        ? "#ef4444"
+                        : "#161b22",
                     color:
                       t === ticker
                         ? "#fff"
-                        : "var(--accent)",
+                        : "#3b82f6",
                     border: `1px solid ${
                       t === ticker
-                        ? "var(--danger)"
-                        : "var(--terminal-border)"
+                        ? "#ef4444"
+                        : "#30363d"
                     }`,
                   }}
                 >
@@ -439,21 +439,21 @@ export default function TickerBacktestPage() {
   // Color helpers for default mode
   const defaultHitColor =
     summary.hit_rate > 0.55
-      ? "var(--success)"
+      ? "#10b981"
       : summary.hit_rate > 0.5
-        ? "var(--warning)"
-        : "var(--danger)";
+        ? "#f59e0b"
+        : "#ef4444";
 
   const quintileColor =
     summary.avg_quintile > 3.2
-      ? "var(--success)"
+      ? "#10b981"
       : summary.avg_quintile > 2.8
-        ? "var(--foreground)"
-        : "var(--danger)";
+        ? "#fff"
+        : "#ef4444";
 
   // Optimized mode: use optimizer's precomputed metrics
   const optHitRate = optPerf?.optimized.hit_rate ?? 0;
-  const optHitColor = optHitRate > 55 ? "var(--success)" : optHitRate > 50 ? "var(--warning)" : "var(--danger)";
+  const optHitColor = optHitRate > 55 ? "#10b981" : optHitRate > 50 ? "#f59e0b" : "#ef4444";
 
   return (
     <div
@@ -461,8 +461,8 @@ export default function TickerBacktestPage() {
         maxWidth: 1600,
         margin: "0 auto",
         padding: 16,
-        fontFamily: "system-ui, -apple-system, sans-serif",
-        background: "var(--background)",
+        fontFamily: "monospace",
+        background: "#0a0a0a",
       }}
     >
       {/* Header */}
@@ -470,8 +470,8 @@ export default function TickerBacktestPage() {
         style={{
           marginBottom: 16,
           padding: "12px 16px",
-          background: "var(--terminal-bg)",
-          border: "1px solid var(--terminal-border)",
+          background: "#161b22",
+          border: "1px solid #30363d",
           borderRadius: 2,
         }}
       >
@@ -495,7 +495,7 @@ export default function TickerBacktestPage() {
                 style={{
                   fontSize: 18,
                   fontWeight: 700,
-                  color: "var(--foreground)",
+                  color: "#fff",
                   fontFamily: "monospace",
                   letterSpacing: "0.5px",
                 }}
@@ -509,7 +509,7 @@ export default function TickerBacktestPage() {
                     fontWeight: 700,
                     fontFamily: "monospace",
                     padding: "3px 10px",
-                    background: "var(--accent)",
+                    background: "#3b82f6",
                     color: "#ffffff",
                     borderRadius: 2,
                     textTransform: "uppercase",
@@ -528,7 +528,7 @@ export default function TickerBacktestPage() {
               <div
                 style={{
                   fontSize: 10,
-                  color: "var(--muted)",
+                  color: "rgba(255,255,255,0.5)",
                   fontFamily: "monospace",
                 }}
               >
@@ -543,14 +543,14 @@ export default function TickerBacktestPage() {
               href={`/predictions/${ticker}`}
               style={{
                 fontSize: 10,
-                color: "var(--accent)",
+                color: "#3b82f6",
                 textDecoration: "none",
                 fontFamily: "monospace",
                 fontWeight: 600,
                 padding: "6px 12px",
-                border: "1px solid var(--accent)",
+                border: "1px solid #3b82f6",
                 borderRadius: 2,
-                background: "var(--input-bg)",
+                background: "#0d1117",
               }}
             >
               &larr; BACK TO PREDICTIONS
@@ -559,14 +559,14 @@ export default function TickerBacktestPage() {
               href={`/backtest?from=${ticker}`}
               style={{
                 fontSize: 10,
-                color: "var(--success)",
+                color: "#10b981",
                 textDecoration: "none",
                 fontFamily: "monospace",
                 fontWeight: 600,
                 padding: "6px 12px",
-                border: "1px solid var(--success)",
+                border: "1px solid #10b981",
                 borderRadius: 2,
-                background: "var(--input-bg)",
+                background: "#0d1117",
               }}
             >
               BACKTEST ALL STOCKS &rarr;
@@ -595,17 +595,17 @@ export default function TickerBacktestPage() {
               <div style={subLabelStyle}>DIRECTION ACCURACY</div>
             </div>
 
-            <div style={{ ...cardStyle, borderColor: "var(--info)", borderWidth: 2 }}>
+            <div style={{ ...cardStyle, borderColor: "#06b6d4", borderWidth: 2 }}>
               <div style={labelStyle}>MAE</div>
-              <div style={{ ...valueStyle, color: "var(--info)" }}>
+              <div style={{ ...valueStyle, color: "#06b6d4" }}>
                 {optPerf.optimized.mae.toFixed(2)}%
               </div>
               <div style={subLabelStyle}>MEAN ABSOLUTE ERROR</div>
             </div>
 
-            <div style={{ ...cardStyle, borderColor: optPerf.optimized.r2 > 0 ? "var(--success)" : "var(--muted)", borderWidth: 2 }}>
+            <div style={{ ...cardStyle, borderColor: optPerf.optimized.r2 > 0 ? "#10b981" : "rgba(255,255,255,0.5)", borderWidth: 2 }}>
               <div style={labelStyle}>R²</div>
-              <div style={{ ...valueStyle, color: optPerf.optimized.r2 > 0 ? "var(--success)" : "var(--muted)" }}>
+              <div style={{ ...valueStyle, color: optPerf.optimized.r2 > 0 ? "#10b981" : "rgba(255,255,255,0.5)" }}>
                 {optPerf.optimized.r2.toFixed(3)}
               </div>
               <div style={subLabelStyle}>EXPLAINED VARIANCE</div>
@@ -619,9 +619,9 @@ export default function TickerBacktestPage() {
               <div style={subLabelStyle}>INFORMATION COEFF</div>
             </div>
 
-            <div style={{ ...cardStyle, borderColor: optPerf.optimized.sharpe > 1 ? "var(--success)" : "var(--warning)", borderWidth: 2 }}>
+            <div style={{ ...cardStyle, borderColor: optPerf.optimized.sharpe > 1 ? "#10b981" : "#f59e0b", borderWidth: 2 }}>
               <div style={labelStyle}>SHARPE</div>
-              <div style={{ ...valueStyle, color: optPerf.optimized.sharpe > 1 ? "var(--success)" : "var(--warning)" }}>
+              <div style={{ ...valueStyle, color: optPerf.optimized.sharpe > 1 ? "#10b981" : "#f59e0b" }}>
                 {optPerf.optimized.sharpe.toFixed(2)}
               </div>
               <div style={subLabelStyle}>RISK-ADJ RETURN</div>
@@ -647,25 +647,25 @@ export default function TickerBacktestPage() {
               IMPROVEMENT vs DEFAULT:
             </span>
             <span>
-              <span style={{ color: "var(--foreground)", fontWeight: 600 }}>Hit Rate</span>{" "}
-              <span style={{ color: optPerf.improvement.hit_rate_delta > 0 ? "var(--success)" : "var(--danger)" }}>
+              <span style={{ color: "#fff", fontWeight: 600 }}>Hit Rate</span>{" "}
+              <span style={{ color: optPerf.improvement.hit_rate_delta > 0 ? "#10b981" : "#ef4444" }}>
                 {optPerf.improvement.hit_rate_delta > 0 ? "+" : ""}
                 {optPerf.improvement.hit_rate_delta.toFixed(1)}pp
               </span>
-              <span style={{ color: "var(--muted)", marginLeft: 4 }}>
+              <span style={{ color: "rgba(255,255,255,0.5)", marginLeft: 4 }}>
                 ({optPerf.default_baseline.hit_rate.toFixed(1)}% → {optPerf.optimized.hit_rate.toFixed(1)}%)
               </span>
             </span>
             <span>
-              <span style={{ color: "var(--foreground)", fontWeight: 600 }}>MAE</span>{" "}
-              <span style={{ color: optPerf.improvement.mae_delta > 0 ? "var(--success)" : "var(--danger)" }}>
+              <span style={{ color: "#fff", fontWeight: 600 }}>MAE</span>{" "}
+              <span style={{ color: optPerf.improvement.mae_delta > 0 ? "#10b981" : "#ef4444" }}>
                 {optPerf.improvement.mae_delta > 0 ? "-" : "+"}
                 {Math.abs(optPerf.improvement.mae_delta).toFixed(2)}%
               </span>
             </span>
             <span>
-              <span style={{ color: "var(--foreground)", fontWeight: 600 }}>R²</span>{" "}
-              <span style={{ color: "var(--success)" }}>
+              <span style={{ color: "#fff", fontWeight: 600 }}>R²</span>{" "}
+              <span style={{ color: "#10b981" }}>
                 +{(optPerf.optimized.r2 - optPerf.default_baseline.r2).toFixed(3)}
               </span>
             </span>
@@ -675,11 +675,11 @@ export default function TickerBacktestPage() {
               marginBottom: 8,
               padding: "6px 12px",
               background: "rgba(16, 185, 129, 0.1)",
-              border: "1px solid var(--success)",
+              border: "1px solid #10b981",
               borderRadius: 2,
               fontFamily: "monospace",
               fontSize: 9,
-              color: "var(--success)",
+              color: "#10b981",
             }}
           >
             Charts and predictions below use the optimized factor selection ({optimizerData?.config?.n_factors} factors).
@@ -706,12 +706,12 @@ export default function TickerBacktestPage() {
           <div
             style={{
               ...cardStyle,
-              borderColor: "var(--info)",
+              borderColor: "#06b6d4",
               borderWidth: 2,
             }}
           >
             <div style={labelStyle}>MAE</div>
-            <div style={{ ...valueStyle, color: "var(--info)" }}>
+            <div style={{ ...valueStyle, color: "#06b6d4" }}>
               {(summary.mae * 100).toFixed(2)}%
             </div>
             <div style={subLabelStyle}>MEAN ABSOLUTE ERROR</div>
@@ -734,12 +734,12 @@ export default function TickerBacktestPage() {
           <div
             style={{
               ...cardStyle,
-              borderColor: "var(--accent)",
+              borderColor: "#3b82f6",
               borderWidth: 2,
             }}
           >
             <div style={labelStyle}>CONFIDENCE</div>
-            <div style={{ ...valueStyle, color: "var(--accent)" }}>
+            <div style={{ ...valueStyle, color: "#3b82f6" }}>
               {(summary.avg_confidence * 100).toFixed(0)}%
             </div>
             <div style={subLabelStyle}>AVG MODEL CONFIDENCE</div>
@@ -769,35 +769,35 @@ export default function TickerBacktestPage() {
             >
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke="var(--chart-grid)"
+                stroke="#21262d"
                 vertical={false}
               />
               <XAxis
                 dataKey="month"
-                stroke="var(--border)"
+                stroke="#30363d"
                 style={{ fontSize: 9, fontFamily: "monospace" }}
-                tick={{ fill: "var(--muted)" }}
+                tick={{ fill: "rgba(255,255,255,0.5)" }}
                 tickFormatter={formatMonth}
                 minTickGap={40}
               />
               <YAxis
-                stroke="var(--border)"
+                stroke="#30363d"
                 style={{ fontSize: 9, fontFamily: "monospace" }}
-                tick={{ fill: "var(--muted)" }}
+                tick={{ fill: "rgba(255,255,255,0.5)" }}
                 tickFormatter={(v: number) => `${v.toFixed(0)}%`}
               />
               <ReferenceLine
                 y={0}
-                stroke="var(--muted-foreground)"
+                stroke="rgba(255,255,255,0.5)"
                 strokeWidth={1}
               />
               <Tooltip
                 contentStyle={tooltipStyle}
                 formatter={(value: any, name?: string) => [
                   <span key="val" style={{ color: "#10b981" }}>{Number(value).toFixed(2)}%</span>,
-                  <span key="label" style={{ color: "var(--foreground)" }}>{name === "predicted" ? "Predicted" : "Actual"}</span>,
+                  <span key="label" style={{ color: "#fff" }}>{name === "predicted" ? "Predicted" : "Actual"}</span>,
                 ]}
-                labelFormatter={(label: string) => <span style={{ color: "var(--foreground)", fontWeight: 600 }}>{label}</span>}
+                labelFormatter={(label: string) => <span style={{ color: "#fff", fontWeight: 600 }}>{label}</span>}
               />
               <Bar dataKey="predicted" fill="#3b82f6" opacity={0.7} radius={[1, 1, 0, 0]} />
               <Bar dataKey="actual" radius={[1, 1, 0, 0]}>
@@ -819,7 +819,7 @@ export default function TickerBacktestPage() {
               marginTop: 6,
               fontSize: 9,
               fontFamily: "monospace",
-              color: "var(--muted)",
+              color: "rgba(255,255,255,0.5)",
             }}
           >
             <span>
@@ -848,10 +848,10 @@ export default function TickerBacktestPage() {
                   fontWeight: 600,
                   fontFamily: "monospace",
                   padding: "3px 8px",
-                  border: "1px solid var(--terminal-border)",
+                  border: "1px solid #30363d",
                   borderRadius: "3px 0 0 3px",
-                  background: strategy === "long-only" ? "var(--accent)" : "var(--card-bg)",
-                  color: strategy === "long-only" ? "#fff" : "var(--muted)",
+                  background: strategy === "long-only" ? "#3b82f6" : "#161b22",
+                  color: strategy === "long-only" ? "#fff" : "rgba(255,255,255,0.5)",
                   cursor: "pointer",
                 }}
               >
@@ -864,11 +864,11 @@ export default function TickerBacktestPage() {
                   fontWeight: 600,
                   fontFamily: "monospace",
                   padding: "3px 8px",
-                  border: "1px solid var(--terminal-border)",
+                  border: "1px solid #30363d",
                   borderLeft: "none",
                   borderRadius: "0 3px 3px 0",
-                  background: strategy === "long-short" ? "var(--accent)" : "var(--card-bg)",
-                  color: strategy === "long-short" ? "#fff" : "var(--muted)",
+                  background: strategy === "long-short" ? "#3b82f6" : "#161b22",
+                  color: strategy === "long-short" ? "#fff" : "rgba(255,255,255,0.5)",
                   cursor: "pointer",
                 }}
               >
@@ -883,35 +883,35 @@ export default function TickerBacktestPage() {
             >
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke="var(--chart-grid)"
+                stroke="#21262d"
                 vertical={false}
               />
               <XAxis
                 dataKey="month"
-                stroke="var(--border)"
+                stroke="#30363d"
                 style={{ fontSize: 9, fontFamily: "monospace" }}
-                tick={{ fill: "var(--muted)" }}
+                tick={{ fill: "rgba(255,255,255,0.5)" }}
                 tickFormatter={formatMonth}
                 minTickGap={40}
               />
               <YAxis
-                stroke="var(--border)"
+                stroke="#30363d"
                 style={{ fontSize: 9, fontFamily: "monospace" }}
-                tick={{ fill: "var(--muted)" }}
+                tick={{ fill: "rgba(255,255,255,0.5)" }}
                 tickFormatter={(v: number) => `${v.toFixed(0)}%`}
               />
               <ReferenceLine
                 y={0}
-                stroke="var(--muted-foreground)"
+                stroke="rgba(255,255,255,0.5)"
                 strokeWidth={1}
               />
               <Tooltip
                 contentStyle={tooltipStyle}
                 formatter={(value, name) => [
                   <span key="val" style={{ color: Number(value) >= 0 ? "#10b981" : "#ef4444" }}>{Number(value).toFixed(1)}%</span>,
-                  <span key="label" style={{ color: "var(--foreground)" }}>{name === "cumReturn" ? "Strategy" : "Buy & Hold"}</span>,
+                  <span key="label" style={{ color: "#fff" }}>{name === "cumReturn" ? "Strategy" : "Buy & Hold"}</span>,
                 ]}
-                labelFormatter={(label) => <span style={{ color: "var(--foreground)", fontWeight: 600 }}>{label}</span>}
+                labelFormatter={(label) => <span style={{ color: "#fff", fontWeight: 600 }}>{label}</span>}
               />
               <Line
                 type="monotone"
@@ -941,7 +941,7 @@ export default function TickerBacktestPage() {
               gap: 16,
               fontSize: 8,
               fontFamily: "monospace",
-              color: "var(--muted)",
+              color: "rgba(255,255,255,0.5)",
               marginTop: 6,
             }}
           >
@@ -960,15 +960,15 @@ export default function TickerBacktestPage() {
         style={{
           marginBottom: 16,
           borderRadius: 2,
-          border: "1px solid var(--terminal-border)",
-          background: "var(--terminal-bg)",
+          border: "1px solid #30363d",
+          background: "#161b22",
           overflow: "hidden",
         }}
       >
         <div
           style={{
             padding: "8px 12px",
-            borderBottom: "1px solid var(--terminal-border)",
+            borderBottom: "1px solid #30363d",
           }}
         >
           <span
@@ -976,7 +976,7 @@ export default function TickerBacktestPage() {
               fontSize: 10,
               fontWeight: 700,
               fontFamily: "monospace",
-              color: "var(--foreground)",
+              color: "#fff",
             }}
           >
             PREDICTION HISTORY
@@ -984,7 +984,7 @@ export default function TickerBacktestPage() {
           <span
             style={{
               fontSize: 9,
-              color: "var(--muted)",
+              color: "rgba(255,255,255,0.5)",
               fontFamily: "monospace",
               marginLeft: 8,
             }}
@@ -1004,10 +1004,10 @@ export default function TickerBacktestPage() {
             <thead>
               <tr
                 style={{
-                  borderBottom: "1px solid var(--terminal-border)",
+                  borderBottom: "1px solid #30363d",
                   position: "sticky",
                   top: 0,
-                  background: "var(--terminal-bg)",
+                  background: "#161b22",
                   zIndex: 1,
                 }}
               >
@@ -1025,7 +1025,7 @@ export default function TickerBacktestPage() {
                     style={{
                       textAlign: h === "DATE" ? "left" : "right",
                       padding: "6px 8px",
-                      color: "var(--muted)",
+                      color: "rgba(255,255,255,0.5)",
                       fontWeight: 600,
                     }}
                   >
@@ -1050,13 +1050,13 @@ export default function TickerBacktestPage() {
                   <tr
                     key={dateStr}
                     style={{
-                      borderBottom: "1px solid var(--border-subtle)",
+                      borderBottom: "1px solid #21262d",
                     }}
                   >
                     <td
                       style={{
                         padding: "4px 8px",
-                        color: "var(--foreground)",
+                        color: "#fff",
                       }}
                     >
                       {dateStr}
@@ -1067,8 +1067,8 @@ export default function TickerBacktestPage() {
                         textAlign: "right",
                         color:
                           p.ensemble_prediction >= 0
-                            ? "var(--success)"
-                            : "var(--danger)",
+                            ? "#10b981"
+                            : "#ef4444",
                       }}
                     >
                       {p.ensemble_prediction >= 0 ? "+" : ""}
@@ -1079,10 +1079,10 @@ export default function TickerBacktestPage() {
                         padding: "4px 8px",
                         textAlign: "right",
                         color: !hasActual
-                          ? "var(--muted)"
+                          ? "rgba(255,255,255,0.5)"
                           : (p.actual_return as number) >= 0
-                            ? "var(--success)"
-                            : "var(--danger)",
+                            ? "#10b981"
+                            : "#ef4444",
                       }}
                     >
                       {hasActual
@@ -1093,7 +1093,7 @@ export default function TickerBacktestPage() {
                       style={{
                         padding: "4px 8px",
                         textAlign: "right",
-                        color: "var(--foreground)",
+                        color: "#fff",
                       }}
                     >
                       {err !== null ? `${(err * 100).toFixed(2)}%` : "—"}
@@ -1104,10 +1104,10 @@ export default function TickerBacktestPage() {
                         textAlign: "right",
                         color:
                           p.direction_correct === null
-                            ? "var(--muted)"
+                            ? "rgba(255,255,255,0.5)"
                             : p.direction_correct
-                              ? "var(--success)"
-                              : "var(--danger)",
+                              ? "#10b981"
+                              : "#ef4444",
                         fontWeight: 600,
                       }}
                     >
@@ -1123,10 +1123,10 @@ export default function TickerBacktestPage() {
                         textAlign: "right",
                         color:
                           p.quintile >= 4
-                            ? "var(--success)"
+                            ? "#10b981"
                             : p.quintile <= 2
-                              ? "var(--danger)"
-                              : "var(--foreground)",
+                              ? "#ef4444"
+                              : "#fff",
                         fontWeight: 600,
                       }}
                     >
@@ -1136,7 +1136,7 @@ export default function TickerBacktestPage() {
                       style={{
                         padding: "4px 8px",
                         textAlign: "right",
-                        color: "var(--muted)",
+                        color: "rgba(255,255,255,0.5)",
                       }}
                     >
                       {(p.confidence_score * 100).toFixed(0)}%
@@ -1164,10 +1164,10 @@ export default function TickerBacktestPage() {
         >
           {GLOSSARY.map((g) => (
             <div key={g.term}>
-              <span style={{ color: "var(--accent)", fontWeight: 700 }}>
+              <span style={{ color: "#3b82f6", fontWeight: 700 }}>
                 {g.term}
               </span>
-              <span style={{ color: "var(--muted)" }}> &mdash; {g.def}</span>
+              <span style={{ color: "rgba(255,255,255,0.5)" }}> &mdash; {g.def}</span>
             </div>
           ))}
         </div>

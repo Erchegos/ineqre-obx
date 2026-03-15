@@ -17,6 +17,7 @@ type StockData = {
   start_date: string;
   end_date: string;
   rows: number;
+  mktcap: number | null;
   // Data quality metrics
   expectedDays: number;
   completenessPct: number;
@@ -47,6 +48,7 @@ export default function StocksPage() {
   const [tickersWithOptimizer, setTickersWithOptimizer] = useState<Set<string>>(new Set());
   const [tickersWithBacktest, setTickersWithBacktest] = useState<Set<string>>(new Set());
   const [tickersWithOptions, setTickersWithOptions] = useState<Set<string>>(new Set());
+  const [tickersWithExcel, setTickersWithExcel] = useState<Set<string>>(new Set());
 
   const fetchStocks = useCallback(async (assetTypes: Set<AssetType>) => {
     setLoading(true);
@@ -74,6 +76,7 @@ export default function StocksPage() {
 
         return {
           ...stock,
+          mktcap: stock.mktcap ?? null,
           expectedDays: metrics.expectedDays,
           completenessPct: metrics.completenessPct,
           dataTier: metrics.dataTier,
@@ -100,7 +103,7 @@ export default function StocksPage() {
 
       try {
         // Fetch all in parallel
-        const [factorRes, optimizerRes, optionsRes, backtestRes] = await Promise.all([
+        const [factorRes, optimizerRes, optionsRes, backtestRes, excelRes] = await Promise.all([
           fetch("/api/factors/tickers", {
             method: "GET",
             headers: { accept: "application/json" },
@@ -114,6 +117,10 @@ export default function StocksPage() {
             headers: { accept: "application/json" },
               }),
           fetch("/api/backtest/tickers", {
+            method: "GET",
+            headers: { accept: "application/json" },
+              }),
+          fetch("/api/valuation/excel?list=true", {
             method: "GET",
             headers: { accept: "application/json" },
               }),
@@ -144,6 +151,13 @@ export default function StocksPage() {
           const data = await backtestRes.json();
           if (data.success && data.tickers) {
             setTickersWithBacktest(new Set(data.tickers));
+          }
+        }
+
+        if (excelRes.ok) {
+          const data = await excelRes.json();
+          if (data.success && data.tickers) {
+            setTickersWithExcel(new Set(data.tickers));
           }
         }
       } catch (e) {
@@ -220,6 +234,11 @@ export default function StocksPage() {
       let aVal: any = a[sortBy];
       let bVal: any = b[sortBy];
 
+      // Handle nulls — push them to the end regardless of sort direction
+      if (aVal == null && bVal == null) return 0;
+      if (aVal == null) return 1;
+      if (bVal == null) return -1;
+
       if (typeof aVal === "string") {
         aVal = aVal.toLowerCase();
         bVal = (bVal as string).toLowerCase();
@@ -280,7 +299,7 @@ export default function StocksPage() {
       case 'B': return '#f59e0b'; // Amber
       case 'C': return '#f97316'; // Orange
       case 'F': return '#ef4444'; // Red
-      default: return 'var(--muted)';
+      default: return 'rgba(255,255,255,0.5)';
     }
   };
 
@@ -288,8 +307,8 @@ export default function StocksPage() {
     return (
       <div style={{
         minHeight: "100vh",
-        background: "var(--background)",
-        color: "var(--foreground)",
+        background: "#0a0a0a",
+        color: "#fff",
         padding: 32,
         display: "flex",
         alignItems: "center",
@@ -304,13 +323,13 @@ export default function StocksPage() {
     return (
       <div style={{
         minHeight: "100vh",
-        background: "var(--background)",
-        color: "var(--foreground)",
+        background: "#0a0a0a",
+        color: "#fff",
         padding: 32
       }}>
-        <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+        <div style={{ maxWidth: 1600, margin: "0 auto" }}>
           <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 16 }}>Error</h1>
-          <p style={{ color: "var(--danger)" }}>{error}</p>
+          <p style={{ color: "#ef4444" }}>{error}</p>
         </div>
       </div>
     );
@@ -319,38 +338,38 @@ export default function StocksPage() {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "var(--background)",
-      color: "var(--foreground)",
+      background: "#0a0a0a",
+      color: "#fff",
       padding: 32
     }}>
       <style dangerouslySetInnerHTML={{ __html: `
         .stock-table tbody tr {
-          border-bottom: 1px solid var(--table-border);
+          border-bottom: 1px solid #30363d;
           transition: background 0.15s;
         }
         .stock-table tbody tr:hover {
-          background: var(--hover-bg) !important;
+          background: rgba(59,130,246,0.08) !important;
         }
         .search-input {
           width: 100%;
           padding: 12px 16px;
           font-size: 14px;
-          border: 1px solid var(--border);
+          border: 1px solid #30363d;
           border-radius: 4px;
-          background: var(--card-bg);
-          color: var(--foreground);
+          background: #161b22;
+          color: #fff;
           outline: none;
           transition: border-color 0.2s;
         }
         .search-input:focus {
-          border-color: var(--accent);
+          border-color: #3b82f6;
         }
         .search-input::placeholder {
-          color: var(--muted);
+          color: rgba(255,255,255,0.5);
         }
       `}} />
 
-      <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+      <div style={{ maxWidth: 1600, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <h1 style={{ fontSize: 32, fontWeight: 700, margin: 0 }}>Assets</h1>
@@ -358,23 +377,23 @@ export default function StocksPage() {
               href="/"
               style={{
                 display: "inline-block",
-                color: "var(--foreground)",
+                color: "#fff",
                 textDecoration: "none",
                 fontSize: 13,
                 fontWeight: 500,
                 padding: "8px 16px",
-                border: "1px solid var(--border)",
+                border: "1px solid #30363d",
                 borderRadius: 4,
-                background: "var(--card-bg)",
+                background: "#161b22",
                 transition: "all 0.15s ease"
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = "var(--foreground)";
-                e.currentTarget.style.background = "var(--hover-bg)";
+                e.currentTarget.style.borderColor = "#fff";
+                e.currentTarget.style.background = "rgba(59,130,246,0.08)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = "var(--border)";
-                e.currentTarget.style.background = "var(--card-bg)";
+                e.currentTarget.style.borderColor = "#30363d";
+                e.currentTarget.style.background = "#161b22";
               }}
             >
               Home
@@ -384,23 +403,23 @@ export default function StocksPage() {
             <Link
               href="/options"
               style={{
-                color: "var(--foreground)",
+                color: "#fff",
                 textDecoration: "none",
                 fontSize: 13,
                 fontWeight: 500,
                 padding: "8px 16px",
-                border: "1px solid var(--border)",
+                border: "1px solid #30363d",
                 borderRadius: 4,
-                background: "var(--card-bg)",
+                background: "#161b22",
                 transition: "all 0.15s ease",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = "var(--foreground)";
-                e.currentTarget.style.background = "var(--hover-bg)";
+                e.currentTarget.style.borderColor = "#fff";
+                e.currentTarget.style.background = "rgba(59,130,246,0.08)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = "var(--border)";
-                e.currentTarget.style.background = "var(--card-bg)";
+                e.currentTarget.style.borderColor = "#30363d";
+                e.currentTarget.style.background = "#161b22";
               }}
             >
               Options
@@ -408,13 +427,13 @@ export default function StocksPage() {
             <Link
               href="/correlation"
               style={{
-                color: "var(--accent)",
+                color: "#3b82f6",
                 textDecoration: "none",
                 fontSize: 14,
                 fontWeight: 500,
                 padding: "8px 16px",
                 borderRadius: 4,
-                border: "1px solid var(--accent)",
+                border: "1px solid #3b82f6",
                 transition: "all 0.15s",
               }}
             >
@@ -423,13 +442,13 @@ export default function StocksPage() {
             <Link
               href="/valuation"
               style={{
-                color: "var(--accent)",
+                color: "#3b82f6",
                 textDecoration: "none",
                 fontSize: 14,
                 fontWeight: 500,
                 padding: "8px 16px",
                 borderRadius: 4,
-                border: "1px solid var(--accent)",
+                border: "1px solid #3b82f6",
                 transition: "all 0.15s",
               }}
             >
@@ -437,7 +456,7 @@ export default function StocksPage() {
             </Link>
           </div>
         </div>
-        <p style={{ color: "var(--muted)", marginBottom: 16, fontSize: 14 }}>
+        <p style={{ color: "rgba(255,255,255,0.5)", marginBottom: 16, fontSize: 14 }}>
           Universe: {stocks.length} assets | Tier A: {tierCounts.A} | Tier B: {tierCounts.B} | Tier C: {tierCounts.C} | Tier F: {tierCounts.F} | <span style={{ color: '#10b981', fontWeight: 600 }}>ML Ready: {mlCount}</span> | <span style={{ color: '#60a5fa', fontWeight: 600 }}>Backtested: {btCount}</span> | <span style={{ color: '#8b5cf6', fontWeight: 600 }}>Optimized: {optCount}</span> | <span style={{ color: '#f59e0b', fontWeight: 600 }}>Options: {optionsCount}</span>
           <span style={{ marginLeft: 16, fontSize: 13 }}>Source: Interactive Brokers</span>
         </p>
@@ -465,10 +484,10 @@ export default function StocksPage() {
                   padding: "8px 14px",
                   fontSize: 12,
                   fontWeight: 500,
-                  border: isSelected ? "1px solid var(--accent)" : "1px solid var(--border)",
+                  border: isSelected ? "1px solid #3b82f6" : "1px solid #30363d",
                   borderRadius: 4,
-                  background: isSelected ? "var(--accent)" : "var(--card-bg)",
-                  color: isSelected ? "#fff" : "var(--foreground)",
+                  background: isSelected ? "#3b82f6" : "#161b22",
+                  color: isSelected ? "#fff" : "#fff",
                   cursor: "pointer",
                   transition: "all 0.15s ease",
                   whiteSpace: "nowrap",
@@ -479,16 +498,16 @@ export default function StocksPage() {
                   if (isSelected) {
                     e.currentTarget.style.filter = "brightness(0.9)";
                   } else {
-                    e.currentTarget.style.borderColor = "var(--accent)";
-                    e.currentTarget.style.background = "var(--hover-bg)";
+                    e.currentTarget.style.borderColor = "#3b82f6";
+                    e.currentTarget.style.background = "rgba(59,130,246,0.08)";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (isSelected) {
                     e.currentTarget.style.filter = "brightness(1)";
                   } else {
-                    e.currentTarget.style.borderColor = "var(--border)";
-                    e.currentTarget.style.background = "var(--card-bg)";
+                    e.currentTarget.style.borderColor = "#30363d";
+                    e.currentTarget.style.background = "#161b22";
                   }
                 }}
                 onMouseDown={(e) => {
@@ -538,10 +557,10 @@ export default function StocksPage() {
                     padding: "10px 14px",
                     fontSize: 12,
                     fontWeight: 500,
-                    border: isSelected ? "1px solid var(--accent)" : "1px solid var(--border)",
+                    border: isSelected ? "1px solid #3b82f6" : "1px solid #30363d",
                     borderRadius: 4,
-                    background: isSelected ? "var(--accent)" : "var(--card-bg)",
-                    color: isSelected ? "#fff" : "var(--foreground)",
+                    background: isSelected ? "#3b82f6" : "#161b22",
+                    color: isSelected ? "#fff" : "#fff",
                     cursor: "pointer",
                     transition: "all 0.15s ease",
                     whiteSpace: "nowrap",
@@ -552,16 +571,16 @@ export default function StocksPage() {
                     if (isSelected) {
                       e.currentTarget.style.filter = "brightness(0.9)";
                     } else {
-                      e.currentTarget.style.borderColor = "var(--accent)";
-                      e.currentTarget.style.background = "var(--hover-bg)";
+                      e.currentTarget.style.borderColor = "#3b82f6";
+                      e.currentTarget.style.background = "rgba(59,130,246,0.08)";
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (isSelected) {
                       e.currentTarget.style.filter = "brightness(1)";
                     } else {
-                      e.currentTarget.style.borderColor = "var(--border)";
-                      e.currentTarget.style.background = "var(--card-bg)";
+                      e.currentTarget.style.borderColor = "#30363d";
+                      e.currentTarget.style.background = "#161b22";
                     }
                   }}
                   onMouseDown={(e) => {
@@ -583,14 +602,14 @@ export default function StocksPage() {
           <div style={{
             marginBottom: 24,
             padding: 16,
-            background: "var(--card-bg)",
-            border: "1px solid var(--border)",
+            background: "#161b22",
+            border: "1px solid #30363d",
             borderRadius: 4,
           }}>
             <div style={{
               fontSize: 12,
               fontWeight: 600,
-              color: "var(--muted-foreground)",
+              color: "rgba(255,255,255,0.5)",
               marginBottom: 12,
               textTransform: "uppercase",
               letterSpacing: "0.05em"
@@ -618,23 +637,23 @@ export default function StocksPage() {
                       padding: "6px 12px",
                       fontSize: 11.5,
                       fontWeight: 500,
-                      border: isSelected ? "1px solid var(--accent)" : "1px solid var(--border)",
+                      border: isSelected ? "1px solid #3b82f6" : "1px solid #30363d",
                       borderRadius: 3,
-                      background: isSelected ? "var(--accent)" : "transparent",
-                      color: isSelected ? "#fff" : "var(--foreground)",
+                      background: isSelected ? "#3b82f6" : "transparent",
+                      color: isSelected ? "#fff" : "#fff",
                       cursor: "pointer",
                       transition: "all 0.15s ease",
                       whiteSpace: "nowrap",
                     }}
                     onMouseEnter={(e) => {
                       if (!isSelected) {
-                        e.currentTarget.style.borderColor = "var(--accent)";
-                        e.currentTarget.style.background = "var(--hover-bg)";
+                        e.currentTarget.style.borderColor = "#3b82f6";
+                        e.currentTarget.style.background = "rgba(59,130,246,0.08)";
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!isSelected) {
-                        e.currentTarget.style.borderColor = "var(--border)";
+                        e.currentTarget.style.borderColor = "#30363d";
                         e.currentTarget.style.background = "transparent";
                       }
                     }}
@@ -650,21 +669,21 @@ export default function StocksPage() {
                     padding: "6px 12px",
                     fontSize: 11.5,
                     fontWeight: 500,
-                    border: "1px solid var(--danger)",
+                    border: "1px solid #ef4444",
                     borderRadius: 3,
                     background: "transparent",
-                    color: "var(--danger)",
+                    color: "#ef4444",
                     cursor: "pointer",
                     transition: "all 0.15s ease",
                     whiteSpace: "nowrap",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "var(--danger)";
+                    e.currentTarget.style.background = "#ef4444";
                     e.currentTarget.style.color = "#fff";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.color = "var(--danger)";
+                    e.currentTarget.style.color = "#ef4444";
                   }}
                 >
                   Clear Filters
@@ -675,7 +694,7 @@ export default function StocksPage() {
         )}
 
         {searchQuery && (
-          <div style={{ marginTop: -16, marginBottom: 16, fontSize: 13, color: "var(--muted)" }}>
+          <div style={{ marginTop: -16, marginBottom: 16, fontSize: 13, color: "rgba(255,255,255,0.5)" }}>
             Found {filteredAndSortedStocks.length} result{filteredAndSortedStocks.length !== 1 ? 's' : ''}
           </div>
         )}
@@ -684,19 +703,19 @@ export default function StocksPage() {
           <table className="stock-table" style={{
             width: "100%",
             borderCollapse: "collapse",
-            background: "var(--card-bg)",
-            border: "1px solid var(--card-border)",
+            background: "#161b22",
+            border: "1px solid #30363d",
             borderRadius: 4,
           }}>
             <thead>
-              <tr style={{ borderBottom: "1px solid var(--border)" }}>
+              <tr style={{ borderBottom: "1px solid #30363d" }}>
                 <th style={{ textAlign: "left", padding: "16px" }}>
                   <button
                     onClick={() => toggleSort("ticker")}
                     style={{
                       background: "none",
                       border: "none",
-                      color: "var(--foreground)",
+                      color: "#fff",
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
@@ -711,7 +730,8 @@ export default function StocksPage() {
                     Ticker <SortIcon column="ticker" />
                   </button>
                 </th>
-                <th style={{ textAlign: "left", padding: "16px", fontSize: 13, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--foreground)" }}>
+                <th style={{ textAlign: "left", padding: "12px 8px", fontSize: 13, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "#fff", minWidth: 140 }}>
+                  Tags
                 </th>
                 <th style={{ textAlign: "left", padding: "16px" }}>
                   <button
@@ -719,7 +739,7 @@ export default function StocksPage() {
                     style={{
                       background: "none",
                       border: "none",
-                      color: "var(--foreground)",
+                      color: "#fff",
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
@@ -740,7 +760,7 @@ export default function StocksPage() {
                     style={{
                       background: "none",
                       border: "none",
-                      color: "var(--foreground)",
+                      color: "#fff",
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
@@ -755,26 +775,39 @@ export default function StocksPage() {
                     Sector <SortIcon column="sector" />
                   </button>
                 </th>
-                <th style={{ textAlign: "left", padding: "16px" }}>
+                <th style={{ textAlign: "right", padding: "16px" }}>
                   <button
-                    onClick={() => toggleSort("currency")}
+                    onClick={() => toggleSort("mktcap")}
                     style={{
                       background: "none",
                       border: "none",
-                      color: "var(--foreground)",
+                      color: "#fff",
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
+                      justifyContent: "flex-end",
                       gap: 8,
                       fontSize: 13,
                       fontWeight: 600,
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
                       padding: 0,
+                      marginLeft: "auto",
                     }}
                   >
-                    Currency <SortIcon column="currency" />
+                    Mkt Cap <SortIcon column="mktcap" />
                   </button>
+                </th>
+                <th style={{ textAlign: "center", padding: "12px 8px" }}>
+                  <span style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    color: "#fff",
+                  }}>
+                    Ccy
+                  </span>
                 </th>
                 <th style={{ textAlign: "right", padding: "16px" }}>
                   <button
@@ -782,7 +815,7 @@ export default function StocksPage() {
                     style={{
                       background: "none",
                       border: "none",
-                      color: "var(--foreground)",
+                      color: "#fff",
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
@@ -805,7 +838,7 @@ export default function StocksPage() {
                     style={{
                       background: "none",
                       border: "none",
-                      color: "var(--foreground)",
+                      color: "#fff",
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
@@ -828,7 +861,7 @@ export default function StocksPage() {
                     style={{
                       background: "none",
                       border: "none",
-                      color: "var(--foreground)",
+                      color: "#fff",
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
@@ -851,7 +884,7 @@ export default function StocksPage() {
                     style={{
                       background: "none",
                       border: "none",
-                      color: "var(--foreground)",
+                      color: "#fff",
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
@@ -874,7 +907,7 @@ export default function StocksPage() {
                     style={{
                       background: "none",
                       border: "none",
-                      color: "var(--foreground)",
+                      color: "#fff",
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
@@ -897,7 +930,7 @@ export default function StocksPage() {
                     style={{
                       background: "none",
                       border: "none",
-                      color: "var(--foreground)",
+                      color: "#fff",
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
@@ -920,7 +953,7 @@ export default function StocksPage() {
                     style={{
                       background: "none",
                       border: "none",
-                      color: "var(--foreground)",
+                      color: "#fff",
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
@@ -948,7 +981,7 @@ export default function StocksPage() {
                 >
                   <td style={{ padding: "16px" }}>
                     <span style={{
-                      color: "var(--accent)",
+                      color: "#3b82f6",
                       fontWeight: 600,
                       fontSize: 14,
                     }}>
@@ -1009,6 +1042,19 @@ export default function StocksPage() {
                           letterSpacing: "0.04em",
                         }}>OPTN</span>
                       )}
+                      {tickersWithExcel.has(stock.ticker) && (
+                        <span style={{
+                          fontSize: 9.5,
+                          fontWeight: 600,
+                          padding: "3px 8px",
+                          borderRadius: 10,
+                          background: "rgba(34, 197, 94, 0.12)",
+                          color: "#4ade80",
+                          border: "1px solid rgba(34, 197, 94, 0.3)",
+                          fontFamily: "monospace",
+                          letterSpacing: "0.04em",
+                        }}>XLS</span>
+                      )}
                       {selectedAssetTypes.size > 1 && stock.asset_type !== 'equity' && (
                         <span style={{
                           fontSize: 9.5,
@@ -1016,7 +1062,7 @@ export default function StocksPage() {
                           padding: "3px 8px",
                           borderRadius: 10,
                           background: stock.asset_type === 'index' ? 'rgba(59, 130, 246, 0.12)' : stock.asset_type === 'commodity_etf' ? 'rgba(245, 158, 11, 0.12)' : stock.asset_type === 'index_etf' ? 'rgba(139, 92, 246, 0.12)' : 'rgba(156, 163, 175, 0.12)',
-                          color: stock.asset_type === 'index' ? '#60a5fa' : stock.asset_type === 'commodity_etf' ? '#fbbf24' : stock.asset_type === 'index_etf' ? '#a78bfa' : 'var(--muted)',
+                          color: stock.asset_type === 'index' ? '#60a5fa' : stock.asset_type === 'commodity_etf' ? '#fbbf24' : stock.asset_type === 'index_etf' ? '#a78bfa' : 'rgba(255,255,255,0.5)',
                           border: `1px solid ${stock.asset_type === 'index' ? 'rgba(59, 130, 246, 0.3)' : stock.asset_type === 'commodity_etf' ? 'rgba(245, 158, 11, 0.3)' : stock.asset_type === 'index_etf' ? 'rgba(139, 92, 246, 0.3)' : 'rgba(156, 163, 175, 0.3)'}`,
                           fontFamily: "monospace",
                           letterSpacing: "0.04em",
@@ -1027,38 +1073,47 @@ export default function StocksPage() {
                       )}
                     </div>
                   </td>
-                  <td style={{ padding: "16px", color: "var(--foreground)", fontSize: 14 }}>
+                  <td style={{ padding: "16px", color: "#fff", fontSize: 14 }}>
                     {stock.name}
                   </td>
-                  <td style={{ padding: "16px", color: "var(--muted-foreground)", fontSize: 13 }}>
+                  <td style={{ padding: "16px", color: "rgba(255,255,255,0.5)", fontSize: 13 }}>
                     {stock.sector || '—'}
                   </td>
-                  <td style={{ padding: "16px", color: "var(--foreground)", fontSize: 13, fontWeight: 500 }}>
+                  <td style={{ padding: "16px", textAlign: "right", fontFamily: "monospace", color: "#fff", fontSize: 13, fontWeight: 500 }}>
+                    {stock.mktcap != null
+                      ? stock.mktcap >= 1e9
+                        ? `${(stock.mktcap / 1e9).toFixed(1)}B`
+                        : stock.mktcap >= 1e6
+                          ? `${(stock.mktcap / 1e6).toFixed(0)}M`
+                          : `${(stock.mktcap / 1e3).toFixed(0)}K`
+                      : '—'}
+                  </td>
+                  <td style={{ padding: "12px 8px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: 12 }}>
                     {stock.currency || 'NOK'}
                   </td>
                   <td style={{
                     padding: "16px",
                     textAlign: "right",
                     fontFamily: "monospace",
-                    color: "var(--foreground)",
+                    color: "#fff",
                     fontSize: 14,
                   }}>
                     {stock.last_close.toFixed(2)}
                   </td>
-                  <td style={{ padding: "16px", textAlign: "right", color: "var(--muted)", fontSize: 13 }}>
+                  <td style={{ padding: "16px", textAlign: "right", color: "rgba(255,255,255,0.5)", fontSize: 13 }}>
                     {stock.start_date}
                   </td>
-                  <td style={{ padding: "16px", textAlign: "right", color: "var(--muted)", fontSize: 13 }}>
+                  <td style={{ padding: "16px", textAlign: "right", color: "rgba(255,255,255,0.5)", fontSize: 13 }}>
                     {stock.end_date}
                   </td>
-                  <td style={{ padding: "16px", textAlign: "right", color: "var(--muted)", fontSize: 13 }}>
+                  <td style={{ padding: "16px", textAlign: "right", color: "rgba(255,255,255,0.5)", fontSize: 13 }}>
                     {stock.rows.toLocaleString()}
                   </td>
                   <td style={{
                     padding: "16px",
                     textAlign: "right",
                     fontFamily: "monospace",
-                    color: "var(--muted)",
+                    color: "rgba(255,255,255,0.5)",
                     fontSize: 13,
                   }}>
                     {stock.expectedDays.toLocaleString()}
@@ -1067,7 +1122,7 @@ export default function StocksPage() {
                     padding: "16px",
                     textAlign: "right",
                     fontFamily: "monospace",
-                    color: "var(--foreground)",
+                    color: "#fff",
                     fontSize: 13,
                     fontWeight: 500,
                   }}>
@@ -1093,7 +1148,7 @@ export default function StocksPage() {
           <div style={{
             textAlign: "center",
             padding: 48,
-            color: "var(--muted)"
+            color: "rgba(255,255,255,0.5)"
           }}>
             {searchQuery ? `No stocks found matching "${searchQuery}"` : "No stocks found with sufficient IBKR data"}
           </div>

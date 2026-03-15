@@ -52,13 +52,13 @@ type MonthlyData = {
 const cardStyle = {
   padding: 10,
   borderRadius: 2,
-  background: "var(--card-bg)",
-  border: "1px solid var(--terminal-border)",
+  background: "#161b22",
+  border: "1px solid #30363d",
 };
 
 const labelStyle = {
   fontSize: 9,
-  color: "var(--muted)",
+  color: "rgba(255,255,255,0.5)",
   marginBottom: 2,
   fontFamily: "monospace" as const,
   fontWeight: 600,
@@ -72,41 +72,41 @@ const valueStyle = {
 
 const subLabelStyle = {
   fontSize: 8,
-  color: "var(--muted)",
+  color: "rgba(255,255,255,0.5)",
   marginTop: 2,
   fontFamily: "monospace" as const,
   fontWeight: 600,
 };
 
 const tooltipStyle = {
-  background: "var(--terminal-bg)",
-  border: "1px solid var(--terminal-border)",
+  background: "#161b22",
+  border: "1px solid #30363d",
   borderRadius: 2,
   fontSize: 10,
   fontFamily: "monospace",
   padding: "6px 8px",
-  color: "var(--foreground)",
+  color: "#fff",
 };
 
 const chartCardStyle = {
   padding: 12,
   borderRadius: 2,
-  border: "1px solid var(--terminal-border)",
-  background: "var(--terminal-bg)",
+  border: "1px solid #30363d",
+  background: "#161b22",
 };
 
 const sectionStyle = {
   padding: 12,
   borderRadius: 2,
-  border: "1px solid var(--terminal-border)",
-  background: "var(--terminal-bg)",
+  border: "1px solid #30363d",
+  background: "#161b22",
 };
 
 const sectionTitle = {
   fontSize: 10,
   fontWeight: 700,
   marginBottom: 10,
-  color: "var(--foreground)",
+  color: "#fff",
   fontFamily: "monospace" as const,
 };
 
@@ -156,7 +156,7 @@ export default function BacktestPage() {
           margin: "0 auto",
           padding: "100px 16px 16px",
           fontFamily: "monospace",
-          color: "var(--muted)",
+          color: "rgba(255,255,255,0.5)",
           textAlign: "center",
         }}
       >
@@ -173,7 +173,7 @@ export default function BacktestPage() {
           margin: "0 auto",
           padding: "100px 16px 16px",
           fontFamily: "monospace",
-          color: "var(--danger)",
+          color: "#ef4444",
           textAlign: "center",
         }}
       >
@@ -201,18 +201,18 @@ export default function BacktestPage() {
 
   const hitColor =
     run.overall_hit_rate > 0.55
-      ? "var(--success)"
+      ? "#10b981"
       : run.overall_hit_rate > 0.5
-        ? "var(--warning)"
-        : "var(--danger)";
+        ? "#f59e0b"
+        : "#ef4444";
 
   const lsColor =
-    run.long_short_annualized > 0 ? "var(--success)" : "var(--danger)";
+    run.long_short_annualized > 0 ? "#10b981" : "#ef4444";
 
   const calColor =
     run.p90_calibration > 0.85 && run.p90_calibration < 0.95
-      ? "var(--success)"
-      : "var(--warning)";
+      ? "#10b981"
+      : "#f59e0b";
 
   return (
     <div
@@ -220,8 +220,8 @@ export default function BacktestPage() {
         maxWidth: 1600,
         margin: "0 auto",
         padding: 16,
-        fontFamily: "system-ui, -apple-system, sans-serif",
-        background: "var(--background)",
+        fontFamily: "monospace",
+        background: "#0a0a0a",
       }}
     >
       {/* Header */}
@@ -229,8 +229,8 @@ export default function BacktestPage() {
         style={{
           marginBottom: 16,
           padding: "12px 16px",
-          background: "var(--terminal-bg)",
-          border: "1px solid var(--terminal-border)",
+          background: "#161b22",
+          border: "1px solid #30363d",
           borderRadius: 2,
         }}
       >
@@ -254,7 +254,7 @@ export default function BacktestPage() {
                 style={{
                   fontSize: 20,
                   fontWeight: 700,
-                  color: "var(--foreground)",
+                  color: "#fff",
                   fontFamily: "monospace",
                   letterSpacing: "0.5px",
                 }}
@@ -267,7 +267,7 @@ export default function BacktestPage() {
                   fontWeight: 700,
                   fontFamily: "monospace",
                   padding: "2px 8px",
-                  background: "var(--accent)",
+                  background: "#3b82f6",
                   color: "#ffffff",
                   borderRadius: 2,
                 }}
@@ -278,7 +278,7 @@ export default function BacktestPage() {
             <div
               style={{
                 fontSize: 10,
-                color: "var(--muted)",
+                color: "rgba(255,255,255,0.5)",
                 fontFamily: "monospace",
               }}
             >
@@ -290,14 +290,14 @@ export default function BacktestPage() {
               onClick={() => window.history.back()}
               style={{
                 fontSize: 10,
-                color: "var(--accent)",
+                color: "#3b82f6",
                 textDecoration: "none",
                 fontFamily: "monospace",
                 fontWeight: 600,
                 padding: "6px 12px",
-                border: "1px solid var(--accent)",
+                border: "1px solid #3b82f6",
                 borderRadius: 2,
-                background: "var(--input-bg)",
+                background: "#0d1117",
                 cursor: "pointer",
               }}
             >
@@ -307,14 +307,14 @@ export default function BacktestPage() {
               href="/"
               style={{
                 fontSize: 10,
-                color: "var(--muted)",
+                color: "rgba(255,255,255,0.5)",
                 textDecoration: "none",
                 fontFamily: "monospace",
                 fontWeight: 600,
                 padding: "6px 12px",
-                border: "1px solid var(--border)",
+                border: "1px solid #30363d",
                 borderRadius: 2,
-                background: "var(--input-bg)",
+                background: "#0d1117",
               }}
             >
               HOME
@@ -343,12 +343,12 @@ export default function BacktestPage() {
         <div
           style={{
             ...cardStyle,
-            borderColor: "var(--info)",
+            borderColor: "#06b6d4",
             borderWidth: 2,
           }}
         >
           <div style={labelStyle}>INFORMATION COEFFICIENT</div>
-          <div style={{ ...valueStyle, color: "var(--info)" }}>
+          <div style={{ ...valueStyle, color: "#06b6d4" }}>
             {run.overall_ic_mean.toFixed(3)}
           </div>
           <div style={subLabelStyle}>
@@ -403,26 +403,26 @@ export default function BacktestPage() {
               </defs>
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke="var(--chart-grid)"
+                stroke="#21262d"
                 vertical={false}
               />
               <XAxis
                 dataKey="month"
-                stroke="var(--border)"
+                stroke="#30363d"
                 style={{ fontSize: 9, fontFamily: "monospace" }}
-                tick={{ fill: "var(--muted)" }}
+                tick={{ fill: "rgba(255,255,255,0.5)" }}
                 tickFormatter={formatMonth}
                 minTickGap={50}
               />
               <YAxis
-                stroke="var(--border)"
+                stroke="#30363d"
                 style={{ fontSize: 9, fontFamily: "monospace" }}
-                tick={{ fill: "var(--muted)" }}
+                tick={{ fill: "rgba(255,255,255,0.5)" }}
                 tickFormatter={(v: number) => v.toFixed(1)}
               />
               <ReferenceLine
                 y={0}
-                stroke="var(--muted-foreground)"
+                stroke="rgba(255,255,255,0.5)"
                 strokeWidth={1}
               />
               <Tooltip
@@ -456,26 +456,26 @@ export default function BacktestPage() {
             >
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke="var(--chart-grid)"
+                stroke="#21262d"
                 vertical={false}
               />
               <XAxis
                 dataKey="month"
-                stroke="var(--border)"
+                stroke="#30363d"
                 style={{ fontSize: 9, fontFamily: "monospace" }}
-                tick={{ fill: "var(--muted)" }}
+                tick={{ fill: "rgba(255,255,255,0.5)" }}
                 tickFormatter={formatMonth}
                 minTickGap={50}
               />
               <YAxis
-                stroke="var(--border)"
+                stroke="#30363d"
                 style={{ fontSize: 9, fontFamily: "monospace" }}
-                tick={{ fill: "var(--muted)" }}
+                tick={{ fill: "rgba(255,255,255,0.5)" }}
                 tickFormatter={(v: number) => `${v.toFixed(0)}%`}
               />
               <ReferenceLine
                 y={0}
-                stroke="var(--muted-foreground)"
+                stroke="rgba(255,255,255,0.5)"
                 strokeWidth={1}
               />
               <Tooltip
@@ -513,14 +513,14 @@ export default function BacktestPage() {
           }}
         >
           <thead>
-            <tr style={{ borderBottom: "1px solid var(--terminal-border)" }}>
+            <tr style={{ borderBottom: "1px solid #30363d" }}>
               {["REGIME", "N", "HIT RATE", "IC", "AVG L/S"].map((h) => (
                 <th
                   key={h}
                   style={{
                     textAlign: h === "REGIME" ? "left" : "right",
                     padding: 8,
-                    color: "var(--muted)",
+                    color: "rgba(255,255,255,0.5)",
                     fontWeight: 600,
                   }}
                 >
@@ -537,21 +537,21 @@ export default function BacktestPage() {
               return (
                 <tr
                   key={regime}
-                  style={{ borderBottom: "1px solid var(--border-subtle)" }}
+                  style={{ borderBottom: "1px solid #21262d" }}
                 >
-                  <td style={{ padding: 8, color: "var(--foreground)", fontWeight: 600, textTransform: "uppercase" }}>
+                  <td style={{ padding: 8, color: "#fff", fontWeight: 600, textTransform: "uppercase" }}>
                     {regime}
                   </td>
-                  <td style={{ padding: 8, textAlign: "right", color: "var(--muted)" }}>
+                  <td style={{ padding: 8, textAlign: "right", color: "rgba(255,255,255,0.5)" }}>
                     {m.n.toLocaleString()}
                   </td>
-                  <td style={{ padding: 8, textAlign: "right", color: m.hitRate > 0.55 ? "var(--success)" : m.hitRate > 0.5 ? "var(--foreground)" : "var(--danger)" }}>
+                  <td style={{ padding: 8, textAlign: "right", color: m.hitRate > 0.55 ? "#10b981" : m.hitRate > 0.5 ? "#fff" : "#ef4444" }}>
                     {(m.hitRate * 100).toFixed(1)}%
                   </td>
-                  <td style={{ padding: 8, textAlign: "right", color: m.ic > 0.05 ? "var(--success)" : m.ic > 0 ? "var(--foreground)" : "var(--danger)" }}>
+                  <td style={{ padding: 8, textAlign: "right", color: m.ic > 0.05 ? "#10b981" : m.ic > 0 ? "#fff" : "#ef4444" }}>
                     {m.ic.toFixed(3)}
                   </td>
-                  <td style={{ padding: 8, textAlign: "right", color: m.avgLS > 0 ? "var(--success)" : "var(--danger)" }}>
+                  <td style={{ padding: 8, textAlign: "right", color: m.avgLS > 0 ? "#10b981" : "#ef4444" }}>
                     {m.avgLS >= 0 ? "+" : ""}{(m.avgLS * 100).toFixed(2)}%
                   </td>
                 </tr>
@@ -566,16 +566,16 @@ export default function BacktestPage() {
         style={{
           marginBottom: 16,
           borderRadius: 2,
-          border: "1px solid var(--terminal-border)",
-          background: "var(--terminal-bg)",
+          border: "1px solid #30363d",
+          background: "#161b22",
           overflow: "hidden",
         }}
       >
-        <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--terminal-border)" }}>
-          <span style={{ fontSize: 10, fontWeight: 700, fontFamily: "monospace", color: "var(--foreground)" }}>
+        <div style={{ padding: "8px 12px", borderBottom: "1px solid #30363d" }}>
+          <span style={{ fontSize: 10, fontWeight: 700, fontFamily: "monospace", color: "#fff" }}>
             MONTHLY BREAKDOWN
           </span>
-          <span style={{ fontSize: 9, color: "var(--muted)", fontFamily: "monospace", marginLeft: 8 }}>
+          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", marginLeft: 8 }}>
             {monthly.length} MONTHS
           </span>
         </div>
@@ -591,10 +591,10 @@ export default function BacktestPage() {
             <thead>
               <tr
                 style={{
-                  borderBottom: "1px solid var(--terminal-border)",
+                  borderBottom: "1px solid #30363d",
                   position: "sticky",
                   top: 0,
-                  background: "var(--terminal-bg)",
+                  background: "#161b22",
                   zIndex: 1,
                 }}
               >
@@ -604,7 +604,7 @@ export default function BacktestPage() {
                     style={{
                       textAlign: h === "MONTH" ? "left" : "right",
                       padding: "6px 8px",
-                      color: "var(--muted)",
+                      color: "rgba(255,255,255,0.5)",
                       fontWeight: 600,
                     }}
                   >
@@ -617,15 +617,15 @@ export default function BacktestPage() {
               {monthly.map((m) => {
                 const monthStr = typeof m.month === "string" ? m.month.slice(0, 7) : m.month;
                 return (
-                  <tr key={monthStr} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-                    <td style={{ padding: "4px 8px", color: "var(--foreground)" }}>{monthStr}</td>
-                    <td style={{ padding: "4px 8px", textAlign: "right", color: "var(--muted)" }}>{m.n_tickers}</td>
-                    <td style={{ padding: "4px 8px", textAlign: "right", color: m.ic > 0 ? "var(--success)" : "var(--danger)" }}>{m.ic.toFixed(3)}</td>
-                    <td style={{ padding: "4px 8px", textAlign: "right", color: m.hit_rate > 0.55 ? "var(--success)" : m.hit_rate < 0.5 ? "var(--danger)" : "var(--foreground)" }}>{(m.hit_rate * 100).toFixed(1)}</td>
-                    <td style={{ padding: "4px 8px", textAlign: "right", color: "var(--foreground)" }}>{(m.mae * 100).toFixed(2)}</td>
-                    <td style={{ padding: "4px 8px", textAlign: "right", color: m.long_return > 0 ? "var(--success)" : "var(--danger)" }}>{(m.long_return * 100).toFixed(2)}</td>
-                    <td style={{ padding: "4px 8px", textAlign: "right", color: m.short_return > 0 ? "var(--success)" : "var(--danger)" }}>{(m.short_return * 100).toFixed(2)}</td>
-                    <td style={{ padding: "4px 8px", textAlign: "right", fontWeight: 600, color: m.long_short_return > 0 ? "var(--success)" : "var(--danger)" }}>
+                  <tr key={monthStr} style={{ borderBottom: "1px solid #21262d" }}>
+                    <td style={{ padding: "4px 8px", color: "#fff" }}>{monthStr}</td>
+                    <td style={{ padding: "4px 8px", textAlign: "right", color: "rgba(255,255,255,0.5)" }}>{m.n_tickers}</td>
+                    <td style={{ padding: "4px 8px", textAlign: "right", color: m.ic > 0 ? "#10b981" : "#ef4444" }}>{m.ic.toFixed(3)}</td>
+                    <td style={{ padding: "4px 8px", textAlign: "right", color: m.hit_rate > 0.55 ? "#10b981" : m.hit_rate < 0.5 ? "#ef4444" : "#fff" }}>{(m.hit_rate * 100).toFixed(1)}</td>
+                    <td style={{ padding: "4px 8px", textAlign: "right", color: "#fff" }}>{(m.mae * 100).toFixed(2)}</td>
+                    <td style={{ padding: "4px 8px", textAlign: "right", color: m.long_return > 0 ? "#10b981" : "#ef4444" }}>{(m.long_return * 100).toFixed(2)}</td>
+                    <td style={{ padding: "4px 8px", textAlign: "right", color: m.short_return > 0 ? "#10b981" : "#ef4444" }}>{(m.short_return * 100).toFixed(2)}</td>
+                    <td style={{ padding: "4px 8px", textAlign: "right", fontWeight: 600, color: m.long_short_return > 0 ? "#10b981" : "#ef4444" }}>
                       {m.long_short_return >= 0 ? "+" : ""}{(m.long_short_return * 100).toFixed(2)}
                     </td>
                   </tr>
@@ -651,8 +651,8 @@ export default function BacktestPage() {
         >
           {GLOSSARY.map((g) => (
             <div key={g.term}>
-              <span style={{ color: "var(--accent)", fontWeight: 700 }}>{g.term}</span>
-              <span style={{ color: "var(--muted)" }}> &mdash; {g.def}</span>
+              <span style={{ color: "#3b82f6", fontWeight: 700 }}>{g.term}</span>
+              <span style={{ color: "rgba(255,255,255,0.5)" }}> &mdash; {g.def}</span>
             </div>
           ))}
         </div>
@@ -662,7 +662,7 @@ export default function BacktestPage() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <div style={sectionStyle}>
           <div style={{ ...sectionTitle, marginBottom: 8 }}>METHODOLOGY</div>
-          <div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "monospace", lineHeight: 1.6 }}>
+          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", lineHeight: 1.6 }}>
             <div><strong>BACKTEST:</strong> Walk-forward out-of-sample, monthly rebalance, no lookahead bias</div>
             <div><strong>UNIVERSE:</strong> Oslo Bors equities with factor data on rebalance date</div>
             <div><strong>STRATEGY:</strong> Long Q5 (top quintile predicted), Short Q1 (bottom quintile)</div>
@@ -680,14 +680,14 @@ export default function BacktestPage() {
           style={{
             padding: 12,
             borderRadius: 2,
-            border: "1px solid var(--warning)",
-            background: "var(--warning-bg)",
+            border: "1px solid #f59e0b",
+            background: "rgba(245,158,11,0.08)",
           }}
         >
-          <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 8, color: "var(--warning)", fontFamily: "monospace" }}>
+          <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 8, color: "#f59e0b", fontFamily: "monospace" }}>
             IMPORTANT CAVEAT
           </div>
-          <div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "monospace", lineHeight: 1.6 }}>
+          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", lineHeight: 1.6 }}>
             Model weights (FACTOR_WEIGHTS_GB, FACTOR_WEIGHTS_RF) are fixed
             constants derived from academic research &mdash; not trained on
             historical data. This backtest measures how well these

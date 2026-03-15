@@ -118,8 +118,8 @@ interface OptimizationResult {
 
 // Shared styles
 const cardStyle: React.CSSProperties = {
-  background: "var(--card-bg)",
-  border: "1px solid var(--card-border)",
+  background: "#161b22",
+  border: "1px solid #30363d",
   borderRadius: 6,
   padding: 20,
 };
@@ -127,7 +127,7 @@ const cardStyle: React.CSSProperties = {
 const sectionTitle: React.CSSProperties = {
   fontSize: 13,
   fontWeight: 600,
-  color: "var(--muted)",
+  color: "rgba(255,255,255,0.5)",
   letterSpacing: "0.05em",
   textTransform: "uppercase",
   marginBottom: 14,
@@ -143,19 +143,19 @@ const tooltipStyle: React.CSSProperties = {
 };
 
 const inputStyle: React.CSSProperties = {
-  background: "var(--input-bg)",
-  border: "1px solid var(--input-border)",
+  background: "#0d1117",
+  border: "1px solid #30363d",
   borderRadius: 4,
   padding: "8px 12px",
   fontSize: 14,
-  color: "var(--foreground)",
+  color: "#fff",
   width: "100%",
   fontFamily: "monospace",
 };
 
 const labelStyle: React.CSSProperties = {
   fontSize: 12,
-  color: "var(--muted)",
+  color: "rgba(255,255,255,0.5)",
   textTransform: "uppercase",
   letterSpacing: "0.05em",
   marginBottom: 6,
@@ -163,7 +163,7 @@ const labelStyle: React.CSSProperties = {
 };
 
 const buttonStyle: React.CSSProperties = {
-  background: "var(--accent)",
+  background: "#3b82f6",
   color: "#fff",
   border: "none",
   borderRadius: 4,
@@ -324,13 +324,13 @@ export default function STDChannelStrategyPage() {
   // Show configuration screen when no data loaded yet, or loading screen when backtest is running
   if (!data && !error) {
     return (
-      <div style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)" }}>
+      <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff" }}>
         {/* Header */}
-        <header style={{ borderBottom: "1px solid var(--border)", padding: "16px 24px" }}>
+        <header style={{ borderBottom: "1px solid #30363d", padding: "16px 24px" }}>
           <div style={{ maxWidth: 1600, margin: "0 auto" }}>
-            <Link href="/stocks" style={{ color: "var(--muted)", fontSize: 12, textDecoration: "none" }}>← Back to Stocks</Link>
+            <Link href="/stocks" style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, textDecoration: "none" }}>← Back to Stocks</Link>
             <h1 style={{ fontSize: 24, fontWeight: 600, marginTop: 4 }}>STD Channel Mean Reversion</h1>
-            <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 2 }}>
+            <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, marginTop: 2 }}>
               Slope-aligned mean reversion with fundamental quality filter
             </p>
           </div>
@@ -345,14 +345,14 @@ export default function STDChannelStrategyPage() {
               display: "flex",
               alignItems: "center",
               gap: 16,
-              background: "linear-gradient(135deg, var(--card-bg) 0%, #1a1a2e 100%)",
-              borderColor: "var(--accent)",
+              background: "linear-gradient(135deg, #161b22 0%, #1a1a2e 100%)",
+              borderColor: "#3b82f6",
             }}>
               <div style={{
                 width: 48,
                 height: 48,
                 borderRadius: "50%",
-                background: "linear-gradient(135deg, var(--accent) 0%, #60a5fa 100%)",
+                background: "linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -370,24 +370,24 @@ export default function STDChannelStrategyPage() {
                 <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
                   Running Full Backtest
                 </div>
-                <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 8 }}>
                   Analyzing {windowSize}-day channels across all OBX tickers with fundamental filters...
                 </div>
                 <div style={{
                   height: 4,
-                  background: "var(--border)",
+                  background: "#30363d",
                   borderRadius: 2,
                   overflow: "hidden",
                 }}>
                   <div style={{
                     height: "100%",
                     width: `${loadingProgress}%`,
-                    background: "linear-gradient(90deg, var(--accent) 0%, #60a5fa 100%)",
+                    background: "linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%)",
                     borderRadius: 2,
                     transition: "width 0.5s ease-out",
                   }} />
                 </div>
-                <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4, fontFamily: "monospace" }}>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginTop: 4, fontFamily: "monospace" }}>
                   {loadingProgress.toFixed(0)}% complete
                 </div>
               </div>
@@ -399,7 +399,7 @@ export default function STDChannelStrategyPage() {
               display: "flex",
               alignItems: "center",
               gap: 16,
-              background: "linear-gradient(135deg, var(--card-bg) 0%, #1a2a1a 100%)",
+              background: "linear-gradient(135deg, #161b22 0%, #1a2a1a 100%)",
               borderColor: "#10b981",
             }}>
               <div style={{
@@ -419,7 +419,7 @@ export default function STDChannelStrategyPage() {
                 <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
                   Ready to Run Backtest
                 </div>
-                <div style={{ fontSize: 12, color: "var(--muted)" }}>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>
                   Configure parameters below and click &quot;Run Backtest&quot; to analyze {windowSize}-day channels across all OBX tickers
                 </div>
               </div>
@@ -427,7 +427,7 @@ export default function STDChannelStrategyPage() {
           )}
 
           {/* Editable Parameters */}
-          <section style={{ ...cardStyle, marginBottom: 24, background: "var(--hover-bg)" }}>
+          <section style={{ ...cardStyle, marginBottom: 24, background: "rgba(59,130,246,0.08)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <div style={sectionTitle}>Strategy Parameters</div>
               <div style={{ display: "flex", gap: 8 }}>
@@ -436,7 +436,7 @@ export default function STDChannelStrategyPage() {
                   disabled={optimizing || loading}
                   style={{
                     ...buttonStyle,
-                    background: optimizing || loading ? "var(--muted)" : "#f59e0b",
+                    background: optimizing || loading ? "rgba(255,255,255,0.5)" : "#f59e0b",
                     opacity: optimizing || loading ? 0.6 : 1,
                     cursor: optimizing || loading ? "not-allowed" : "pointer",
                   }}
@@ -448,7 +448,7 @@ export default function STDChannelStrategyPage() {
                   disabled={loading}
                   style={{
                     ...buttonStyle,
-                    background: loading ? "var(--muted)" : "var(--accent)",
+                    background: loading ? "rgba(255,255,255,0.5)" : "#3b82f6",
                     opacity: loading ? 0.6 : 1,
                     cursor: loading ? "not-allowed" : "pointer",
                   }}
@@ -575,7 +575,7 @@ export default function STDChannelStrategyPage() {
             </div>
 
             {/* Strategy Direction Section */}
-            <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #30363d" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12 }}>
                 <div style={{ ...sectionTitle, margin: 0 }}>Strategy Direction</div>
                 <div style={{ display: "flex", gap: 6 }}>
@@ -597,11 +597,11 @@ export default function STDChannelStrategyPage() {
                         borderRadius: 4,
                         cursor: loading ? "not-allowed" : "pointer",
                         background: strategyDirection === dir
-                          ? dir === "LONG" ? "rgba(16, 185, 129, 0.25)" : dir === "SHORT" ? "rgba(239, 68, 68, 0.25)" : "var(--accent)"
+                          ? dir === "LONG" ? "rgba(16, 185, 129, 0.25)" : dir === "SHORT" ? "rgba(239, 68, 68, 0.25)" : "#3b82f6"
                           : "rgba(255,255,255,0.08)",
                         color: strategyDirection === dir
                           ? dir === "LONG" ? "#10b981" : dir === "SHORT" ? "#ef4444" : "#fff"
-                          : "var(--muted)",
+                          : "rgba(255,255,255,0.5)",
                         opacity: loading ? 0.5 : 1,
                       }}
                     >
@@ -609,7 +609,7 @@ export default function STDChannelStrategyPage() {
                     </button>
                   ))}
                 </div>
-                <span style={{ fontSize: 11, color: "var(--muted)" }}>
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
                   {strategyDirection === "LONG" ? "Only take long positions (buy oversold)" :
                    strategyDirection === "SHORT" ? "Only take short positions (sell overbought)" :
                    "Take both long and short positions"}
@@ -618,7 +618,7 @@ export default function STDChannelStrategyPage() {
             </div>
 
             {/* Event Filter Section */}
-            <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #30363d" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12 }}>
                 <div style={{ ...sectionTitle, margin: 0 }}>Event-Driven Filters</div>
                 <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: loading ? "not-allowed" : "pointer" }}>
@@ -629,7 +629,7 @@ export default function STDChannelStrategyPage() {
                     style={{ width: 16, height: 16 }}
                     disabled={loading}
                   />
-                  <span style={{ fontSize: 12, color: useEventFilters ? "var(--foreground)" : "var(--muted)" }}>
+                  <span style={{ fontSize: 12, color: useEventFilters ? "#fff" : "rgba(255,255,255,0.5)" }}>
                     {useEventFilters ? "Enabled" : "Disabled"}
                   </span>
                 </label>
@@ -648,11 +648,11 @@ export default function STDChannelStrategyPage() {
                       placeholder="0.5"
                     />
                   </div>
-                  <div style={{ gridColumn: "span 3", display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "var(--muted)" }}>
+                  <div style={{ gridColumn: "span 3", display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
                     <span style={{ padding: "2px 6px", background: "rgba(16, 185, 129, 0.15)", color: "#10b981", borderRadius: 3 }}>Volume</span>
                     <span style={{ padding: "2px 6px", background: "rgba(59, 130, 246, 0.15)", color: "#3b82f6", borderRadius: 3 }}>Gap</span>
                     <span style={{ padding: "2px 6px", background: "rgba(168, 85, 247, 0.15)", color: "#a855f7", borderRadius: 3 }}>Market</span>
-                    <span style={{ padding: "2px 6px", background: "rgba(249, 115, 22, 0.15)", color: "#f97316", borderRadius: 3 }}>Volatility</span>
+                    <span style={{ padding: "2px 6px", background: "rgba(245, 158, 11, 0.15)", color: "#f59e0b", borderRadius: 3 }}>Volatility</span>
                     <span style={{ padding: "2px 6px", background: "rgba(236, 72, 153, 0.15)", color: "#ec4899", borderRadius: 3 }}>Fundamentals</span>
                     <span style={{ padding: "2px 6px", background: "rgba(20, 184, 166, 0.15)", color: "#14b8a6", borderRadius: 3 }}>Research</span>
                     <span style={{ padding: "2px 6px", background: "rgba(251, 191, 36, 0.15)", color: "#fbbf24", borderRadius: 3 }}>Liquidity</span>
@@ -668,13 +668,13 @@ export default function STDChannelStrategyPage() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
             {["Win Rate", "Sharpe Ratio", "Total Return", "Profit Factor", "Avg Return", "Max Drawdown", "Avg Holding", "Avg R²"].map((label, i) => (
               <div key={i} style={cardStyle}>
-                <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
                   {label}
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: "var(--muted)", fontFamily: "monospace" }}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: "rgba(255,255,255,0.5)", fontFamily: "monospace" }}>
                   --
                 </div>
-                <div style={{ fontSize: 10, color: "var(--muted-foreground)", marginTop: 2 }}>Run backtest</div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>Run backtest</div>
               </div>
             ))}
           </div>
@@ -683,9 +683,9 @@ export default function STDChannelStrategyPage() {
           <div style={{
             textAlign: "center",
             padding: 24,
-            color: "var(--muted)",
+            color: "rgba(255,255,255,0.5)",
             fontSize: 13,
-            border: "1px dashed var(--border)",
+            border: "1px dashed #30363d",
             borderRadius: 6,
           }}>
             {loading ? (
@@ -711,11 +711,11 @@ export default function STDChannelStrategyPage() {
 
   if (error && !data) {
     return (
-      <div style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)", padding: 24 }}>
+      <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff", padding: 24 }}>
         <div style={{ maxWidth: 1600, margin: "0 auto" }}>
-          <div style={{ background: "var(--danger-bg)", border: "1px solid var(--danger)", borderRadius: 6, padding: 16 }}>
-            <div style={{ color: "var(--danger)", fontWeight: 600 }}>Error loading strategy</div>
-            <div style={{ color: "var(--danger)", fontSize: 13, marginTop: 4 }}>{error}</div>
+          <div style={{ background: "rgba(239,68,68,0.08)", border: "1px solid #ef4444", borderRadius: 6, padding: 16 }}>
+            <div style={{ color: "#ef4444", fontWeight: 600 }}>Error loading strategy</div>
+            <div style={{ color: "#ef4444", fontSize: 13, marginTop: 4 }}>{error}</div>
           </div>
         </div>
       </div>
@@ -861,24 +861,24 @@ export default function STDChannelStrategyPage() {
   ];
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)" }}>
+    <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff" }}>
       {/* Header */}
-      <header style={{ borderBottom: "1px solid var(--border)", padding: "16px 24px" }}>
+      <header style={{ borderBottom: "1px solid #30363d", padding: "16px 24px" }}>
         <div style={{ maxWidth: 1600, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <Link href="/stocks" style={{ color: "var(--muted)", fontSize: 12, textDecoration: "none" }}>
+            <Link href="/stocks" style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, textDecoration: "none" }}>
               ← Back to Stocks
             </Link>
             <h1 style={{ fontSize: 24, fontWeight: 600, marginTop: 4 }}>STD Channel Mean Reversion</h1>
-            <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 2 }}>
+            <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, marginTop: 2 }}>
               Slope-aligned mean reversion with fundamental quality filter
             </p>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
               Strategy Status
             </div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: currentSignals.length > 0 ? "var(--success)" : "var(--muted)" }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: currentSignals.length > 0 ? "#10b981" : "rgba(255,255,255,0.5)" }}>
               {currentSignals.length > 0 ? `${currentSignals.length} Active Signal${currentSignals.length > 1 ? "s" : ""}` : "No Active Signals"}
             </div>
           </div>
@@ -887,7 +887,7 @@ export default function STDChannelStrategyPage() {
 
       <main style={{ maxWidth: 1600, margin: "0 auto", padding: 24 }}>
         {/* Strategy Parameters - Editable */}
-        <section style={{ ...cardStyle, marginBottom: 24, background: "var(--hover-bg)" }}>
+        <section style={{ ...cardStyle, marginBottom: 24, background: "rgba(59,130,246,0.08)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <div style={sectionTitle}>Strategy Parameters</div>
             <div style={{ display: "flex", gap: 8 }}>
@@ -896,7 +896,7 @@ export default function STDChannelStrategyPage() {
                 disabled={optimizing}
                 style={{
                   ...buttonStyle,
-                  background: optimizing ? "var(--muted)" : "#f59e0b",
+                  background: optimizing ? "rgba(255,255,255,0.5)" : "#f59e0b",
                   opacity: optimizing ? 0.6 : 1,
                   cursor: optimizing ? "not-allowed" : "pointer",
                 }}
@@ -908,7 +908,7 @@ export default function STDChannelStrategyPage() {
                 disabled={loading}
                 style={{
                   ...buttonStyle,
-                  background: loading ? "var(--muted)" : "var(--accent)",
+                  background: loading ? "rgba(255,255,255,0.5)" : "#3b82f6",
                   opacity: loading ? 0.6 : 1,
                   cursor: loading ? "not-allowed" : "pointer",
                 }}
@@ -1025,7 +1025,7 @@ export default function STDChannelStrategyPage() {
           </div>
 
           {/* Strategy Direction Section */}
-          <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #30363d" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12 }}>
               <div style={{ ...sectionTitle, margin: 0 }}>Strategy Direction</div>
               <div style={{ display: "flex", gap: 6 }}>
@@ -1046,11 +1046,11 @@ export default function STDChannelStrategyPage() {
                       borderRadius: 4,
                       cursor: loading ? "not-allowed" : "pointer",
                       background: strategyDirection === dir
-                        ? dir === "LONG" ? "rgba(16, 185, 129, 0.25)" : dir === "SHORT" ? "rgba(239, 68, 68, 0.25)" : "var(--accent)"
+                        ? dir === "LONG" ? "rgba(16, 185, 129, 0.25)" : dir === "SHORT" ? "rgba(239, 68, 68, 0.25)" : "#3b82f6"
                         : "rgba(255,255,255,0.08)",
                       color: strategyDirection === dir
                         ? dir === "LONG" ? "#10b981" : dir === "SHORT" ? "#ef4444" : "#fff"
-                        : "var(--muted)",
+                        : "rgba(255,255,255,0.5)",
                       opacity: loading ? 0.5 : 1,
                     }}
                   >
@@ -1058,7 +1058,7 @@ export default function STDChannelStrategyPage() {
                   </button>
                 ))}
               </div>
-              <span style={{ fontSize: 11, color: "var(--muted)" }}>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
                 {strategyDirection === "LONG" ? "Only take long positions (buy oversold)" :
                  strategyDirection === "SHORT" ? "Only take short positions (sell overbought)" :
                  "Take both long and short positions"}
@@ -1067,7 +1067,7 @@ export default function STDChannelStrategyPage() {
           </div>
 
           {/* Event Filter Section */}
-          <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #30363d" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12 }}>
               <div style={{ ...sectionTitle, margin: 0 }}>Event-Driven Filters</div>
               <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
@@ -1077,7 +1077,7 @@ export default function STDChannelStrategyPage() {
                   onChange={(e) => setUseEventFilters(e.target.checked)}
                   style={{ width: 16, height: 16 }}
                 />
-                <span style={{ fontSize: 12, color: useEventFilters ? "var(--foreground)" : "var(--muted)" }}>
+                <span style={{ fontSize: 12, color: useEventFilters ? "#fff" : "rgba(255,255,255,0.5)" }}>
                   {useEventFilters ? "Enabled" : "Disabled"}
                 </span>
               </label>
@@ -1095,11 +1095,11 @@ export default function STDChannelStrategyPage() {
                     placeholder="0.5"
                   />
                 </div>
-                <div style={{ gridColumn: "span 3", display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "var(--muted)" }}>
+                <div style={{ gridColumn: "span 3", display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
                   <span style={{ padding: "2px 6px", background: "rgba(16, 185, 129, 0.15)", color: "#10b981", borderRadius: 3 }}>Volume</span>
                   <span style={{ padding: "2px 6px", background: "rgba(59, 130, 246, 0.15)", color: "#3b82f6", borderRadius: 3 }}>Gap</span>
                   <span style={{ padding: "2px 6px", background: "rgba(168, 85, 247, 0.15)", color: "#a855f7", borderRadius: 3 }}>Market</span>
-                  <span style={{ padding: "2px 6px", background: "rgba(249, 115, 22, 0.15)", color: "#f97316", borderRadius: 3 }}>Volatility</span>
+                  <span style={{ padding: "2px 6px", background: "rgba(245, 158, 11, 0.15)", color: "#f59e0b", borderRadius: 3 }}>Volatility</span>
                   <span style={{ padding: "2px 6px", background: "rgba(236, 72, 153, 0.15)", color: "#ec4899", borderRadius: 3 }}>Fundamentals</span>
                   <span style={{ padding: "2px 6px", background: "rgba(20, 184, 166, 0.15)", color: "#14b8a6", borderRadius: 3 }}>Research</span>
                   <span style={{ padding: "2px 6px", background: "rgba(251, 191, 36, 0.15)", color: "#fbbf24", borderRadius: 3 }}>Liquidity</span>
@@ -1115,17 +1115,17 @@ export default function STDChannelStrategyPage() {
           <section style={{ ...cardStyle, marginBottom: 24, background: "#1a1a0a", borderColor: "#4a4a2a" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <div style={sectionTitle}>Optimization Results (Top 10)</div>
-              <button onClick={() => setShowOptimizer(false)} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 18 }}>×</button>
+              <button onClick={() => setShowOptimizer(false)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 18 }}>×</button>
             </div>
             {optimizing ? (
-              <div style={{ textAlign: "center", padding: 32, color: "var(--muted)" }}>
+              <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.5)" }}>
                 Testing 270 parameter combinations... This takes ~30 seconds.
               </div>
             ) : optimResults ? (
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                   <thead>
-                    <tr style={{ color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--border)" }}>
+                    <tr style={{ color: "rgba(255,255,255,0.5)", textAlign: "left", borderBottom: "1px solid #30363d" }}>
                       <th style={{ padding: "8px", fontWeight: 500 }}>Entry σ</th>
                       <th style={{ padding: "8px", fontWeight: 500 }}>Stop σ</th>
                       <th style={{ padding: "8px", fontWeight: 500 }}>Max Days</th>
@@ -1142,7 +1142,7 @@ export default function STDChannelStrategyPage() {
                   </thead>
                   <tbody>
                     {optimResults.slice(0, 10).map((r, idx) => (
-                      <tr key={idx} style={{ borderBottom: "1px solid var(--table-border)", background: idx === 0 ? "#2a2a1a" : "#141414" }}>
+                      <tr key={idx} style={{ borderBottom: "1px solid #30363d", background: idx === 0 ? "#2a2a1a" : "#141414" }}>
                         <td style={{ padding: "10px 8px", fontFamily: "monospace" }}>{r.params.entrySigma.toFixed(2)}</td>
                         <td style={{ padding: "10px 8px", fontFamily: "monospace" }}>{r.params.stopSigma.toFixed(1)}</td>
                         <td style={{ padding: "10px 8px", fontFamily: "monospace" }}>{r.params.maxDays}</td>
@@ -1155,7 +1155,7 @@ export default function STDChannelStrategyPage() {
                         <td style={{ padding: "10px 8px", textAlign: "right", fontFamily: "monospace", color: r.totalReturn > 0 ? "#10b981" : "#ef4444" }}>
                           {(r.totalReturn * 100).toFixed(0)}%
                         </td>
-                        <td style={{ padding: "10px 8px", textAlign: "right", fontFamily: "monospace", color: r.sharpe >= 1 ? "#10b981" : "var(--muted)" }}>
+                        <td style={{ padding: "10px 8px", textAlign: "right", fontFamily: "monospace", color: r.sharpe >= 1 ? "#10b981" : "rgba(255,255,255,0.5)" }}>
                           {r.sharpe.toFixed(2)}
                         </td>
                         <td style={{ padding: "10px 8px", textAlign: "right", fontFamily: "monospace" }}>
@@ -1167,7 +1167,7 @@ export default function STDChannelStrategyPage() {
                         <td style={{ padding: "10px 8px" }}>
                           <button
                             onClick={() => applyOptimalParams(r)}
-                            style={{ ...buttonStyle, padding: "4px 10px", fontSize: 11, background: idx === 0 ? "#f59e0b" : "var(--accent)" }}
+                            style={{ ...buttonStyle, padding: "4px 10px", fontSize: 11, background: idx === 0 ? "#f59e0b" : "#3b82f6" }}
                           >
                             Apply
                           </button>
@@ -1186,7 +1186,7 @@ export default function STDChannelStrategyPage() {
           <div style={sectionTitle}>
             Backtest Performance Summary
             {strategyDirection !== "BOTH" && <span style={{ marginLeft: 8, fontSize: 12, color: strategyDirection === "LONG" ? "#10b981" : "#ef4444" }}>({strategyDirection} only)</span>}
-            {loading && <span style={{ color: "var(--warning)", marginLeft: 8 }}>(updating...)</span>}
+            {loading && <span style={{ color: "#f59e0b", marginLeft: 8 }}>(updating...)</span>}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
             <MetricCard
@@ -1251,24 +1251,24 @@ export default function STDChannelStrategyPage() {
                   <span style={{ width: 8, height: 8, background: "#8b5cf6", borderRadius: 2 }} />
                   Signal Quality Filter
                 </div>
-                <p style={{ fontSize: 11, color: "var(--muted)", margin: 0 }}>
+                <p style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", margin: 0 }}>
                   8-factor scoring: Mean reversion vs regime shift classification
                 </p>
               </div>
               {data?.filterStats && (
                 <div style={{ display: "flex", gap: 16, padding: "6px 12px", background: "rgba(139, 92, 246, 0.05)", borderRadius: 4, border: "1px solid rgba(139, 92, 246, 0.15)", fontSize: 10 }}>
                   <div>
-                    <span style={{ color: "var(--muted)" }}>Score: </span>
+                    <span style={{ color: "rgba(255,255,255,0.5)" }}>Score: </span>
                     <span style={{ fontWeight: 700, fontFamily: "monospace", color: data.filterStats.avgScore >= 0.7 ? "#10b981" : "#fbbf24" }}>
                       {(data.filterStats.avgScore * 100).toFixed(0)}%
                     </span>
                   </div>
                   <div>
-                    <span style={{ color: "var(--muted)" }}>Filtered: </span>
+                    <span style={{ color: "rgba(255,255,255,0.5)" }}>Filtered: </span>
                     <span style={{ fontWeight: 700, fontFamily: "monospace", color: "#ef4444" }}>
                       {data.filterStats.candidatesFiltered}
                     </span>
-                    <span style={{ color: "var(--muted)" }}> ({data.filterStats.filterRate})</span>
+                    <span style={{ color: "rgba(255,255,255,0.5)" }}> ({data.filterStats.filterRate})</span>
                   </div>
                 </div>
               )}
@@ -1300,7 +1300,7 @@ export default function STDChannelStrategyPage() {
               <FilterWeightCard
                 name="Volatility Regime"
                 weight={10}
-                color="#f97316"
+                color="#f59e0b"
                 description="High-vol regime: extremes common. Low-vol: unusual, better reversion."
                 logic="HIGH VOL → COMMON | LOW VOL → UNUSUAL"
               />
@@ -1336,21 +1336,21 @@ export default function STDChannelStrategyPage() {
 
             {/* Scoring Legend */}
             <div style={{ marginTop: 12, display: "flex", gap: 20, padding: "8px 12px", background: "rgba(0,0,0,0.2)", borderRadius: 4, alignItems: "center", fontSize: 10 }}>
-              <span style={{ color: "var(--muted)", fontWeight: 500 }}>ACTION:</span>
+              <span style={{ color: "rgba(255,255,255,0.5)", fontWeight: 500 }}>ACTION:</span>
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <span style={{ width: 8, height: 8, background: "#10b981", borderRadius: 1 }} />
                 <span style={{ color: "#10b981", fontWeight: 600 }}>≥70%</span>
-                <span style={{ color: "var(--muted)" }}>PROCEED</span>
+                <span style={{ color: "rgba(255,255,255,0.5)" }}>PROCEED</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <span style={{ width: 8, height: 8, background: "#fbbf24", borderRadius: 1 }} />
                 <span style={{ color: "#fbbf24", fontWeight: 600 }}>50-70%</span>
-                <span style={{ color: "var(--muted)" }}>CAUTION</span>
+                <span style={{ color: "rgba(255,255,255,0.5)" }}>CAUTION</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <span style={{ width: 8, height: 8, background: "#ef4444", borderRadius: 1 }} />
                 <span style={{ color: "#ef4444", fontWeight: 600 }}>&lt;50%</span>
-                <span style={{ color: "var(--muted)" }}>AVOID</span>
+                <span style={{ color: "rgba(255,255,255,0.5)" }}>AVOID</span>
               </div>
             </div>
           </section>
@@ -1370,16 +1370,16 @@ export default function STDChannelStrategyPage() {
                       <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#21262d" vertical={false} />
                   <XAxis
                     dataKey="date"
-                    stroke="var(--muted)"
+                    stroke="rgba(255,255,255,0.5)"
                     fontSize={10}
                     tickFormatter={(v) => v.slice(5)}
                     minTickGap={50}
                   />
                   <YAxis
-                    stroke="var(--muted)"
+                    stroke="rgba(255,255,255,0.5)"
                     fontSize={10}
                     tickFormatter={(v) => `${v.toFixed(0)}%`}
                     domain={["auto", "auto"]}
@@ -1401,7 +1401,7 @@ export default function STDChannelStrategyPage() {
                     }}
                     labelFormatter={(label) => <span style={{ color: "#e4e4e7", fontWeight: 600 }}>Exit: {label}</span>}
                   />
-                  <ReferenceLine y={0} stroke="var(--border)" strokeDasharray="3 3" />
+                  <ReferenceLine y={0} stroke="#30363d" strokeDasharray="3 3" />
                   <Area
                     type="monotone"
                     dataKey="cumulative"
@@ -1423,9 +1423,9 @@ export default function STDChannelStrategyPage() {
             <div style={{ height: 300 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={exitReasonData} layout="vertical" margin={{ left: 10, right: 30 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" horizontal={false} />
-                  <XAxis type="number" stroke="var(--muted)" fontSize={10} tickFormatter={(v) => `${v}%`} />
-                  <YAxis type="category" dataKey="name" stroke="var(--muted)" fontSize={11} width={50} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#21262d" horizontal={false} />
+                  <XAxis type="number" stroke="rgba(255,255,255,0.5)" fontSize={10} tickFormatter={(v) => `${v}%`} />
+                  <YAxis type="category" dataKey="name" stroke="rgba(255,255,255,0.5)" fontSize={11} width={50} />
                   <Tooltip
                     contentStyle={tooltipStyle}
                     labelStyle={{ color: "#a1a1aa", marginBottom: 4 }}
@@ -1451,12 +1451,12 @@ export default function STDChannelStrategyPage() {
             <div style={{ ...sectionTitle, display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ width: 8, height: 8, background: "#10b981", borderRadius: "50%" }} />
               Current Active Signals
-              {useEventFilters && <span style={{ fontSize: 10, color: "var(--muted)", fontWeight: 400 }}>(with event filter analysis)</span>}
+              {useEventFilters && <span style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontWeight: 400 }}>(with event filter analysis)</span>}
             </div>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
                 <thead>
-                  <tr style={{ color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--border)" }}>
+                  <tr style={{ color: "rgba(255,255,255,0.5)", textAlign: "left", borderBottom: "1px solid #30363d" }}>
                     <th style={{ padding: "10px 14px 10px 0", fontWeight: 600 }}>Ticker</th>
                     <th style={{ padding: "10px 14px", fontWeight: 600 }}>Signal</th>
                     <th style={{ padding: "10px 14px", fontWeight: 600, textAlign: "right" }}>Sigma</th>
@@ -1478,17 +1478,17 @@ export default function STDChannelStrategyPage() {
                       <tr
                         key={idx}
                         style={{
-                          borderBottom: expandedSignal === signal.ticker ? "none" : "1px solid var(--table-border)",
+                          borderBottom: expandedSignal === signal.ticker ? "none" : "1px solid #30363d",
                           cursor: signal.eventFilters ? "pointer" : "default",
                         }}
                         onClick={() => signal.eventFilters && setExpandedSignal(expandedSignal === signal.ticker ? null : signal.ticker)}
                       >
                         <td style={{ padding: "10px 12px 10px 0" }}>
-                          <Link href={`/stocks/${signal.ticker}`} style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }} onClick={(e) => e.stopPropagation()}>
+                          <Link href={`/stocks/${signal.ticker}`} style={{ color: "#3b82f6", fontWeight: 600, textDecoration: "none" }} onClick={(e) => e.stopPropagation()}>
                             {signal.ticker}
                           </Link>
                           {signal.eventFilters && (
-                            <span style={{ marginLeft: 6, fontSize: 10, color: "var(--muted)" }}>
+                            <span style={{ marginLeft: 6, fontSize: 10, color: "rgba(255,255,255,0.5)" }}>
                               {expandedSignal === signal.ticker ? "▼" : "▶"}
                             </span>
                           )}
@@ -1524,7 +1524,7 @@ export default function STDChannelStrategyPage() {
                                 <div style={{
                                   width: 40,
                                   height: 4,
-                                  background: "var(--border)",
+                                  background: "#30363d",
                                   borderRadius: 2,
                                   overflow: "hidden",
                                 }}>
@@ -1581,7 +1581,7 @@ export default function STDChannelStrategyPage() {
                         <tr key={`${idx}-filters`}>
                           <td colSpan={useEventFilters ? 9 : 7} style={{ padding: "0 0 12px 12px", background: "#0d1f17" }}>
                             <div style={{ padding: 12, borderRadius: 4, background: "#0a1510", border: "1px solid #1a3a2a" }}>
-                              <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                                 Event Filter Breakdown
                               </div>
                               <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
@@ -1589,11 +1589,11 @@ export default function STDChannelStrategyPage() {
                                   <div key={fIdx} style={{
                                     padding: 8,
                                     borderRadius: 4,
-                                    background: "var(--card-bg)",
+                                    background: "#161b22",
                                     border: `1px solid ${filter.score >= 0.7 ? "#1a4a3a" : filter.score >= 0.5 ? "#4a4a2a" : "#4a2a2a"}`,
                                   }}>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                                      <span style={{ fontSize: 10, fontWeight: 600, color: "var(--foreground)" }}>{filter.name}</span>
+                                      <span style={{ fontSize: 10, fontWeight: 600, color: "#fff" }}>{filter.name}</span>
                                       <span style={{
                                         fontSize: 10,
                                         fontWeight: 600,
@@ -1606,7 +1606,7 @@ export default function STDChannelStrategyPage() {
                                     <div style={{
                                       width: "100%",
                                       height: 3,
-                                      background: "var(--border)",
+                                      background: "#30363d",
                                       borderRadius: 2,
                                       marginBottom: 6,
                                     }}>
@@ -1617,7 +1617,7 @@ export default function STDChannelStrategyPage() {
                                         borderRadius: 2,
                                       }} />
                                     </div>
-                                    <div style={{ fontSize: 9, color: "var(--muted)", lineHeight: 1.3 }}>
+                                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", lineHeight: 1.3 }}>
                                       {filter.reason}
                                     </div>
                                   </div>
@@ -1653,7 +1653,7 @@ export default function STDChannelStrategyPage() {
               {/* Direction Filter - Only show when strategy is BOTH (otherwise all trades are same direction) */}
               {strategyDirection === "BOTH" ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase" }}>Direction:</span>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", textTransform: "uppercase" }}>Direction:</span>
                   <div style={{ display: "flex", gap: 4 }}>
                     {(["ALL", "LONG", "SHORT"] as const).map(dir => (
                       <button
@@ -1667,11 +1667,11 @@ export default function STDChannelStrategyPage() {
                           borderRadius: 4,
                           cursor: "pointer",
                           background: filterDirection === dir
-                            ? dir === "LONG" ? "rgba(16, 185, 129, 0.3)" : dir === "SHORT" ? "rgba(239, 68, 68, 0.3)" : "var(--accent)"
+                            ? dir === "LONG" ? "rgba(16, 185, 129, 0.3)" : dir === "SHORT" ? "rgba(239, 68, 68, 0.3)" : "#3b82f6"
                             : "rgba(255,255,255,0.05)",
                           color: filterDirection === dir
                             ? dir === "LONG" ? "#10b981" : dir === "SHORT" ? "#ef4444" : "#fff"
-                            : "var(--muted)",
+                            : "rgba(255,255,255,0.5)",
                         }}
                       >
                         {dir}
@@ -1681,7 +1681,7 @@ export default function STDChannelStrategyPage() {
                 </div>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase" }}>Direction:</span>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", textTransform: "uppercase" }}>Direction:</span>
                   <span style={{
                     padding: "4px 10px",
                     fontSize: 11,
@@ -1696,7 +1696,7 @@ export default function STDChannelStrategyPage() {
               )}
               {/* Exit Filter */}
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase" }}>Exit:</span>
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", textTransform: "uppercase" }}>Exit:</span>
                 <div style={{ display: "flex", gap: 4 }}>
                   {(["ALL", "TARGET", "TIME", "STOP"] as const).map(exit => (
                     <button
@@ -1710,11 +1710,11 @@ export default function STDChannelStrategyPage() {
                         borderRadius: 4,
                         cursor: "pointer",
                         background: filterExit === exit
-                          ? exit === "TARGET" ? "rgba(16, 185, 129, 0.3)" : exit === "TIME" ? "rgba(59, 130, 246, 0.3)" : exit === "STOP" ? "rgba(239, 68, 68, 0.3)" : "var(--accent)"
+                          ? exit === "TARGET" ? "rgba(16, 185, 129, 0.3)" : exit === "TIME" ? "rgba(59, 130, 246, 0.3)" : exit === "STOP" ? "rgba(239, 68, 68, 0.3)" : "#3b82f6"
                           : "rgba(255,255,255,0.05)",
                         color: filterExit === exit
                           ? exit === "TARGET" ? "#10b981" : exit === "TIME" ? "#3b82f6" : exit === "STOP" ? "#ef4444" : "#fff"
-                          : "var(--muted)",
+                          : "rgba(255,255,255,0.5)",
                       }}
                     >
                       {exit}
@@ -1727,52 +1727,52 @@ export default function STDChannelStrategyPage() {
           <div style={{ overflowX: "auto", maxHeight: 600 }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead style={{ position: "sticky", top: 0, background: "#08080c", zIndex: 1 }}>
-                <tr style={{ borderBottom: "2px solid var(--border)" }}>
+                <tr style={{ borderBottom: "2px solid #30363d" }}>
                   <th
                     onClick={() => handleSort("ticker")}
-                    style={{ padding: "12px 10px 12px 0", fontWeight: 600, color: sortColumn === "ticker" ? "var(--accent)" : "var(--muted)", textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
+                    style={{ padding: "12px 10px 12px 0", fontWeight: 600, color: sortColumn === "ticker" ? "#3b82f6" : "rgba(255,255,255,0.5)", textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
                   >
                     Ticker {sortColumn === "ticker" && (sortDirection === "asc" ? "↑" : "↓")}
                   </th>
                   <th
                     onClick={() => handleSort("direction")}
-                    style={{ padding: "12px 10px", fontWeight: 600, color: sortColumn === "direction" ? "var(--accent)" : "var(--muted)", textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
+                    style={{ padding: "12px 10px", fontWeight: 600, color: sortColumn === "direction" ? "#3b82f6" : "rgba(255,255,255,0.5)", textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
                   >
                     Direction {sortColumn === "direction" && (sortDirection === "asc" ? "↑" : "↓")}
                   </th>
                   <th
                     onClick={() => handleSort("eventScore")}
-                    style={{ padding: "12px 10px", fontWeight: 600, color: sortColumn === "eventScore" ? "var(--accent)" : "var(--muted)", textAlign: "center", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
+                    style={{ padding: "12px 10px", fontWeight: 600, color: sortColumn === "eventScore" ? "#3b82f6" : "rgba(255,255,255,0.5)", textAlign: "center", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
                   >
                     Event Score {sortColumn === "eventScore" && (sortDirection === "asc" ? "↑" : "↓")}
                   </th>
                   <th
                     onClick={() => handleSort("pnl")}
-                    style={{ padding: "12px 10px", fontWeight: 600, color: sortColumn === "pnl" ? "var(--accent)" : "var(--muted)", textAlign: "right", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
+                    style={{ padding: "12px 10px", fontWeight: 600, color: sortColumn === "pnl" ? "#3b82f6" : "rgba(255,255,255,0.5)", textAlign: "right", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
                   >
                     P&L {sortColumn === "pnl" && (sortDirection === "asc" ? "↑" : "↓")}
                   </th>
                   <th
                     onClick={() => handleSort("entryDate")}
-                    style={{ padding: "12px 10px", fontWeight: 600, color: sortColumn === "entryDate" ? "var(--accent)" : "var(--muted)", textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
+                    style={{ padding: "12px 10px", fontWeight: 600, color: sortColumn === "entryDate" ? "#3b82f6" : "rgba(255,255,255,0.5)", textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
                   >
                     Entry → Exit {sortColumn === "entryDate" && (sortDirection === "asc" ? "↑" : "↓")}
                   </th>
-                  <th style={{ padding: "12px 10px", fontWeight: 600, color: "var(--muted)", textAlign: "right", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em" }}>Entry $</th>
-                  <th style={{ padding: "12px 10px", fontWeight: 600, color: "var(--muted)", textAlign: "right", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em" }}>Exit $</th>
+                  <th style={{ padding: "12px 10px", fontWeight: 600, color: "rgba(255,255,255,0.5)", textAlign: "right", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em" }}>Entry $</th>
+                  <th style={{ padding: "12px 10px", fontWeight: 600, color: "rgba(255,255,255,0.5)", textAlign: "right", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em" }}>Exit $</th>
                   <th
                     onClick={() => handleSort("days")}
-                    style={{ padding: "12px 10px", fontWeight: 600, color: sortColumn === "days" ? "var(--accent)" : "var(--muted)", textAlign: "right", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
+                    style={{ padding: "12px 10px", fontWeight: 600, color: sortColumn === "days" ? "#3b82f6" : "rgba(255,255,255,0.5)", textAlign: "right", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
                   >
                     Days {sortColumn === "days" && (sortDirection === "asc" ? "↑" : "↓")}
                   </th>
                   <th
                     onClick={() => handleSort("exit")}
-                    style={{ padding: "12px 10px", fontWeight: 600, color: sortColumn === "exit" ? "var(--accent)" : "var(--muted)", textAlign: "center", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
+                    style={{ padding: "12px 10px", fontWeight: 600, color: sortColumn === "exit" ? "#3b82f6" : "rgba(255,255,255,0.5)", textAlign: "center", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
                   >
                     Exit {sortColumn === "exit" && (sortDirection === "asc" ? "↑" : "↓")}
                   </th>
-                  <th style={{ padding: "12px 10px", fontWeight: 600, color: "var(--muted)", textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", minWidth: 240 }}>Signal Analysis</th>
+                  <th style={{ padding: "12px 10px", fontWeight: 600, color: "rgba(255,255,255,0.5)", textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", minWidth: 240 }}>Signal Analysis</th>
                 </tr>
               </thead>
               <tbody>
@@ -1818,13 +1818,13 @@ export default function STDChannelStrategyPage() {
                     <tr
                       key={idx}
                       style={{
-                        borderBottom: "1px solid var(--table-border)",
+                        borderBottom: "1px solid #30363d",
                         background: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)",
                         borderLeft: `3px solid ${trade.exitReason === "TARGET" ? "#10b981" : trade.exitReason === "STOP" ? "#ef4444" : "#3b82f6"}`,
                       }}
                     >
                       <td style={{ padding: "12px 10px 12px 8px" }}>
-                        <Link href={`/stocks/${trade.ticker}`} style={{ color: "var(--accent)", fontWeight: 700, textDecoration: "none", fontSize: 14 }}>
+                        <Link href={`/stocks/${trade.ticker}`} style={{ color: "#3b82f6", fontWeight: 700, textDecoration: "none", fontSize: 14 }}>
                           {trade.ticker}
                         </Link>
                       </td>
@@ -1847,7 +1847,7 @@ export default function STDChannelStrategyPage() {
                           <div style={{
                             width: 40,
                             height: 7,
-                            background: "var(--border)",
+                            background: "#30363d",
                             borderRadius: 3,
                             overflow: "hidden",
                           }}>
@@ -1878,7 +1878,7 @@ export default function STDChannelStrategyPage() {
                           {trade.returnPct >= 0 ? "+" : ""}{(trade.returnPct * 100).toFixed(1)}%
                         </span>
                       </td>
-                      <td style={{ padding: "12px 10px", fontFamily: "monospace", fontSize: 11, color: "var(--muted)" }}>
+                      <td style={{ padding: "12px 10px", fontFamily: "monospace", fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
                         {trade.entryDate.slice(2)} → {trade.exitDate.slice(2)}
                       </td>
                       <td style={{ padding: "12px 10px", textAlign: "right", fontFamily: "monospace", fontSize: 13 }}>
@@ -1887,7 +1887,7 @@ export default function STDChannelStrategyPage() {
                       <td style={{ padding: "12px 10px", textAlign: "right", fontFamily: "monospace", fontSize: 13 }}>
                         {trade.exitPrice.toFixed(2)}
                       </td>
-                      <td style={{ padding: "12px 10px", textAlign: "right", fontFamily: "monospace", fontSize: 13, color: trade.holdingDays <= 7 ? "#10b981" : trade.holdingDays <= 14 ? "var(--foreground)" : "#fbbf24" }}>
+                      <td style={{ padding: "12px 10px", textAlign: "right", fontFamily: "monospace", fontSize: 13, color: trade.holdingDays <= 7 ? "#10b981" : trade.holdingDays <= 14 ? "#fff" : "#fbbf24" }}>
                         {trade.holdingDays}
                       </td>
                       <td style={{ padding: "12px 10px", textAlign: "center" }}>
@@ -1907,11 +1907,11 @@ export default function STDChannelStrategyPage() {
                       </td>
                       <td style={{ padding: "12px 10px" }}>
                         <div style={{ fontSize: 13, lineHeight: 1.5 }}>
-                          <div style={{ color: "var(--foreground)", fontWeight: 600, marginBottom: 4 }}>
+                          <div style={{ color: "#fff", fontWeight: 600, marginBottom: 4 }}>
                             <span style={{ color: eventScore >= 0.7 ? "#10b981" : eventScore >= 0.5 ? "#fbbf24" : "#ef4444" }}>●</span>{" "}
                             {eventDescription}
                           </div>
-                          <div style={{ color: "var(--muted)", fontSize: 12 }}>
+                          <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 12 }}>
                             {(eventScore * 100).toFixed(0)}% • σ={trade.sigmaAtEntry.toFixed(1)} • R²={trade.r2.toFixed(2)} {outcomeText}
                           </div>
                         </div>
@@ -1934,7 +1934,7 @@ export default function STDChannelStrategyPage() {
             fontSize: 12,
           }}>
             <div>
-              <span style={{ color: "var(--muted)" }}>Avg Event Score: </span>
+              <span style={{ color: "rgba(255,255,255,0.5)" }}>Avg Event Score: </span>
               <span style={{ fontFamily: "monospace", fontWeight: 600 }}>
                 {filteredAndSortedTrades.length > 0 ? (
                   filteredAndSortedTrades.reduce((sum, t) => sum + (t.eventScore ?? 1), 0) / filteredAndSortedTrades.length * 100
@@ -1942,7 +1942,7 @@ export default function STDChannelStrategyPage() {
               </span>
             </div>
             <div>
-              <span style={{ color: "var(--muted)" }}>Avg σ: </span>
+              <span style={{ color: "rgba(255,255,255,0.5)" }}>Avg σ: </span>
               <span style={{ fontFamily: "monospace", fontWeight: 600 }}>
                 {filteredAndSortedTrades.length > 0 ? (
                   filteredAndSortedTrades.reduce((sum, t) => sum + Math.abs(t.sigmaAtEntry), 0) / filteredAndSortedTrades.length
@@ -1950,7 +1950,7 @@ export default function STDChannelStrategyPage() {
               </span>
             </div>
             <div>
-              <span style={{ color: "var(--muted)" }}>R²: </span>
+              <span style={{ color: "rgba(255,255,255,0.5)" }}>R²: </span>
               <span style={{ fontFamily: "monospace", fontWeight: 600 }}>
                 {filteredAndSortedTrades.length > 0 ? (
                   filteredAndSortedTrades.reduce((sum, t) => sum + t.r2, 0) / filteredAndSortedTrades.length
@@ -1981,7 +1981,7 @@ export default function STDChannelStrategyPage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
             <div>
               <div style={sectionTitle}>Strategy Specification</div>
-              <p style={{ fontSize: 11, color: "var(--muted)", margin: 0 }}>
+              <p style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", margin: 0 }}>
                 Institutional-grade mean reversion system with multi-factor quality controls
               </p>
             </div>
@@ -1996,10 +1996,10 @@ export default function STDChannelStrategyPage() {
               <div style={{ fontSize: 10, color: "#10b981", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>
                 Entry Logic
               </div>
-              <div style={{ fontSize: 12, color: "var(--foreground)", marginBottom: 8 }}>
+              <div style={{ fontSize: 12, color: "#fff", marginBottom: 8 }}>
                 <strong>Extreme Deviation Only</strong>
               </div>
-              <ul style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.6, margin: 0, paddingLeft: 16 }}>
+              <ul style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", lineHeight: 1.6, margin: 0, paddingLeft: 16 }}>
                 <li>LONG: Price &lt; -{entrySigma}σ in <span style={{ color: "#10b981" }}>uptrend</span> (slope &gt; 0)</li>
                 <li>SHORT: Price &gt; +{entrySigma}σ in <span style={{ color: "#ef4444" }}>downtrend</span> (slope &lt; 0)</li>
                 <li>Slope alignment prevents counter-trend trades</li>
@@ -2014,10 +2014,10 @@ export default function STDChannelStrategyPage() {
               <div style={{ fontSize: 10, color: "#8b5cf6", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>
                 Quality Gates
               </div>
-              <div style={{ fontSize: 12, color: "var(--foreground)", marginBottom: 8 }}>
+              <div style={{ fontSize: 12, color: "#fff", marginBottom: 8 }}>
                 <strong>Multi-Factor Screen</strong>
               </div>
-              <ul style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.6, margin: 0, paddingLeft: 16 }}>
+              <ul style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", lineHeight: 1.6, margin: 0, paddingLeft: 16 }}>
                 <li>R² ≥ {minR2} (statistical significance)</li>
                 <li>B/M ≥ {minBM} (value factor tilt)</li>
                 <li>E/P ≥ {minEP} (earnings quality)</li>
@@ -2033,10 +2033,10 @@ export default function STDChannelStrategyPage() {
               <div style={{ fontSize: 10, color: "#ef4444", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>
                 Risk Controls
               </div>
-              <div style={{ fontSize: 12, color: "var(--foreground)", marginBottom: 8 }}>
+              <div style={{ fontSize: 12, color: "#fff", marginBottom: 8 }}>
                 <strong>Drawdown Protection</strong>
               </div>
-              <ul style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.6, margin: 0, paddingLeft: 16 }}>
+              <ul style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", lineHeight: 1.6, margin: 0, paddingLeft: 16 }}>
                 <li>Stop Loss: ±{stopSigma}σ from regression</li>
                 <li>Time Exit: {maxDays} days max holding</li>
                 <li>Max Positions: {maxPositions} concurrent</li>
@@ -2049,31 +2049,31 @@ export default function STDChannelStrategyPage() {
           </div>
 
           {/* Mathematical Basis */}
-          <div style={{ marginTop: 16, padding: 16, background: "rgba(0,0,0,0.2)", borderRadius: 6, border: "1px solid var(--border)" }}>
-            <div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>
+          <div style={{ marginTop: 16, padding: 16, background: "rgba(0,0,0,0.2)", borderRadius: 6, border: "1px solid #30363d" }}>
+            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>
               Mathematical Foundation
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, fontSize: 11 }}>
               <div>
-                <div style={{ color: "var(--muted)", marginBottom: 4 }}>Channel Model</div>
+                <div style={{ color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>Channel Model</div>
                 <code style={{ fontSize: 10, color: "#a855f7", fontFamily: "monospace" }}>
                   P(t) = α + βt + ε, ε ~ N(0, σ²)
                 </code>
               </div>
               <div>
-                <div style={{ color: "var(--muted)", marginBottom: 4 }}>Z-Score</div>
+                <div style={{ color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>Z-Score</div>
                 <code style={{ fontSize: 10, color: "#a855f7", fontFamily: "monospace" }}>
                   z = (P - P̂) / σ_residual
                 </code>
               </div>
               <div>
-                <div style={{ color: "var(--muted)", marginBottom: 4 }}>Quality Metric</div>
+                <div style={{ color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>Quality Metric</div>
                 <code style={{ fontSize: 10, color: "#a855f7", fontFamily: "monospace" }}>
                   R² = 1 - SS_res / SS_tot
                 </code>
               </div>
               <div>
-                <div style={{ color: "var(--muted)", marginBottom: 4 }}>Event Score</div>
+                <div style={{ color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>Event Score</div>
                 <code style={{ fontSize: 10, color: "#a855f7", fontFamily: "monospace" }}>
                   S = Σ(wᵢ × fᵢ), Σwᵢ = 1
                 </code>
@@ -2093,17 +2093,17 @@ function MetricCard({ label, value, subtext, positive, neutral }: {
   positive: boolean;
   neutral?: boolean;
 }) {
-  const valueColor = neutral ? "var(--foreground)" : positive ? "#10b981" : "#ef4444";
+  const valueColor = neutral ? "#fff" : positive ? "#10b981" : "#ef4444";
 
   return (
     <div style={cardStyle}>
-      <div style={{ fontSize: 12, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
         {label}
       </div>
       <div style={{ fontSize: 28, fontWeight: 700, color: valueColor, fontFamily: "monospace" }}>
         {value}
       </div>
-      <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 4 }}>{subtext}</div>
+      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 4 }}>{subtext}</div>
     </div>
   );
 }
@@ -2138,7 +2138,7 @@ function FilterWeightCard({ name, weight, color, description, logic }: {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, marginTop: 2 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ width: 8, height: 8, background: color, borderRadius: 2 }} />
-          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--foreground)" }}>{name}</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>{name}</span>
         </div>
         <span style={{
           fontSize: 11,
@@ -2151,7 +2151,7 @@ function FilterWeightCard({ name, weight, color, description, logic }: {
       </div>
 
       {/* Description */}
-      <p style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.4, margin: "0 0 8px 0" }}>
+      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", lineHeight: 1.4, margin: "0 0 8px 0" }}>
         {description}
       </p>
 

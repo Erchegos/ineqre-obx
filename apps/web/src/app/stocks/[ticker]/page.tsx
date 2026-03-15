@@ -994,10 +994,10 @@ export default function StockTickerPage() {
   }, [activeStats, data]);
 
   return (
-    <main style={{ padding: "16px 24px", maxWidth: 1400, margin: "0 auto", minHeight: "100vh", background: "var(--background)", color: "var(--foreground)" }}>
+    <main style={{ padding: "16px 32px", maxWidth: 1600, margin: "0 auto", minHeight: "100vh", background: "#0a0a0a", color: "#fff" }}>
       <style>{`
         .stock-hero-metrics { display: flex; flex-wrap: wrap; }
-        .stock-chart-news { display: grid; grid-template-columns: 3fr 2fr; gap: 10px; }
+        .stock-chart-news { display: grid; grid-template-columns: 3fr 1.5fr; gap: 10px; }
         .stock-metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; }
         .stock-mode-fundamentals { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
         .stock-mode-fundamentals .fundamentals-strip { margin-left: auto; display: flex; align-items: center; gap: 14px; }
@@ -1013,11 +1013,11 @@ export default function StockTickerPage() {
       {/* ═══ BLOOMBERG-STYLE HERO BAR ═══ */}
       <div style={{
         background: "rgba(255,255,255,0.02)",
-        border: "1px solid var(--border)",
+        border: "1px solid #30363d",
         borderRadius: 3,
         padding: "10px 14px",
         marginBottom: 12,
-        fontFamily: "'Geist Mono', monospace",
+        fontFamily: "monospace",
       }}>
         {/* Row 1: Ticker + Name + Badge + Nav */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
@@ -1026,40 +1026,40 @@ export default function StockTickerPage() {
               {ticker || "?"}
             </h1>
             {stockName && (
-              <span style={{ fontSize: 12, color: "var(--muted-foreground)", fontWeight: 400 }}>
+              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 400 }}>
                 {stockName}
               </span>
             )}
             {ticker && <LiquidityBadge ticker={ticker} />}
             {stockSector && (
-              <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 2, background: "rgba(255,255,255,0.06)", color: "var(--muted-foreground)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 2, background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
                 {stockSector}
               </span>
             )}
           </div>
           <nav style={{ display: "flex", gap: 0, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
-            <Link href="/" style={{ fontSize: 10, color: "var(--muted-foreground)", textDecoration: "none", padding: "2px 6px", borderRadius: 3 }}>Home</Link>
-            <span style={{ color: "var(--border)", fontSize: 9 }}>/</span>
-            <Link href="/stocks" style={{ fontSize: 10, color: "var(--muted-foreground)", textDecoration: "none", padding: "2px 6px", borderRadius: 3 }}>Stocks</Link>
-            <span style={{ color: "var(--border)", fontSize: 9 }}>/</span>
-            <span style={{ fontSize: 10, color: "var(--foreground)", fontWeight: 600, padding: "2px 6px", fontFamily: "'Geist Mono', monospace" }}>{ticker}</span>
-            <span style={{ color: "var(--border)", fontSize: 10, margin: "0 4px" }}>|</span>
-            <Link href="/news" style={{ fontSize: 10, color: "var(--muted-foreground)", textDecoration: "none", padding: "2px 6px", borderRadius: 3 }}>News</Link>
+            <Link href="/" style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textDecoration: "none", padding: "2px 6px", borderRadius: 3 }}>Home</Link>
+            <span style={{ color: "#30363d", fontSize: 9 }}>/</span>
+            <Link href="/stocks" style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textDecoration: "none", padding: "2px 6px", borderRadius: 3 }}>Stocks</Link>
+            <span style={{ color: "#30363d", fontSize: 9 }}>/</span>
+            <span style={{ fontSize: 10, color: "#fff", fontWeight: 600, padding: "2px 6px", fontFamily: "monospace" }}>{ticker}</span>
+            <span style={{ color: "#30363d", fontSize: 10, margin: "0 4px" }}>|</span>
+            <Link href="/news" style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textDecoration: "none", padding: "2px 6px", borderRadius: 3 }}>News</Link>
             {sectorPeers.length > 0 && (
               <>
-                <span style={{ color: "var(--border)", fontSize: 10, margin: "0 4px" }}>|</span>
-                <span style={{ fontSize: 9, color: "var(--muted-foreground)", opacity: 0.6, textTransform: "uppercase", letterSpacing: "0.05em" }}>PEERS</span>
+                <span style={{ color: "#30363d", fontSize: 10, margin: "0 4px" }}>|</span>
+                <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", opacity: 0.6, textTransform: "uppercase", letterSpacing: "0.05em" }}>PEERS</span>
                 {sectorPeers.map((p) => (
                   <Link
                     key={p.ticker}
                     href={`/stocks/${p.ticker}`}
                     style={{
                       fontSize: 10,
-                      color: "var(--accent)",
+                      color: "#3b82f6",
                       textDecoration: "none",
                       fontWeight: 600,
                       padding: "2px 5px",
-                      fontFamily: "'Geist Mono', monospace",
+                      fontFamily: "monospace",
                     }}
                     title={p.name}
                   >
@@ -1082,17 +1082,17 @@ export default function StockTickerPage() {
               }}>
                 {priceInfo.change >= 0 ? "▲" : "▼"} {priceInfo.change >= 0 ? "+" : ""}{priceInfo.changePct.toFixed(2)}%
               </span>
-              <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
                 {priceInfo.change >= 0 ? "+" : ""}{priceInfo.change.toFixed(2)}
               </span>
             </>
           ) : (
-            <span style={{ fontSize: 14, color: "var(--muted-foreground)" }}>Loading...</span>
+            <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>Loading...</span>
           )}
 
           {activeStats && (
             <>
-              <span style={{ width: 1, height: 16, background: "var(--border)" }} />
+              <span style={{ width: 1, height: 16, background: "#30363d" }} />
               {[
                 { label: "VOL", value: fmtPct(activeStats.volatility) },
                 { label: "SHARPE", value: fmtNum(activeStats.sharpeRatio, 2) },
@@ -1102,8 +1102,8 @@ export default function StockTickerPage() {
                 ...(cagr !== null ? [{ label: "CAGR", value: fmtPct(cagr), color: cagr >= 0 ? "#22c55e" : "#ef4444" }] : []),
               ].map((m) => (
                 <div key={m.label} style={{ display: "flex", alignItems: "baseline", gap: 4 }} title={(m as any).tooltip || undefined}>
-                  <span style={{ fontSize: 9, color: "var(--muted-foreground)", fontWeight: 700, letterSpacing: "0.04em" }}>{m.label}</span>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: m.color || "var(--foreground)" }}>{m.value}</span>
+                  <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontWeight: 700, letterSpacing: "0.04em" }}>{m.label}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: m.color || "#fff" }}>{m.value}</span>
                   {(m as any).warn && (
                     <span style={{ fontSize: 8, color: "#f59e0b", fontWeight: 600 }} title={(m as any).tooltip}>*</span>
                   )}
@@ -1118,13 +1118,13 @@ export default function StockTickerPage() {
           {[
             { href: `/volatility/${ticker}`, label: "VOLATILITY" },
             { href: `/montecarlo/${ticker}`, label: "MONTE CARLO" },
-            ...(!stockMetaLoading && totalRows >= 756 && hasFactorData ? [{ href: `/predictions/${ticker}`, label: "ML PREDICTIONS" }] : []),
+            { href: `/predictions/${ticker}`, label: "ML PREDICTIONS" },
             ...(["EQNR.US", "BORR.US", "FLNG.US", "FRO.US"].includes(ticker) ? [{ href: `/options/${ticker}`, label: "OPTIONS" }] : []),
             { href: "/std-channel-strategy", label: "STD OPTIMIZER" },
           ].map((link) => (
             <Link key={link.href} href={link.href} style={{
               padding: "4px 8px", borderRadius: 2, background: "rgba(255,255,255,0.04)",
-              border: "1px solid var(--border)", color: "var(--foreground)",
+              border: "1px solid #30363d", color: "#fff",
               fontSize: 9, fontWeight: 600, textDecoration: "none", letterSpacing: "0.03em",
               transition: "all 0.15s",
             }}>
@@ -1136,14 +1136,14 @@ export default function StockTickerPage() {
 
       {/* View Mode Toggle + Inline Fundamentals */}
       <div className="stock-mode-fundamentals">
-        <span style={{ fontSize: 13, color: "var(--muted)", letterSpacing: "0.02em", textTransform: "uppercase" }}>
+        <span style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", letterSpacing: "0.02em", textTransform: "uppercase" }}>
           Analysis Mode
         </span>
         <div style={{
           display: "inline-flex",
-          border: "1px solid var(--border)",
+          border: "1px solid #30363d",
           borderRadius: 6,
-          background: "var(--card-bg)",
+          background: "#161b22",
           padding: 2,
         }}>
           <button
@@ -1152,8 +1152,8 @@ export default function StockTickerPage() {
               padding: "9px 16px",
               borderRadius: 4,
               border: "none",
-              background: viewMode === "historical" ? "var(--accent)" : "transparent",
-              color: viewMode === "historical" ? "white" : "var(--foreground)",
+              background: viewMode === "historical" ? "#3b82f6" : "transparent",
+              color: viewMode === "historical" ? "white" : "#fff",
               fontSize: 13,
               fontWeight: 500,
               cursor: "pointer",
@@ -1176,7 +1176,7 @@ export default function StockTickerPage() {
               borderRadius: 4,
               border: "none",
               background: viewMode === "std_channel" ? "#2962ff" : "transparent",
-              color: viewMode === "std_channel" ? "white" : "var(--foreground)",
+              color: viewMode === "std_channel" ? "white" : "#fff",
               fontSize: 13,
               fontWeight: 500,
               cursor: "pointer",
@@ -1199,7 +1199,7 @@ export default function StockTickerPage() {
               borderRadius: 4,
               border: "none",
               background: viewMode === "model" ? "#00897B" : "transparent",
-              color: viewMode === "model" ? "white" : "var(--foreground)",
+              color: viewMode === "model" ? "white" : "#fff",
               fontSize: 13,
               fontWeight: 500,
               cursor: "pointer",
@@ -1219,41 +1219,41 @@ export default function StockTickerPage() {
 
         {/* Inline Fundamentals Strip — 5 multiples matching portfolio optimizer VAL */}
         {inlineFundamentals && (
-          <div className="fundamentals-strip" style={{ fontFamily: "'Geist Mono', monospace" }}>
+          <div className="fundamentals-strip" style={{ fontFamily: "monospace" }}>
             {inlineFundamentals.ep !== null && inlineFundamentals.ep > 0 && (
-              <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
                 <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", marginRight: 3 }}>P/E</span>
-                <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{(1 / inlineFundamentals.ep).toFixed(1)}x</span>
+                <span style={{ fontWeight: 600, color: "#fff" }}>{(1 / inlineFundamentals.ep).toFixed(1)}x</span>
               </span>
             )}
             {inlineFundamentals.bm !== null && inlineFundamentals.bm > 0 && (
-              <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
                 <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", marginRight: 3 }}>P/B</span>
-                <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{(1 / inlineFundamentals.bm).toFixed(2)}</span>
+                <span style={{ fontWeight: 600, color: "#fff" }}>{(1 / inlineFundamentals.bm).toFixed(2)}</span>
               </span>
             )}
             {inlineFundamentals.dy !== null && (
-              <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
                 <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", marginRight: 3 }}>DY</span>
-                <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{(inlineFundamentals.dy * 100).toFixed(1)}%</span>
+                <span style={{ fontWeight: 600, color: "#fff" }}>{(inlineFundamentals.dy * 100).toFixed(1)}%</span>
               </span>
             )}
             {inlineFundamentals.ev_ebitda !== null && inlineFundamentals.ev_ebitda !== 0 && (
-              <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
                 <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", marginRight: 3 }}>EV/EB</span>
-                <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{inlineFundamentals.ev_ebitda.toFixed(1)}x</span>
+                <span style={{ fontWeight: 600, color: "#fff" }}>{inlineFundamentals.ev_ebitda.toFixed(1)}x</span>
               </span>
             )}
             {inlineFundamentals.sp !== null && inlineFundamentals.sp > 0 && (
-              <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
                 <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", marginRight: 3 }}>P/S</span>
-                <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{(1 / inlineFundamentals.sp).toFixed(2)}x</span>
+                <span style={{ fontWeight: 600, color: "#fff" }}>{(1 / inlineFundamentals.sp).toFixed(2)}x</span>
               </span>
             )}
             {inlineFundamentals.mktcap !== null && (
-              <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
                 <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", marginRight: 3 }}>MCAP</span>
-                <span style={{ fontWeight: 600, color: "var(--foreground)" }}>
+                <span style={{ fontWeight: 600, color: "#fff" }}>
                   {inlineFundamentals.mktcap >= 1e9
                     ? `${(inlineFundamentals.mktcap / 1e9).toFixed(0)}B`
                     : `${(inlineFundamentals.mktcap / 1e6).toFixed(0)}M`}
@@ -1263,13 +1263,13 @@ export default function StockTickerPage() {
             <button
               onClick={() => setIsPanelOpen(true)}
               style={{
-                padding: "2px 8px", borderRadius: 2, border: "1px solid var(--border)",
-                background: "transparent", color: "var(--accent)", fontSize: 9,
+                padding: "2px 8px", borderRadius: 2, border: "1px solid #30363d",
+                background: "transparent", color: "#3b82f6", fontSize: 9,
                 fontWeight: 700, fontFamily: "monospace", cursor: "pointer",
                 letterSpacing: "0.04em", transition: "border-color 0.15s",
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--accent)")}
-              onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
+              onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#3b82f6")}
+              onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#30363d")}
             >
               MORE ▸
             </button>
@@ -1280,7 +1280,7 @@ export default function StockTickerPage() {
       {/* Timeframe Selector - compact, only in Historical mode */}
       {viewMode === "historical" && (
         <div style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 9, color: "var(--muted-foreground)", letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "monospace", fontWeight: 700 }}>
+          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "monospace", fontWeight: 700 }}>
             Timeframe
           </span>
           <TimeframeSelector
@@ -1300,15 +1300,15 @@ export default function StockTickerPage() {
       )}
 
       {loading && (
-        <div style={{ padding: 20, borderRadius: 4, border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--muted)", fontSize: 14 }}>
+        <div style={{ padding: 20, borderRadius: 4, border: "1px solid #30363d", background: "#161b22", color: "rgba(255,255,255,0.5)", fontSize: 14 }}>
           Loading analytics...
         </div>
       )}
 
       {!loading && error && (
-        <div style={{ padding: 20, borderRadius: 4, border: "1px solid var(--danger)", background: "var(--card-bg)" }}>
-          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6, color: "var(--danger)" }}>Error</div>
-          <div style={{ fontSize: 13, color: "var(--muted)" }}>{error}</div>
+        <div style={{ padding: 20, borderRadius: 4, border: "1px solid #ef4444", background: "#161b22" }}>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6, color: "#ef4444" }}>Error</div>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>{error}</div>
         </div>
       )}
 
@@ -1321,25 +1321,25 @@ export default function StockTickerPage() {
               { label: "TOT RET", value: fmtPct(activeStats.totalReturn), color: activeStats.totalReturn >= 0 ? "#22c55e" : "#ef4444" },
               { label: "CAGR", value: cagr !== null ? fmtPct(cagr) : "—", color: (cagr ?? 0) >= 0 ? "#22c55e" : "#ef4444" },
               { label: "MAX DD", value: fmtPct(activeStats.maxDrawdown), color: "#ef4444" },
-              { label: "VaR 95%", value: fmtPct(activeStats.var95), color: "var(--foreground)" },
-              { label: "CVaR 95%", value: fmtPct(activeStats.cvar95), color: "var(--foreground)" },
-              { label: "SHARPE", value: fmtNum(activeStats.sharpeRatio, 3), color: "var(--foreground)" },
-              { label: `β vs ${data.betaInfo?.benchmark || "OBX"}`, value: fmtNum(activeStats.beta, 3), color: "var(--foreground)", sub: data.betaInfo ? `${data.betaInfo.rawDataPoints}d overlap` : undefined, warn: data.betaInfo && data.betaInfo.rawDataPoints < 200 },
+              { label: "VaR 95%", value: fmtPct(activeStats.var95), color: "#fff" },
+              { label: "CVaR 95%", value: fmtPct(activeStats.cvar95), color: "#fff" },
+              { label: "SHARPE", value: fmtNum(activeStats.sharpeRatio, 3), color: "#fff" },
+              { label: `β vs ${data.betaInfo?.benchmark || "OBX"}`, value: fmtNum(activeStats.beta, 3), color: "#fff", sub: data.betaInfo ? `${data.betaInfo.rawDataPoints}d overlap` : undefined, warn: data.betaInfo && data.betaInfo.rawDataPoints < 200 },
             ].map((m) => (
               <div key={m.label} style={{
                 padding: "6px 8px",
                 background: "rgba(255,255,255,0.02)",
-                border: `1px solid ${(m as any).warn ? "rgba(245,158,11,0.3)" : "var(--border)"}`,
+                border: `1px solid ${(m as any).warn ? "rgba(245,158,11,0.3)" : "#30363d"}`,
                 borderRadius: 3,
               }}>
-                <div style={{ fontSize: 8, fontWeight: 700, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3, fontFamily: "monospace" }}>
+                <div style={{ fontSize: 8, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3, fontFamily: "monospace" }}>
                   {m.label}
                 </div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: m.color, fontFamily: "monospace" }}>
                   {m.value}
                 </div>
                 {(m as any).sub && (
-                  <div style={{ fontSize: 8, color: (m as any).warn ? "#f59e0b" : "var(--muted-foreground)", marginTop: 1, fontFamily: "monospace" }}>
+                  <div style={{ fontSize: 8, color: (m as any).warn ? "#f59e0b" : "rgba(255,255,255,0.5)", marginTop: 1, fontFamily: "monospace" }}>
                     {(m as any).sub}{(m as any).warn ? " ⚠" : ""}
                   </div>
                 )}
@@ -1350,7 +1350,7 @@ export default function StockTickerPage() {
           {/* Row 2: Chart + News side-by-side */}
           <div className="stock-chart-news" style={{ marginBottom: 10 }}>
             {/* Chart panel (left) */}
-            <div style={{ padding: "8px 12px", borderRadius: 3, border: "1px solid var(--border)", background: "rgba(255,255,255,0.02)" }}>
+            <div style={{ padding: "8px 12px", borderRadius: 3, border: "1px solid #30363d", background: "rgba(255,255,255,0.02)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                 <div style={{ display: "flex", gap: 2 }}>
                   {(["price", "total_return", "comparison"] as const).map((mode) => (
@@ -1358,9 +1358,9 @@ export default function StockTickerPage() {
                       key={mode}
                       onClick={() => setChartMode(mode)}
                       style={{
-                        padding: "3px 8px", borderRadius: 2, border: "1px solid var(--border)",
-                        background: chartMode === mode ? "var(--accent)" : "transparent",
-                        color: chartMode === mode ? "#fff" : "var(--muted-foreground)",
+                        padding: "3px 8px", borderRadius: 2, border: "1px solid #30363d",
+                        background: chartMode === mode ? "#3b82f6" : "transparent",
+                        color: chartMode === mode ? "#fff" : "rgba(255,255,255,0.5)",
                         fontSize: 9, fontWeight: 600, fontFamily: "monospace", cursor: "pointer",
                         letterSpacing: "0.03em", textTransform: "uppercase",
                       }}
@@ -1369,7 +1369,7 @@ export default function StockTickerPage() {
                     </button>
                   ))}
                 </div>
-                <span style={{ fontSize: 9, color: "var(--muted-foreground)", fontFamily: "monospace" }}>
+                <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace" }}>
                   {getModeLabel()}
                 </span>
               </div>
@@ -1387,21 +1387,21 @@ export default function StockTickerPage() {
                   initialBars={limit}
                 />
               ) : (
-                <PriceChart data={chartData} height={340} />
+                <PriceChart data={chartData} height={460} />
               )}
             </div>
 
             {/* News + Price Targets panel (right) */}
-            <div style={{ border: "1px solid var(--border)", borderRadius: 3, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+            <div style={{ border: "1px solid #30363d", borderRadius: 3, overflow: "hidden", display: "flex", flexDirection: "column" }}>
               <div style={{
                 display: "flex", justifyContent: "space-between", alignItems: "center",
                 padding: "4px 8px", background: "rgba(255,255,255,0.03)",
-                borderBottom: "1px solid var(--border)", flexShrink: 0,
+                borderBottom: "1px solid #30363d", flexShrink: 0,
               }}>
-                <span style={{ fontSize: 9, fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.06em", color: "var(--muted-foreground)" }}>
+                <span style={{ fontSize: 9, fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.06em", color: "rgba(255,255,255,0.5)" }}>
                   NEWS
                 </span>
-                <Link href="/news" style={{ fontSize: 9, color: "var(--accent)", textDecoration: "none", fontFamily: "monospace" }}>
+                <Link href="/news" style={{ fontSize: 9, color: "#3b82f6", textDecoration: "none", fontFamily: "monospace" }}>
                   ALL →
                 </Link>
               </div>
@@ -1414,12 +1414,12 @@ export default function StockTickerPage() {
                 <div style={{
                   display: "flex", justifyContent: "space-between", alignItems: "center",
                   padding: "4px 8px", background: "rgba(255,255,255,0.03)",
-                  borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)", flexShrink: 0,
+                  borderTop: "1px solid #30363d", borderBottom: "1px solid #30363d", flexShrink: 0,
                 }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.06em", color: "var(--muted-foreground)" }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.06em", color: "rgba(255,255,255,0.5)" }}>
                     ANALYST PRICE TARGETS
                   </span>
-                  <span style={{ fontSize: 9, color: "var(--muted-foreground)", fontFamily: "monospace" }}>
+                  <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace" }}>
                     via BørsXtra · last 90d
                   </span>
                 </div>
@@ -1430,16 +1430,16 @@ export default function StockTickerPage() {
                       fontSize: 12, padding: "4px 0",
                       borderBottom: i < priceTargets.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none",
                     }}>
-                      <span style={{ fontSize: 10, color: "var(--muted-foreground)", fontFamily: "monospace", minWidth: 68, flexShrink: 0 }}>
+                      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", minWidth: 68, flexShrink: 0 }}>
                         {pt.date}
                       </span>
                       {pt.broker && (
                         <span style={{
                           fontSize: 10, padding: "1px 5px", background: "rgba(255,255,255,0.08)",
-                          borderRadius: 3, color: "#aaa", fontWeight: 500, flexShrink: 0,
+                          borderRadius: 3, color: "rgba(255,255,255,0.5)", fontWeight: 500, flexShrink: 0,
                         }}>{pt.broker}</span>
                       )}
-                      <span style={{ color: "var(--foreground)", flex: 1 }}>{pt.action}</span>
+                      <span style={{ color: "#fff", flex: 1 }}>{pt.action}</span>
                       {pt.rating && pt.ratingColor && (
                         <span style={{
                           fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 3,
@@ -1455,12 +1455,12 @@ export default function StockTickerPage() {
           </div>
 
           {/* Row 4: Significant Moves — full width */}
-          <div style={{ border: "1px solid var(--border)", borderRadius: 3, overflow: "hidden", marginBottom: 10 }}>
+          <div style={{ border: "1px solid #30363d", borderRadius: 3, overflow: "hidden", marginBottom: 10 }}>
             <div style={{
               padding: "4px 8px", background: "rgba(255,255,255,0.03)",
-              borderBottom: "1px solid var(--border)",
+              borderBottom: "1px solid #30363d",
               fontSize: 9, fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.06em",
-              color: "var(--muted-foreground)",
+              color: "rgba(255,255,255,0.5)",
             }}>
               SIGNIFICANT MOVES (2σ)
             </div>
@@ -1475,15 +1475,15 @@ export default function StockTickerPage() {
       {!loading && viewMode === "std_channel" && (
         <>
           {stdChannelLoading && (
-            <div style={{ padding: 20, borderRadius: 4, border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--muted)" }}>
+            <div style={{ padding: 20, borderRadius: 4, border: "1px solid #30363d", background: "#161b22", color: "rgba(255,255,255,0.5)" }}>
               Loading STD channel data...
             </div>
           )}
 
           {stdChannelError && (
-            <div style={{ padding: 20, borderRadius: 4, border: "1px solid var(--danger)", background: "var(--card-bg)" }}>
-              <div style={{ fontWeight: 600, color: "var(--danger)", marginBottom: 8 }}>Error</div>
-              <div style={{ fontSize: 14, color: "var(--muted)" }}>{stdChannelError}</div>
+            <div style={{ padding: 20, borderRadius: 4, border: "1px solid #ef4444", background: "#161b22" }}>
+              <div style={{ fontWeight: 600, color: "#ef4444", marginBottom: 8 }}>Error</div>
+              <div style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>{stdChannelError}</div>
             </div>
           )}
 
@@ -1493,12 +1493,12 @@ export default function StockTickerPage() {
               <div style={{
                 padding: 20,
                 borderRadius: 4,
-                border: "1px solid var(--card-border)",
-                background: "var(--card-bg)",
+                border: "1px solid #30363d",
+                background: "#161b22",
                 marginBottom: 20,
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                  <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--foreground)", margin: 0 }}>
+                  <h2 style={{ fontSize: 16, fontWeight: 600, color: "#fff", margin: 0 }}>
                     Channel Statistics
                   </h2>
                   <button
@@ -1506,9 +1506,9 @@ export default function StockTickerPage() {
                     style={{
                       padding: "5px 12px",
                       borderRadius: 4,
-                      border: "1px solid var(--border)",
-                      background: showWindowSettings ? "var(--hover-bg)" : "transparent",
-                      color: "var(--muted-foreground)",
+                      border: "1px solid #30363d",
+                      background: showWindowSettings ? "rgba(59,130,246,0.08)" : "transparent",
+                      color: "rgba(255,255,255,0.5)",
                       fontSize: 11,
                       cursor: "pointer",
                       fontFamily: "monospace",
@@ -1523,54 +1523,54 @@ export default function StockTickerPage() {
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16 }}>
                   <div>
-                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Data Points</div>
-                    <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "monospace", color: "var(--foreground)" }}>
+                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 6 }}>Data Points</div>
+                    <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "monospace", color: "#fff" }}>
                       {stdChannelData.count}
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Window Size</div>
-                    <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "monospace", color: "var(--accent)" }}>
+                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 6 }}>Window Size</div>
+                    <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "monospace", color: "#3b82f6" }}>
                       {stdChannelData.metadata.windowSize}
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>R² (Fit Quality)</div>
+                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 6 }}>R² (Fit Quality)</div>
                     <div style={{
                       fontSize: 22,
                       fontWeight: 600,
                       fontFamily: "monospace",
-                      color: stdChannelData.metadata.r2 > 0.8 ? "var(--success)"
-                        : stdChannelData.metadata.r2 > 0.6 ? "var(--success)"
-                        : stdChannelData.metadata.r2 > 0.4 ? "var(--warning)"
-                        : "var(--danger)"
+                      color: stdChannelData.metadata.r2 > 0.8 ? "#10b981"
+                        : stdChannelData.metadata.r2 > 0.6 ? "#10b981"
+                        : stdChannelData.metadata.r2 > 0.4 ? "#f59e0b"
+                        : "#ef4444"
                     }}>
                       {stdChannelData.metadata.r2.toFixed(4)}
                     </div>
-                    <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2 }}>
+                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>
                       {stdChannelData.metadata.r2 > 0.8 ? "Excellent" : stdChannelData.metadata.r2 > 0.6 ? "Good" : stdChannelData.metadata.r2 > 0.4 ? "Moderate" : "Poor"}
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Slope (Trend)</div>
+                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 6 }}>Slope (Trend)</div>
                     <div style={{
                       fontSize: 22,
                       fontWeight: 600,
                       fontFamily: "monospace",
-                      color: stdChannelData.metadata.slope > 0 ? "var(--success)" : "var(--danger)"
+                      color: stdChannelData.metadata.slope > 0 ? "#10b981" : "#ef4444"
                     }}>
                       {stdChannelData.metadata.slope > 0 ? "+" : ""}{stdChannelData.metadata.slope.toFixed(4)}
                     </div>
-                    <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>
                       {stdChannelData.metadata.slope > 0 ? "Uptrend" : "Downtrend"}
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Correlation (R)</div>
-                    <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "monospace", color: "var(--foreground)" }}>
+                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 6 }}>Correlation (R)</div>
+                    <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "monospace", color: "#fff" }}>
                       {stdChannelData.metadata.r.toFixed(4)}
                     </div>
-                    <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2, lineHeight: 1.4 }}>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2, lineHeight: 1.4 }}>
                       Strength of linear trend
                     </div>
                   </div>
@@ -1581,13 +1581,13 @@ export default function StockTickerPage() {
                   <div style={{
                     marginTop: 16,
                     padding: 16,
-                    background: "var(--hover-bg)",
+                    background: "rgba(59,130,246,0.08)",
                     borderRadius: 6,
-                    border: "1px solid var(--border)",
+                    border: "1px solid #30363d",
                   }}>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 14 }}>
                       <div>
-                        <label style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4, display: "block" }}>
+                        <label style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4, display: "block" }}>
                           Fixed Window
                         </label>
                         <input
@@ -1599,16 +1599,16 @@ export default function StockTickerPage() {
                             width: "100%",
                             padding: "6px 8px",
                             borderRadius: 4,
-                            border: "1px solid var(--input-border)",
-                            background: "var(--input-bg)",
-                            color: "var(--foreground)",
+                            border: "1px solid #30363d",
+                            background: "#0d1117",
+                            color: "#fff",
                             fontSize: 12,
                             fontFamily: "monospace",
                           }}
                         />
                       </div>
                       <div>
-                        <label style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4, display: "block" }}>
+                        <label style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4, display: "block" }}>
                           Min Window
                         </label>
                         <input
@@ -1619,16 +1619,16 @@ export default function StockTickerPage() {
                             width: "100%",
                             padding: "6px 8px",
                             borderRadius: 4,
-                            border: "1px solid var(--input-border)",
-                            background: "var(--input-bg)",
-                            color: "var(--foreground)",
+                            border: "1px solid #30363d",
+                            background: "#0d1117",
+                            color: "#fff",
                             fontSize: 12,
                             fontFamily: "monospace",
                           }}
                         />
                       </div>
                       <div>
-                        <label style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4, display: "block" }}>
+                        <label style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4, display: "block" }}>
                           Max Window
                         </label>
                         <input
@@ -1639,16 +1639,16 @@ export default function StockTickerPage() {
                             width: "100%",
                             padding: "6px 8px",
                             borderRadius: 4,
-                            border: "1px solid var(--input-border)",
-                            background: "var(--input-bg)",
-                            color: "var(--foreground)",
+                            border: "1px solid #30363d",
+                            background: "#0d1117",
+                            color: "#fff",
                             fontSize: 12,
                             fontFamily: "monospace",
                           }}
                         />
                       </div>
                       <div>
-                        <label style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4, display: "block" }}>
+                        <label style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4, display: "block" }}>
                           Step Size
                         </label>
                         <input
@@ -1659,9 +1659,9 @@ export default function StockTickerPage() {
                             width: "100%",
                             padding: "6px 8px",
                             borderRadius: 4,
-                            border: "1px solid var(--input-border)",
-                            background: "var(--input-bg)",
-                            color: "var(--foreground)",
+                            border: "1px solid #30363d",
+                            background: "#0d1117",
+                            color: "#fff",
                             fontSize: 12,
                             fontFamily: "monospace",
                           }}
@@ -1671,22 +1671,22 @@ export default function StockTickerPage() {
 
                     {/* Deviation Bands */}
                     <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-                      <span style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Bands:</span>
-                      <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "var(--foreground)" }}>
+                      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Bands:</span>
+                      <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "#fff" }}>
                         <input
                           type="checkbox"
                           checked={showDeviation1}
                           onChange={(e) => setShowDeviation1(e.target.checked)}
-                          style={{ accentColor: "var(--accent)" }}
+                          style={{ accentColor: "#3b82f6" }}
                         />
                         ±1σ
                       </label>
-                      <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "var(--foreground)" }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "#fff" }}>
                         <input
                           type="checkbox"
                           checked={showDeviation2}
                           onChange={(e) => setShowDeviation2(e.target.checked)}
-                          style={{ accentColor: "var(--accent)" }}
+                          style={{ accentColor: "#3b82f6" }}
                         />
                         ±2σ
                       </label>
@@ -1700,15 +1700,15 @@ export default function StockTickerPage() {
                 <div style={{
                   padding: 20,
                   borderRadius: 4,
-                  border: "1px solid var(--card-border)",
-                  background: "var(--card-bg)",
+                  border: "1px solid #30363d",
+                  background: "#161b22",
                   marginBottom: 20,
                 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                    <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--foreground)" }}>
+                    <h2 style={{ fontSize: 16, fontWeight: 600, color: "#fff" }}>
                       {ticker} - Price Chart with STD Channels
                     </h2>
-                    <div style={{ fontSize: 12, color: "var(--muted)", fontFamily: "monospace" }}>
+                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontFamily: "monospace" }}>
                       Showing {stdChartData.length} bars | Window: {stdChannelData.metadata.windowSize} | k1={k1}, k2={k2}
                     </div>
                   </div>
@@ -1727,16 +1727,16 @@ export default function StockTickerPage() {
               <div style={{
                 padding: 20,
                 borderRadius: 4,
-                border: "1px solid var(--card-border)",
-                background: "var(--card-bg)",
+                border: "1px solid #30363d",
+                background: "#161b22",
                 marginBottom: 20,
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
                   <div>
-                    <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4, color: "var(--foreground)" }}>
+                    <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4, color: "#fff" }}>
                       Mean Reversion Backtest
                     </h2>
-                    <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
+                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>
                       Optimized parameters for {ticker} using slope-aligned mean reversion
                     </div>
                   </div>
@@ -1747,9 +1747,9 @@ export default function StockTickerPage() {
                       style={{
                         padding: "8px 10px",
                         borderRadius: 4,
-                        border: "1px solid var(--border)",
-                        background: showOptimizerParams ? "var(--accent)" : "transparent",
-                        color: showOptimizerParams ? "#fff" : "var(--muted)",
+                        border: "1px solid #30363d",
+                        background: showOptimizerParams ? "#3b82f6" : "transparent",
+                        color: showOptimizerParams ? "#fff" : "rgba(255,255,255,0.5)",
                         fontSize: 14,
                         cursor: "pointer",
                         display: "flex",
@@ -1767,7 +1767,7 @@ export default function StockTickerPage() {
                         padding: "8px 16px",
                         borderRadius: 4,
                         border: "none",
-                        background: stdBacktestLoading ? "var(--muted)" : "#f59e0b",
+                        background: stdBacktestLoading ? "rgba(255,255,255,0.5)" : "#f59e0b",
                         color: "#fff",
                         fontSize: 12,
                         fontWeight: 600,
@@ -1784,16 +1784,16 @@ export default function StockTickerPage() {
                 {showOptimizerParams && (
                   <div style={{
                     padding: 16,
-                    background: "linear-gradient(135deg, var(--card-bg) 0%, var(--hover-bg) 100%)",
+                    background: "linear-gradient(135deg, #161b22 0%, rgba(59,130,246,0.08) 100%)",
                     borderRadius: 6,
                     marginBottom: 16,
-                    border: "1px solid var(--accent)",
+                    border: "1px solid #3b82f6",
                     borderLeftWidth: 3,
                   }}>
                     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                       {/* Entry Sigma - when to enter */}
                       <div>
-                        <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                           Entry σ <span style={{ textTransform: "none", opacity: 0.7 }}>(distance from mean to enter)</span>
                         </div>
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -1804,9 +1804,9 @@ export default function StockTickerPage() {
                               style={{
                                 padding: "4px 10px",
                                 borderRadius: 4,
-                                border: optEntrySigmas.has(v) ? "1px solid var(--accent)" : "1px solid var(--border)",
-                                background: optEntrySigmas.has(v) ? "var(--accent)" : "transparent",
-                                color: optEntrySigmas.has(v) ? "#fff" : "var(--foreground)",
+                                border: optEntrySigmas.has(v) ? "1px solid #3b82f6" : "1px solid #30363d",
+                                background: optEntrySigmas.has(v) ? "#3b82f6" : "transparent",
+                                color: optEntrySigmas.has(v) ? "#fff" : "#fff",
                                 fontSize: 12,
                                 fontFamily: "monospace",
                                 cursor: "pointer",
@@ -1820,7 +1820,7 @@ export default function StockTickerPage() {
 
                       {/* Stop Offset - risk per trade */}
                       <div>
-                        <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                           Stop Offset <span style={{ textTransform: "none", opacity: 0.7 }}>(stop = entry + offset, controls risk)</span>
                         </div>
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -1831,9 +1831,9 @@ export default function StockTickerPage() {
                               style={{
                                 padding: "4px 10px",
                                 borderRadius: 4,
-                                border: optStopOffsets.has(v) ? "1px solid #ef4444" : "1px solid var(--border)",
+                                border: optStopOffsets.has(v) ? "1px solid #ef4444" : "1px solid #30363d",
                                 background: optStopOffsets.has(v) ? "rgba(239, 68, 68, 0.2)" : "transparent",
-                                color: optStopOffsets.has(v) ? "#ef4444" : "var(--foreground)",
+                                color: optStopOffsets.has(v) ? "#ef4444" : "#fff",
                                 fontSize: 12,
                                 fontFamily: "monospace",
                                 cursor: "pointer",
@@ -1843,14 +1843,14 @@ export default function StockTickerPage() {
                             </button>
                           ))}
                         </div>
-                        <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4, fontStyle: "italic" }}>
+                        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginTop: 4, fontStyle: "italic" }}>
                           e.g. Entry 2σ + Offset 0.5σ = Stop at 2.5σ (risk 0.5σ per trade)
                         </div>
                       </div>
 
                       {/* Max Holding Days */}
                       <div>
-                        <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                           Max Days <span style={{ textTransform: "none", opacity: 0.7 }}>(time limit per trade)</span>
                         </div>
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -1861,9 +1861,9 @@ export default function StockTickerPage() {
                               style={{
                                 padding: "4px 10px",
                                 borderRadius: 4,
-                                border: optMaxDays.has(v) ? "1px solid #3b82f6" : "1px solid var(--border)",
+                                border: optMaxDays.has(v) ? "1px solid #3b82f6" : "1px solid #30363d",
                                 background: optMaxDays.has(v) ? "rgba(59, 130, 246, 0.2)" : "transparent",
-                                color: optMaxDays.has(v) ? "#3b82f6" : "var(--foreground)",
+                                color: optMaxDays.has(v) ? "#3b82f6" : "#fff",
                                 fontSize: 12,
                                 fontFamily: "monospace",
                                 cursor: "pointer",
@@ -1879,7 +1879,7 @@ export default function StockTickerPage() {
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 120px", gap: 12 }}>
                         {/* Min R² */}
                         <div>
-                          <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                             Min R² <span style={{ textTransform: "none", opacity: 0.7 }}>(channel quality)</span>
                           </div>
                           <div style={{ display: "flex", gap: 6 }}>
@@ -1890,9 +1890,9 @@ export default function StockTickerPage() {
                                 style={{
                                   padding: "4px 10px",
                                   borderRadius: 4,
-                                  border: optMinR2s.has(v) ? "1px solid #10b981" : "1px solid var(--border)",
+                                  border: optMinR2s.has(v) ? "1px solid #10b981" : "1px solid #30363d",
                                   background: optMinR2s.has(v) ? "rgba(16, 185, 129, 0.2)" : "transparent",
-                                  color: optMinR2s.has(v) ? "#10b981" : "var(--foreground)",
+                                  color: optMinR2s.has(v) ? "#10b981" : "#fff",
                                   fontSize: 12,
                                   fontFamily: "monospace",
                                   cursor: "pointer",
@@ -1906,7 +1906,7 @@ export default function StockTickerPage() {
 
                         {/* Window Sizes */}
                         <div>
-                          <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                             Window <span style={{ textTransform: "none", opacity: 0.7 }}>(lookback)</span>
                           </div>
                           <div style={{ display: "flex", gap: 6 }}>
@@ -1917,9 +1917,9 @@ export default function StockTickerPage() {
                                 style={{
                                   padding: "4px 8px",
                                   borderRadius: 4,
-                                  border: optWindows.has(v) ? "1px solid var(--foreground)" : "1px solid var(--border)",
-                                  background: optWindows.has(v) ? "var(--hover-bg)" : "transparent",
-                                  color: optWindows.has(v) ? "var(--foreground)" : "var(--muted)",
+                                  border: optWindows.has(v) ? "1px solid #fff" : "1px solid #30363d",
+                                  background: optWindows.has(v) ? "rgba(59,130,246,0.08)" : "transparent",
+                                  color: optWindows.has(v) ? "#fff" : "rgba(255,255,255,0.5)",
                                   fontSize: 11,
                                   fontFamily: "monospace",
                                   cursor: "pointer",
@@ -1933,7 +1933,7 @@ export default function StockTickerPage() {
 
                         {/* Min Trades */}
                         <div>
-                          <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                             Min Trades
                           </div>
                           <input
@@ -1946,9 +1946,9 @@ export default function StockTickerPage() {
                               width: "100%",
                               padding: "4px 8px",
                               borderRadius: 4,
-                              border: "1px solid var(--input-border)",
-                              background: "var(--input-bg)",
-                              color: "var(--foreground)",
+                              border: "1px solid #30363d",
+                              background: "#0d1117",
+                              color: "#fff",
                               fontSize: 12,
                             }}
                           />
@@ -1964,9 +1964,9 @@ export default function StockTickerPage() {
                     {stdBacktestLoading && (
                       <div style={{
                         padding: 20,
-                        background: "linear-gradient(135deg, var(--card-bg) 0%, #1a1a2e 100%)",
+                        background: "linear-gradient(135deg, #161b22 0%, #1a1a2e 100%)",
                         borderRadius: 6,
-                        border: "1px solid var(--accent)",
+                        border: "1px solid #3b82f6",
                       }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                           <div style={{
@@ -1988,15 +1988,15 @@ export default function StockTickerPage() {
                             }} />
                           </div>
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, color: "var(--foreground)" }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, color: "#fff" }}>
                               Optimizing {ticker}
                             </div>
-                            <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 8 }}>
+                            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginBottom: 8 }}>
                               Testing ~270 parameter combinations...
                             </div>
                             <div style={{
                               height: 4,
-                              background: "var(--border)",
+                              background: "#30363d",
                               borderRadius: 2,
                               overflow: "hidden",
                             }}>
@@ -2008,7 +2008,7 @@ export default function StockTickerPage() {
                                 transition: "width 0.15s ease-out",
                               }} />
                             </div>
-                            <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4, fontFamily: "monospace" }}>
+                            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginTop: 4, fontFamily: "monospace" }}>
                               {optimizerProgress.toFixed(0)}% complete
                             </div>
                           </div>
@@ -2017,7 +2017,7 @@ export default function StockTickerPage() {
                     )}
 
                     {stdBacktestError && (
-                      <div style={{ padding: 12, background: "var(--danger-bg)", border: "1px solid var(--danger)", borderRadius: 4, color: "var(--danger)", fontSize: 12 }}>
+                      <div style={{ padding: 12, background: "rgba(239,68,68,0.08)", border: "1px solid #ef4444", borderRadius: 4, color: "#ef4444", fontSize: 12 }}>
                         {stdBacktestError}
                       </div>
                     )}
@@ -2032,39 +2032,39 @@ export default function StockTickerPage() {
                           marginBottom: 16,
                         }}>
                           <div style={{ background: "rgba(16, 185, 129, 0.1)", padding: 12, borderRadius: 4, border: "1px solid rgba(16, 185, 129, 0.2)" }}>
-                            <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", marginBottom: 4 }}>Total Return</div>
+                            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", marginBottom: 4 }}>Total Return</div>
                             <div style={{ fontSize: 20, fontWeight: 700, color: "#10b981", fontFamily: "monospace" }}>
                               {(stdBacktestData.best.totalReturn * 100).toFixed(0)}%
                             </div>
-                            <div style={{ fontSize: 10, color: "var(--muted-foreground)" }}>{stdBacktestData.best.totalTrades} trades</div>
+                            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>{stdBacktestData.best.totalTrades} trades</div>
                           </div>
-                          <div style={{ background: "var(--hover-bg)", padding: 12, borderRadius: 4 }}>
-                            <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", marginBottom: 4 }}>Win Rate</div>
+                          <div style={{ background: "rgba(59,130,246,0.08)", padding: 12, borderRadius: 4 }}>
+                            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", marginBottom: 4 }}>Win Rate</div>
                             <div style={{ fontSize: 20, fontWeight: 700, color: stdBacktestData.best.winRate >= 0.5 ? "#10b981" : "#ef4444", fontFamily: "monospace" }}>
                               {(stdBacktestData.best.winRate * 100).toFixed(0)}%
                             </div>
                           </div>
-                          <div style={{ background: "var(--hover-bg)", padding: 12, borderRadius: 4 }}>
-                            <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", marginBottom: 4 }}>Sharpe</div>
-                            <div style={{ fontSize: 20, fontWeight: 700, color: stdBacktestData.best.sharpe >= 1 ? "#10b981" : "var(--foreground)", fontFamily: "monospace" }}>
+                          <div style={{ background: "rgba(59,130,246,0.08)", padding: 12, borderRadius: 4 }}>
+                            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", marginBottom: 4 }}>Sharpe</div>
+                            <div style={{ fontSize: 20, fontWeight: 700, color: stdBacktestData.best.sharpe >= 1 ? "#10b981" : "#fff", fontFamily: "monospace" }}>
                               {stdBacktestData.best.sharpe.toFixed(2)}
                             </div>
                           </div>
-                          <div style={{ background: "var(--hover-bg)", padding: 12, borderRadius: 4 }}>
-                            <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", marginBottom: 4 }}>Profit Factor</div>
-                            <div style={{ fontSize: 20, fontWeight: 700, color: "var(--foreground)", fontFamily: "monospace" }}>
+                          <div style={{ background: "rgba(59,130,246,0.08)", padding: 12, borderRadius: 4 }}>
+                            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", marginBottom: 4 }}>Profit Factor</div>
+                            <div style={{ fontSize: 20, fontWeight: 700, color: "#fff", fontFamily: "monospace" }}>
                               {stdBacktestData.best.profitFactor > 10 ? ">10" : stdBacktestData.best.profitFactor.toFixed(2)}
                             </div>
                           </div>
                           <div style={{ background: "rgba(239, 68, 68, 0.1)", padding: 12, borderRadius: 4, border: "1px solid rgba(239, 68, 68, 0.2)" }}>
-                            <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", marginBottom: 4 }}>Max Drawdown</div>
+                            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", marginBottom: 4 }}>Max Drawdown</div>
                             <div style={{ fontSize: 20, fontWeight: 700, color: "#ef4444", fontFamily: "monospace" }}>
                               -{(stdBacktestData.best.maxDrawdown * 100).toFixed(1)}%
                             </div>
                           </div>
-                          <div style={{ background: "var(--hover-bg)", padding: 12, borderRadius: 4 }}>
-                            <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", marginBottom: 4 }}>Avg Hold</div>
-                            <div style={{ fontSize: 20, fontWeight: 700, color: "var(--foreground)", fontFamily: "monospace" }}>
+                          <div style={{ background: "rgba(59,130,246,0.08)", padding: 12, borderRadius: 4 }}>
+                            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", marginBottom: 4 }}>Avg Hold</div>
+                            <div style={{ fontSize: 20, fontWeight: 700, color: "#fff", fontFamily: "monospace" }}>
                               {stdBacktestData.best.avgHoldingDays.toFixed(0)}d
                             </div>
                           </div>
@@ -2072,14 +2072,14 @@ export default function StockTickerPage() {
 
                         {/* Best Parameters */}
                         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
-                          <div style={{ fontSize: 11, color: "var(--muted)" }}>
-                            <strong style={{ color: "var(--foreground)" }}>Best Parameters:</strong>{" "}
+                          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+                            <strong style={{ color: "#fff" }}>Best Parameters:</strong>{" "}
                             Entry {stdBacktestData.best.params.entrySigma}σ, Stop {stdBacktestData.best.params.stopSigma}σ,
                             Max {stdBacktestData.best.params.maxDays}d, R² ≥ {stdBacktestData.best.params.minR2},
                             Window {stdBacktestData.best.params.windowSize}
                           </div>
-                          <div style={{ fontSize: 11, color: "var(--muted)" }}>
-                            <strong style={{ color: "var(--foreground)" }}>Data:</strong>{" "}
+                          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+                            <strong style={{ color: "#fff" }}>Data:</strong>{" "}
                             {stdBacktestData.dateRange.start} to {stdBacktestData.dateRange.end} ({stdBacktestData.dataPoints} days)
                           </div>
                         </div>
@@ -2105,9 +2105,9 @@ export default function StockTickerPage() {
                               style={{
                                 padding: "6px 12px",
                                 borderRadius: 4,
-                                border: "1px solid var(--border)",
-                                background: showTrades ? "var(--hover-bg)" : "transparent",
-                                color: "var(--accent)",
+                                border: "1px solid #30363d",
+                                background: showTrades ? "rgba(59,130,246,0.08)" : "transparent",
+                                color: "#3b82f6",
                                 fontSize: 12,
                                 fontWeight: 500,
                                 cursor: "pointer",
@@ -2121,7 +2121,7 @@ export default function StockTickerPage() {
                               <div style={{ overflowX: "auto" }}>
                                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
                                   <thead>
-                                    <tr style={{ color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--border)" }}>
+                                    <tr style={{ color: "rgba(255,255,255,0.5)", textAlign: "left", borderBottom: "1px solid #30363d" }}>
                                       <th style={{ padding: "8px 6px", fontWeight: 500 }}>#</th>
                                       <th style={{ padding: "8px 6px", fontWeight: 500 }}>Entry Date</th>
                                       <th style={{ padding: "8px 6px", fontWeight: 500 }}>Exit Date</th>
@@ -2136,11 +2136,11 @@ export default function StockTickerPage() {
                                       <tr
                                         key={idx}
                                         style={{
-                                          borderBottom: "1px solid var(--border)",
-                                          background: idx % 2 === 0 ? "transparent" : "var(--hover-bg)",
+                                          borderBottom: "1px solid #30363d",
+                                          background: idx % 2 === 0 ? "transparent" : "rgba(59,130,246,0.08)",
                                         }}
                                       >
-                                        <td style={{ padding: "8px 6px", color: "var(--muted)" }}>{idx + 1}</td>
+                                        <td style={{ padding: "8px 6px", color: "rgba(255,255,255,0.5)" }}>{idx + 1}</td>
                                         <td style={{ padding: "8px 6px", fontFamily: "monospace" }}>{trade.entryDate}</td>
                                         <td style={{ padding: "8px 6px", fontFamily: "monospace" }}>{trade.exitDate}</td>
                                         <td style={{
@@ -2178,13 +2178,13 @@ export default function StockTickerPage() {
                         {/* All Results Table (collapsed by default, expandable) */}
                         {stdBacktestData.results.length > 1 && (
                           <details style={{ marginTop: 16 }}>
-                            <summary style={{ cursor: "pointer", fontSize: 12, color: "var(--accent)", fontWeight: 500 }}>
+                            <summary style={{ cursor: "pointer", fontSize: 12, color: "#3b82f6", fontWeight: 500 }}>
                               Show all {stdBacktestData.results.length} optimized parameter sets
                             </summary>
                             <div style={{ overflowX: "auto", marginTop: 12 }}>
                               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
                                 <thead>
-                                  <tr style={{ color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--border)" }}>
+                                  <tr style={{ color: "rgba(255,255,255,0.5)", textAlign: "left", borderBottom: "1px solid #30363d" }}>
                                     <th style={{ padding: "6px 8px", fontWeight: 500 }}>Entry σ</th>
                                     <th style={{ padding: "6px 8px", fontWeight: 500 }}>Stop σ</th>
                                     <th style={{ padding: "6px 8px", fontWeight: 500 }}>Max Days</th>
@@ -2199,7 +2199,7 @@ export default function StockTickerPage() {
                                 </thead>
                                 <tbody>
                                   {stdBacktestData.results.map((r, idx) => (
-                                    <tr key={idx} style={{ borderBottom: "1px solid var(--table-border)", background: idx === 0 ? "#2a2a1a" : "#141414" }}>
+                                    <tr key={idx} style={{ borderBottom: "1px solid #30363d", background: idx === 0 ? "#2a2a1a" : "#141414" }}>
                                       <td style={{ padding: "8px", fontFamily: "monospace" }}>{r.params.entrySigma}</td>
                                       <td style={{ padding: "8px", fontFamily: "monospace" }}>{r.params.stopSigma}</td>
                                       <td style={{ padding: "8px", fontFamily: "monospace" }}>{r.params.maxDays}</td>
@@ -2230,7 +2230,7 @@ export default function StockTickerPage() {
 
                 {/* Initial state - show hint */}
                 {!showOptimizer && (
-                  <div style={{ fontSize: 12, color: "var(--muted-foreground)", fontStyle: "italic" }}>
+                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontStyle: "italic" }}>
                     Click &quot;Configure&quot; to adjust parameters, then &quot;Run Backtest&quot; to find the best STD Channel mean reversion strategy for {ticker}.
                   </div>
                 )}
@@ -2241,45 +2241,45 @@ export default function StockTickerPage() {
                 <div style={{
                   padding: 20,
                   borderRadius: 4,
-                  border: "1px solid var(--card-border)",
-                  background: "var(--card-bg)",
+                  border: "1px solid #30363d",
+                  background: "#161b22",
                   marginBottom: 20,
                 }}>
-                  <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: "var(--foreground)" }}>
+                  <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: "#fff" }}>
                     Position Analysis
                   </h2>
 
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 16 }}>
                     <div>
-                      <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Current Price</div>
-                      <div style={{ fontSize: 20, fontWeight: 600, fontFamily: "monospace", color: "var(--foreground)" }}>
+                      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 6 }}>Current Price</div>
+                      <div style={{ fontSize: 20, fontWeight: 600, fontFamily: "monospace", color: "#fff" }}>
                         {meanReversalInfo.lastClose.toFixed(2)}
                       </div>
                     </div>
 
                     <div>
-                      <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Distance from Regression Line</div>
+                      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 6 }}>Distance from Regression Line</div>
                       <div style={{
                         fontSize: 20,
                         fontWeight: 600,
                         fontFamily: "monospace",
-                        color: meanReversalInfo.sigmaUnits > 0 ? "var(--success)" : "var(--danger)"
+                        color: meanReversalInfo.sigmaUnits > 0 ? "#10b981" : "#ef4444"
                       }}>
                         {meanReversalInfo.sigmaUnits > 0 ? "+" : ""}{meanReversalInfo.sigmaUnits.toFixed(2)}σ
                       </div>
-                      <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
+                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>
                         {meanReversalInfo.distanceFromMid > 0 ? "+" : ""}{meanReversalInfo.distanceFromMid.toFixed(2)} pts
                       </div>
                     </div>
 
                     <div>
-                      <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Position Classification</div>
+                      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 6 }}>Position Classification</div>
                       <div style={{
                         fontSize: 16,
                         fontWeight: 600,
-                        color: meanReversalInfo.position === 'extreme_high' || meanReversalInfo.position === 'extreme_low' ? "var(--danger)"
-                          : meanReversalInfo.position === 'high' || meanReversalInfo.position === 'low' ? "var(--warning)"
-                          : "var(--muted)"
+                        color: meanReversalInfo.position === 'extreme_high' || meanReversalInfo.position === 'extreme_low' ? "#ef4444"
+                          : meanReversalInfo.position === 'high' || meanReversalInfo.position === 'low' ? "#f59e0b"
+                          : "rgba(255,255,255,0.5)"
                       }}>
                         {meanReversalInfo.position === 'extreme_high' ? "Extreme High"
                           : meanReversalInfo.position === 'extreme_low' ? "Extreme Low"
@@ -2290,16 +2290,16 @@ export default function StockTickerPage() {
                     </div>
 
                     <div>
-                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>
+                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginBottom: 6 }}>
                         Distance to {meanReversalInfo.sigmaUnits > 0 ? "Upper" : "Lower"} Band (±2σ)
                       </div>
-                      <div style={{ fontSize: 16, fontWeight: 600, fontFamily: "monospace", color: "var(--foreground)" }}>
+                      <div style={{ fontSize: 16, fontWeight: 600, fontFamily: "monospace", color: "#fff" }}>
                         {meanReversalInfo.sigmaUnits > 0
                           ? `${meanReversalInfo.distanceToUpper2.toFixed(2)}%`
                           : `${meanReversalInfo.distanceToLower2.toFixed(2)}%`
                         }
                       </div>
-                      <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
+                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>
                         Level: {meanReversalInfo.sigmaUnits > 0
                           ? meanReversalInfo.upperBand2.toFixed(2)
                           : meanReversalInfo.lowerBand2.toFixed(2)
@@ -2311,11 +2311,11 @@ export default function StockTickerPage() {
                   <div style={{
                     padding: 14,
                     borderRadius: 4,
-                    background: "var(--hover-bg)",
-                    border: "1px solid var(--border)",
+                    background: "rgba(59,130,246,0.08)",
+                    border: "1px solid #30363d",
                   }}>
-                    <div style={{ fontSize: 12, color: "var(--foreground)", lineHeight: 1.6 }}>
-                      <strong style={{ color: "var(--muted)" }}>Analysis:</strong>{" "}
+                    <div style={{ fontSize: 12, color: "#fff", lineHeight: 1.6 }}>
+                      <strong style={{ color: "rgba(255,255,255,0.5)" }}>Analysis:</strong>{" "}
                       {meanReversalInfo.position === 'extreme_high' || meanReversalInfo.position === 'extreme_low' ? (
                         <>
                           Price is currently {Math.abs(meanReversalInfo.sigmaUnits).toFixed(1)}σ {meanReversalInfo.sigmaUnits > 0 ? "above" : "below"} the regression line,
@@ -2342,8 +2342,8 @@ export default function StockTickerPage() {
               <div style={{
                 padding: 20,
                 borderRadius: 4,
-                border: "1px solid var(--card-border)",
-                background: "var(--card-bg)",
+                border: "1px solid #30363d",
+                background: "#161b22",
               }}>
                 <div
                   onClick={() => setShowMethodology(!showMethodology)}
@@ -2355,20 +2355,20 @@ export default function StockTickerPage() {
                     userSelect: "none",
                   }}
                 >
-                  <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--foreground)" }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>
                     Methodology & Interpretation
                   </h3>
-                  <span style={{ fontSize: 18, color: "var(--muted)" }}>
+                  <span style={{ fontSize: 18, color: "rgba(255,255,255,0.5)" }}>
                     {showMethodology ? "−" : "+"}
                   </span>
                 </div>
 
                 {showMethodology && (
-                  <div style={{ marginTop: 16, fontSize: 13, lineHeight: 1.7, color: "var(--foreground)" }}>
+                  <div style={{ marginTop: 16, fontSize: 13, lineHeight: 1.7, color: "#fff" }}>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
                       <div>
-                        <h4 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "var(--muted)" }}>Core Features:</h4>
-                        <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6, color: "var(--foreground)" }}>
+                        <h4 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "rgba(255,255,255,0.5)" }}>Core Features:</h4>
+                        <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6, color: "#fff" }}>
                           <li><strong>Automatic Window Optimization:</strong> Identifies optimal lookback period (255-1530 bars) by maximizing R²</li>
                           <li><strong>Fixed Window Analysis:</strong> Manual window size selection for specific time periods</li>
                           <li><strong>Preset Time Ranges:</strong> Predefined configurations for short, medium, and long-term analysis</li>
@@ -2376,8 +2376,8 @@ export default function StockTickerPage() {
                         </ul>
                       </div>
                       <div>
-                        <h4 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "var(--muted)" }}>Position Classifications:</h4>
-                        <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6, color: "var(--foreground)" }}>
+                        <h4 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "rgba(255,255,255,0.5)" }}>Position Classifications:</h4>
+                        <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6, color: "#fff" }}>
                           <li><strong>Extreme High/Low:</strong> Price exceeds ±1.8σ - Elevated mean reversion probability</li>
                           <li><strong>Elevated/Depressed:</strong> Price between ±0.8σ and ±1.8σ - Moderate deviation range</li>
                           <li><strong>Within Range:</strong> Price within ±0.8σ - Normal statistical range</li>
@@ -2386,9 +2386,9 @@ export default function StockTickerPage() {
                       </div>
                     </div>
 
-                    <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
-                      <h4 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "var(--muted)" }}>Statistical Metrics:</h4>
-                      <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6, color: "var(--foreground)" }}>
+                    <div style={{ borderTop: "1px solid #30363d", paddingTop: 16 }}>
+                      <h4 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "rgba(255,255,255,0.5)" }}>Statistical Metrics:</h4>
+                      <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6, color: "#fff" }}>
                         <li>
                           <strong>R² (Fit Quality):</strong> Measures how well the linear regression fits the price data.
                           Values range from 0 (no fit) to 1 (perfect fit). Higher R² means the trend line better explains price movements,
@@ -2406,8 +2406,8 @@ export default function StockTickerPage() {
                       </ul>
                     </div>
 
-                    <div style={{ marginTop: 16, padding: 12, borderRadius: 4, background: "var(--hover-bg)", border: "1px solid var(--border)" }}>
-                      <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                    <div style={{ marginTop: 16, padding: 12, borderRadius: 4, background: "rgba(59,130,246,0.08)", border: "1px solid #30363d" }}>
+                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
                         <strong>Note:</strong> The standard deviation channel uses linear regression to identify the trend and statistical boundaries.
                         Higher R² values indicate better linear fit and more reliable mean reversion characteristics. Position analysis considers both
                         the distance from the regression line (in sigma units) and proximity to the outer bands. This tool is intended for analysis purposes
@@ -2445,35 +2445,35 @@ export default function StockTickerPage() {
             onSubmit={(e) => { e.preventDefault(); handleModelLogin(); }}
             style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 24, width: 340 }}
           >
-            <div style={{ fontSize: 16, fontWeight: 600, color: "#e0e0e0", marginBottom: 4, fontFamily: "'Geist Mono', monospace" }}>Sign In</div>
-            <div style={{ fontSize: 11, color: "#8b949e", marginBottom: 16, fontFamily: "'Geist Mono', monospace" }}>Sign in to save & load model edits</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#e0e0e0", marginBottom: 4, fontFamily: "monospace" }}>Sign In</div>
+            <div style={{ fontSize: 11, color: "#8b949e", marginBottom: 16, fontFamily: "monospace" }}>Sign in to save & load model edits</div>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: "block", fontSize: 9, fontWeight: 700, color: "#8b949e", marginBottom: 4, letterSpacing: "0.06em", fontFamily: "'Geist Mono', monospace" }}>USERNAME</label>
+              <label style={{ display: "block", fontSize: 9, fontWeight: 700, color: "#8b949e", marginBottom: 4, letterSpacing: "0.06em", fontFamily: "monospace" }}>USERNAME</label>
               <input
                 value={modelUsername}
                 onChange={(e) => setModelUsername(e.target.value)}
                 placeholder="Enter username"
                 autoFocus
                 autoComplete="username"
-                style={{ width: "100%", padding: "8px 10px", fontSize: 13, background: "#0d1117", border: "1px solid #30363d", borderRadius: 4, color: "#fff", fontFamily: "'Geist Mono', monospace", boxSizing: "border-box" }}
+                style={{ width: "100%", padding: "8px 10px", fontSize: 13, background: "#0d1117", border: "1px solid #30363d", borderRadius: 4, color: "#fff", fontFamily: "monospace", boxSizing: "border-box" }}
               />
             </div>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: "block", fontSize: 9, fontWeight: 700, color: "#8b949e", marginBottom: 4, letterSpacing: "0.06em", fontFamily: "'Geist Mono', monospace" }}>PASSWORD</label>
+              <label style={{ display: "block", fontSize: 9, fontWeight: 700, color: "#8b949e", marginBottom: 4, letterSpacing: "0.06em", fontFamily: "monospace" }}>PASSWORD</label>
               <input
                 type="password"
                 value={modelPassword}
                 onChange={(e) => setModelPassword(e.target.value)}
                 placeholder="Enter password"
                 autoComplete="current-password"
-                style={{ width: "100%", padding: "8px 10px", fontSize: 13, background: "#0d1117", border: "1px solid #30363d", borderRadius: 4, color: "#fff", fontFamily: "'Geist Mono', monospace", boxSizing: "border-box" }}
+                style={{ width: "100%", padding: "8px 10px", fontSize: 13, background: "#0d1117", border: "1px solid #30363d", borderRadius: 4, color: "#fff", fontFamily: "monospace", boxSizing: "border-box" }}
               />
             </div>
             <button
               type="submit"
               disabled={modelAuthLoading || !modelPassword || !modelUsername}
               style={{
-                width: "100%", padding: "8px 0", fontSize: 13, fontWeight: 600, fontFamily: "'Geist Mono', monospace",
+                width: "100%", padding: "8px 0", fontSize: 13, fontWeight: 600, fontFamily: "monospace",
                 background: (modelAuthLoading || !modelPassword || !modelUsername) ? "#30363d" : "#3b82f6",
                 color: "#fff", border: "none", borderRadius: 4, cursor: (modelAuthLoading || !modelPassword || !modelUsername) ? "default" : "pointer",
                 opacity: (modelAuthLoading || !modelPassword || !modelUsername) ? 0.5 : 1,
@@ -2482,7 +2482,7 @@ export default function StockTickerPage() {
               {modelAuthLoading ? "Signing in..." : "Sign In"}
             </button>
             {modelAuthError && (
-              <div style={{ marginTop: 8, fontSize: 11, color: "#ef4444", fontFamily: "'Geist Mono', monospace" }}>{modelAuthError}</div>
+              <div style={{ marginTop: 8, fontSize: 11, color: "#ef4444", fontFamily: "monospace" }}>{modelAuthError}</div>
             )}
           </form>
         </div>
@@ -2491,36 +2491,36 @@ export default function StockTickerPage() {
       {/* SHARED ANALYSIS SECTIONS */}
       {!loading && data && activeReturns && (
         <>
-          <div style={{ marginBottom: 24, padding: 20, borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)" }}>
-            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "var(--foreground)" }}>
+          <div style={{ marginBottom: 24, padding: 20, borderRadius: 4, border: "1px solid #30363d", background: "#161b22" }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "#fff" }}>
               Return Distribution Analysis
             </h2>
-            <p style={{ fontSize: 12, color: "var(--muted-foreground)", marginBottom: 16, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 16, lineHeight: 1.5 }}>
               <strong>Probability density at different timeframes.</strong> Shows how likely different returns are over various holding periods.
               Wider curves = more uncertainty. Skewness and kurtosis reveal tail risk.
             </p>
             <ReturnDistributionChart returns={activeReturns} height={320} />
           </div>
 
-          <div style={{ marginBottom: 24, padding: 20, borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)" }}>
-            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "var(--foreground)" }}>
+          <div style={{ marginBottom: 24, padding: 20, borderRadius: 4, border: "1px solid #30363d", background: "#161b22" }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "#fff" }}>
               Residual Squares Analysis
             </h2>
-            <p style={{ fontSize: 12, color: "var(--muted-foreground)", marginBottom: 16, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 16, lineHeight: 1.5 }}>
               <strong>Unexplained variance from OBX beta model.</strong> Measures idiosyncratic risk not explained by market movements.
               Lower residuals = stock moves with market. Higher residuals = stock has unique drivers.
             </p>
             {residualsLoading && (
-              <div style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>
+              <div style={{ padding: 40, textAlign: "center", color: "rgba(255,255,255,0.5)" }}>
                 Loading residuals data...
               </div>
             )}
             {!residualsLoading && residualsError && (
-              <div style={{ padding: 20, borderRadius: 4, border: "1px solid var(--danger)", background: "rgba(239, 68, 68, 0.05)" }}>
-                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6, color: "var(--danger)" }}>
+              <div style={{ padding: 20, borderRadius: 4, border: "1px solid #ef4444", background: "rgba(239, 68, 68, 0.05)" }}>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6, color: "#ef4444" }}>
                   Unable to load residuals data
                 </div>
-                <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>{residualsError}</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>{residualsError}</div>
               </div>
             )}
             {!residualsLoading && !residualsError && residualsData && residualsData.length > 0 && (
@@ -2534,17 +2534,17 @@ export default function StockTickerPage() {
               />
             )}
             {!residualsLoading && !residualsError && (!residualsData || residualsData.length === 0) && (
-              <div style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>
+              <div style={{ padding: 40, textAlign: "center", color: "rgba(255,255,255,0.5)" }}>
                 No residuals data available
               </div>
             )}
           </div>
 
-          <div style={{ padding: 20, borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)" }}>
-            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "var(--foreground)" }}>
+          <div style={{ padding: 20, borderRadius: 4, border: "1px solid #30363d", background: "#161b22" }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "#fff" }}>
               Daily Returns Analysis
             </h2>
-            <p style={{ fontSize: 12, color: "var(--muted-foreground)", marginBottom: 16, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 16, lineHeight: 1.5 }}>
               <strong>Daily return time series with statistical measures.</strong> Each row shows the log return for that day,
               with cumulative return calculated from the oldest date in the selected range. Win rate, skewness, and kurtosis reveal return distribution characteristics.
             </p>
@@ -2559,9 +2559,9 @@ export default function StockTickerPage() {
                     style={{
                       padding: "6px 12px",
                       borderRadius: 3,
-                      border: "1px solid var(--input-border)",
-                      background: "var(--input-bg)",
-                      color: "var(--foreground)",
+                      border: "1px solid #30363d",
+                      background: "#0d1117",
+                      color: "#fff",
                       fontSize: 12,
                       cursor: "pointer",
                       fontWeight: 500,
@@ -2569,12 +2569,12 @@ export default function StockTickerPage() {
                       transform: "scale(1)"
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "var(--hover-bg)";
-                      e.currentTarget.style.borderColor = "var(--accent)";
+                      e.currentTarget.style.background = "rgba(59,130,246,0.08)";
+                      e.currentTarget.style.borderColor = "#3b82f6";
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "var(--input-bg)";
-                      e.currentTarget.style.borderColor = "var(--input-border)";
+                      e.currentTarget.style.background = "#0d1117";
+                      e.currentTarget.style.borderColor = "#30363d";
                     }}
                     onMouseDown={(e) => {
                       e.currentTarget.style.transform = "scale(0.95)";
@@ -2589,24 +2589,24 @@ export default function StockTickerPage() {
               </div>
               <div style={{ flex: 1 }} />
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <input type="date" value={returnsStartDate} onChange={(e) => setReturnsStartDate(e.target.value)} style={{ padding: "6px 10px", borderRadius: 3, border: "1px solid var(--input-border)", background: "var(--input-bg)", color: "var(--foreground)", fontSize: 12 }} />
-                <span style={{ color: "var(--muted)" }}>→</span>
-                <input type="date" value={returnsEndDate} onChange={(e) => setReturnsEndDate(e.target.value)} style={{ padding: "6px 10px", borderRadius: 3, border: "1px solid var(--input-border)", background: "var(--input-bg)", color: "var(--foreground)", fontSize: 12 }} />
+                <input type="date" value={returnsStartDate} onChange={(e) => setReturnsStartDate(e.target.value)} style={{ padding: "6px 10px", borderRadius: 3, border: "1px solid #30363d", background: "#0d1117", color: "#fff", fontSize: 12 }} />
+                <span style={{ color: "rgba(255,255,255,0.5)" }}>→</span>
+                <input type="date" value={returnsEndDate} onChange={(e) => setReturnsEndDate(e.target.value)} style={{ padding: "6px 10px", borderRadius: 3, border: "1px solid #30363d", background: "#0d1117", color: "#fff", fontSize: 12 }} />
               </div>
             </div>
 
             {/* Filter Controls */}
-            <div style={{ marginBottom: 24, padding: 14, borderRadius: 4, border: "1px solid var(--border-subtle)", background: "var(--hover-bg)" }}>
-              <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", marginBottom: 10, fontWeight: 600 }}>Filter Returns</div>
+            <div style={{ marginBottom: 24, padding: 14, borderRadius: 4, border: "1px solid #21262d", background: "rgba(59,130,246,0.08)" }}>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", marginBottom: 10, fontWeight: 600 }}>Filter Returns</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
                 <button
                   onClick={() => setReturnFilter("all")}
                   style={{
                     padding: "6px 12px",
                     borderRadius: 3,
-                    border: "1px solid var(--input-border)",
-                    background: returnFilter === "all" ? "var(--accent)" : "var(--input-bg)",
-                    color: returnFilter === "all" ? "white" : "var(--foreground)",
+                    border: "1px solid #30363d",
+                    background: returnFilter === "all" ? "#3b82f6" : "#0d1117",
+                    color: returnFilter === "all" ? "white" : "#fff",
                     fontSize: 12,
                     cursor: "pointer",
                     fontWeight: 500,
@@ -2618,16 +2618,16 @@ export default function StockTickerPage() {
                     if (returnFilter === "all") {
                       e.currentTarget.style.filter = "brightness(0.9)";
                     } else {
-                      e.currentTarget.style.background = "var(--hover-bg)";
-                      e.currentTarget.style.borderColor = "var(--accent)";
+                      e.currentTarget.style.background = "rgba(59,130,246,0.08)";
+                      e.currentTarget.style.borderColor = "#3b82f6";
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (returnFilter === "all") {
                       e.currentTarget.style.filter = "brightness(1)";
                     } else {
-                      e.currentTarget.style.background = "var(--input-bg)";
-                      e.currentTarget.style.borderColor = "var(--input-border)";
+                      e.currentTarget.style.background = "#0d1117";
+                      e.currentTarget.style.borderColor = "#30363d";
                     }
                   }}
                   onMouseDown={(e) => {
@@ -2644,9 +2644,9 @@ export default function StockTickerPage() {
                   style={{
                     padding: "6px 12px",
                     borderRadius: 3,
-                    border: "1px solid var(--input-border)",
-                    background: returnFilter === "positive" ? "var(--success)" : "var(--input-bg)",
-                    color: returnFilter === "positive" ? "white" : "var(--foreground)",
+                    border: "1px solid #30363d",
+                    background: returnFilter === "positive" ? "#10b981" : "#0d1117",
+                    color: returnFilter === "positive" ? "white" : "#fff",
                     fontSize: 12,
                     cursor: "pointer",
                     fontWeight: 500,
@@ -2658,16 +2658,16 @@ export default function StockTickerPage() {
                     if (returnFilter === "positive") {
                       e.currentTarget.style.filter = "brightness(0.9)";
                     } else {
-                      e.currentTarget.style.background = "var(--hover-bg)";
-                      e.currentTarget.style.borderColor = "var(--success)";
+                      e.currentTarget.style.background = "rgba(59,130,246,0.08)";
+                      e.currentTarget.style.borderColor = "#10b981";
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (returnFilter === "positive") {
                       e.currentTarget.style.filter = "brightness(1)";
                     } else {
-                      e.currentTarget.style.background = "var(--input-bg)";
-                      e.currentTarget.style.borderColor = "var(--input-border)";
+                      e.currentTarget.style.background = "#0d1117";
+                      e.currentTarget.style.borderColor = "#30363d";
                     }
                   }}
                   onMouseDown={(e) => {
@@ -2684,9 +2684,9 @@ export default function StockTickerPage() {
                   style={{
                     padding: "6px 12px",
                     borderRadius: 3,
-                    border: "1px solid var(--input-border)",
-                    background: returnFilter === "negative" ? "var(--danger)" : "var(--input-bg)",
-                    color: returnFilter === "negative" ? "white" : "var(--foreground)",
+                    border: "1px solid #30363d",
+                    background: returnFilter === "negative" ? "#ef4444" : "#0d1117",
+                    color: returnFilter === "negative" ? "white" : "#fff",
                     fontSize: 12,
                     cursor: "pointer",
                     fontWeight: 500,
@@ -2698,16 +2698,16 @@ export default function StockTickerPage() {
                     if (returnFilter === "negative") {
                       e.currentTarget.style.filter = "brightness(0.9)";
                     } else {
-                      e.currentTarget.style.background = "var(--hover-bg)";
-                      e.currentTarget.style.borderColor = "var(--danger)";
+                      e.currentTarget.style.background = "rgba(59,130,246,0.08)";
+                      e.currentTarget.style.borderColor = "#ef4444";
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (returnFilter === "negative") {
                       e.currentTarget.style.filter = "brightness(1)";
                     } else {
-                      e.currentTarget.style.background = "var(--input-bg)";
-                      e.currentTarget.style.borderColor = "var(--input-border)";
+                      e.currentTarget.style.background = "#0d1117";
+                      e.currentTarget.style.borderColor = "#30363d";
                     }
                   }}
                   onMouseDown={(e) => {
@@ -2724,9 +2724,9 @@ export default function StockTickerPage() {
                   style={{
                     padding: "6px 12px",
                     borderRadius: 3,
-                    border: "1px solid var(--input-border)",
-                    background: returnFilter === "large_positive" ? "var(--success)" : "var(--input-bg)",
-                    color: returnFilter === "large_positive" ? "white" : "var(--foreground)",
+                    border: "1px solid #30363d",
+                    background: returnFilter === "large_positive" ? "#10b981" : "#0d1117",
+                    color: returnFilter === "large_positive" ? "white" : "#fff",
                     fontSize: 12,
                     cursor: "pointer",
                     fontWeight: 500,
@@ -2738,16 +2738,16 @@ export default function StockTickerPage() {
                     if (returnFilter === "large_positive") {
                       e.currentTarget.style.filter = "brightness(0.9)";
                     } else {
-                      e.currentTarget.style.background = "var(--hover-bg)";
-                      e.currentTarget.style.borderColor = "var(--success)";
+                      e.currentTarget.style.background = "rgba(59,130,246,0.08)";
+                      e.currentTarget.style.borderColor = "#10b981";
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (returnFilter === "large_positive") {
                       e.currentTarget.style.filter = "brightness(1)";
                     } else {
-                      e.currentTarget.style.background = "var(--input-bg)";
-                      e.currentTarget.style.borderColor = "var(--input-border)";
+                      e.currentTarget.style.background = "#0d1117";
+                      e.currentTarget.style.borderColor = "#30363d";
                     }
                   }}
                   onMouseDown={(e) => {
@@ -2764,9 +2764,9 @@ export default function StockTickerPage() {
                   style={{
                     padding: "6px 12px",
                     borderRadius: 3,
-                    border: "1px solid var(--input-border)",
-                    background: returnFilter === "large_negative" ? "var(--danger)" : "var(--input-bg)",
-                    color: returnFilter === "large_negative" ? "white" : "var(--foreground)",
+                    border: "1px solid #30363d",
+                    background: returnFilter === "large_negative" ? "#ef4444" : "#0d1117",
+                    color: returnFilter === "large_negative" ? "white" : "#fff",
                     fontSize: 12,
                     cursor: "pointer",
                     fontWeight: 500,
@@ -2778,16 +2778,16 @@ export default function StockTickerPage() {
                     if (returnFilter === "large_negative") {
                       e.currentTarget.style.filter = "brightness(0.9)";
                     } else {
-                      e.currentTarget.style.background = "var(--hover-bg)";
-                      e.currentTarget.style.borderColor = "var(--danger)";
+                      e.currentTarget.style.background = "rgba(59,130,246,0.08)";
+                      e.currentTarget.style.borderColor = "#ef4444";
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (returnFilter === "large_negative") {
                       e.currentTarget.style.filter = "brightness(1)";
                     } else {
-                      e.currentTarget.style.background = "var(--input-bg)";
-                      e.currentTarget.style.borderColor = "var(--input-border)";
+                      e.currentTarget.style.background = "#0d1117";
+                      e.currentTarget.style.borderColor = "#30363d";
                     }
                   }}
                   onMouseDown={(e) => {
@@ -2804,9 +2804,9 @@ export default function StockTickerPage() {
                   style={{
                     padding: "6px 12px",
                     borderRadius: 3,
-                    border: "1px solid var(--input-border)",
-                    background: returnFilter === "custom" ? "var(--accent)" : "var(--input-bg)",
-                    color: returnFilter === "custom" ? "white" : "var(--foreground)",
+                    border: "1px solid #30363d",
+                    background: returnFilter === "custom" ? "#3b82f6" : "#0d1117",
+                    color: returnFilter === "custom" ? "white" : "#fff",
                     fontSize: 12,
                     cursor: "pointer",
                     fontWeight: 500,
@@ -2818,16 +2818,16 @@ export default function StockTickerPage() {
                     if (returnFilter === "custom") {
                       e.currentTarget.style.filter = "brightness(0.9)";
                     } else {
-                      e.currentTarget.style.background = "var(--hover-bg)";
-                      e.currentTarget.style.borderColor = "var(--accent)";
+                      e.currentTarget.style.background = "rgba(59,130,246,0.08)";
+                      e.currentTarget.style.borderColor = "#3b82f6";
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (returnFilter === "custom") {
                       e.currentTarget.style.filter = "brightness(1)";
                     } else {
-                      e.currentTarget.style.background = "var(--input-bg)";
-                      e.currentTarget.style.borderColor = "var(--input-border)";
+                      e.currentTarget.style.background = "#0d1117";
+                      e.currentTarget.style.borderColor = "#30363d";
                     }
                   }}
                   onMouseDown={(e) => {
@@ -2841,7 +2841,7 @@ export default function StockTickerPage() {
                 </button>
                 {returnFilter === "custom" && (
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <span style={{ fontSize: 12, color: "var(--muted)" }}>|±| ≥</span>
+                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>|±| ≥</span>
                     <input
                       type="number"
                       value={customFilterThreshold}
@@ -2853,20 +2853,20 @@ export default function StockTickerPage() {
                         width: "60px",
                         padding: "6px 8px",
                         borderRadius: 3,
-                        border: "1px solid var(--input-border)",
-                        background: "var(--input-bg)",
-                        color: "var(--foreground)",
+                        border: "1px solid #30363d",
+                        background: "#0d1117",
+                        color: "#fff",
                         fontSize: 12
                       }}
                     />
-                    <span style={{ fontSize: 12, color: "var(--muted)" }}>%</span>
+                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>%</span>
                   </div>
                 )}
               </div>
             </div>
 
             {returnStats && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16, marginBottom: 24, padding: 16, borderRadius: 3, border: "1px solid var(--border-subtle)", background: "var(--card-bg)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16, marginBottom: 24, padding: 16, borderRadius: 3, border: "1px solid #21262d", background: "#161b22" }}>
                 <StatItem label="Win Rate" value={`${returnStats.winRate.toFixed(1)}%`} />
                 <StatItem label="Avg Gain" value={fmtPct(returnStats.avgGain, 3)} colorType="success" />
                 <StatItem label="Avg Loss" value={fmtPct(returnStats.avgLoss, 3)} colorType="danger" />
@@ -2908,8 +2908,8 @@ export default function StockTickerPage() {
                         }}
                         style={{
                           padding: "10px 12px",
-                          borderBottom: "1px solid var(--border)",
-                          color: sortColumn === key ? "var(--accent)" : "var(--muted)",
+                          borderBottom: "1px solid #30363d",
+                          color: sortColumn === key ? "#3b82f6" : "rgba(255,255,255,0.5)",
                           textAlign: align as any,
                           cursor: "pointer",
                           userSelect: "none",
@@ -2917,10 +2917,10 @@ export default function StockTickerPage() {
                           transition: "color 0.2s"
                         }}
                         onMouseEnter={(e) => {
-                          if (sortColumn !== key) e.currentTarget.style.color = "var(--foreground)";
+                          if (sortColumn !== key) e.currentTarget.style.color = "#fff";
                         }}
                         onMouseLeave={(e) => {
-                          if (sortColumn !== key) e.currentTarget.style.color = "var(--muted)";
+                          if (sortColumn !== key) e.currentTarget.style.color = "rgba(255,255,255,0.5)";
                         }}
                       >
                         {label}
@@ -2936,20 +2936,20 @@ export default function StockTickerPage() {
                 <tbody>
                   {sortedReturns.map((row, idx) => (
                     <tr key={row.date} style={{
-                      borderBottom: "1px solid var(--border)",
+                      borderBottom: "1px solid #30363d",
                       backgroundColor: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)"
                     }}>
-                      <td style={{ padding: "10px 12px", color: "var(--foreground)" }}>{row.date}</td>
+                      <td style={{ padding: "10px 12px", color: "#fff" }}>{row.date}</td>
                       <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right" }}>{fmtNum(row.close)}</td>
-                      <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right", color: "var(--muted-foreground)" }}>{fmtNum(row.adj_close)}</td>
-                      <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right", color: row.return > 0 ? "var(--success)" : row.return < 0 ? "var(--danger)" : "var(--foreground)" }}>{fmtPct(row.return, 4)}</td>
-                      <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right", color: row.cumulative > 0 ? "var(--success)" : row.cumulative < 0 ? "var(--danger)" : "var(--foreground)" }}>{fmtPct(row.cumulative, 2)}</td>
+                      <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right", color: "rgba(255,255,255,0.5)" }}>{fmtNum(row.adj_close)}</td>
+                      <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right", color: row.return > 0 ? "#10b981" : row.return < 0 ? "#ef4444" : "#fff" }}>{fmtPct(row.return, 4)}</td>
+                      <td style={{ padding: "10px 12px", fontFamily: "monospace", textAlign: "right", color: row.cumulative > 0 ? "#10b981" : row.cumulative < 0 ? "#ef4444" : "#fff" }}>{fmtPct(row.cumulative, 2)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <div style={{ marginTop: 12, fontSize: 11, color: "var(--muted-foreground)", textAlign: "right" }}>
+            <div style={{ marginTop: 12, fontSize: 11, color: "rgba(255,255,255,0.5)", textAlign: "right" }}>
               Showing {sortedReturns.length} days
               {returnFilter !== "all" && ` (filtered from ${activeReturns.length} total)`}
               {sortColumn !== "date" && ` • Sorted by ${sortColumn === "return" ? "Daily Return" : sortColumn === "cumulative" ? "Cumulative" : sortColumn === "close" ? "Close" : "Adj Close"} ${sortDirection === "asc" ? "↑" : "↓"}`}
@@ -2965,13 +2965,13 @@ export default function StockTickerPage() {
       />
 
       {/* Data Sources — hidden in model mode */}
-      {viewMode !== "model" && <div style={{ borderTop: "1px solid #1a1a1a", marginTop: 16, padding: "12px 16px", fontSize: 9, color: "#444", fontFamily: "'Geist Mono', monospace", lineHeight: 1.8 }}>
-        <span style={{ fontWeight: 700, color: "#555", letterSpacing: "0.06em" }}>DATA SOURCES</span>
+      {viewMode !== "model" && <div style={{ borderTop: "1px solid #1a1a1a", marginTop: 16, padding: "12px 16px", fontSize: 9, color: "#444", fontFamily: "monospace", lineHeight: 1.8 }}>
+        <span style={{ fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.06em" }}>DATA SOURCES</span>
         <div style={{ marginTop: 4 }}>
-          <span style={{ color: "#666" }}>Prices:</span> Interactive Brokers TWS API (primary), Yahoo Finance (fallback) &middot;{" "}
-          <span style={{ color: "#666" }}>Fundamentals:</span> Yahoo Finance (E/P, B/M, Dividend Yield, Market Cap) &middot;{" "}
-          <span style={{ color: "#666" }}>Volatility:</span> Calculated from daily returns (Yang-Zhang, EWMA) &middot;{" "}
-          <span style={{ color: "#666" }}>Research:</span> Pareto Securities, DNB Markets, Carnegie
+          <span style={{ color: "rgba(255,255,255,0.4)" }}>Prices:</span> Interactive Brokers TWS API (primary), Yahoo Finance (fallback) &middot;{" "}
+          <span style={{ color: "rgba(255,255,255,0.4)" }}>Fundamentals:</span> Yahoo Finance (E/P, B/M, Dividend Yield, Market Cap) &middot;{" "}
+          <span style={{ color: "rgba(255,255,255,0.4)" }}>Volatility:</span> Calculated from daily returns (Yang-Zhang, EWMA) &middot;{" "}
+          <span style={{ color: "rgba(255,255,255,0.4)" }}>Research:</span> Pareto Securities, DNB Markets, Carnegie
         </div>
       </div>}
     </main>
@@ -2981,13 +2981,13 @@ export default function StockTickerPage() {
 // Subcomponents
 function StatItem({ label, value, colorType }: { label: string; value: string; colorType?: "success" | "danger" }) {
   const getColor = () => {
-    if (colorType === "success") return "var(--success)";
-    if (colorType === "danger") return "var(--danger)";
-    return "var(--foreground)";
+    if (colorType === "success") return "#10b981";
+    if (colorType === "danger") return "#ef4444";
+    return "#fff";
   };
   return (
     <div>
-      <div style={{ fontSize: 10, color: "var(--muted-foreground)", marginBottom: 4, textTransform: "uppercase" }}>{label}</div>
+      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginBottom: 4, textTransform: "uppercase" }}>{label}</div>
       <div style={{ fontSize: 15, fontWeight: 600, color: getColor(), fontFamily: "monospace" }}>{value}</div>
     </div>
   );
