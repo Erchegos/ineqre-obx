@@ -101,7 +101,7 @@ export default function HomePage() {
         }
         .feature-card:hover {
           transform: translateY(-3px);
-          border-color: #3b82f6 !important;
+          border-color: var(--accent) !important;
           box-shadow: 0 8px 24px rgba(59, 130, 246, 0.12);
         }
         .cap-card {
@@ -109,15 +109,15 @@ export default function HomePage() {
         }
         .cap-card:hover {
           transform: translateY(-2px);
-          border-color: #3b82f6 !important;
+          border-color: var(--accent) !important;
           box-shadow: 0 4px 16px rgba(59, 130, 246, 0.08);
         }
       `}</style>
 
       <main style={{
         minHeight: "100vh",
-        background: "#0a0a0a",
-        color: "#fff",
+        background: "#0d1117",
+        color: "#e6edf3",
         padding: "48px 32px"
       }}>
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
@@ -125,13 +125,13 @@ export default function HomePage() {
           {/* Hero */}
           <header style={{
             marginBottom: 48,
-            borderBottom: "1px solid #30363d",
+            borderBottom: "1px solid #21262d",
             paddingBottom: 32,
           }}>
             <div style={{
               fontSize: 11,
               fontFamily: "monospace",
-              color: "rgba(255,255,255,0.5)",
+              color: "#8b949e",
               marginBottom: 16,
               letterSpacing: "0.1em",
               textTransform: "uppercase",
@@ -145,9 +145,9 @@ export default function HomePage() {
               fontSize: 42,
               fontWeight: 700,
               marginBottom: 16,
-              color: "#fff",
+              color: "#e6edf3",
               letterSpacing: "-0.03em",
-              fontFamily: "monospace",
+              fontFamily: "system-ui, -apple-system, sans-serif",
               opacity: heroVisible ? 1 : 0,
               transform: heroVisible ? "translateY(0)" : "translateY(20px)",
               transition: "all 0.7s cubic-bezier(0.4, 0, 0.2, 1) 0.1s",
@@ -156,9 +156,10 @@ export default function HomePage() {
             </h1>
             <p style={{
               fontSize: 15,
-              color: "rgba(255,255,255,0.5)",
+              color: "#8b949e",
               lineHeight: 1.7,
               maxWidth: 720,
+              fontFamily: "system-ui, -apple-system, sans-serif",
               opacity: heroVisible ? 1 : 0,
               transform: heroVisible ? "translateY(0)" : "translateY(16px)",
               transition: "all 0.7s cubic-bezier(0.4, 0, 0.2, 1) 0.25s",
@@ -186,17 +187,17 @@ export default function HomePage() {
           {/* Active Stock Research */}
           <section ref={modulesReveal.ref} style={{ marginBottom: 48 }}>
             <h2 style={{
-              fontWeight: 700,
+              fontWeight: 600,
               marginBottom: 24,
-              color: "#fff",
+              color: "#8b949e",
               textTransform: "uppercase",
               letterSpacing: "0.08em",
               fontSize: 12,
-              fontFamily: "monospace",
+              fontFamily: "system-ui, -apple-system, sans-serif",
               opacity: modulesReveal.visible ? 1 : 0,
               transition: "opacity 0.5s ease",
             }}>
-              // Active Stock Research
+              Active Stock Research
             </h2>
 
             <div style={{
@@ -246,17 +247,17 @@ export default function HomePage() {
           {/* Quantitative Analytics */}
           <section style={{ marginBottom: 48 }}>
             <h2 style={{
-              fontWeight: 700,
+              fontWeight: 600,
               marginBottom: 24,
-              color: "#fff",
+              color: "#8b949e",
               textTransform: "uppercase",
               letterSpacing: "0.08em",
               fontSize: 12,
-              fontFamily: "monospace",
+              fontFamily: "system-ui, -apple-system, sans-serif",
               opacity: modulesReveal.visible ? 1 : 0,
               transition: "opacity 0.5s ease",
             }}>
-              // Quantitative Analytics & Portfolio Tools
+              Quantitative Analytics & Portfolio Tools
             </h2>
 
             <div style={{
@@ -329,17 +330,17 @@ export default function HomePage() {
           {/* Sector Intelligence */}
           <section style={{ marginBottom: 48 }}>
             <h2 style={{
-              fontWeight: 700,
+              fontWeight: 600,
               marginBottom: 24,
-              color: "#fff",
+              color: "#8b949e",
               textTransform: "uppercase",
               letterSpacing: "0.08em",
               fontSize: 12,
-              fontFamily: "monospace",
+              fontFamily: "system-ui, -apple-system, sans-serif",
               opacity: modulesReveal.visible ? 1 : 0,
               transition: "opacity 0.5s ease",
             }}>
-              // Sector Intelligence
+              Sector Intelligence
             </h2>
 
             <div style={{
@@ -377,17 +378,17 @@ export default function HomePage() {
           {/* Analytics Capabilities */}
           <section ref={capabilitiesReveal.ref} style={{ marginBottom: 56 }}>
             <h2 style={{
-              fontWeight: 700,
+              fontWeight: 600,
               marginBottom: 24,
-              color: "#fff",
+              color: "#8b949e",
               textTransform: "uppercase",
               letterSpacing: "0.08em",
               fontSize: 12,
-              fontFamily: "monospace",
+              fontFamily: "system-ui, -apple-system, sans-serif",
               opacity: capabilitiesReveal.visible ? 1 : 0,
               transition: "opacity 0.5s ease",
             }}>
-              // Analytics Engine
+              Analytics Engine
             </h2>
 
             <div style={{
@@ -422,17 +423,17 @@ export default function HomePage() {
           {/* Upcoming Projects */}
           <section ref={upcomingReveal.ref} style={{ marginBottom: 56 }}>
             <h2 style={{
-              fontWeight: 700,
+              fontWeight: 600,
               marginBottom: 24,
-              color: "#fff",
+              color: "#8b949e",
               textTransform: "uppercase",
               letterSpacing: "0.08em",
               fontSize: 12,
-              fontFamily: "monospace",
+              fontFamily: "system-ui, -apple-system, sans-serif",
               opacity: upcomingReveal.visible ? 1 : 0,
               transition: "opacity 0.5s ease",
             }}>
-              // Upcoming
+              Upcoming
             </h2>
 
             <div style={{
@@ -461,22 +462,22 @@ export default function HomePage() {
           {/* Tech Stack Footer */}
           <footer style={{
             paddingTop: 28,
-            borderTop: "1px solid #30363d",
+            borderTop: "1px solid #21262d",
             fontSize: 11.5,
-            color: "rgba(255,255,255,0.5)",
-            fontFamily: "monospace"
+            color: "#8b949e",
+            fontFamily: "system-ui, -apple-system, sans-serif"
           }}>
             <p style={{ marginBottom: 8, lineHeight: 1.6 }}>
-              <strong style={{ color: "#fff", fontWeight: 700 }}>Tech Stack:</strong> Next.js 15 · TypeScript · PostgreSQL 17 · Drizzle ORM · Python · scikit-learn · Interactive Brokers TWS API · Anthropic Claude API
+              <strong style={{ color: "#e6edf3", fontWeight: 600 }}>Tech Stack:</strong> Next.js 15 · TypeScript · PostgreSQL 17 · Drizzle ORM · Python · scikit-learn · Interactive Brokers TWS API · Anthropic Claude API
             </p>
             <p style={{ marginBottom: 8, lineHeight: 1.6 }}>
-              <strong style={{ color: "#fff", fontWeight: 700 }}>Architecture:</strong> Server-side compute · Connection pooling · Transaction pooler (Supabase) · JWT authentication · Vercel edge deployment
+              <strong style={{ color: "#e6edf3", fontWeight: 600 }}>Architecture:</strong> Server-side compute · Connection pooling · Transaction pooler (Supabase) · JWT authentication · Vercel edge deployment
             </p>
             <p style={{ marginBottom: 8, lineHeight: 1.6 }}>
-              <strong style={{ color: "#fff", fontWeight: 700 }}>Data:</strong> Real-time OHLCV ingestion via IBKR · 225+ securities · 300K+ daily data points · Supabase storage for PDF attachments
+              <strong style={{ color: "#e6edf3", fontWeight: 600 }}>Data:</strong> Real-time OHLCV ingestion via IBKR · 225+ securities · 300K+ daily data points · Supabase storage for PDF attachments
             </p>
             <p style={{ lineHeight: 1.6 }}>
-              <strong style={{ color: "#fff", fontWeight: 700 }}>Sources:</strong> Interactive Brokers TWS API · Yahoo Finance · Norges Bank (FX rates) · Pareto Securities · DNB Markets · DNB Carnegie · Redeye · Xtrainvestor · Finanstilsynet · BarentsWatch · Oslo Stock Exchange
+              <strong style={{ color: "#e6edf3", fontWeight: 600 }}>Sources:</strong> Interactive Brokers TWS API · Yahoo Finance · Norges Bank (FX rates) · Pareto Securities · DNB Markets · DNB Carnegie · Redeye · Xtrainvestor · Finanstilsynet · BarentsWatch · Oslo Stock Exchange
             </p>
           </footer>
 
@@ -492,18 +493,18 @@ function StatBox({ label, value, suffix, live }: { label: string; value: string 
   return (
     <div style={{
       background: "#161b22",
-      border: "1px solid #30363d",
-      borderRadius: 4,
+      border: "1px solid #21262d",
+      borderRadius: 6,
       padding: "18px 20px"
     }}>
       <div style={{
         fontSize: 10,
-        color: "rgba(255,255,255,0.5)",
+        color: "#8b949e",
         textTransform: "uppercase",
         letterSpacing: "0.08em",
         marginBottom: 10,
-        fontWeight: 700,
-        fontFamily: "monospace",
+        fontWeight: 600,
+        fontFamily: "system-ui, -apple-system, sans-serif",
         display: "flex",
         alignItems: "center",
         gap: 6,
@@ -523,15 +524,15 @@ function StatBox({ label, value, suffix, live }: { label: string; value: string 
       <div style={{
         fontSize: 28,
         fontWeight: 700,
-        color: "#fff",
-        fontFamily: "monospace",
+        color: "#e6edf3",
+        fontFamily: "system-ui, -apple-system, sans-serif",
         display: "flex",
         alignItems: "baseline",
         gap: 4
       }}>
         {value}
         {suffix && (
-          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 500 }}>
+          <span style={{ fontSize: 12, color: "#8b949e", fontWeight: 500 }}>
             {suffix}
           </span>
         )}
@@ -556,8 +557,8 @@ function FeatureCard({ href, title, description, tags, visible, delay, children 
       style={{
         display: "block",
         background: "#161b22",
-        border: "1px solid #30363d",
-        borderRadius: 6,
+        border: "1px solid #21262d",
+        borderRadius: 8,
         padding: "22px 24px",
         textDecoration: "none",
         color: "inherit",
@@ -573,15 +574,15 @@ function FeatureCard({ href, title, description, tags, visible, delay, children 
       </div>
       <h3 style={{
         fontSize: 16,
-        fontWeight: 700,
+        fontWeight: 600,
         marginBottom: 8,
-        color: "#fff",
-        fontFamily: "monospace",
+        color: "#e6edf3",
+        fontFamily: "system-ui, -apple-system, sans-serif",
         letterSpacing: "0.01em"
       }}>
         {title}
       </h3>
-      <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", lineHeight: 1.65 }}>
+      <p style={{ fontSize: 13, color: "#8b949e", lineHeight: 1.65, fontFamily: "system-ui, -apple-system, sans-serif" }}>
         {description}
       </p>
       {children}
@@ -601,8 +602,8 @@ function CapabilityCard({ title, accent, children, visible, delay }: {
       className="cap-card"
       style={{
         background: "#161b22",
-        border: "1px solid #30363d",
-        borderRadius: 4,
+        border: "1px solid #21262d",
+        borderRadius: 6,
         padding: "14px 16px",
         borderLeft: `3px solid ${accent}`,
         opacity: visible ? 1 : 0,
@@ -612,15 +613,15 @@ function CapabilityCard({ title, accent, children, visible, delay }: {
     >
       <h4 style={{
         fontSize: 12,
-        fontWeight: 700,
+        fontWeight: 600,
         marginBottom: 10,
-        color: "#fff",
-        fontFamily: "monospace",
+        color: "#e6edf3",
+        fontFamily: "system-ui, -apple-system, sans-serif",
         letterSpacing: "0.03em"
       }}>
         {title}
       </h4>
-      <p style={{ fontSize: 12.5, color: "rgba(255,255,255,0.5)", lineHeight: 1.65 }}>
+      <p style={{ fontSize: 12.5, color: "#8b949e", lineHeight: 1.65, fontFamily: "system-ui, -apple-system, sans-serif" }}>
         {children}
       </p>
     </div>
@@ -643,17 +644,17 @@ function TagPill({ label, color }: { label: string; color: string }) {
       display: "inline-flex",
       alignItems: "center",
       justifyContent: "center",
-      height: 16,
-      padding: "0 6px",
-      borderRadius: 2,
-      fontSize: 8,
-      fontFamily: "monospace",
+      height: 18,
+      padding: "0 7px",
+      borderRadius: 10,
+      fontSize: 9,
+      fontFamily: "system-ui, -apple-system, sans-serif",
       fontWeight: 600,
-      letterSpacing: "0.05em",
+      letterSpacing: "0.03em",
       textTransform: "uppercase" as const,
       whiteSpace: "nowrap" as const,
-      background: `${hex}15`,
-      color: `${hex}bb`,
+      background: `${hex}18`,
+      color: `${hex}cc`,
     }}>
       {label}
     </span>

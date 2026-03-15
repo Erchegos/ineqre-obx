@@ -114,6 +114,42 @@ export async function POST(request: Request) {
     // Vol reduction estimate
     const volReduction = hedgeRatio * Math.abs(netExposure) * 100;
 
+    // Execution details — what exactly to buy/sell
+    const hedgedNotionalNOK = notional * hedgeRatio * Math.abs(netExposure);
+    // Convert NOK exposure to foreign currency at spot (spot = NOK per 1 FCY)
+    const hedgedAmountFCY = hedgedNotionalNOK / spot;
+    const hedgedAmountNOK = hedgedNotionalNOK;
+    // Settlement: deliver FCY, receive NOK at forward rate
+    const settlementNOK = hedgedAmountFCY * hedgeMetrics.forwardRate;
+    const hedgeCostNOK = hedgedNotionalNOK * hedgeMetrics.costBps / 10000 * (days / 365);
+
+    // Product recommendation
+    const isSmallExposure = hedgedNotionalNOK < 500_000;
+    const isLargeExposure = hedgedNotionalNOK >= 10_000_000;
+    const isHighVol = hedgeMetrics.costBps > 200;
+
+    let recommendedProduct: string;
+    let productExplanation: string;
+    let alternativeProduct: string;
+    let alternativeExplanation: string;
+
+    if (isSmallExposure) {
+      recommendedProduct = "FX Forward (bank)";
+      productExplanation = "Standard forward contract through your bank. Locks in the exchange rate with no upfront cost — you simply agree to exchange at the forward rate on the settlement date.";
+      alternativeProduct = "Do nothing";
+      alternativeExplanation = "For small exposures, the admin cost of hedging may exceed the risk reduction benefit.";
+    } else if (isHighVol && !isLargeExposure) {
+      recommendedProduct = "FX Option (put on NOK)";
+      productExplanation = "Buy a put option on NOK (call on foreign currency) to protect against NOK strengthening, while keeping upside if NOK weakens. You pay an option premium upfront but have no obligation.";
+      alternativeProduct = "FX Forward (bank)";
+      alternativeExplanation = "Cheaper than options but locks you in — you lose upside if NOK weakens in your favor.";
+    } else {
+      recommendedProduct = "FX Forward (bank)";
+      productExplanation = "Standard forward contract through your bank. No upfront cost — you agree today to exchange currencies at the forward rate on the settlement date. Most common corporate hedge.";
+      alternativeProduct = "FX Option (collar)";
+      alternativeExplanation = "Zero-cost collar: buy a put (floor) and sell a call (cap) at offsetting premiums. Protects downside but caps upside within a range.";
+    }
+
     return NextResponse.json({
       ticker: ticker?.toUpperCase() || null,
       currency: ccy,
@@ -132,6 +168,21 @@ export async function POST(request: Request) {
       netExposure,
       volReductionPct: volReduction,
       scenarios,
+      // Execution details
+      execution: {
+        action: netExposure > 0 ? "SELL" : "BUY",
+        actionVerb: netExposure > 0 ? "Sell" : "Buy",
+        amountFCY: hedgedAmountFCY,
+        amountNOK: hedgedAmountNOK,
+        settlementNOK,
+        hedgeCostNOK,
+        forwardRate: hedgeMetrics.forwardRate,
+        settlementDate: new Date(Date.now() + days * 86400000).toISOString().slice(0, 10),
+        recommendedProduct,
+        productExplanation,
+        alternativeProduct,
+        alternativeExplanation,
+      },
     });
   } catch (error: any) {
     console.error("[FX Hedge Calculator API] Error:", error);

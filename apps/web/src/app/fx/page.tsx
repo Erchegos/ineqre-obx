@@ -150,6 +150,14 @@ function sigStar(t: number): string {
   return "";
 }
 
+/** Returns significance stars + spurious flag when fundamental exposure is ~0% */
+function sigStarChecked(t: number, fundamentalNetExposure: number | undefined): { stars: string; spurious: boolean } {
+  const stars = sigStar(t);
+  // If statistically significant but company has ~0% fundamental exposure, flag as likely spurious
+  const spurious = stars.length > 0 && fundamentalNetExposure !== undefined && Math.abs(fundamentalNetExposure) < 2;
+  return { stars, spurious };
+}
+
 function exposureColor(v: number): string {
   const abs = Math.abs(v);
   if (abs < 0.05) return "transparent";
@@ -845,18 +853,23 @@ export default function FXTerminalPage() {
                 <thead>
                   <tr>
                     <th style={S.th}></th>
-                    {Object.keys(correlationMatrix).map(p => (
-                      <th key={p} style={{ ...S.th, textAlign: "center", color: CCY_COLORS[p.replace("NOK", "")] || "rgba(255,255,255,0.5)" }}>
-                        {p.replace("NOK", "")}
-                      </th>
-                    ))}
+                    {Object.keys(correlationMatrix).map(p => {
+                      const label = p === "NOK" ? "NOK" : p.replace("NOK", "");
+                      return (
+                        <th key={p} style={{ ...S.th, textAlign: "center", color: CCY_COLORS[label] || "rgba(255,255,255,0.5)" }}>
+                          {label}
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.entries(correlationMatrix).map(([p1, row]) => (
+                  {Object.entries(correlationMatrix).map(([p1, row]) => {
+                    const label = p1 === "NOK" ? "NOK" : p1.replace("NOK", "");
+                    return (
                     <tr key={p1}>
-                      <td style={{ ...S.td, fontWeight: 600, color: CCY_COLORS[p1.replace("NOK", "")] || "rgba(255,255,255,0.5)" }}>
-                        {p1.replace("NOK", "")}
+                      <td style={{ ...S.td, fontWeight: 600, color: CCY_COLORS[label] || "rgba(255,255,255,0.5)" }}>
+                        {label}
                       </td>
                       {Object.values(row).map((v, i) => (
                         <td
@@ -872,7 +885,8 @@ export default function FXTerminalPage() {
                         </td>
                       ))}
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             ) : (
@@ -972,7 +986,13 @@ export default function FXTerminalPage() {
                 </tr>
               </thead>
               <tbody>
-                {sortedSensitivity.map((row) => (
+                {sortedSensitivity.map((row) => {
+                  const exp = exposureHeatmap.find((e) => e.ticker === row.ticker);
+                  const chkUsd = sigStarChecked(row.tstatUsd, exp?.usd);
+                  const chkEur = sigStarChecked(row.tstatEur, exp?.eur);
+                  const chkGbp = sigStarChecked(row.tstatGbp, exp?.gbp);
+                  const chkSek = sigStarChecked(row.tstatSek, exp?.sek);
+                  return (
                   <tr
                     key={row.ticker}
                     style={{ cursor: "pointer", background: selectedSensTicker === row.ticker ? "rgba(59,130,246,0.08)" : undefined }}
@@ -984,21 +1004,22 @@ export default function FXTerminalPage() {
                     </td>
                     <td style={S.td}>{row.betaMarket.toFixed(3)}</td>
                     <td style={{ ...S.td, color: CCY_COLORS.USD }}>
-                      {row.betaUsd.toFixed(3)}{sigStar(row.tstatUsd)}
+                      {row.betaUsd.toFixed(3)}{chkUsd.spurious ? <span title="Likely spurious — 0% fundamental exposure" style={{ opacity: 0.3 }}>{chkUsd.stars}</span> : chkUsd.stars}
                     </td>
                     <td style={{ ...S.td, color: CCY_COLORS.EUR }}>
-                      {row.betaEur.toFixed(3)}{sigStar(row.tstatEur)}
+                      {row.betaEur.toFixed(3)}{chkEur.spurious ? <span title="Likely spurious — 0% fundamental exposure" style={{ opacity: 0.3 }}>{chkEur.stars}</span> : chkEur.stars}
                     </td>
                     <td style={{ ...S.td, color: CCY_COLORS.GBP }}>
-                      {row.betaGbp.toFixed(3)}{sigStar(row.tstatGbp)}
+                      {row.betaGbp.toFixed(3)}{chkGbp.spurious ? <span title="Likely spurious — 0% fundamental exposure" style={{ opacity: 0.3 }}>{chkGbp.stars}</span> : chkGbp.stars}
                     </td>
                     <td style={{ ...S.td, color: CCY_COLORS.SEK }}>
-                      {row.betaSek.toFixed(3)}{sigStar(row.tstatSek)}
+                      {row.betaSek.toFixed(3)}{chkSek.spurious ? <span title="Likely spurious — 0% fundamental exposure" style={{ opacity: 0.3 }}>{chkSek.stars}</span> : chkSek.stars}
                     </td>
                     <td style={S.td}>{(row.rSquared * 100).toFixed(1)}%</td>
                     <td style={S.td}>{(row.rSquaredFxOnly * 100).toFixed(1)}%</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           ) : (
@@ -1013,7 +1034,7 @@ export default function FXTerminalPage() {
                 <div><span style={{ color: CCY_COLORS.USD, fontWeight: 600 }}>USD</span> / <span style={{ color: CCY_COLORS.EUR, fontWeight: 600 }}>EUR</span> / <span style={{ color: CCY_COLORS.GBP, fontWeight: 600 }}>GBP</span> / <span style={{ color: CCY_COLORS.SEK, fontWeight: 600 }}>SEK</span> &mdash; Sensitivity to each currency pair vs NOK. Positive = stock rises when NOK weakens.</div>
                 <div><span style={{ color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>FIT (R&sup2;)</span> &mdash; How much of the stock&apos;s movement is explained by market + currencies combined (0-100%).</div>
                 <div><span style={{ color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>FX FIT</span> &mdash; How much is explained by currencies alone, excluding the market factor.</div>
-                <div><span style={{ color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>Stars</span> &mdash; {"\u2605"} = likely real (95%), {"\u2605\u2605"} = strong (99%), {"\u2605\u2605\u2605"} = very strong (99.9%). No star = may be noise.</div>
+                <div><span style={{ color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>Stars</span> &mdash; {"\u2605"} = likely real (95%), {"\u2605\u2605"} = strong (99%), {"\u2605\u2605\u2605"} = very strong (99.9%). No star = may be noise. <span style={{ opacity: 0.4 }}>Dimmed stars</span> = statistically significant but company has ~0% fundamental exposure in that currency (likely spurious correlation from multi-currency regression).</div>
               </div>
             </HelpToggle>
           )}
@@ -1046,6 +1067,9 @@ export default function FXTerminalPage() {
                       {["Market", "Usd", "Eur", "Gbp", "Sek"].map((c) => {
                         const beta = sensDetail.statistical[`beta${c}`];
                         const tstat = sensDetail.statistical[`tstat${c}`];
+                        const detailExp = exposureHeatmap.find((e) => e.ticker === selectedSensTicker);
+                        const fundExp = c === "Market" ? undefined : detailExp?.[c.toLowerCase() as "usd" | "eur" | "gbp" | "sek"];
+                        const chk = c === "Market" ? { stars: sigStar(tstat || 0), spurious: false } : sigStarChecked(tstat || 0, fundExp);
                         return (
                           <tr key={c}>
                             <td style={{ ...S.td, color: CCY_COLORS[c.toUpperCase()] || "rgba(255,255,255,0.5)", fontWeight: 600 }}>
@@ -1053,7 +1077,11 @@ export default function FXTerminalPage() {
                             </td>
                             <td style={S.td}>{beta?.toFixed(4)}</td>
                             <td style={S.td}>{tstat?.toFixed(2)}</td>
-                            <td style={S.td}>{sigStar(tstat || 0)}</td>
+                            <td style={S.td}>
+                              {chk.spurious
+                                ? <span title="Likely spurious — 0% fundamental exposure" style={{ opacity: 0.3 }}>{chk.stars} <span style={{ fontSize: 9 }}>?</span></span>
+                                : chk.stars}
+                            </td>
                           </tr>
                         );
                       })}
@@ -1353,32 +1381,12 @@ export default function FXTerminalPage() {
             {/* Hedge calculator */}
             <div style={S.card}>
               <div style={S.cardTitle}>HEDGE CALCULATOR &mdash; {companyTicker}</div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 10, lineHeight: 1.6 }}>
-                {companyTicker} earns revenue in foreign currencies. If NOK strengthens, those earnings are worth less in NOK.
-                A <b style={{ color: "rgba(255,255,255,0.8)" }}>forward contract</b> lets the company lock in today&apos;s exchange rate for a future date, removing that uncertainty.
-              </div>
-              <HelpToggle id="hedge-calc" label="How to read this calculator" showHelp={showHelp} setShowHelp={setShowHelp}>
+              <div style={{ display: "flex", gap: 16, alignItems: "flex-end", marginBottom: 16, flexWrap: "wrap" }}>
                 <div>
-                  <b style={{ color: "rgba(255,255,255,0.8)" }}>What you&apos;re simulating:</b> You have {hedgeNotional.toLocaleString("no-NO")} NOK of foreign currency exposure.
-                  The hedge ratio controls how much of that exposure you protect with a forward contract.<br /><br />
-                  <b style={{ color: "rgba(255,255,255,0.8)" }}>The 4 metrics:</b><br />
-                  &bull; <b style={{ color: "rgba(255,255,255,0.8)" }}>FORWARD</b> — The locked-in exchange rate for your chosen tenor. If spot is 9.70 and forward is 9.73, you&apos;ll pay slightly more per USD, but you know the exact rate.<br />
-                  &bull; <b style={{ color: "rgba(255,255,255,0.8)" }}>COST (ANN BPS)</b> — The annualized cost of hedging in basis points. E.g., 38 bps means hedging costs ~0.38% per year. This comes from the interest rate difference between NOK and the foreign currency.<br />
-                  &bull; <b style={{ color: "rgba(255,255,255,0.8)" }}>BREAK-EVEN</b> — How much NOK must strengthen before the hedge saves you money. If break-even is +0.14%, the hedge only pays off if NOK moves more than that.<br />
-                  &bull; <b style={{ color: "rgba(255,255,255,0.8)" }}>VOL REDUCTION</b> — How much the hedge reduces your P&amp;L volatility. Higher = more stable cashflows.<br /><br />
-                  <b style={{ color: "rgba(255,255,255,0.8)" }}>The scenario table:</b><br />
-                  &bull; <b style={{ color: "rgba(255,255,255,0.8)" }}>FX MOVE</b> — Hypothetical NOK/{hedgeCurrency} change. Negative = NOK strengthens (bad for exporters), positive = NOK weakens (good for exporters).<br />
-                  &bull; <b style={{ color: "rgba(255,255,255,0.8)" }}>UNHEDGED P&amp;L</b> — Your gain/loss if you do nothing.<br />
-                  &bull; <b style={{ color: "rgba(255,255,255,0.8)" }}>HEDGED P&amp;L</b> — Your gain/loss with the forward contract in place.<br />
-                  &bull; <b style={{ color: "rgba(255,255,255,0.8)" }}>SAVINGS</b> — Difference. Green = the hedge helped. Red = you would have been better off unhedged (because NOK weakened in your favor).
-                </div>
-              </HelpToggle>
-              <div style={{ display: "flex", gap: 16, alignItems: "flex-end", marginBottom: 12, flexWrap: "wrap" }}>
-                <div>
-                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>NOTIONAL (NOK)</div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>TOTAL EXPOSURE (NOK)</div>
                   <input
                     type="number"
-                    style={{ ...S.input, width: 130 }}
+                    style={{ ...S.input, width: 140 }}
                     value={hedgeNotional}
                     onChange={(e) => setHedgeNotional(parseFloat(e.target.value) || 0)}
                   />
@@ -1416,30 +1424,118 @@ export default function FXTerminalPage() {
 
               {hedgeResult && (
                 <div>
-                  <div style={{ display: "flex", gap: 24, marginBottom: 12 }}>
-                    <div>
-                      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>FORWARD</div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{hedgeResult.forward?.toFixed(4)}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>COST (ANN BPS)</div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: "#3b82f6" }}>{hedgeResult.costBpsAnnualized?.toFixed(1)}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>BREAK-EVEN</div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{fmtPct(hedgeResult.breakEvenPct, 2)}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>VOL REDUCTION</div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: "#10b981" }}>{hedgeResult.volReductionPct?.toFixed(1)}%</div>
-                    </div>
-                  </div>
+                  {/* ===== EXECUTION ORDER — What exactly to do ===== */}
+                  {hedgeResult.execution && hedgeResult.execution.amountFCY > 0 && (
+                    <div style={{ marginBottom: 16, padding: 16, background: "rgba(59,130,246,0.06)", borderRadius: 6, border: "1px solid rgba(59,130,246,0.2)" }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#3b82f6", marginBottom: 10, letterSpacing: "0.05em" }}>
+                        YOUR ORDER
+                      </div>
 
-                  {/* Scenario table */}
+                      {/* The one-line summary */}
+                      <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 12, lineHeight: 1.5 }}>
+                        <span style={{ color: hedgeResult.execution.action === "SELL" ? "#ef4444" : "#10b981" }}>
+                          {hedgeResult.execution.actionVerb}
+                        </span>{" "}
+                        {hedgeCurrency}{" "}
+                        {Math.round(hedgeResult.execution.amountFCY).toLocaleString("no-NO")}{" "}
+                        forward at{" "}
+                        <span style={{ color: "#3b82f6" }}>{hedgeResult.execution.forwardRate?.toFixed(4)}</span>{" "}
+                        for {hedgeTenor} (settling {hedgeResult.execution.settlementDate})
+                      </div>
+
+                      {/* Contract details grid */}
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 8, marginBottom: 12 }}>
+                        <div style={{ background: "#0d1117", borderRadius: 4, padding: "8px 12px", border: "1px solid #21262d" }}>
+                          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em" }}>YOU {hedgeResult.execution.action === "SELL" ? "DELIVER" : "RECEIVE"}</div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: CCY_COLORS[hedgeCurrency] || "#fff" }}>
+                            {hedgeCurrency} {Math.round(hedgeResult.execution.amountFCY).toLocaleString("no-NO")}
+                          </div>
+                        </div>
+                        <div style={{ background: "#0d1117", borderRadius: 4, padding: "8px 12px", border: "1px solid #21262d" }}>
+                          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em" }}>YOU {hedgeResult.execution.action === "SELL" ? "RECEIVE" : "DELIVER"}</div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: CCY_COLORS.NOK || "#F44336" }}>
+                            NOK {Math.round(hedgeResult.execution.settlementNOK).toLocaleString("no-NO")}
+                          </div>
+                        </div>
+                        <div style={{ background: "#0d1117", borderRadius: 4, padding: "8px 12px", border: "1px solid #21262d" }}>
+                          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em" }}>FORWARD RATE</div>
+                          <div style={{ fontSize: 14, fontWeight: 700 }}>{hedgeResult.execution.forwardRate?.toFixed(4)}</div>
+                        </div>
+                        <div style={{ background: "#0d1117", borderRadius: 4, padding: "8px 12px", border: "1px solid #21262d" }}>
+                          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em" }}>HEDGE COST</div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: "#f59e0b" }}>
+                            NOK {Math.round(hedgeResult.execution.hedgeCostNOK).toLocaleString("no-NO")}
+                          </div>
+                          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)" }}>{hedgeResult.costBpsAnnualized?.toFixed(0)} bps/year</div>
+                        </div>
+                        <div style={{ background: "#0d1117", borderRadius: 4, padding: "8px 12px", border: "1px solid #21262d" }}>
+                          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em" }}>BREAK-EVEN</div>
+                          <div style={{ fontSize: 14, fontWeight: 700 }}>{fmtPct(hedgeResult.breakEvenPct, 2)}</div>
+                          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)" }}>NOK must move this much for hedge to pay off</div>
+                        </div>
+                        <div style={{ background: "#0d1117", borderRadius: 4, padding: "8px 12px", border: "1px solid #21262d" }}>
+                          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em" }}>VOL REDUCTION</div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: "#10b981" }}>{hedgeResult.volReductionPct?.toFixed(1)}%</div>
+                        </div>
+                      </div>
+
+                      {/* Upfront cost note */}
+                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>
+                        No upfront payment. The forward is a binding agreement &mdash; on {hedgeResult.execution.settlementDate} you exchange currencies at the agreed rate regardless of where spot is.
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ===== RECOMMENDED PRODUCT ===== */}
+                  {hedgeResult.execution && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+                      <div style={{ background: "#0d1117", borderRadius: 6, padding: 14, border: "1px solid #21262d" }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "#10b981", letterSpacing: "0.05em", marginBottom: 6 }}>RECOMMENDED</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 4 }}>{hedgeResult.execution.recommendedProduct}</div>
+                        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>
+                          {hedgeResult.execution.productExplanation}
+                        </div>
+                      </div>
+                      <div style={{ background: "#0d1117", borderRadius: 6, padding: 14, border: "1px solid #21262d" }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em", marginBottom: 6 }}>ALTERNATIVE</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 4 }}>{hedgeResult.execution.alternativeProduct}</div>
+                        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", lineHeight: 1.5 }}>
+                          {hedgeResult.execution.alternativeExplanation}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ===== HOW TO EXECUTE ===== */}
+                  {hedgeResult.execution && (
+                    <div style={{ marginBottom: 16, padding: 14, background: "#0d1117", borderRadius: 6, border: "1px solid #21262d" }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.5)", letterSpacing: "0.05em", marginBottom: 8 }}>HOW TO EXECUTE</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "6px 12px", fontSize: 11, color: "rgba(255,255,255,0.6)", lineHeight: 1.5 }}>
+                        <div style={{ fontWeight: 700, color: "#3b82f6" }}>1.</div>
+                        <div><b style={{ color: "rgba(255,255,255,0.8)" }}>Call your bank&apos;s FX desk</b> (DNB Markets, Nordea Markets, SEB, or your primary bank). Ask for a quote on a {hedgeTenor} {hedgeCurrency}/NOK forward for {hedgeCurrency} {Math.round(hedgeResult.execution.amountFCY).toLocaleString("no-NO")}.</div>
+                        <div style={{ fontWeight: 700, color: "#3b82f6" }}>2.</div>
+                        <div><b style={{ color: "rgba(255,255,255,0.8)" }}>Compare the quoted rate</b> to the theoretical forward of {hedgeResult.execution.forwardRate?.toFixed(4)}. Bank quotes include a spread &mdash; expect 2-10 pips markup depending on relationship and size.</div>
+                        <div style={{ fontWeight: 700, color: "#3b82f6" }}>3.</div>
+                        <div><b style={{ color: "rgba(255,255,255,0.8)" }}>Confirm the trade</b> verbally or via the bank&apos;s e-trading platform (e.g., DNB FX Online, Nordea Markets Online). You&apos;ll receive a trade confirmation by email.</div>
+                        <div style={{ fontWeight: 700, color: "#3b82f6" }}>4.</div>
+                        <div><b style={{ color: "rgba(255,255,255,0.8)" }}>On settlement date ({hedgeResult.execution.settlementDate})</b>, the exchange happens automatically. Your bank debits/credits the agreed amounts. No action needed on your part.</div>
+                      </div>
+                      <div style={{ marginTop: 10, fontSize: 10, color: "rgba(255,255,255,0.35)", lineHeight: 1.5 }}>
+                        Minimum size: Most banks require {">"}NOK 100,000 for FX forwards. No upfront margin for standard corporate forwards (credit line based). ISDA/GMSLA agreement may be required for first-time hedging.
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ===== SCENARIO TABLE ===== */}
+                  <HelpToggle id="hedge-scenarios" label="Scenario analysis" showHelp={showHelp} setShowHelp={setShowHelp}>
+                    How does the hedge perform if {hedgeCurrency}/NOK moves?
+                    Negative = NOK strengthens (hedge protects you). Positive = NOK weakens (you give up upside).
+                    SAVINGS = how much better off you are hedged vs unhedged. Green = hedge helped.
+                  </HelpToggle>
                   <table style={S.table}>
                     <thead>
                       <tr>
-                        <th style={S.th}>FX MOVE</th>
+                        <th style={S.th}>{hedgeCurrency}/NOK MOVE</th>
                         <th style={S.th}>UNHEDGED P&amp;L</th>
                         <th style={S.th}>HEDGED P&amp;L</th>
                         <th style={S.th}>SAVINGS</th>
@@ -1466,15 +1562,19 @@ export default function FXTerminalPage() {
                   {/* Plain-language summary */}
                   <div style={{ marginTop: 12, padding: 10, background: "#0d1117", borderRadius: 4, border: "1px solid #21262d", fontSize: 12, color: "rgba(255,255,255,0.6)", lineHeight: 1.6 }}>
                     <b style={{ color: "rgba(255,255,255,0.8)" }}>Bottom line:</b>{" "}
-                    {hedgeResult.costBpsAnnualized < 50
-                      ? `Hedging ${hedgeRatio}% of your ${hedgeCurrency} exposure costs ~${hedgeResult.costBpsAnnualized?.toFixed(0)} bps/year. `
-                      : `Hedging is relatively expensive at ${hedgeResult.costBpsAnnualized?.toFixed(0)} bps/year. `}
-                    {hedgeResult.volReductionPct >= 20
-                      ? `In return, your cashflow volatility drops by ${hedgeResult.volReductionPct?.toFixed(0)}% — a meaningful reduction in risk. `
-                      : hedgeResult.volReductionPct >= 5
-                        ? `Vol reduction of ${hedgeResult.volReductionPct?.toFixed(0)}% is modest. `
-                        : `Vol reduction is minimal at ${hedgeResult.volReductionPct?.toFixed(0)}%. Consider if the cost is worth it. `}
-                    The hedge protects you if NOK strengthens (negative FX moves), but you give up gains if NOK weakens.
+                    {hedgeResult.execution && hedgeResult.execution.amountFCY > 0
+                      ? <>
+                          {hedgeResult.execution.actionVerb} {hedgeCurrency} {Math.round(hedgeResult.execution.amountFCY).toLocaleString("no-NO")} forward at {hedgeResult.execution.forwardRate?.toFixed(4)} for {hedgeTenor}.
+                          {" "}This costs NOK {Math.round(hedgeResult.execution.hedgeCostNOK).toLocaleString("no-NO")} ({hedgeResult.costBpsAnnualized?.toFixed(0)} bps/year annualized).
+                          {hedgeResult.volReductionPct >= 5
+                            ? ` Reduces your cashflow volatility by ${hedgeResult.volReductionPct?.toFixed(0)}%.`
+                            : ` Minimal vol reduction — consider whether the cost is justified.`}
+                          {" "}Call your bank&apos;s FX desk to get a live quote.
+                        </>
+                      : <>
+                          No hedgeable exposure detected for {companyTicker} in {hedgeCurrency}. Check the exposure data above.
+                        </>
+                    }
                   </div>
                 </div>
               )}

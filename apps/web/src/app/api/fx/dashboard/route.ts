@@ -132,8 +132,8 @@ export async function GET() {
       nokIndex = nokTradeWeightedIndex(aligned);
     }
 
-    // Cross-pair correlation matrix (63D returns)
-    const corrPairs = ["NOKUSD", "NOKEUR", "NOKGBP", "NOKSEK"] as const;
+    // Cross-pair correlation matrix (63D returns) — includes NOK TWI
+    const corrPairs = ["NOKUSD", "NOKEUR", "NOKGBP", "NOKSEK", "NOKDKK"] as const;
     const pairReturns: Record<string, number[]> = {};
     for (const p of corrPairs) {
       const data = byPair[p] || [];
@@ -147,10 +147,23 @@ export async function GET() {
       pairReturns[p] = rets;
     }
 
+    // Compute NOK TWI returns for the correlation matrix
+    if (nokIndex.length > 1) {
+      const twiRets: number[] = [];
+      const last64 = nokIndex.slice(-64);
+      for (let i = 1; i < last64.length; i++) {
+        if (last64[i].index > 0 && last64[i - 1].index > 0) {
+          twiRets.push(Math.log(last64[i].index / last64[i - 1].index));
+        }
+      }
+      pairReturns["NOK"] = twiRets;
+    }
+
+    const allCorrKeys = [...corrPairs, ...(pairReturns["NOK"] ? ["NOK"] as const : [])];
     const correlationMatrix: Record<string, Record<string, number>> = {};
-    for (const p1 of corrPairs) {
+    for (const p1 of allCorrKeys) {
       correlationMatrix[p1] = {};
-      for (const p2 of corrPairs) {
+      for (const p2 of allCorrKeys) {
         correlationMatrix[p1][p2] = correlation(pairReturns[p1] || [], pairReturns[p2] || []);
       }
     }
