@@ -12,6 +12,21 @@ export const dynamic = "force-dynamic";
  *   so that logged-out users can see a blurred preview
  */
 export async function GET(req: NextRequest) {
+  // List mode: return all tickers that have saved edits
+  if (req.nextUrl.searchParams.get("list") === "true") {
+    try {
+      const result = await pool.query(
+        `SELECT DISTINCT ticker FROM spreadsheet_edits ORDER BY ticker`
+      );
+      return secureJsonResponse({
+        success: true,
+        tickers: result.rows.map((r: { ticker: string }) => r.ticker),
+      });
+    } catch (error) {
+      return safeErrorResponse(error, "Failed to list edits");
+    }
+  }
+
   const ticker = req.nextUrl.searchParams.get("ticker")?.toUpperCase();
   if (!ticker || !/^[A-Z0-9.]{1,20}$/.test(ticker)) {
     return NextResponse.json({ error: "Invalid ticker" }, { status: 400 });

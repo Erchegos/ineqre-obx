@@ -43,7 +43,8 @@ export default function StocksPage() {
     new Set(['equity']) // Default to equities only
   );
   const [selectedSectors, setSelectedSectors] = useState<Set<string>>(new Set());
-  const [tierFilter, setTierFilter] = useState<'all' | 'tierA' | 'tierAB' | 'ml' | 'options'>('tierAB');
+  const [selectedTiers, setSelectedTiers] = useState<Set<string>>(new Set(['A', 'B']));
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [tickersWithFactors, setTickersWithFactors] = useState<Set<string>>(new Set());
   const [tickersWithOptimizer, setTickersWithOptimizer] = useState<Set<string>>(new Set());
   const [tickersWithBacktest, setTickersWithBacktest] = useState<Set<string>>(new Set());
@@ -96,77 +97,56 @@ export default function StocksPage() {
     fetchStocks(selectedAssetTypes);
   }, [selectedAssetTypes, fetchStocks]);
 
-  // Check which stocks have factor data and optimizer configs available
+  // Fetch tag data immediately on mount — runs in parallel with stocks fetch
   useEffect(() => {
-    async function checkFactorAndOptimizerData() {
-      if (stocks.length === 0) return;
-
+    async function fetchTagData() {
       try {
-        // Fetch all in parallel
-        const [factorRes, optimizerRes, optionsRes, backtestRes, excelRes] = await Promise.all([
-          fetch("/api/factors/tickers", {
-            method: "GET",
-            headers: { accept: "application/json" },
-              }),
-          fetch("/api/optimizer-config/tickers", {
-            method: "GET",
-            headers: { accept: "application/json" },
-              }),
-          fetch("/api/options", {
-            method: "GET",
-            headers: { accept: "application/json" },
-              }),
-          fetch("/api/backtest/tickers", {
-            method: "GET",
-            headers: { accept: "application/json" },
-              }),
-          fetch("/api/valuation/excel?list=true", {
-            method: "GET",
-            headers: { accept: "application/json" },
-              }),
+        const [factorRes, optimizerRes, optionsRes, backtestRes, excelRes, editsRes] = await Promise.all([
+          fetch("/api/factors/tickers", { headers: { accept: "application/json" } }),
+          fetch("/api/optimizer-config/tickers", { headers: { accept: "application/json" } }),
+          fetch("/api/options", { headers: { accept: "application/json" } }),
+          fetch("/api/backtest/tickers", { headers: { accept: "application/json" } }),
+          fetch("/api/valuation/excel?list=true", { headers: { accept: "application/json" } }),
+          fetch("/api/valuation/excel/edits?list=true", { headers: { accept: "application/json" } }).catch(() => null),
         ]);
 
         if (factorRes.ok) {
           const data = await factorRes.json();
-          if (data.success && data.tickers) {
-            setTickersWithFactors(new Set(data.tickers));
-          }
+          if (data.success && data.tickers) setTickersWithFactors(new Set(data.tickers));
         }
-
         if (optimizerRes.ok) {
           const data = await optimizerRes.json();
-          if (data.success && data.tickers) {
-            setTickersWithOptimizer(new Set(data.tickers));
-          }
+          if (data.success && data.tickers) setTickersWithOptimizer(new Set(data.tickers));
         }
-
         if (optionsRes.ok) {
           const data = await optionsRes.json();
-          if (data.stocks) {
-            setTickersWithOptions(new Set(data.stocks.map((s: { ticker: string }) => s.ticker)));
-          }
+          if (data.stocks) setTickersWithOptions(new Set(data.stocks.map((s: { ticker: string }) => s.ticker)));
         }
-
         if (backtestRes.ok) {
           const data = await backtestRes.json();
-          if (data.success && data.tickers) {
-            setTickersWithBacktest(new Set(data.tickers));
-          }
+          if (data.success && data.tickers) setTickersWithBacktest(new Set(data.tickers));
         }
 
+        // Combine Excel files (local) + spreadsheet_edits (DB) for XLS tag
+        const xlsTickers = new Set<string>();
         if (excelRes.ok) {
           const data = await excelRes.json();
-          if (data.success && data.tickers) {
-            setTickersWithExcel(new Set(data.tickers));
-          }
+          if (data.success && data.tickers) data.tickers.forEach((t: string) => xlsTickers.add(t));
         }
+        if (editsRes && editsRes.ok) {
+          try {
+            const data = await editsRes.json();
+            if (data.success && data.tickers) data.tickers.forEach((t: string) => xlsTickers.add(t));
+          } catch { /* non-fatal */ }
+        }
+        if (xlsTickers.size > 0) setTickersWithExcel(xlsTickers);
       } catch (e) {
         // Silently skip on error
       }
     }
 
-    checkFactorAndOptimizerData();
-  }, [stocks]);
+    fetchTagData();
+  }, []);
 
   const toggleAssetType = (type: AssetType) => {
     setSelectedAssetTypes(prev => {
@@ -201,15 +181,20 @@ export default function StocksPage() {
   const filteredAndSortedStocks = useMemo(() => {
     let filtered = stocks;
 
-    // Filter by tier
-    if (tierFilter === 'tierA') {
-      filtered = filtered.filter(stock => stock.dataTier === 'A');
-    } else if (tierFilter === 'tierAB') {
-      filtered = filtered.filter(stock => stock.dataTier === 'A' || stock.dataTier === 'B');
-    } else if (tierFilter === 'ml') {
+    // Filter by tier toggles
+    if (selectedTiers.size > 0) {
+      filtered = filtered.filter(stock => selectedTiers.has(stock.dataTier));
+    }
+
+    // Filter by tag
+    if (tagFilter === 'ml') {
       filtered = filtered.filter(stock => tickersWithFactors.has(stock.ticker));
-    } else if (tierFilter === 'options') {
+    } else if (tagFilter === 'bt') {
+      filtered = filtered.filter(stock => tickersWithBacktest.has(stock.ticker));
+    } else if (tagFilter === 'options') {
       filtered = filtered.filter(stock => hasOptions(stock.ticker));
+    } else if (tagFilter === 'xls') {
+      filtered = filtered.filter(stock => tickersWithExcel.has(stock.ticker));
     }
 
     // Filter by sector
@@ -252,7 +237,7 @@ export default function StocksPage() {
     });
 
     return sorted;
-  }, [stocks, searchQuery, sortBy, sortOrder, selectedSectors, tierFilter, tickersWithFactors, hasOptions]);
+  }, [stocks, searchQuery, sortBy, sortOrder, selectedSectors, selectedTiers, tagFilter, tickersWithFactors, tickersWithBacktest, tickersWithExcel, hasOptions]);
 
   // Calculate tier counts and ML predictions count for summary panel
   const tierCounts = useMemo(() => {
@@ -457,70 +442,88 @@ export default function StocksPage() {
           </div>
         </div>
         <p style={{ color: "rgba(255,255,255,0.5)", marginBottom: 16, fontSize: 14 }}>
-          Universe: {stocks.length} assets | Tier A: {tierCounts.A} | Tier B: {tierCounts.B} | Tier C: {tierCounts.C} | Tier F: {tierCounts.F} | <span style={{ color: '#10b981', fontWeight: 600 }}>ML Ready: {mlCount}</span> | <span style={{ color: '#60a5fa', fontWeight: 600 }}>Backtested: {btCount}</span> | <span style={{ color: '#8b5cf6', fontWeight: 600 }}>Optimized: {optCount}</span> | <span style={{ color: '#f59e0b', fontWeight: 600 }}>Options: {optionsCount}</span>
+          Universe: {stocks.length} assets | Tier A: {tierCounts.A} | Tier B: {tierCounts.B} | Tier C: {tierCounts.C} | <span style={{ color: '#10b981', fontWeight: 600 }}>ML: {mlCount}</span> | <span style={{ color: '#60a5fa', fontWeight: 600 }}>Backtested: {btCount}</span> | <span style={{ color: '#f59e0b', fontWeight: 600 }}>Options: {optionsCount}</span>
           <span style={{ marginLeft: 16, fontSize: 13 }}>Source: Interactive Brokers</span>
         </p>
 
-        {/* Tier Filters */}
+        {/* Tier + Tag Filters */}
         <div style={{
           display: "flex",
-          gap: 8,
+          gap: 16,
           marginBottom: 16,
-          flexWrap: "wrap"
+          flexWrap: "wrap",
+          alignItems: "center",
         }}>
-          {[
-            { key: 'all', label: 'All' },
-            { key: 'tierA', label: 'Tier A Only' },
-            { key: 'tierAB', label: 'A+B Only' },
-            { key: 'ml', label: 'ML Ready' },
-            { key: 'options', label: 'Options Available' },
-          ].map((filter) => {
-            const isSelected = tierFilter === filter.key;
-            return (
-              <button
-                key={filter.key}
-                onClick={() => setTierFilter(filter.key as typeof tierFilter)}
-                style={{
-                  padding: "8px 14px",
-                  fontSize: 12,
-                  fontWeight: 500,
-                  border: isSelected ? "1px solid #3b82f6" : "1px solid #30363d",
-                  borderRadius: 4,
-                  background: isSelected ? "#3b82f6" : "#161b22",
-                  color: isSelected ? "#fff" : "#fff",
-                  cursor: "pointer",
-                  transition: "all 0.15s ease",
-                  whiteSpace: "nowrap",
-                  transform: "scale(1)",
-                  boxShadow: isSelected ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
-                }}
-                onMouseEnter={(e) => {
-                  if (isSelected) {
-                    e.currentTarget.style.filter = "brightness(0.9)";
-                  } else {
-                    e.currentTarget.style.borderColor = "#3b82f6";
-                    e.currentTarget.style.background = "rgba(59,130,246,0.08)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (isSelected) {
-                    e.currentTarget.style.filter = "brightness(1)";
-                  } else {
-                    e.currentTarget.style.borderColor = "#30363d";
-                    e.currentTarget.style.background = "#161b22";
-                  }
-                }}
-                onMouseDown={(e) => {
-                  e.currentTarget.style.transform = "scale(0.95)";
-                }}
-                onMouseUp={(e) => {
-                  e.currentTarget.style.transform = "scale(1)";
-                }}
-              >
-                {filter.label}
-              </button>
-            );
-          })}
+          {/* Tier toggles — independent, multi-select */}
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em", textTransform: "uppercase", marginRight: 4 }}>Tier</span>
+            {(['A', 'B', 'C'] as const).map((tier) => {
+              const isSelected = selectedTiers.has(tier);
+              return (
+                <button
+                  key={tier}
+                  onClick={() => {
+                    setSelectedTiers(prev => {
+                      const next = new Set(prev);
+                      if (next.has(tier)) {
+                        next.delete(tier);
+                      } else {
+                        next.add(tier);
+                      }
+                      return next;
+                    });
+                  }}
+                  style={{
+                    padding: "6px 12px",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    border: isSelected ? `1px solid ${getTierColor(tier)}` : "1px solid #30363d",
+                    borderRadius: 4,
+                    background: isSelected ? `${getTierColor(tier)}18` : "#161b22",
+                    color: isSelected ? getTierColor(tier) : "rgba(255,255,255,0.5)",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  {tier}
+                </button>
+              );
+            })}
+          </div>
+
+          <span style={{ width: 1, height: 24, background: "#30363d" }} />
+
+          {/* Tag filters — single-select (or none) */}
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em", textTransform: "uppercase", marginRight: 4 }}>Tags</span>
+            {[
+              { key: 'ml', label: 'ML', color: '#10b981' },
+              { key: 'bt', label: 'BT', color: '#60a5fa' },
+              { key: 'options', label: 'Options', color: '#fbbf24' },
+              { key: 'xls', label: 'XLS', color: '#4ade80' },
+            ].map((tag) => {
+              const isSelected = tagFilter === tag.key;
+              return (
+                <button
+                  key={tag.key}
+                  onClick={() => setTagFilter(isSelected ? null : tag.key)}
+                  style={{
+                    padding: "6px 12px",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    border: isSelected ? `1px solid ${tag.color}` : "1px solid #30363d",
+                    borderRadius: 4,
+                    background: isSelected ? `${tag.color}18` : "#161b22",
+                    color: isSelected ? tag.color : "rgba(255,255,255,0.5)",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  {tag.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Search Bar with Asset Type Filters */}
