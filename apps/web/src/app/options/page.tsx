@@ -39,7 +39,7 @@ function fmtExp(exp: string): string {
 function pcColor(ratio: number): string {
   if (ratio > 1.2) return "#ef4444"; // bearish (high put OI)
   if (ratio > 0.8) return "#eab308"; // neutral
-  return "#22c55e"; // bullish (low put OI)
+  return "#10b981"; // bullish (low put OI)
 }
 
 function pcLabel(ratio: number): string {
@@ -83,26 +83,26 @@ export default function OptionsOverviewPage() {
   const totalOI = stocks.reduce((s, st) => s + st.total_oi, 0);
   const totalVol = stocks.reduce((s, st) => s + st.total_vol, 0);
 
-  const lbl: React.CSSProperties = { fontSize: 9, color: "#555", fontFamily: "monospace", letterSpacing: "0.08em", marginBottom: 2 };
+  const lbl: React.CSSProperties = { fontSize: 9, color: "rgba(255,255,255,0.35)", fontFamily: "monospace", letterSpacing: "0.08em", marginBottom: 2 };
   const val: React.CSSProperties = { fontSize: 13, fontWeight: 700, fontFamily: "monospace" };
   const smVal: React.CSSProperties = { fontSize: 11, fontWeight: 600, fontFamily: "monospace" };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0a0a0f", color: "#e5e5e5", fontFamily: "'Inter', -apple-system, sans-serif" }}>
-      <header style={{ borderBottom: "1px solid #1e1e2e", padding: "10px 24px", background: "#0d0d14" }}>
-        <div style={{ maxWidth: 1800, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "monospace" }}>
+      <header style={{ borderBottom: "1px solid #30363d", padding: "10px 24px", background: "#161b22" }}>
+        <div style={{ maxWidth: 1400, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <Link href="/stocks" style={{ color: "#555", textDecoration: "none", fontSize: 16, lineHeight: 1, padding: "6px 10px", border: "1px solid #1e1e2e", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center" }} title="Back to Assets">
+            <Link href="/stocks" style={{ color: "rgba(255,255,255,0.35)", textDecoration: "none", fontSize: 16, lineHeight: 1, padding: "6px 10px", border: "1px solid #30363d", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center" }} title="Back to Assets">
               &larr;
             </Link>
             <div>
-              <Link href="/stocks" style={{ color: "#555", fontSize: 10, textDecoration: "none", fontFamily: "monospace", letterSpacing: "0.05em" }}>
+              <Link href="/stocks" style={{ color: "rgba(255,255,255,0.35)", fontSize: 10, textDecoration: "none", fontFamily: "monospace", letterSpacing: "0.05em" }}>
                 ASSET LIST
               </Link>
               <h1 style={{ fontSize: 16, fontWeight: 800, marginTop: 2, fontFamily: "monospace", letterSpacing: "0.02em" }}>OPTIONS ANALYSIS</h1>
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 10, color: "#444", fontFamily: "monospace" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>
             {stocks.length > 0 && (
               <>
                 <span>OI: {fmtK(totalOI)}</span>
@@ -114,13 +114,13 @@ export default function OptionsOverviewPage() {
         </div>
       </header>
 
-      <main style={{ maxWidth: 1800, margin: "0 auto", padding: "16px 24px" }}>
+      <main style={{ maxWidth: 1400, margin: "0 auto", padding: "16px 24px" }}>
         {loading && (
           <div style={{ ...panel, textAlign: "center", padding: 48 }}>
-            <div style={{ width: 200, height: 2, background: "#1e1e2e", margin: "0 auto", overflow: "hidden" }}>
+            <div style={{ width: 200, height: 2, background: "#30363d", margin: "0 auto", overflow: "hidden" }}>
               <div style={{ width: "40%", height: "100%", background: "#3b82f6", animation: "load 1.2s ease-in-out infinite" }} />
             </div>
-            <div style={{ fontSize: 11, color: "#666", marginTop: 10, fontFamily: "monospace" }}>LOADING OPTIONS DATA...</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 10, fontFamily: "monospace" }}>LOADING OPTIONS DATA...</div>
             <style>{`@keyframes load { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }`}</style>
           </div>
         )}
@@ -133,7 +133,7 @@ export default function OptionsOverviewPage() {
         )}
 
         {!loading && !error && stocks.length === 0 && (
-          <div style={{ ...panel, textAlign: "center", padding: 40, color: "#444", fontFamily: "monospace", fontSize: 12 }}>
+          <div style={{ ...panel, textAlign: "center", padding: 40, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", fontSize: 12 }}>
             No options data available. Run fetch-options-daily.ts to load data.
           </div>
         )}
@@ -142,16 +142,16 @@ export default function OptionsOverviewPage() {
           <>
             {/* Sort controls */}
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>
-              <span style={{ fontSize: 10, color: "#555", fontFamily: "monospace", marginRight: 4 }}>SORT:</span>
+              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", fontFamily: "monospace", marginRight: 4 }}>SORT:</span>
               {(["oi", "vol", "iv", "ticker"] as const).map(s => (
                 <button
                   key={s}
                   onClick={() => setSortBy(s)}
                   style={{
-                    padding: "3px 8px", fontSize: 10, fontFamily: "monospace", cursor: "pointer", borderRadius: 1,
-                    border: sortBy === s ? "1px solid #6366f1" : "1px solid #1e1e2e",
-                    background: sortBy === s ? "rgba(99,102,241,0.15)" : "transparent",
-                    color: sortBy === s ? "#818cf8" : "#555",
+                    padding: "3px 8px", fontSize: 10, fontFamily: "monospace", cursor: "pointer", borderRadius: 4,
+                    border: sortBy === s ? "1px solid #3b82f6" : "1px solid #30363d",
+                    background: sortBy === s ? "rgba(59,130,246,0.15)" : "transparent",
+                    color: sortBy === s ? "#3b82f6" : "rgba(255,255,255,0.35)",
                     fontWeight: sortBy === s ? 700 : 500,
                   }}
                 >
@@ -175,14 +175,15 @@ export default function OptionsOverviewPage() {
                     style={{
                       display: "block",
                       padding: "16px 20px",
-                      background: "#0d0d14",
-                      border: "1px solid #1e1e2e",
+                      background: "#161b22",
+                      border: "1px solid #30363d",
+                      borderRadius: 8,
                       textDecoration: "none",
                       color: "inherit",
                       transition: "all 0.1s",
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#3b82f6"; e.currentTarget.style.background = "#0e0e1a"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#1e1e2e"; e.currentTarget.style.background = "#0d0d14"; }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#3b82f6"; e.currentTarget.style.background = "rgba(59,130,246,0.08)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#30363d"; e.currentTarget.style.background = "#161b22"; }}
                   >
                     {/* Row 1: Ticker, price, P/C sentiment */}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
@@ -192,14 +193,14 @@ export default function OptionsOverviewPage() {
                         </span>
                         <span style={{ fontSize: 16, fontWeight: 700, fontFamily: "monospace" }}>
                           {stock.underlying_price.toFixed(2)}
-                          <span style={{ fontSize: 10, color: "#555", marginLeft: 4 }}>{stock.currency}</span>
+                          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginLeft: 4 }}>{stock.currency}</span>
                         </span>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                         {stock.atm_iv !== null && (
                           <div style={{ textAlign: "right" }}>
                             <div style={lbl}>ATM IV</div>
-                            <div style={{ ...val, color: stock.atm_iv > 0.5 ? "#ef4444" : stock.atm_iv > 0.3 ? "#eab308" : "#22c55e" }}>
+                            <div style={{ ...val, color: stock.atm_iv > 0.5 ? "#ef4444" : stock.atm_iv > 0.3 ? "#eab308" : "#10b981" }}>
                               {(stock.atm_iv * 100).toFixed(1)}%
                             </div>
                           </div>
@@ -210,7 +211,7 @@ export default function OptionsOverviewPage() {
                             {stock.pc_ratio_oi.toFixed(2)} <span style={{ fontSize: 9 }}>{pcLabel(stock.pc_ratio_oi)}</span>
                           </div>
                         </div>
-                        <div style={{ color: hoursAgo < 24 ? "#22c55e" : hoursAgo < 48 ? "#eab308" : "#ef4444", fontSize: 9, fontFamily: "monospace", opacity: 0.7 }}>
+                        <div style={{ color: hoursAgo < 24 ? "#10b981" : hoursAgo < 48 ? "#eab308" : "#ef4444", fontSize: 9, fontFamily: "monospace", opacity: 0.7 }}>
                           {hoursAgo}H AGO
                         </div>
                       </div>
@@ -224,7 +225,7 @@ export default function OptionsOverviewPage() {
                       </div>
                       <div>
                         <div style={lbl}>CALL OI</div>
-                        <div style={{ ...smVal, color: "#22c55e" }}>{fmtK(stock.total_call_oi)}</div>
+                        <div style={{ ...smVal, color: "#10b981" }}>{fmtK(stock.total_call_oi)}</div>
                       </div>
                       <div>
                         <div style={lbl}>PUT OI</div>
@@ -241,7 +242,7 @@ export default function OptionsOverviewPage() {
                             <>
                               ${stock.max_pain.toFixed(0)}
                               {maxPainDist !== null && (
-                                <span style={{ fontSize: 9, color: maxPainDist > 0 ? "#22c55e" : "#ef4444", marginLeft: 3 }}>
+                                <span style={{ fontSize: 9, color: maxPainDist > 0 ? "#10b981" : "#ef4444", marginLeft: 3 }}>
                                   {maxPainDist > 0 ? "+" : ""}{maxPainDist.toFixed(1)}%
                                 </span>
                               )}
@@ -256,7 +257,7 @@ export default function OptionsOverviewPage() {
                             <>
                               {fmtExp(stock.nearest_expiry)}
                               {stock.days_to_expiry !== null && (
-                                <span style={{ fontSize: 9, color: stock.days_to_expiry <= 7 ? "#ef4444" : "#555", marginLeft: 3 }}>
+                                <span style={{ fontSize: 9, color: stock.days_to_expiry <= 7 ? "#ef4444" : "rgba(255,255,255,0.35)", marginLeft: 3 }}>
                                   {stock.days_to_expiry}d
                                 </span>
                               )}
@@ -274,15 +275,15 @@ export default function OptionsOverviewPage() {
 
                     {/* Row 3: OI distribution bar */}
                     <div style={{ marginTop: 10 }}>
-                      <div style={{ display: "flex", height: 4, borderRadius: 2, overflow: "hidden", background: "#1e1e2e" }}>
+                      <div style={{ display: "flex", height: 4, borderRadius: 2, overflow: "hidden", background: "#30363d" }}>
                         {stock.total_oi > 0 && (
                           <>
-                            <div style={{ width: `${(stock.total_call_oi / stock.total_oi) * 100}%`, background: "#22c55e", transition: "width 0.3s" }} />
+                            <div style={{ width: `${(stock.total_call_oi / stock.total_oi) * 100}%`, background: "#10b981", transition: "width 0.3s" }} />
                             <div style={{ width: `${(stock.total_put_oi / stock.total_oi) * 100}%`, background: "#ef4444", transition: "width 0.3s" }} />
                           </>
                         )}
                       </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3, fontSize: 8, fontFamily: "monospace", color: "#444" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3, fontSize: 8, fontFamily: "monospace", color: "rgba(255,255,255,0.4)" }}>
                         <span>CALLS {stock.total_oi > 0 ? ((stock.total_call_oi / stock.total_oi) * 100).toFixed(0) : 0}%</span>
                         <span>PUTS {stock.total_oi > 0 ? ((stock.total_put_oi / stock.total_oi) * 100).toFixed(0) : 0}%</span>
                       </div>
@@ -295,12 +296,12 @@ export default function OptionsOverviewPage() {
         )}
 
         {/* Data Sources */}
-        <div style={{ borderTop: "1px solid #1a1a1a", marginTop: 16, padding: "12px 16px", fontSize: 9, color: "#444", fontFamily: "monospace", lineHeight: 1.8 }}>
-          <span style={{ fontWeight: 700, color: "#555", letterSpacing: "0.06em" }}>DATA SOURCES</span>
+        <div style={{ borderTop: "1px solid #30363d", marginTop: 16, padding: "12px 16px", fontSize: 9, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", lineHeight: 1.8 }}>
+          <span style={{ fontWeight: 700, color: "rgba(255,255,255,0.5)", letterSpacing: "0.06em" }}>DATA SOURCES</span>
           <div style={{ marginTop: 4 }}>
-            <span style={{ color: "#666" }}>Options Data:</span> Yahoo Finance (15-min delayed) &middot;{" "}
-            <span style={{ color: "#666" }}>Aggregated Stats:</span> Open interest, IV, max pain, P/C ratio computed from chain data &middot;{" "}
-            <span style={{ color: "#666" }}>Underlying Prices:</span> Interactive Brokers TWS API, Yahoo Finance
+            <span style={{ color: "rgba(255,255,255,0.4)" }}>Options Data:</span> Yahoo Finance (15-min delayed) &middot;{" "}
+            <span style={{ color: "rgba(255,255,255,0.4)" }}>Aggregated Stats:</span> Open interest, IV, max pain, P/C ratio computed from chain data &middot;{" "}
+            <span style={{ color: "rgba(255,255,255,0.4)" }}>Underlying Prices:</span> Interactive Brokers TWS API, Yahoo Finance
           </div>
         </div>
       </main>
@@ -309,7 +310,8 @@ export default function OptionsOverviewPage() {
 }
 
 const panel: React.CSSProperties = {
-  background: "#0d0d14",
-  border: "1px solid #1e1e2e",
-  padding: "12px 16px",
+  background: "#161b22",
+  border: "1px solid #30363d",
+  borderRadius: 8,
+  padding: 16,
 };

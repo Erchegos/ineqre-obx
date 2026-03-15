@@ -351,89 +351,96 @@ export default function CorrelationPage() {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "var(--background)",
-      color: "var(--foreground)",
-      padding: 32
+      background: "#0a0a0a",
+      color: "#fff",
+      fontFamily: "monospace",
+      padding: "20px 24px"
     }}>
       <style dangerouslySetInnerHTML={{ __html: `
         .search-input {
           width: 100%;
-          padding: 12px 16px;
-          font-size: 14px;
-          border: 1px solid var(--border);
-          border-radius: 4px;
-          background: var(--card-bg);
-          color: var(--foreground);
+          padding: 8px 10px;
+          font-size: 12px;
+          font-family: monospace;
+          border: 1px solid #30363d;
+          border-radius: 5px;
+          background: #0d1117;
+          color: #fff;
           outline: none;
           transition: border-color 0.2s;
         }
         .search-input:focus {
-          border-color: var(--accent);
+          border-color: #3b82f6;
         }
         .search-input::placeholder {
-          color: var(--muted);
+          color: rgba(255,255,255,0.4);
         }
         .stat-box {
-          background: var(--card-bg);
-          border: 1px solid var(--border);
+          background: #0d1117;
+          border: 1px solid #21262d;
           transition: all 0.15s;
         }
         .stat-box:hover {
-          border-color: var(--accent);
+          border-color: #3b82f6;
         }
       `}} />
 
       <div style={{ maxWidth: 1400, margin: "0 auto" }}>
 
         {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 12 }}>
+        <Link href="/" style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", textDecoration: "none", fontFamily: "monospace" }}>
+          ← HOME
+        </Link>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 12, marginTop: 4 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <h1 style={{ fontSize: 32, fontWeight: 700, margin: 0 }}>
+            <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, fontFamily: "monospace", letterSpacing: "-0.02em" }}>
               Correlation Matrix
             </h1>
             <Link
               href="/stocks"
               style={{
                 display: "inline-block",
-                color: "var(--foreground)",
+                color: "rgba(255,255,255,0.5)",
                 textDecoration: "none",
-                fontSize: 13,
-                fontWeight: 500,
-                padding: "8px 16px",
-                border: "1px solid var(--border)",
-                borderRadius: 4,
-                background: "var(--card-bg)",
+                fontSize: 11,
+                fontWeight: 600,
+                padding: "5px 12px",
+                border: "1px solid #30363d",
+                borderRadius: 8,
+                background: "#161b22",
+                fontFamily: "monospace",
+                letterSpacing: "0.05em",
                 transition: "all 0.15s ease"
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = "var(--foreground)";
-                e.currentTarget.style.background = "var(--hover-bg)";
+                e.currentTarget.style.borderColor = "#3b82f6";
+                e.currentTarget.style.color = "#3b82f6";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = "var(--border)";
-                e.currentTarget.style.background = "var(--card-bg)";
+                e.currentTarget.style.borderColor = "#30363d";
+                e.currentTarget.style.color = "rgba(255,255,255,0.5)";
               }}
             >
-              Back to Assets
+              ASSETS
             </Link>
           </div>
-          <div style={{ fontSize: 13, color: "var(--muted)" }}>
-            Last updated: {currentDate}
+          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>
+            {currentDate}
           </div>
         </div>
-        <p style={{ color: "var(--muted)", marginBottom: 24, fontSize: 14 }}>
+        <p style={{ color: "rgba(255,255,255,0.4)", marginBottom: 20, fontSize: 11, fontFamily: "monospace" }}>
           Quantitative correlation and regime analysis
         </p>
 
         {/* Quick Presets - Prominent */}
         <div style={{
-          background: "var(--card-bg)",
-          border: "1px solid var(--border)",
-          borderRadius: 4,
-          padding: 20,
-          marginBottom: 16
+          background: "#161b22",
+          border: "1px solid #30363d",
+          borderRadius: 8,
+          padding: 16,
+          marginBottom: 12
         }}>
-          <h3 style={{ fontSize: 12, fontWeight: 600, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted-foreground)" }}>
+          <h3 style={{ fontSize: 11, fontWeight: 700, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(255,255,255,0.6)", fontFamily: "monospace" }}>
             Quick Presets
           </h3>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -442,30 +449,24 @@ export default function CorrelationPage() {
                 key={group}
                 onClick={() => handlePresetGroup(group as keyof typeof PRESET_GROUPS)}
                 style={{
-                  padding: "8px 14px",
-                  background: "var(--card-bg)",
-                  color: "var(--foreground)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 4,
+                  padding: "6px 12px",
+                  background: "#21262d",
+                  color: "rgba(255,255,255,0.8)",
+                  border: "1px solid #30363d",
+                  borderRadius: 8,
                   cursor: "pointer",
-                  fontSize: 13,
-                  fontWeight: 500,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  fontFamily: "monospace",
                   transition: "all 0.15s ease",
-                  transform: "scale(1)",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = "var(--accent)";
-                  e.currentTarget.style.background = "var(--hover-bg)";
+                  e.currentTarget.style.borderColor = "#3b82f6";
+                  e.currentTarget.style.color = "#3b82f6";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = "var(--border)";
-                  e.currentTarget.style.background = "var(--card-bg)";
-                }}
-                onMouseDown={(e) => {
-                  e.currentTarget.style.transform = "scale(0.95)";
-                }}
-                onMouseUp={(e) => {
-                  e.currentTarget.style.transform = "scale(1)";
+                  e.currentTarget.style.borderColor = "#30363d";
+                  e.currentTarget.style.color = "rgba(255,255,255,0.8)";
                 }}
               >
                 {group}
@@ -478,17 +479,17 @@ export default function CorrelationPage() {
         <div style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-          gap: 16,
-          marginBottom: 16
+          gap: 12,
+          marginBottom: 12
         }}>
           {/* Lookback Period */}
           <div style={{
-            background: "var(--card-bg)",
-            border: "1px solid var(--border)",
-            borderRadius: 4,
+            background: "#161b22",
+            border: "1px solid #30363d",
+            borderRadius: 8,
             padding: 16
           }}>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            <label style={{ display: "block", fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "monospace" }}>
               Lookback Period
             </label>
             <div style={{ display: "flex", gap: 4 }}>
@@ -500,13 +501,14 @@ export default function CorrelationPage() {
                     onClick={() => setTimeframe(tf.days)}
                     style={{
                       flex: 1,
-                      padding: "8px 4px",
-                      fontSize: 12,
-                      fontWeight: 500,
-                      border: isSelected ? "1px solid var(--accent)" : "1px solid var(--border)",
+                      padding: "6px 4px",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      fontFamily: "monospace",
+                      border: isSelected ? "1px solid #3b82f6" : "1px solid #30363d",
                       borderRadius: 3,
-                      background: isSelected ? "var(--accent)" : "var(--card-bg)",
-                      color: isSelected ? "#fff" : "var(--foreground)",
+                      background: isSelected ? "#3b82f6" : "#0d1117",
+                      color: isSelected ? "#fff" : "rgba(255,255,255,0.6)",
                       cursor: "pointer",
                       transition: "all 0.15s ease",
                       transform: "scale(1)",
@@ -516,16 +518,16 @@ export default function CorrelationPage() {
                       if (isSelected) {
                         e.currentTarget.style.filter = "brightness(0.9)";
                       } else {
-                        e.currentTarget.style.background = "var(--hover-bg)";
-                        e.currentTarget.style.borderColor = "var(--accent)";
+                        e.currentTarget.style.background = "#0d1117";
+                        e.currentTarget.style.borderColor = "#3b82f6";
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (isSelected) {
                         e.currentTarget.style.filter = "brightness(1)";
                       } else {
-                        e.currentTarget.style.background = "var(--card-bg)";
-                        e.currentTarget.style.borderColor = "var(--border)";
+                        e.currentTarget.style.background = "#0d1117";
+                        e.currentTarget.style.borderColor = "#30363d";
                       }
                     }}
                     onMouseDown={(e) => {
@@ -544,12 +546,12 @@ export default function CorrelationPage() {
 
           {/* Rolling Window */}
           <div style={{
-            background: "var(--card-bg)",
-            border: "1px solid var(--border)",
-            borderRadius: 4,
+            background: "#161b22",
+            border: "1px solid #30363d",
+            borderRadius: 8,
             padding: 16
           }}>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            <label style={{ display: "block", fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "monospace" }}>
               Rolling Window
             </label>
             <div style={{ display: "flex", gap: 4 }}>
@@ -561,13 +563,14 @@ export default function CorrelationPage() {
                     onClick={() => setRollingWindow(rw.days)}
                     style={{
                       flex: 1,
-                      padding: "8px 4px",
-                      fontSize: 12,
-                      fontWeight: 500,
-                      border: isSelected ? "1px solid var(--accent)" : "1px solid var(--border)",
+                      padding: "6px 4px",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      fontFamily: "monospace",
+                      border: isSelected ? "1px solid #3b82f6" : "1px solid #30363d",
                       borderRadius: 3,
-                      background: isSelected ? "var(--accent)" : "var(--card-bg)",
-                      color: isSelected ? "#fff" : "var(--foreground)",
+                      background: isSelected ? "#3b82f6" : "#0d1117",
+                      color: isSelected ? "#fff" : "rgba(255,255,255,0.6)",
                       cursor: "pointer",
                       transition: "all 0.15s ease",
                       transform: "scale(1)",
@@ -577,16 +580,16 @@ export default function CorrelationPage() {
                       if (isSelected) {
                         e.currentTarget.style.filter = "brightness(0.9)";
                       } else {
-                        e.currentTarget.style.background = "var(--hover-bg)";
-                        e.currentTarget.style.borderColor = "var(--accent)";
+                        e.currentTarget.style.background = "#0d1117";
+                        e.currentTarget.style.borderColor = "#3b82f6";
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (isSelected) {
                         e.currentTarget.style.filter = "brightness(1)";
                       } else {
-                        e.currentTarget.style.background = "var(--card-bg)";
-                        e.currentTarget.style.borderColor = "var(--border)";
+                        e.currentTarget.style.background = "#0d1117";
+                        e.currentTarget.style.borderColor = "#30363d";
                       }
                     }}
                     onMouseDown={(e) => {
@@ -605,12 +608,12 @@ export default function CorrelationPage() {
 
           {/* Data Mode */}
           <div style={{
-            background: "var(--card-bg)",
-            border: "1px solid var(--border)",
-            borderRadius: 4,
+            background: "#161b22",
+            border: "1px solid #30363d",
+            borderRadius: 8,
             padding: 16
           }}>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            <label style={{ display: "block", fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "monospace" }}>
               Data Mode
             </label>
             <div style={{ display: "flex", gap: 4 }}>
@@ -618,13 +621,14 @@ export default function CorrelationPage() {
                 onClick={() => setDataMode("price")}
                 style={{
                   flex: 1,
-                  padding: "8px 4px",
-                  fontSize: 12,
-                  fontWeight: 500,
-                  border: dataMode === "price" ? "1px solid var(--accent)" : "1px solid var(--border)",
+                  padding: "6px 4px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  fontFamily: "monospace",
+                  border: dataMode === "price" ? "1px solid #3b82f6" : "1px solid #30363d",
                   borderRadius: 3,
-                  background: dataMode === "price" ? "var(--accent)" : "var(--card-bg)",
-                  color: dataMode === "price" ? "#fff" : "var(--foreground)",
+                  background: dataMode === "price" ? "#3b82f6" : "#0d1117",
+                  color: dataMode === "price" ? "#fff" : "rgba(255,255,255,0.6)",
                   cursor: "pointer",
                   transition: "all 0.15s ease",
                   transform: "scale(1)",
@@ -634,16 +638,16 @@ export default function CorrelationPage() {
                   if (dataMode === "price") {
                     e.currentTarget.style.filter = "brightness(0.9)";
                   } else {
-                    e.currentTarget.style.background = "var(--hover-bg)";
-                    e.currentTarget.style.borderColor = "var(--accent)";
+                    e.currentTarget.style.background = "#0d1117";
+                    e.currentTarget.style.borderColor = "#3b82f6";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (dataMode === "price") {
                     e.currentTarget.style.filter = "brightness(1)";
                   } else {
-                    e.currentTarget.style.background = "var(--card-bg)";
-                    e.currentTarget.style.borderColor = "var(--border)";
+                    e.currentTarget.style.background = "#0d1117";
+                    e.currentTarget.style.borderColor = "#30363d";
                   }
                 }}
                 onMouseDown={(e) => {
@@ -659,13 +663,14 @@ export default function CorrelationPage() {
                 onClick={() => setDataMode("total_return")}
                 style={{
                   flex: 1,
-                  padding: "8px 4px",
-                  fontSize: 12,
-                  fontWeight: 500,
-                  border: dataMode === "total_return" ? "1px solid var(--accent)" : "1px solid var(--border)",
+                  padding: "6px 4px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  fontFamily: "monospace",
+                  border: dataMode === "total_return" ? "1px solid #3b82f6" : "1px solid #30363d",
                   borderRadius: 3,
-                  background: dataMode === "total_return" ? "var(--accent)" : "var(--card-bg)",
-                  color: dataMode === "total_return" ? "#fff" : "var(--foreground)",
+                  background: dataMode === "total_return" ? "#3b82f6" : "#0d1117",
+                  color: dataMode === "total_return" ? "#fff" : "rgba(255,255,255,0.6)",
                   cursor: "pointer",
                   transition: "all 0.15s ease",
                   transform: "scale(1)",
@@ -675,16 +680,16 @@ export default function CorrelationPage() {
                   if (dataMode === "total_return") {
                     e.currentTarget.style.filter = "brightness(0.9)";
                   } else {
-                    e.currentTarget.style.background = "var(--hover-bg)";
-                    e.currentTarget.style.borderColor = "var(--accent)";
+                    e.currentTarget.style.background = "#0d1117";
+                    e.currentTarget.style.borderColor = "#3b82f6";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (dataMode === "total_return") {
                     e.currentTarget.style.filter = "brightness(1)";
                   } else {
-                    e.currentTarget.style.background = "var(--card-bg)";
-                    e.currentTarget.style.borderColor = "var(--border)";
+                    e.currentTarget.style.background = "#0d1117";
+                    e.currentTarget.style.borderColor = "#30363d";
                   }
                 }}
                 onMouseDown={(e) => {
@@ -701,12 +706,12 @@ export default function CorrelationPage() {
 
           {/* Matrix Type */}
           <div style={{
-            background: "var(--card-bg)",
-            border: "1px solid var(--border)",
-            borderRadius: 4,
+            background: "#161b22",
+            border: "1px solid #30363d",
+            borderRadius: 8,
             padding: 16
           }}>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            <label style={{ display: "block", fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "monospace" }}>
               Matrix Type
             </label>
             <div style={{ display: "flex", gap: 4 }}>
@@ -714,13 +719,14 @@ export default function CorrelationPage() {
                 onClick={() => setMatrixMode("correlation")}
                 style={{
                   flex: 1,
-                  padding: "8px 4px",
-                  fontSize: 12,
-                  fontWeight: 500,
-                  border: matrixMode === "correlation" ? "1px solid var(--accent)" : "1px solid var(--border)",
+                  padding: "6px 4px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  fontFamily: "monospace",
+                  border: matrixMode === "correlation" ? "1px solid #3b82f6" : "1px solid #30363d",
                   borderRadius: 3,
-                  background: matrixMode === "correlation" ? "var(--accent)" : "var(--card-bg)",
-                  color: matrixMode === "correlation" ? "#fff" : "var(--foreground)",
+                  background: matrixMode === "correlation" ? "#3b82f6" : "#0d1117",
+                  color: matrixMode === "correlation" ? "#fff" : "rgba(255,255,255,0.6)",
                   cursor: "pointer",
                   transition: "all 0.15s ease",
                   transform: "scale(1)",
@@ -730,16 +736,16 @@ export default function CorrelationPage() {
                   if (matrixMode === "correlation") {
                     e.currentTarget.style.filter = "brightness(0.9)";
                   } else {
-                    e.currentTarget.style.background = "var(--hover-bg)";
-                    e.currentTarget.style.borderColor = "var(--accent)";
+                    e.currentTarget.style.background = "#0d1117";
+                    e.currentTarget.style.borderColor = "#3b82f6";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (matrixMode === "correlation") {
                     e.currentTarget.style.filter = "brightness(1)";
                   } else {
-                    e.currentTarget.style.background = "var(--card-bg)";
-                    e.currentTarget.style.borderColor = "var(--border)";
+                    e.currentTarget.style.background = "#0d1117";
+                    e.currentTarget.style.borderColor = "#30363d";
                   }
                 }}
                 onMouseDown={(e) => {
@@ -755,13 +761,14 @@ export default function CorrelationPage() {
                 onClick={() => setMatrixMode("covariance")}
                 style={{
                   flex: 1,
-                  padding: "8px 4px",
-                  fontSize: 12,
-                  fontWeight: 500,
-                  border: matrixMode === "covariance" ? "1px solid var(--accent)" : "1px solid var(--border)",
+                  padding: "6px 4px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  fontFamily: "monospace",
+                  border: matrixMode === "covariance" ? "1px solid #3b82f6" : "1px solid #30363d",
                   borderRadius: 3,
-                  background: matrixMode === "covariance" ? "var(--accent)" : "var(--card-bg)",
-                  color: matrixMode === "covariance" ? "#fff" : "var(--foreground)",
+                  background: matrixMode === "covariance" ? "#3b82f6" : "#0d1117",
+                  color: matrixMode === "covariance" ? "#fff" : "rgba(255,255,255,0.6)",
                   cursor: "pointer",
                   transition: "all 0.15s ease",
                   transform: "scale(1)",
@@ -771,16 +778,16 @@ export default function CorrelationPage() {
                   if (matrixMode === "covariance") {
                     e.currentTarget.style.filter = "brightness(0.9)";
                   } else {
-                    e.currentTarget.style.background = "var(--hover-bg)";
-                    e.currentTarget.style.borderColor = "var(--accent)";
+                    e.currentTarget.style.background = "#0d1117";
+                    e.currentTarget.style.borderColor = "#3b82f6";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (matrixMode === "covariance") {
                     e.currentTarget.style.filter = "brightness(1)";
                   } else {
-                    e.currentTarget.style.background = "var(--card-bg)";
-                    e.currentTarget.style.borderColor = "var(--border)";
+                    e.currentTarget.style.background = "#0d1117";
+                    e.currentTarget.style.borderColor = "#30363d";
                   }
                 }}
                 onMouseDown={(e) => {
@@ -798,14 +805,14 @@ export default function CorrelationPage() {
 
         {/* Ticker Selection */}
         <div style={{
-          background: "var(--card-bg)",
-          border: "1px solid var(--border)",
-          borderRadius: 4,
-          padding: 20,
-          marginBottom: 16
+          background: "#161b22",
+          border: "1px solid #30363d",
+          borderRadius: 8,
+          padding: 16,
+          marginBottom: 12
         }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted-foreground)", margin: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(255,255,255,0.6)", margin: 0, fontFamily: "monospace" }}>
               Selection ({selectedTickers.length})
             </h3>
             <div style={{ display: "flex", gap: 8 }}>
@@ -813,23 +820,24 @@ export default function CorrelationPage() {
                 onClick={() => setShowTickerPanel(!showTickerPanel)}
                 style={{
                   background: "none",
-                  border: "1px solid var(--border)",
-                  fontSize: 11,
-                  color: "var(--accent)",
+                  border: "1px solid #30363d",
+                  fontSize: 10,
+                  color: "#3b82f6",
                   cursor: "pointer",
                   padding: "4px 8px",
                   borderRadius: 3,
-                  fontWeight: 500,
+                  fontWeight: 600,
+                  fontFamily: "monospace",
+                  letterSpacing: "0.05em",
                   transition: "all 0.15s ease",
-                  transform: "scale(1)",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "var(--hover-bg)";
-                  e.currentTarget.style.borderColor = "var(--accent)";
+                  e.currentTarget.style.background = "#0d1117";
+                  e.currentTarget.style.borderColor = "#3b82f6";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = "none";
-                  e.currentTarget.style.borderColor = "var(--border)";
+                  e.currentTarget.style.borderColor = "#30363d";
                 }}
                 onMouseDown={(e) => {
                   e.currentTarget.style.transform = "scale(0.95)";
@@ -843,7 +851,7 @@ export default function CorrelationPage() {
               {selectedTickers.length > 0 && (
                 <button
                   onClick={() => setSelectedTickers([])}
-                  style={{ background: "none", border: "none", fontSize: 11, color: "var(--danger)", cursor: "pointer", padding: 0 }}
+                  style={{ background: "none", border: "none", fontSize: 10, color: "#ef4444", cursor: "pointer", padding: 0, fontFamily: "monospace", fontWeight: 600 }}
                 >
                   Clear
                 </button>
@@ -871,26 +879,27 @@ export default function CorrelationPage() {
                 top: "calc(100% + 4px)",
                 left: 0,
                 right: 0,
-                background: "var(--card-bg)",
-                border: "1px solid var(--border)",
-                borderRadius: 4,
+                background: "#161b22",
+                border: "1px solid #30363d",
+                borderRadius: 6,
                 maxHeight: 240,
                 overflowY: "auto",
                 zIndex: 20,
-                boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
+                boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.3)",
               }}>
                 {filteredTickers.slice(0, 50).map((ticker) => (
                   <div
                     key={ticker}
                     onClick={() => addTicker(ticker)}
                     style={{
-                      padding: "10px 12px",
+                      padding: "8px 10px",
                       cursor: "pointer",
-                      fontSize: 13,
-                      borderBottom: "1px solid var(--border)",
+                      fontSize: 11,
+                      fontFamily: "monospace",
+                      borderBottom: "1px solid #30363d",
                       transition: "background 0.1s"
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = "var(--hover-bg)"}
+                    onMouseEnter={(e) => e.currentTarget.style.background = "rgba(59,130,246,0.08)"}
                     onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                   >
                     {ticker}
@@ -901,7 +910,7 @@ export default function CorrelationPage() {
           </div>
 
           {selectedTickers.length === 0 ? (
-            <span style={{ fontSize: 13, color: "var(--muted)" }}>
+            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "monospace" }}>
               No tickers selected
             </span>
           ) : (
@@ -912,14 +921,15 @@ export default function CorrelationPage() {
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: 8,
-                    padding: "6px 12px",
-                    background: "rgba(59, 130, 246, 0.15)",
-                    color: "rgb(59, 130, 246)",
-                    border: "1px solid rgba(59, 130, 246, 0.3)",
+                    gap: 6,
+                    padding: "4px 10px",
+                    background: "rgba(59,130,246,0.1)",
+                    color: "#3b82f6",
+                    border: "1px solid rgba(59,130,246,0.25)",
                     borderRadius: 3,
-                    fontSize: 13,
+                    fontSize: 11,
                     fontWeight: 600,
+                    fontFamily: "monospace",
                   }}
                 >
                   {ticker}
@@ -949,16 +959,16 @@ export default function CorrelationPage() {
         {/* All Tickers Panel */}
         {showTickerPanel && (
           <div style={{
-            background: "var(--card-bg)",
-            border: "1px solid var(--border)",
-            borderRadius: 4,
-            padding: 20,
-            marginBottom: 16,
+            background: "#161b22",
+            border: "1px solid #30363d",
+            borderRadius: 8,
+            padding: 16,
+            marginBottom: 12,
             maxHeight: 400,
             overflowY: "auto"
           }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <h3 style={{ fontSize: 11, fontWeight: 700, margin: 0, fontFamily: "monospace", color: "rgba(255,255,255,0.6)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
                 All Tickers ({availableTickers.length})
               </h3>
               <select
@@ -966,11 +976,12 @@ export default function CorrelationPage() {
                 onChange={(e) => setSortBy(e.target.value as "alpha" | "selected")}
                 style={{
                   padding: "4px 8px",
-                  background: "var(--card-bg)",
-                  color: "var(--foreground)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 3,
-                  fontSize: 11,
+                  background: "#0d1117",
+                  color: "rgba(255,255,255,0.6)",
+                  border: "1px solid #30363d",
+                  borderRadius: 4,
+                  fontSize: 10,
+                  fontFamily: "monospace",
                 }}
               >
                 <option value="alpha">Alphabetical</option>
@@ -979,8 +990,8 @@ export default function CorrelationPage() {
             </div>
 
             {availableSectors.length > 0 && (
-              <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: "1px solid var(--border)" }}>
-                <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: "1px solid #30363d" }}>
+                <div style={{ fontSize: 9, fontWeight: 700, marginBottom: 10, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "monospace" }}>
                   Filter by Sector
                 </div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -1001,13 +1012,14 @@ export default function CorrelationPage() {
                           });
                         }}
                         style={{
-                          padding: "4px 10px",
-                          fontSize: 11.5,
-                          fontWeight: 500,
-                          border: isSelected ? "1px solid var(--accent)" : "1px solid var(--border)",
+                          padding: "3px 8px",
+                          fontSize: 10,
+                          fontWeight: 600,
+                          fontFamily: "monospace",
+                          border: isSelected ? "1px solid #3b82f6" : "1px solid #30363d",
                           borderRadius: 3,
-                          background: isSelected ? "var(--accent)" : "transparent",
-                          color: isSelected ? "#fff" : "var(--foreground)",
+                          background: isSelected ? "#3b82f6" : "transparent",
+                          color: isSelected ? "#fff" : "rgba(255,255,255,0.6)",
                           cursor: "pointer",
                           transition: "all 0.15s ease",
                         }}
@@ -1023,13 +1035,14 @@ export default function CorrelationPage() {
                         setSelectedTickers([]);
                       }}
                       style={{
-                        padding: "4px 10px",
-                        fontSize: 11.5,
-                        fontWeight: 500,
-                        border: "1px solid var(--danger)",
+                        padding: "3px 8px",
+                        fontSize: 10,
+                        fontWeight: 600,
+                        fontFamily: "monospace",
+                        border: "1px solid #ef4444",
                         borderRadius: 3,
                         background: "transparent",
-                        color: "var(--danger)",
+                        color: "#ef4444",
                         cursor: "pointer",
                       }}
                     >
@@ -1053,15 +1066,16 @@ export default function CorrelationPage() {
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: 8,
-                      padding: "8px 10px",
-                      background: isSelected ? "rgba(59, 130, 246, 0.1)" : "var(--card-bg)",
-                      border: `1px solid ${isSelected ? "var(--accent)" : "var(--border)"}`,
+                      gap: 6,
+                      padding: "6px 8px",
+                      background: isSelected ? "rgba(59,130,246,0.08)" : "#0d1117",
+                      border: `1px solid ${isSelected ? "#3b82f6" : "#30363d"}`,
                       borderRadius: 3,
                       cursor: "pointer",
-                      fontSize: 12,
+                      fontSize: 11,
+                      fontFamily: "monospace",
                       fontWeight: isSelected ? 600 : 400,
-                      color: isSelected ? "var(--accent)" : "var(--foreground)",
+                      color: isSelected ? "#3b82f6" : "rgba(255,255,255,0.6)",
                       transition: "all 0.15s"
                     }}
                   >
@@ -1079,7 +1093,7 @@ export default function CorrelationPage() {
                         width: 14,
                         height: 14,
                         cursor: "pointer",
-                        accentColor: "var(--accent)"
+                        accentColor: "#3b82f6"
                       }}
                     />
                     <span>{ticker}</span>
@@ -1096,17 +1110,19 @@ export default function CorrelationPage() {
           disabled={loading || selectedTickers.length < 2}
           style={{
             width: "100%",
-            padding: 16,
-            background: loading || selectedTickers.length < 2 ? "var(--muted)" : "var(--accent)",
-            color: "white",
+            padding: "10px 20px",
+            background: loading || selectedTickers.length < 2 ? "#30363d" : "linear-gradient(135deg, #3b82f6, #2563eb)",
+            color: "#fff",
             border: "none",
-            borderRadius: 4,
-            fontSize: 14,
-            fontWeight: 600,
+            borderRadius: 6,
+            fontSize: 12,
+            fontWeight: 700,
+            fontFamily: "monospace",
+            letterSpacing: "0.05em",
             cursor: loading || selectedTickers.length < 2 ? "not-allowed" : "pointer",
-            marginBottom: 24,
+            marginBottom: 20,
             transition: "all 0.2s",
-            opacity: loading ? 0.8 : 1
+            opacity: loading || selectedTickers.length < 2 ? 0.5 : 1
           }}
         >
           {loading ? "Computing..." : `Compute Correlations (${selectedTickers.length} assets)`}
@@ -1115,13 +1131,14 @@ export default function CorrelationPage() {
         {/* Error */}
         {error && (
           <div style={{
-            background: "rgba(239, 68, 68, 0.1)",
-            border: "1px solid rgb(239, 68, 68)",
-            color: "rgb(239, 68, 68)",
-            padding: 16,
-            borderRadius: 4,
-            marginBottom: 24,
-            fontSize: 13,
+            background: "rgba(239,68,68,0.08)",
+            border: "1px solid rgba(239,68,68,0.3)",
+            color: "#ef4444",
+            padding: 12,
+            borderRadius: 6,
+            marginBottom: 20,
+            fontSize: 11,
+            fontFamily: "monospace",
           }}>
             {error}
           </div>
@@ -1136,13 +1153,14 @@ export default function CorrelationPage() {
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              marginBottom: 24,
-              padding: 16,
-              background: "var(--card-bg)",
-              border: "1px solid var(--border)",
-              borderRadius: 4,
-              fontSize: 12,
-              color: "var(--muted-foreground)"
+              marginBottom: 20,
+              padding: 12,
+              background: "#161b22",
+              border: "1px solid #30363d",
+              borderRadius: 8,
+              fontSize: 10,
+              fontFamily: "monospace",
+              color: "rgba(255,255,255,0.5)"
             }}>
               <div style={{ display: "flex", gap: 24 }}>
                 <span><strong>Period:</strong> {correlationData.startDate} to {correlationData.endDate}</span>
@@ -1154,16 +1172,17 @@ export default function CorrelationPage() {
                 <button
                   onClick={exportToCSV}
                   style={{
-                    padding: "6px 12px",
-                    background: "var(--accent)",
+                    padding: "5px 12px",
+                    background: "linear-gradient(135deg, #3b82f6, #2563eb)",
                     color: "#fff",
                     border: "none",
-                    borderRadius: 3,
-                    fontSize: 11,
-                    fontWeight: 600,
+                    borderRadius: 4,
+                    fontSize: 9,
+                    fontWeight: 700,
+                    fontFamily: "monospace",
                     cursor: "pointer",
                     textTransform: "uppercase",
-                    letterSpacing: "0.05em"
+                    letterSpacing: "0.08em"
                   }}
                 >
                   Export CSV
@@ -1174,16 +1193,16 @@ export default function CorrelationPage() {
             {/* Market Regime Distribution - PROMINENT */}
             {correlationData.regimeDistribution && (
               <div style={{
-                background: "var(--card-bg)",
-                border: "1px solid var(--border)",
-                borderRadius: 4,
-                padding: 24,
-                marginBottom: 24
+                background: "#161b22",
+                border: "1px solid #30363d",
+                borderRadius: 8,
+                padding: 16,
+                marginBottom: 20
               }}>
-                <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                <h2 style={{ fontSize: 11, fontWeight: 700, marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(255,255,255,0.6)", fontFamily: "monospace" }}>
                   Market Regime Distribution
                 </h2>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 16 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
                   {Object.entries(correlationData.regimeDistribution).map(
                     ([regime, pct]) => {
                       const colors: Record<string, string> = {
@@ -1193,11 +1212,11 @@ export default function CorrelationPage() {
                         "Low Volatility": "rgb(34, 197, 94)",
                       };
                       return (
-                        <div key={regime} className="stat-box" style={{ padding: 16, borderRadius: 4, textAlign: "center" }}>
-                          <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 8, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                        <div key={regime} className="stat-box" style={{ padding: 12, borderRadius: 6, textAlign: "center" }}>
+                          <div style={{ fontSize: 9, fontWeight: 700, marginBottom: 6, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "monospace" }}>
                             {regime}
                           </div>
-                          <div style={{ fontSize: 24, fontWeight: 700, color: colors[regime] }}>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: colors[regime], fontFamily: "monospace" }}>
                             {(pct as number).toFixed(1)}%
                           </div>
                         </div>
@@ -1209,17 +1228,17 @@ export default function CorrelationPage() {
             )}
 
             {/* Matrix & Stats Grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(500px, 1fr))", gap: 24, marginBottom: 24 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(500px, 1fr))", gap: 16, marginBottom: 20 }}>
 
               {/* Correlation Matrix */}
               {correlationData.matrix && (
                 <div style={{
-                  background: "var(--card-bg)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 4,
-                  padding: 24
+                  background: "#161b22",
+                  border: "1px solid #30363d",
+                  borderRadius: 8,
+                  padding: 16
                 }}>
-                  <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  <h2 style={{ fontSize: 11, fontWeight: 700, marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(255,255,255,0.6)", fontFamily: "monospace" }}>
                     {matrixMode === "correlation" ? "Correlation Matrix" : "Covariance Matrix"}
                   </h2>
                   <CorrelationHeatmap data={correlationData.matrix} />
@@ -1229,30 +1248,32 @@ export default function CorrelationPage() {
               {/* Average Correlations */}
               {correlationData.averageCorrelations && (
                 <div style={{
-                  background: "var(--card-bg)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 4,
-                  padding: 24
+                  background: "#161b22",
+                  border: "1px solid #30363d",
+                  borderRadius: 8,
+                  padding: 16
                 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                    <h2 style={{ fontSize: 16, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", margin: 0 }}>
+                    <h2 style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", margin: 0, color: "rgba(255,255,255,0.6)", fontFamily: "monospace" }}>
                       Average Correlations
                     </h2>
                     <button
                       onClick={() => setShowCorrelationInfo(!showCorrelationInfo)}
                       style={{
                         background: "transparent",
-                        border: "1px solid var(--border)",
+                        border: "1px solid #30363d",
                         borderRadius: 4,
-                        padding: "6px 12px",
-                        fontSize: 12,
-                        color: "var(--foreground)",
+                        padding: "4px 10px",
+                        fontSize: 9,
+                        color: "rgba(255,255,255,0.5)",
                         cursor: "pointer",
-                        fontWeight: 500,
+                        fontWeight: 600,
+                        fontFamily: "monospace",
+                        letterSpacing: "0.05em",
                         transition: "all 0.2s"
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = "var(--hover-bg)";
+                        e.currentTarget.style.background = "#0d1117";
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.background = "transparent";
@@ -1264,56 +1285,57 @@ export default function CorrelationPage() {
 
                   {showCorrelationInfo && (
                     <div style={{
-                      background: "var(--hover-bg)",
-                      border: "1px solid var(--border)",
-                      borderRadius: 4,
-                      padding: 20,
-                      marginBottom: 20,
-                      fontSize: 13,
+                      background: "#0d1117",
+                      border: "1px solid #21262d",
+                      borderRadius: 6,
+                      padding: 14,
+                      marginBottom: 16,
+                      fontSize: 11,
+                      fontFamily: "monospace",
                       lineHeight: 1.7,
-                      color: "var(--foreground)"
+                      color: "rgba(255,255,255,0.6)"
                     }}>
-                      <div style={{ fontWeight: 700, marginBottom: 16, fontSize: 14, color: "var(--foreground)" }}>
+                      <div style={{ fontWeight: 700, marginBottom: 12, fontSize: 11, color: "rgba(255,255,255,0.8)", letterSpacing: "0.05em" }}>
                         Understanding Correlation Metrics
                       </div>
 
-                      <div style={{ marginBottom: 16 }}>
-                        <div style={{ fontWeight: 600, marginBottom: 6, color: "var(--foreground)" }}>Correlation Coefficient</div>
-                        <div style={{ marginBottom: 8, color: "var(--foreground)" }}>
+                      <div style={{ marginBottom: 12 }}>
+                        <div style={{ fontWeight: 600, marginBottom: 4, color: "rgba(255,255,255,0.8)" }}>Correlation Coefficient</div>
+                        <div style={{ marginBottom: 6, color: "rgba(255,255,255,0.6)" }}>
                           Measures linear relationship strength between two assets. Range: -1.0 to +1.0
                         </div>
-                        <div style={{ fontSize: 12, color: "var(--muted-foreground)", paddingLeft: 12 }}>
-                          <div>• +1.0: Perfect positive (move in lockstep)</div>
-                          <div>• 0.0: No linear relationship (independent)</div>
-                          <div>• -1.0: Perfect negative (mirror opposite)</div>
+                        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", paddingLeft: 10 }}>
+                          <div>+1.0: Perfect positive (move in lockstep)</div>
+                          <div>0.0: No linear relationship (independent)</div>
+                          <div>-1.0: Perfect negative (mirror opposite)</div>
                           <div style={{ marginTop: 4 }}>Interpretation: Strong (&gt;0.7), Moderate (0.4-0.7), Weak (&lt;0.4)</div>
                         </div>
                       </div>
 
-                      <div style={{ marginBottom: 16 }}>
-                        <div style={{ fontWeight: 600, marginBottom: 6, color: "var(--foreground)" }}>Beta (Market Sensitivity)</div>
-                        <div style={{ marginBottom: 8, color: "var(--foreground)" }}>
+                      <div style={{ marginBottom: 12 }}>
+                        <div style={{ fontWeight: 600, marginBottom: 4, color: "rgba(255,255,255,0.8)" }}>Beta (Market Sensitivity)</div>
+                        <div style={{ marginBottom: 6, color: "rgba(255,255,255,0.6)" }}>
                           Measures systematic risk relative to market (OBX) movements
                         </div>
-                        <div style={{ fontSize: 12, color: "var(--muted-foreground)", paddingLeft: 12 }}>
-                          <div>• β = 1.0: Moves in line with market</div>
-                          <div>• β &gt; 1.0: Amplifies market moves (higher volatility)</div>
-                          <div>• β &lt; 1.0: Dampens market moves (defensive)</div>
-                          <div>• β &lt; 0: Inverse market relationship</div>
+                        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", paddingLeft: 10 }}>
+                          <div>b = 1.0: Moves in line with market</div>
+                          <div>b &gt; 1.0: Amplifies market moves (higher volatility)</div>
+                          <div>b &lt; 1.0: Dampens market moves (defensive)</div>
+                          <div>b &lt; 0: Inverse market relationship</div>
                         </div>
                       </div>
 
                       <div>
-                        <div style={{ fontWeight: 600, marginBottom: 6, color: "var(--foreground)" }}>Statistical Significance</div>
-                        <div style={{ marginBottom: 8, color: "var(--foreground)" }}>
+                        <div style={{ fontWeight: 600, marginBottom: 4, color: "rgba(255,255,255,0.8)" }}>Statistical Significance</div>
+                        <div style={{ marginBottom: 6, color: "rgba(255,255,255,0.6)" }}>
                           Stars (***) indicate reliability - not strength - of the correlation estimate
                         </div>
-                        <div style={{ fontSize: 12, color: "var(--muted-foreground)", paddingLeft: 12 }}>
-                          <div>• *** p&lt;0.001: Highly significant (very low chance of randomness)</div>
-                          <div>• ** p&lt;0.01: Significant</div>
-                          <div>• * p&lt;0.05: Marginally significant</div>
-                          <div>• No stars: Could be random noise</div>
-                          <div style={{ marginTop: 4, fontStyle: "italic" }}>Note: High significance ≠ strong correlation. A 0.2 correlation can be highly significant with enough data.</div>
+                        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", paddingLeft: 10 }}>
+                          <div>*** p&lt;0.001: Highly significant (very low chance of randomness)</div>
+                          <div>** p&lt;0.01: Significant</div>
+                          <div>* p&lt;0.05: Marginally significant</div>
+                          <div>No stars: Could be random noise</div>
+                          <div style={{ marginTop: 4, fontStyle: "italic" }}>Note: High significance does not equal strong correlation. A 0.2 correlation can be highly significant with enough data.</div>
                         </div>
                       </div>
                     </div>
@@ -1327,18 +1349,18 @@ export default function CorrelationPage() {
                           className="stat-box"
                           style={{
                             padding: 16,
-                            borderRadius: 4,
+                            borderRadius: 8,
                             textAlign: "center",
                           }}
                         >
-                          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, color: "var(--muted-foreground)" }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, color: "rgba(255,255,255,0.5)" }}>
                             {item.ticker}
                           </div>
                           <div style={{
                             fontSize: 20,
                             fontWeight: 700,
-                            color: item.avgCorrelation > 0.7 ? "var(--accent)" :
-                                   item.avgCorrelation < 0.3 ? "var(--muted)" : "var(--foreground)"
+                            color: item.avgCorrelation > 0.7 ? "#3b82f6" :
+                                   item.avgCorrelation < 0.3 ? "rgba(255,255,255,0.5)" : "#fff"
                           }}>
                             {item.avgCorrelation.toFixed(2)}
                             <span style={{ fontSize: 14, color: "#f59e0b", marginLeft: 4 }}>
@@ -1356,9 +1378,9 @@ export default function CorrelationPage() {
             {/* Rolling Correlation Chart */}
             {correlationData.rollingCorrelations && correlationData.rollingCorrelations.length > 0 && selectedTickers.length >= 2 && (
               <div style={{
-                background: "var(--card-bg)",
-                border: "1px solid var(--border)",
-                borderRadius: 4,
+                background: "#161b22",
+                border: "1px solid #30363d",
+                borderRadius: 8,
                 padding: 24,
                 marginBottom: 24
               }}>
@@ -1369,10 +1391,10 @@ export default function CorrelationPage() {
                   <button
                     onClick={() => setShowRollingInfo(!showRollingInfo)}
                     style={{
-                      background: "var(--hover-bg)",
-                      border: "1px solid var(--border)",
+                      background: "#0d1117",
+                      border: "1px solid #30363d",
                       fontSize: 11,
-                      color: "var(--accent)",
+                      color: "#3b82f6",
                       cursor: "pointer",
                       padding: "6px 12px",
                       borderRadius: 3,
@@ -1385,26 +1407,26 @@ export default function CorrelationPage() {
 
                 {showRollingInfo && (
                   <div style={{
-                    background: "var(--hover-bg)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 4,
+                    background: "#0d1117",
+                    border: "1px solid #30363d",
+                    borderRadius: 8,
                     padding: 16,
                     marginBottom: 20,
                     fontSize: 13,
                     lineHeight: 1.6
                   }}>
-                    <div style={{ fontWeight: 600, marginBottom: 8, color: "var(--foreground)" }}>
+                    <div style={{ fontWeight: 600, marginBottom: 8, color: "#fff" }}>
                       What is Rolling Correlation?
                     </div>
-                    <p style={{ margin: "0 0 12px 0", color: "var(--muted-foreground)" }}>
+                    <p style={{ margin: "0 0 12px 0", color: "rgba(255,255,255,0.5)" }}>
                       Rolling correlation measures how the relationship between two assets changes over time.
                       Instead of calculating a single correlation for the entire period, it uses a moving window
                       (e.g., 60 days) to compute correlation at each point in time.
                     </p>
-                    <div style={{ fontWeight: 600, marginBottom: 8, color: "var(--foreground)" }}>
+                    <div style={{ fontWeight: 600, marginBottom: 8, color: "#fff" }}>
                       Why it Matters
                     </div>
-                    <p style={{ margin: "0 0 12px 0", color: "var(--muted-foreground)" }}>
+                    <p style={{ margin: "0 0 12px 0", color: "rgba(255,255,255,0.5)" }}>
                       • <strong>Dynamic Relationships:</strong> Correlations are not constant - they vary with market regimes,
                       economic cycles, and company-specific events<br/>
                       • <strong>Risk Management:</strong> Portfolio diversification depends on low correlations.
@@ -1412,10 +1434,10 @@ export default function CorrelationPage() {
                       • <strong>Volatility Context:</strong> The background shading shows market volatility.
                       High volatility periods often coincide with correlation changes
                     </p>
-                    <div style={{ fontWeight: 600, marginBottom: 8, color: "var(--foreground)" }}>
+                    <div style={{ fontWeight: 600, marginBottom: 8, color: "#fff" }}>
                       Interpretation
                     </div>
-                    <p style={{ margin: 0, color: "var(--muted-foreground)" }}>
+                    <p style={{ margin: 0, color: "rgba(255,255,255,0.5)" }}>
                       • <strong>+1.0:</strong> Perfect positive correlation (assets move together)<br/>
                       • <strong>0.0:</strong> No correlation (assets move independently)<br/>
                       • <strong>-1.0:</strong> Perfect negative correlation (assets move in opposite directions)<br/>
@@ -1431,11 +1453,11 @@ export default function CorrelationPage() {
                   gap: 12,
                   marginBottom: 16,
                   padding: "12px 16px",
-                  background: "var(--hover-bg)",
-                  borderRadius: 4,
-                  border: "1px solid var(--border)"
+                  background: "#0d1117",
+                  borderRadius: 8,
+                  border: "1px solid #30363d"
                 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)" }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.5)" }}>
                     Compare:
                   </span>
                   <select
@@ -1450,9 +1472,9 @@ export default function CorrelationPage() {
                       padding: "6px 10px",
                       fontSize: 13,
                       fontWeight: 500,
-                      background: "var(--card-bg)",
-                      color: "var(--foreground)",
-                      border: "1px solid var(--border)",
+                      background: "#161b22",
+                      color: "#fff",
+                      border: "1px solid #30363d",
                       borderRadius: 3,
                       cursor: "pointer"
                     }}
@@ -1463,7 +1485,7 @@ export default function CorrelationPage() {
                       </option>
                     ))}
                   </select>
-                  <span style={{ fontSize: 14, color: "var(--muted-foreground)", fontWeight: 600 }}>vs</span>
+                  <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>vs</span>
                   <select
                     value={rollingPairIndices[1]}
                     onChange={(e) => {
@@ -1476,9 +1498,9 @@ export default function CorrelationPage() {
                       padding: "6px 10px",
                       fontSize: 13,
                       fontWeight: 500,
-                      background: "var(--card-bg)",
-                      color: "var(--foreground)",
-                      border: "1px solid var(--border)",
+                      background: "#161b22",
+                      color: "#fff",
+                      border: "1px solid #30363d",
                       borderRadius: 3,
                       cursor: "pointer"
                     }}

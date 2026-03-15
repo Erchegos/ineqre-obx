@@ -950,6 +950,59 @@ FRO (Frontline), HAFNI (Hafnia), FLNG (Flex LNG), SOFF (Solstad Offshore), BORR 
 
 ---
 
+## UI Style Guide (Standard for All Pages)
+
+All pages must follow this dark terminal theme. Reference: `/portfolio` and `/fx` pages.
+
+### Colors
+| Token | Value | Usage |
+|-------|-------|-------|
+| **Background** | `#0a0a0a` | Page background |
+| **Card** | `#161b22` | Card/panel background |
+| **Card border** | `#30363d` | Borders, dividers |
+| **Inner card** | `#0d1117` | Metric cards, inputs, nested panels |
+| **Inner border** | `#21262d` | Subtle inner borders |
+| **Accent** | `#3b82f6` | Primary accent (links, active tabs, highlights) |
+| **Accent dark** | `#2563eb` | Gradient end for buttons |
+| **Success** | `#10b981` | Positive values, green indicators |
+| **Danger** | `#ef4444` | Negative values, errors |
+| **Warning** | `#f59e0b` | Amber warnings |
+| **Text** | `#fff` | Primary text |
+| **Muted** | `rgba(255,255,255,0.5)` | Secondary labels, inactive tabs |
+| **Dim** | `rgba(255,255,255,0.4)` | Tertiary labels, placeholders |
+| **Faint** | `rgba(255,255,255,0.35)` | Subtle hints |
+
+### Typography
+- **Font**: `monospace` (system monospace stack)
+- **Page title**: `fontSize: 22`, `fontWeight: 700`
+- **Section title**: `fontSize: 11`, `fontWeight: 700`, `rgba(255,255,255,0.6)`, `letterSpacing: "0.08em"`, `textTransform: "uppercase"`
+- **Table header**: `fontSize: 9`, `fontWeight: 600`, `rgba(255,255,255,0.5)`, `letterSpacing: "0.05em"`, `textTransform: "uppercase"`
+- **Body text**: `fontSize: 11-12`
+- **Labels**: `fontSize: 9-10`, `rgba(255,255,255,0.4)`
+- **Metric values**: `fontSize: 18`, `fontWeight: 800`
+
+### Components
+- **Cards**: `background: "#161b22"`, `border: "1px solid #30363d"`, `borderRadius: 8`, `padding: 16`
+- **Buttons (primary)**: `background: "linear-gradient(135deg, #3b82f6, #2563eb)"`, `color: "#fff"`, `borderRadius: 6`, `padding: "8px 20px"`, `fontWeight: 700`
+- **Buttons (secondary)**: `background: "#21262d"`, `border: "1px solid #30363d"`, `borderRadius: 4`
+- **Inputs**: `background: "#0d1117"`, `border: "1px solid #30363d"`, `borderRadius: 5`, `padding: "8px 10px"`
+- **Tables**: `borderCollapse: "collapse"`, header border `#30363d`, row border `#30363d`
+- **Metric cards**: `background: "#0d1117"`, `border: "1px solid #21262d"`, `borderRadius: 4`, centered text
+- **Tabs**: inactive `rgba(255,255,255,0.5)`, active `#3b82f6` with `borderBottom: "2px solid #3b82f6"`
+
+### Layout
+- **Container**: `padding: "20px 24px"`, `maxWidth: 1400`, `margin: "0 auto"`
+- **Grids**: Use CSS grid with `gap: 8-16`
+- **Hover**: Background `rgba(59,130,246,0.08)`, border/text to `#3b82f6`
+
+### Do NOT use
+- Orange accent (`#f97316`) — replaced by blue `#3b82f6`
+- Old dark grays (`#111`, `#222`, `#333`, `#1a1a1a`) — use `#161b22`, `#30363d`, `#0d1117`
+- Old muted text (`#888`, `#666`, `#555`) — use `rgba(255,255,255,0.5/0.4/0.35)`
+- Geist Mono font family — use `monospace`
+
+---
+
 ## Security
 
 - Rate limiting: 100 req/min (public), 500 req/min (authenticated)

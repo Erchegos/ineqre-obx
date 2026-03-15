@@ -470,21 +470,21 @@ export default function OptionsPage() {
   // ─── Loading State ────────────────────────────────────────────
   if (loading && !data) {
     return (
-      <div style={{ minHeight: "100vh", background: "#0a0a0f", color: "#e5e5e5" }}>
-        <header style={{ borderBottom: "1px solid #1e1e2e", padding: "12px 24px" }}>
-          <div style={{ maxWidth: 1800, margin: "0 auto" }}>
-            <Link href="/options" style={{ color: "#666", fontSize: 11, textDecoration: "none", fontFamily: "monospace" }}>
+      <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff" }}>
+        <header style={{ borderBottom: "1px solid #30363d", padding: "12px 24px" }}>
+          <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+            <Link href="/options" style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, textDecoration: "none", fontFamily: "monospace" }}>
               OPTIONS / ASSET LIST
             </Link>
             <h1 style={{ fontSize: 16, fontWeight: 700, marginTop: 4, fontFamily: "monospace", letterSpacing: "0.02em" }}>{ticker} OPTIONS</h1>
           </div>
         </header>
-        <main style={{ maxWidth: 1800, margin: "0 auto", padding: 24 }}>
+        <main style={{ maxWidth: 1400, margin: "0 auto", padding: 24 }}>
           <div style={{ ...panel, textAlign: "center", padding: 48 }}>
-            <div style={{ width: 200, height: 2, background: "#1e1e2e", margin: "0 auto", overflow: "hidden" }}>
+            <div style={{ width: 200, height: 2, background: "#30363d", margin: "0 auto", overflow: "hidden" }}>
               <div style={{ width: "40%", height: "100%", background: "#3b82f6", animation: "load 1.2s ease-in-out infinite" }} />
             </div>
-            <div style={{ fontSize: 11, color: "#666", marginTop: 10, fontFamily: "monospace" }}>LOADING OPTIONS DATA...</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 10, fontFamily: "monospace" }}>LOADING OPTIONS DATA...</div>
           </div>
         </main>
         <style>{`@keyframes load { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }`}</style>
@@ -494,9 +494,9 @@ export default function OptionsPage() {
 
   if (error && !data) {
     return (
-      <div style={{ minHeight: "100vh", background: "#0a0a0f", color: "#e5e5e5", padding: 24 }}>
-        <div style={{ maxWidth: 1800, margin: "0 auto" }}>
-          <Link href="/options" style={{ color: "#666", fontSize: 11, textDecoration: "none", fontFamily: "monospace" }}>OPTIONS / ASSET LIST</Link>
+      <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff", padding: 24 }}>
+        <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+          <Link href="/options" style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, textDecoration: "none", fontFamily: "monospace" }}>OPTIONS / ASSET LIST</Link>
           <h1 style={{ fontSize: 16, fontWeight: 700, marginTop: 8, marginBottom: 16, fontFamily: "monospace" }}>{ticker} OPTIONS</h1>
           <div style={{ ...panel, borderColor: "#7f1d1d" }}>
             <div style={{ color: "#ef4444", fontWeight: 700, fontSize: 12, marginBottom: 6, fontFamily: "monospace" }}>ERROR</div>
@@ -533,16 +533,16 @@ export default function OptionsPage() {
   const atmIV = findValidAtmIV();
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0a0a0f", color: "#e5e5e5", fontFamily: "'Inter', -apple-system, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "monospace" }}>
       {/* ═══ HEADER ═══ */}
-      <header style={{ borderBottom: "1px solid #1e1e2e", padding: "10px 24px", background: "#0d0d14" }}>
-        <div style={{ maxWidth: 1800, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <header style={{ borderBottom: "1px solid #30363d", padding: "10px 24px", background: "#161b22" }}>
+        <div style={{ maxWidth: 1400, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-            <Link href="/options" style={{ color: "#555", textDecoration: "none", fontSize: 16, lineHeight: 1, padding: "6px 10px", border: "1px solid #1e1e2e", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center" }} title="Back to Options">
+            <Link href="/options" style={{ color: "rgba(255,255,255,0.4)", textDecoration: "none", fontSize: 16, lineHeight: 1, padding: "6px 10px", border: "1px solid #30363d", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center" }} title="Back to Options">
               &larr;
             </Link>
             <div>
-              <Link href="/options" style={{ color: "#555", fontSize: 10, textDecoration: "none", fontFamily: "monospace", letterSpacing: "0.05em" }}>
+              <Link href="/options" style={{ color: "rgba(255,255,255,0.4)", fontSize: 10, textDecoration: "none", fontFamily: "monospace", letterSpacing: "0.05em" }}>
                 OPTIONS
               </Link>
               <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginTop: 2 }}>
@@ -552,36 +552,36 @@ export default function OptionsPage() {
                 <span style={{ fontSize: 24, fontWeight: 700, color: "#22c55e", fontFamily: "monospace" }}>
                   {underlyingPrice.toFixed(2)}
                 </span>
-                <span style={{ fontSize: 11, color: "#666", fontFamily: "monospace" }}>{data?.currency || "USD"}</span>
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>{data?.currency || "USD"}</span>
               </div>
             </div>
-            <div style={{ height: 32, width: 1, background: "#1e1e2e" }} />
+            <div style={{ height: 32, width: 1, background: "#30363d" }} />
             <div style={{ display: "flex", gap: 20, fontSize: 11, fontFamily: "monospace" }}>
               <div>
-                <span style={{ color: "#555" }}>ATM IV </span>
+                <span style={{ color: "rgba(255,255,255,0.4)" }}>ATM IV </span>
                 <span style={{ color: "#a78bfa", fontWeight: 700 }}>{atmIV ? (atmIV * 100).toFixed(1) + "%" : "--"}</span>
               </div>
               <div>
-                <span style={{ color: "#555" }}>DTE </span>
+                <span style={{ color: "rgba(255,255,255,0.4)" }}>DTE </span>
                 <span style={{ fontWeight: 700 }}>{dte}</span>
               </div>
               <div>
-                <span style={{ color: "#555" }}>MAX PAIN </span>
+                <span style={{ color: "rgba(255,255,255,0.4)" }}>MAX PAIN </span>
                 <span style={{ color: "#eab308", fontWeight: 700 }}>{data?.maxPain ? data.maxPain.strike.toFixed(0) : "--"}</span>
               </div>
               <div>
-                <span style={{ color: "#555" }}>P/C OI </span>
+                <span style={{ color: "rgba(255,255,255,0.4)" }}>P/C OI </span>
                 <span style={{ color: (data?.putCallRatio || 0) > 1 ? "#ef4444" : "#22c55e", fontWeight: 700 }}>
                   {data?.putCallRatio?.toFixed(2) || "--"}
                 </span>
               </div>
               <div>
-                <span style={{ color: "#555" }}>P/C VOL </span>
+                <span style={{ color: "rgba(255,255,255,0.4)" }}>P/C VOL </span>
                 <span style={{ fontWeight: 700 }}>{data?.putCallVolumeRatio?.toFixed(2) || "--"}</span>
               </div>
             </div>
           </div>
-          <div style={{ fontSize: 10, color: "#444", fontFamily: "monospace", textAlign: "right" }}>
+          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", fontFamily: "monospace", textAlign: "right" }}>
             {data?.lastUpdated && <div>UPD {new Date(data.lastUpdated).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).toUpperCase()}</div>}
             {loading && <div style={{ color: "#eab308" }}>REFRESHING...</div>}
           </div>
@@ -589,9 +589,9 @@ export default function OptionsPage() {
       </header>
 
       {/* ═══ EXPIRATION BAR ═══ */}
-      <div style={{ borderBottom: "1px solid #1e1e2e", padding: "8px 24px", background: "#0d0d14" }}>
-        <div style={{ maxWidth: 1800, margin: "0 auto", display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: "#555", fontFamily: "monospace", marginRight: 4 }}>EXP</span>
+      <div style={{ borderBottom: "1px solid #30363d", padding: "8px 24px", background: "#161b22" }}>
+        <div style={{ maxWidth: 1400, margin: "0 auto", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", marginRight: 4 }}>EXP</span>
           {data?.expirations.map(exp => {
             const d = daysToExpiry(exp);
             const active = exp === selectedExpiry;
@@ -605,9 +605,9 @@ export default function OptionsPage() {
                   fontSize: 11,
                   fontWeight: active ? 700 : 500,
                   fontFamily: "monospace",
-                  border: active ? "1px solid #3b82f6" : "1px solid #1e1e2e",
+                  border: active ? "1px solid #3b82f6" : "1px solid #30363d",
                   background: active ? "rgba(59,130,246,0.15)" : "transparent",
-                  color: active ? "#60a5fa" : "#888",
+                  color: active ? "#60a5fa" : "rgba(255,255,255,0.5)",
                   cursor: "pointer",
                   borderRadius: 1,
                   opacity: loading ? 0.5 : 1,
@@ -621,7 +621,7 @@ export default function OptionsPage() {
         </div>
       </div>
 
-      <main style={{ maxWidth: 1800, margin: "0 auto", padding: "16px 24px" }}>
+      <main style={{ maxWidth: 1400, margin: "0 auto", padding: "16px 24px" }}>
         {/* ═══ STATS STRIP ═══ */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8, marginBottom: 16 }}>
           <StatCell label="ATM IV" value={atmIV ? `${(atmIV * 100).toFixed(1)}%` : "--"} color="#a78bfa" />
@@ -637,13 +637,13 @@ export default function OptionsPage() {
           <section style={panel}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <div style={secHead}>OPEN INTEREST BY STRIKE</div>
-              {data?.maxPain && <div style={{ fontSize: 10, color: "#555", fontFamily: "monospace" }}>Max Pain: <span style={{ color: "#eab308", fontWeight: 700 }}>${data.maxPain.strike.toFixed(0)}</span></div>}
+              {data?.maxPain && <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>Max Pain: <span style={{ color: "#eab308", fontWeight: 700 }}>${data.maxPain.strike.toFixed(0)}</span></div>}
             </div>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={oiData.filter(d => d.callOI > 0 || d.putOI > 0)} barGap={0} barSize={7}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" />
-                <XAxis dataKey="strike" tick={{ fontSize: 9, fill: "#555", fontFamily: "monospace" }} />
-                <YAxis tick={{ fontSize: 9, fill: "#555", fontFamily: "monospace" }} tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#30363d" />
+                <XAxis dataKey="strike" tick={{ fontSize: 9, fill: "rgba(255,255,255,0.4)", fontFamily: "monospace" }} />
+                <YAxis tick={{ fontSize: 9, fill: "rgba(255,255,255,0.4)", fontFamily: "monospace" }} tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} />
                 <Tooltip contentStyle={ttStyle} formatter={(value: number | undefined, name?: string) => [(value ?? 0).toLocaleString(), name === "putOI" ? "Put OI" : "Call OI"]} />
                 <ReferenceLine x={atmStrike} stroke="#22c55e" strokeDasharray="3 3" ifOverflow="extendDomain">
                   <Label value={`Spot ${underlyingPrice.toFixed(1)}`} fill="#22c55e" fontSize={9} fontFamily="monospace" position="insideTop" dy={-4} />
@@ -654,7 +654,7 @@ export default function OptionsPage() {
                   </ReferenceLine>
                 )}
                 <Bar dataKey="callOI" fill="#3b82f6" name="Call OI" radius={[1, 1, 0, 0]} />
-                <Bar dataKey="putOI" fill="#f97316" name="Put OI" radius={[1, 1, 0, 0]} />
+                <Bar dataKey="putOI" fill="#ef4444" name="Put OI" radius={[1, 1, 0, 0]} />
                 <Legend wrapperStyle={{ fontSize: 10, fontFamily: "monospace" }} />
               </BarChart>
             </ResponsiveContainer>
@@ -665,9 +665,9 @@ export default function OptionsPage() {
             <div style={{ marginBottom: 12 }} />
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={volumeData} barGap={0} barSize={7}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" />
-                <XAxis dataKey="strike" tick={{ fontSize: 9, fill: "#555", fontFamily: "monospace" }} />
-                <YAxis tick={{ fontSize: 9, fill: "#555", fontFamily: "monospace" }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#30363d" />
+                <XAxis dataKey="strike" tick={{ fontSize: 9, fill: "rgba(255,255,255,0.4)", fontFamily: "monospace" }} />
+                <YAxis tick={{ fontSize: 9, fill: "rgba(255,255,255,0.4)", fontFamily: "monospace" }} />
                 <Tooltip contentStyle={ttStyle} formatter={(value: number | undefined, name?: string) => [(value ?? 0).toLocaleString(), name ?? ""]} />
                 <ReferenceLine x={atmStrike} stroke="#22c55e" strokeDasharray="3 3" ifOverflow="extendDomain">
                   <Label value={`Spot ${underlyingPrice.toFixed(1)}`} fill="#22c55e" fontSize={9} fontFamily="monospace" position="insideTop" dy={-4} />
@@ -687,9 +687,9 @@ export default function OptionsPage() {
             <div style={{ marginBottom: 12 }} />
             <ResponsiveContainer width="100%" height={260}>
               <LineChart data={ivSkewData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" />
-                <XAxis dataKey="strike" tick={{ fontSize: 9, fill: "#555", fontFamily: "monospace" }} />
-                <YAxis tick={{ fontSize: 9, fill: "#555", fontFamily: "monospace" }} tickFormatter={(v: number) => `${v.toFixed(0)}%`} domain={["auto", "auto"]} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#30363d" />
+                <XAxis dataKey="strike" tick={{ fontSize: 9, fill: "rgba(255,255,255,0.4)", fontFamily: "monospace" }} />
+                <YAxis tick={{ fontSize: 9, fill: "rgba(255,255,255,0.4)", fontFamily: "monospace" }} tickFormatter={(v: number) => `${v.toFixed(0)}%`} domain={["auto", "auto"]} />
                 <Tooltip contentStyle={ttStyle} formatter={(value: number | undefined) => [`${(value ?? 0).toFixed(1)}%`, ""]} labelFormatter={(label) => `Strike: ${label}`} />
                 <ReferenceLine x={underlyingPrice} stroke="#3b82f6" strokeDasharray="3 3" label={{ value: "ATM", fill: "#3b82f6", fontSize: 8, fontFamily: "monospace" }} />
                 <Line type="natural" dataKey="callIV" stroke="#22c55e" strokeWidth={2} dot={{ r: 2, fill: "#22c55e" }} name="Call IV" connectNulls />
@@ -704,10 +704,10 @@ export default function OptionsPage() {
             <div style={{ marginBottom: 12 }} />
             <ResponsiveContainer width="100%" height={260}>
               <ComposedChart data={greeksData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" />
-                <XAxis dataKey="strike" tick={{ fontSize: 9, fill: "#555", fontFamily: "monospace" }} />
-                <YAxis yAxisId="delta" tick={{ fontSize: 9, fill: "#555", fontFamily: "monospace" }} domain={[0, 1]} />
-                <YAxis yAxisId="gamma" orientation="right" tick={{ fontSize: 9, fill: "#555", fontFamily: "monospace" }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#30363d" />
+                <XAxis dataKey="strike" tick={{ fontSize: 9, fill: "rgba(255,255,255,0.4)", fontFamily: "monospace" }} />
+                <YAxis yAxisId="delta" tick={{ fontSize: 9, fill: "rgba(255,255,255,0.4)", fontFamily: "monospace" }} domain={[0, 1]} />
+                <YAxis yAxisId="gamma" orientation="right" tick={{ fontSize: 9, fill: "rgba(255,255,255,0.4)", fontFamily: "monospace" }} />
                 <Tooltip contentStyle={ttStyle} />
                 <ReferenceLine x={underlyingPrice} stroke="#3b82f6" strokeDasharray="3 3" yAxisId="delta" />
                 <Line yAxisId="delta" type="monotone" dataKey="callDelta" stroke="#22c55e" strokeWidth={1.5} dot={false} name="|Call D|" connectNulls />
@@ -725,7 +725,7 @@ export default function OptionsPage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <div style={{ ...secHead, margin: 0 }}>P&L CALCULATOR</div>
             {positions.length > 0 && (
-              <button onClick={clearPositions} style={{ padding: "3px 10px", fontSize: 10, fontFamily: "monospace", fontWeight: 600, border: "1px solid #1e1e2e", background: "transparent", color: "#555", cursor: "pointer", borderRadius: 1 }}>
+              <button onClick={clearPositions} style={{ padding: "3px 10px", fontSize: 10, fontFamily: "monospace", fontWeight: 600, border: "1px solid #30363d", background: "transparent", color: "rgba(255,255,255,0.4)", cursor: "pointer", borderRadius: 1 }}>
                 CLEAR
               </button>
             )}
@@ -734,18 +734,18 @@ export default function OptionsPage() {
           {/* PRESET STRATEGIES */}
           <div style={{ marginBottom: 12 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: "#555", fontFamily: "monospace", letterSpacing: "0.1em" }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", letterSpacing: "0.1em" }}>
                 STRATEGIES
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 9, fontWeight: 700, color: "#555", fontFamily: "monospace", letterSpacing: "0.1em" }}>QTY</span>
+                <span style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", letterSpacing: "0.1em" }}>QTY</span>
                 <button onClick={() => setStrategyQty(q => Math.max(1, q - 1))} style={{ ...qtyBtn, opacity: strategyQty <= 1 ? 0.3 : 1 }}>-</button>
                 <input
                   type="number"
                   min="1"
                   value={strategyQty}
                   onChange={e => { const v = parseInt(e.target.value) || 1; setStrategyQty(Math.max(1, v)); }}
-                  style={{ width: 40, padding: "3px 4px", fontSize: 12, fontWeight: 700, textAlign: "center", background: "#0a0a0f", border: "1px solid #1e1e2e", color: "#e5e5e5", fontFamily: "monospace", borderRadius: 0 }}
+                  style={{ width: 40, padding: "3px 4px", fontSize: 12, fontWeight: 700, textAlign: "center", background: "#0a0a0a", border: "1px solid #30363d", color: "#fff", fontFamily: "monospace", borderRadius: 0 }}
                 />
                 <button onClick={() => setStrategyQty(q => q + 1)} style={qtyBtn}>+</button>
               </div>
@@ -760,15 +760,15 @@ export default function OptionsPage() {
                     fontSize: 10,
                     fontWeight: activeStrategy === s.key ? 700 : 600,
                     fontFamily: "monospace",
-                    border: activeStrategy === s.key ? "1px solid #3b82f6" : "1px solid #1e1e2e",
+                    border: activeStrategy === s.key ? "1px solid #3b82f6" : "1px solid #30363d",
                     background: activeStrategy === s.key ? "rgba(59,130,246,0.1)" : "transparent",
-                    color: activeStrategy === s.key ? "#60a5fa" : "#888",
+                    color: activeStrategy === s.key ? "#60a5fa" : "rgba(255,255,255,0.5)",
                     cursor: "pointer",
                     borderRadius: 1,
                     letterSpacing: "0.03em",
                   }}
                   onMouseEnter={(e) => { if (activeStrategy !== s.key) { e.currentTarget.style.borderColor = "#3b82f6"; e.currentTarget.style.color = "#60a5fa"; } }}
-                  onMouseLeave={(e) => { if (activeStrategy !== s.key) { e.currentTarget.style.borderColor = "#1e1e2e"; e.currentTarget.style.color = "#888"; } }}
+                  onMouseLeave={(e) => { if (activeStrategy !== s.key) { e.currentTarget.style.borderColor = "#30363d"; e.currentTarget.style.color = "rgba(255,255,255,0.5)"; } }}
                 >
                   {s.label}
                 </button>
@@ -777,11 +777,11 @@ export default function OptionsPage() {
             {activeStrategy && (() => {
               const s = strategies.find(s => s.key === activeStrategy);
               return s ? (
-                <div style={{ marginTop: 8, padding: "8px 12px", background: "#0a0a0f", border: "1px solid #1e1e2e", fontSize: 10, fontFamily: "monospace", lineHeight: 1.6 }}>
+                <div style={{ marginTop: 8, padding: "8px 12px", background: "#0a0a0a", border: "1px solid #30363d", fontSize: 10, fontFamily: "monospace", lineHeight: 1.6 }}>
                   <div style={{ color: "#60a5fa", fontWeight: 700, marginBottom: 3 }}>{s.label}</div>
-                  <div style={{ color: "#888" }}>{s.legs}</div>
-                  <div style={{ color: "#666", marginTop: 2 }}>{s.desc}</div>
-                  <div style={{ display: "flex", gap: 16, marginTop: 4, color: "#555", fontSize: 9 }}>
+                  <div style={{ color: "rgba(255,255,255,0.5)" }}>{s.legs}</div>
+                  <div style={{ color: "rgba(255,255,255,0.4)", marginTop: 2 }}>{s.desc}</div>
+                  <div style={{ display: "flex", gap: 16, marginTop: 4, color: "rgba(255,255,255,0.4)", fontSize: 9 }}>
                     <span>Outlook: <span style={{ color: s.outlookColor, fontWeight: 700 }}>{s.outlook}</span></span>
                     <span>Risk: <span style={{ fontWeight: 700 }}>{s.risk}</span></span>
                     <span>Cost: <span style={{ fontWeight: 700 }}>{s.cost}</span></span>
@@ -793,7 +793,7 @@ export default function OptionsPage() {
 
           <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 20 }}>
             <div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: "#555", marginBottom: 8, fontFamily: "monospace", letterSpacing: "0.1em" }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.4)", marginBottom: 8, fontFamily: "monospace", letterSpacing: "0.1em" }}>
                 MANUAL ENTRY
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8 }}>
@@ -857,7 +857,7 @@ export default function OptionsPage() {
 
               {positions.length > 0 && (
                 <div style={{ marginTop: 12 }}>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: "#555", marginBottom: 6, fontFamily: "monospace", letterSpacing: "0.1em" }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.4)", marginBottom: 6, fontFamily: "monospace", letterSpacing: "0.1em" }}>
                     POSITIONS ({positions.length})
                   </div>
                   {positions.map((pos, i) => (
@@ -866,7 +866,7 @@ export default function OptionsPage() {
                       justifyContent: "space-between",
                       alignItems: "center",
                       padding: "5px 8px",
-                      background: "#0d0d14",
+                      background: "#0a0a0a",
                       marginBottom: 2,
                       fontSize: 11,
                       fontFamily: "monospace",
@@ -881,33 +881,33 @@ export default function OptionsPage() {
                         {" "}@{pos.strike} -- ${pos.premium.toFixed(2)}
                       </div>
                       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                        <button onClick={() => editPosition(i)} style={{ background: "none", border: "1px solid #1e1e2e", color: "#60a5fa", cursor: "pointer", fontSize: 8, fontWeight: 700, padding: "1px 5px", fontFamily: "monospace", letterSpacing: "0.05em" }} title="Edit position">EDIT</button>
-                        <button onClick={() => removePosition(i)} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 14, lineHeight: 1, fontFamily: "monospace" }}>x</button>
+                        <button onClick={() => editPosition(i)} style={{ background: "none", border: "1px solid #30363d", color: "#60a5fa", cursor: "pointer", fontSize: 8, fontWeight: 700, padding: "1px 5px", fontFamily: "monospace", letterSpacing: "0.05em" }} title="Edit position">EDIT</button>
+                        <button onClick={() => removePosition(i)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 14, lineHeight: 1, fontFamily: "monospace" }}>x</button>
                       </div>
                     </div>
                   ))}
-                  <div style={{ marginTop: 10, padding: "10px 12px", background: "#0d0d14", border: "1px solid #1e1e2e" }}>
+                  <div style={{ marginTop: 10, padding: "10px 12px", background: "#0a0a0a", border: "1px solid #30363d" }}>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 11, fontFamily: "monospace" }}>
                       <div>
-                        <div style={{ color: "#555", fontSize: 9, letterSpacing: "0.1em", marginBottom: 2 }}>NET COST</div>
+                        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 9, letterSpacing: "0.1em", marginBottom: 2 }}>NET COST</div>
                         <div style={{ fontWeight: 700, fontSize: 13, color: totalCost < 0 ? "#22c55e" : "#ef4444" }}>
                           ${Math.abs(totalCost).toFixed(0)} {totalCost < 0 ? "(CR)" : "(DR)"}
                         </div>
                       </div>
                       <div>
-                        <div style={{ color: "#555", fontSize: 9, letterSpacing: "0.1em", marginBottom: 2 }}>BREAKEVEN</div>
+                        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 9, letterSpacing: "0.1em", marginBottom: 2 }}>BREAKEVEN</div>
                         <div style={{ fontWeight: 700, fontSize: 13 }}>
                           {breakevens.length > 0 ? breakevens.map(b => `$${b}`).join(", ") : "--"}
                         </div>
                       </div>
                       <div>
-                        <div style={{ color: "#555", fontSize: 9, letterSpacing: "0.1em", marginBottom: 2 }}>MAX PROFIT</div>
+                        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 9, letterSpacing: "0.1em", marginBottom: 2 }}>MAX PROFIT</div>
                         <div style={{ fontWeight: 700, fontSize: 13, color: "#22c55e" }}>
                           {maxProfitLoss.maxProfit === "unlimited" ? "UNLIMITED" : `$${(maxProfitLoss.maxProfit as number).toFixed(0)}`}
                         </div>
                       </div>
                       <div>
-                        <div style={{ color: "#555", fontSize: 9, letterSpacing: "0.1em", marginBottom: 2 }}>MAX LOSS</div>
+                        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 9, letterSpacing: "0.1em", marginBottom: 2 }}>MAX LOSS</div>
                         <div style={{ fontWeight: 700, fontSize: 13, color: "#ef4444" }}>
                           {maxProfitLoss.maxLoss === "unlimited" ? "UNLIMITED" : `$${Math.abs(maxProfitLoss.maxLoss as number).toFixed(0)}`}
                         </div>
@@ -915,13 +915,13 @@ export default function OptionsPage() {
                     </div>
                   </div>
                   {portfolioGreeks && (
-                    <div style={{ marginTop: 8, padding: "8px 12px", background: "#0d0d14", border: "1px solid #1e1e2e" }}>
-                      <div style={{ fontSize: 9, fontWeight: 700, color: "#555", marginBottom: 4, fontFamily: "monospace", letterSpacing: "0.1em" }}>PORTFOLIO GREEKS</div>
+                    <div style={{ marginTop: 8, padding: "8px 12px", background: "#0a0a0a", border: "1px solid #30363d" }}>
+                      <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.4)", marginBottom: 4, fontFamily: "monospace", letterSpacing: "0.1em" }}>PORTFOLIO GREEKS</div>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 12px", fontSize: 11, fontFamily: "monospace" }}>
-                        <div><span style={{ color: "#555", fontSize: 9 }}>DELTA </span><span style={{ fontWeight: 700 }}>{portfolioGreeks.delta.toFixed(3)}</span></div>
-                        <div><span style={{ color: "#555", fontSize: 9 }}>GAMMA </span><span style={{ fontWeight: 700 }}>{portfolioGreeks.gamma.toFixed(4)}</span></div>
-                        <div><span style={{ color: "#555", fontSize: 9 }}>THETA </span><span style={{ fontWeight: 700, color: portfolioGreeks.theta < 0 ? "#ef4444" : "#22c55e" }}>{portfolioGreeks.theta.toFixed(2)}</span></div>
-                        <div><span style={{ color: "#555", fontSize: 9 }}>VEGA </span><span style={{ fontWeight: 700, color: "#a78bfa" }}>{portfolioGreeks.vega.toFixed(3)}</span></div>
+                        <div><span style={{ color: "rgba(255,255,255,0.4)", fontSize: 9 }}>DELTA </span><span style={{ fontWeight: 700 }}>{portfolioGreeks.delta.toFixed(3)}</span></div>
+                        <div><span style={{ color: "rgba(255,255,255,0.4)", fontSize: 9 }}>GAMMA </span><span style={{ fontWeight: 700 }}>{portfolioGreeks.gamma.toFixed(4)}</span></div>
+                        <div><span style={{ color: "rgba(255,255,255,0.4)", fontSize: 9 }}>THETA </span><span style={{ fontWeight: 700, color: portfolioGreeks.theta < 0 ? "#ef4444" : "#22c55e" }}>{portfolioGreeks.theta.toFixed(2)}</span></div>
+                        <div><span style={{ color: "rgba(255,255,255,0.4)", fontSize: 9 }}>VEGA </span><span style={{ fontWeight: 700, color: "#a78bfa" }}>{portfolioGreeks.vega.toFixed(3)}</span></div>
                       </div>
                     </div>
                   )}
@@ -930,15 +930,15 @@ export default function OptionsPage() {
             </div>
 
             <div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: "#555", marginBottom: 8, fontFamily: "monospace", letterSpacing: "0.1em" }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.4)", marginBottom: 8, fontFamily: "monospace", letterSpacing: "0.1em" }}>
                 PAYOFF ANALYSIS — TIME DECAY
               </div>
               {positions.length > 0 && multiTimeData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={360}>
                   <LineChart data={multiTimeData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" />
-                    <XAxis dataKey="price" tick={{ fontSize: 9, fill: "#555", fontFamily: "monospace" }} tickFormatter={(v: number) => `${v.toFixed(0)}`} />
-                    <YAxis tick={{ fontSize: 9, fill: "#555", fontFamily: "monospace" }} tickFormatter={(v: number) => `$${v.toFixed(0)}`} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#30363d" />
+                    <XAxis dataKey="price" tick={{ fontSize: 9, fill: "rgba(255,255,255,0.4)", fontFamily: "monospace" }} tickFormatter={(v: number) => `${v.toFixed(0)}`} />
+                    <YAxis tick={{ fontSize: 9, fill: "rgba(255,255,255,0.4)", fontFamily: "monospace" }} tickFormatter={(v: number) => `$${v.toFixed(0)}`} />
                     {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     <Tooltip content={({ active, payload, label }: any) => {
                       if (!active || !payload?.length) return null;
@@ -947,19 +947,19 @@ export default function OptionsPage() {
                       const m1 = Math.max(Math.round(dte * 0.66), 1);
                       const m2 = Math.max(Math.round(dte * 0.33), 1);
                       return (
-                        <div style={{ background: "#12121e", border: "1px solid #1e1e2e", padding: "8px 12px", fontSize: 11, fontFamily: "monospace" }}>
-                          <div style={{ color: "#888", fontWeight: 700, marginBottom: 6 }}>PRICE: ${Number(label).toFixed(2)}</div>
+                        <div style={{ background: "#0a0a0a", border: "1px solid #30363d", padding: "8px 12px", fontSize: 11, fontFamily: "monospace" }}>
+                          <div style={{ color: "rgba(255,255,255,0.5)", fontWeight: 700, marginBottom: 6 }}>PRICE: ${Number(label).toFixed(2)}</div>
                           <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "3px 10px", marginBottom: 6 }}>
                             <span style={{ color: "#22c55e", fontSize: 10 }}>Today ({dte}d)</span>
                             <span style={{ textAlign: "right", fontWeight: 700, color: d.pnlToday >= 0 ? "#22c55e" : "#ef4444" }}>${d.pnlToday?.toFixed(0)}</span>
                             <span style={{ color: "#eab308", fontSize: 10 }}>{m1}d to exp</span>
                             <span style={{ textAlign: "right", fontWeight: 700, color: d.pnlMid1 >= 0 ? "#22c55e" : "#ef4444" }}>${d.pnlMid1?.toFixed(0)}</span>
-                            <span style={{ color: "#f97316", fontSize: 10 }}>{m2}d to exp</span>
+                            <span style={{ color: "#a78bfa", fontSize: 10 }}>{m2}d to exp</span>
                             <span style={{ textAlign: "right", fontWeight: 700, color: d.pnlMid2 >= 0 ? "#22c55e" : "#ef4444" }}>${d.pnlMid2?.toFixed(0)}</span>
-                            <span style={{ color: "#555", fontSize: 10 }}>At Expiry</span>
+                            <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 10 }}>At Expiry</span>
                             <span style={{ textAlign: "right", fontWeight: 700, color: d.pnlExpiry >= 0 ? "#22c55e" : "#ef4444" }}>${d.pnlExpiry?.toFixed(0)}</span>
                           </div>
-                          <div style={{ borderTop: "1px solid #1e1e2e", paddingTop: 4, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 10px", fontSize: 10 }}>
+                          <div style={{ borderTop: "1px solid #30363d", paddingTop: 4, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 10px", fontSize: 10 }}>
                             <span>Delta: <span style={{ fontWeight: 700 }}>{(d.delta / greeksNorm)?.toFixed(3)}</span></span>
                             <span>Gamma: <span style={{ fontWeight: 700 }}>{(d.gamma / greeksNorm)?.toFixed(4)}</span></span>
                             <span style={{ color: "#ef4444" }}>Theta: <span style={{ fontWeight: 700 }}>{(d.theta / greeksNorm)?.toFixed(2)}</span></span>
@@ -968,13 +968,13 @@ export default function OptionsPage() {
                         </div>
                       );
                     }} />
-                    <ReferenceLine y={0} stroke="#333" strokeWidth={1} />
+                    <ReferenceLine y={0} stroke="#30363d" strokeWidth={1} />
                     <ReferenceLine x={underlyingPrice} stroke="#3b82f6" strokeDasharray="3 3" label={{ value: "Spot", fill: "#3b82f6", fontSize: 8, fontFamily: "monospace" }} />
                     {breakevens.map((be, i) => (
                       <ReferenceLine key={i} x={be} stroke="#eab308" strokeDasharray="3 3" label={{ value: `BE ${be}`, fill: "#eab308", fontSize: 8, fontFamily: "monospace" }} />
                     ))}
-                    <Line type="monotone" dataKey="pnlExpiry" stroke="#555" strokeDasharray="4 2" strokeWidth={1} dot={false} name="At Expiry" />
-                    <Line type="monotone" dataKey="pnlMid2" stroke="#f97316" strokeWidth={1} dot={false} name={`${Math.max(Math.round(dte * 0.33), 1)}d`} />
+                    <Line type="monotone" dataKey="pnlExpiry" stroke="rgba(255,255,255,0.4)" strokeDasharray="4 2" strokeWidth={1} dot={false} name="At Expiry" />
+                    <Line type="monotone" dataKey="pnlMid2" stroke="#a78bfa" strokeWidth={1} dot={false} name={`${Math.max(Math.round(dte * 0.33), 1)}d`} />
                     <Line type="monotone" dataKey="pnlMid1" stroke="#eab308" strokeWidth={1} dot={false} name={`${Math.max(Math.round(dte * 0.66), 1)}d`} />
                     <Line type="monotone" dataKey="pnlToday" stroke="#22c55e" strokeWidth={2} dot={false} name={`Today (${dte}d)`} />
                     <Legend wrapperStyle={{ fontSize: 10, fontFamily: "monospace" }} />
@@ -986,16 +986,16 @@ export default function OptionsPage() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  background: "#0d0d14",
-                  border: "1px solid #1e1e2e",
-                  color: "#444",
+                  background: "#0a0a0a",
+                  border: "1px solid #30363d",
+                  color: "rgba(255,255,255,0.35)",
                   fontSize: 11,
                   fontFamily: "monospace",
                   flexDirection: "column",
                   gap: 6,
                 }}>
                   <div>Select a preset strategy or click <span style={{ color: "#22c55e", fontWeight: 700 }}>B</span>/<span style={{ color: "#ef4444", fontWeight: 700 }}>S</span> on the chain</div>
-                  <div style={{ color: "#333", fontSize: 10 }}>Time decay curves show P&L at different DTE</div>
+                  <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 10 }}>Time decay curves show P&L at different DTE</div>
                 </div>
               )}
             </div>
@@ -1004,7 +1004,7 @@ export default function OptionsPage() {
 
         {/* ═══ OPTIONS CHAIN TABLE ═══ */}
         <section style={{ ...panel, marginBottom: 8, padding: 0, overflow: "hidden" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderBottom: "1px solid #1e1e2e" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderBottom: "1px solid #30363d" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ ...secHead, margin: 0 }}>OPTIONS CHAIN</div>
               <div style={{ display: "flex", gap: 2 }}>
@@ -1016,7 +1016,7 @@ export default function OptionsPage() {
                     fontFamily: "monospace",
                     border: chainFilter === f ? "1px solid #6366f1" : "1px solid transparent",
                     background: chainFilter === f ? "rgba(99,102,241,0.15)" : "transparent",
-                    color: chainFilter === f ? "#818cf8" : "#555",
+                    color: chainFilter === f ? "#818cf8" : "rgba(255,255,255,0.4)",
                     cursor: "pointer",
                     borderRadius: 1,
                   }}>
@@ -1030,9 +1030,9 @@ export default function OptionsPage() {
               fontSize: 10,
               fontWeight: 600,
               fontFamily: "monospace",
-              border: "1px solid #1e1e2e",
+              border: "1px solid #30363d",
               background: showGreeks ? "rgba(167,139,250,0.1)" : "transparent",
-              color: showGreeks ? "#a78bfa" : "#555",
+              color: showGreeks ? "#a78bfa" : "rgba(255,255,255,0.4)",
               cursor: "pointer",
               borderRadius: 1,
             }}>
@@ -1040,9 +1040,9 @@ export default function OptionsPage() {
             </button>
           </div>
           <div style={{ overflowX: "auto", maxHeight: 600 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: "'JetBrains Mono', 'Fira Code', monospace" }}>
-              <thead style={{ position: "sticky", top: 0, background: "#0d0d14", zIndex: 1 }}>
-                <tr style={{ borderBottom: "1px solid #1e1e2e" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: "monospace" }}>
+              <thead style={{ position: "sticky", top: 0, background: "#0a0a0a", zIndex: 1 }}>
+                <tr style={{ borderBottom: "1px solid #30363d" }}>
                   <th style={thStyle}>OI</th>
                   <th style={thStyle}>VOL</th>
                   <th style={thStyle}>BID</th>
@@ -1056,7 +1056,7 @@ export default function OptionsPage() {
                     <th style={thStyle}>V</th>
                   </>}
                   <th style={{ ...thStyle, textAlign: "center", width: 40 }}></th>
-                  <th style={{ ...thStyle, textAlign: "center", background: "#12121e", fontSize: 10, fontWeight: 800, minWidth: 70, letterSpacing: "0.05em" }}>STRIKE</th>
+                  <th style={{ ...thStyle, textAlign: "center", background: "#0a0a0a", fontSize: 10, fontWeight: 800, minWidth: 70, letterSpacing: "0.05em" }}>STRIKE</th>
                   <th style={{ ...thStyle, textAlign: "center", width: 40 }}></th>
                   {showGreeks && <>
                     <th style={thStyle}>D</th>
@@ -1071,11 +1071,11 @@ export default function OptionsPage() {
                   <th style={thStyle}>VOL</th>
                   <th style={thStyle}>OI</th>
                 </tr>
-                <tr style={{ borderBottom: "1px solid #1e1e2e" }}>
+                <tr style={{ borderBottom: "1px solid #30363d" }}>
                   <th colSpan={showGreeks ? 11 : 7} style={{ padding: "2px 8px", fontSize: 9, fontWeight: 800, color: "#22c55e", textAlign: "center", background: "rgba(34,197,94,0.04)", letterSpacing: "0.1em" }}>
                     CALLS
                   </th>
-                  <th style={{ padding: "2px", background: "#12121e" }} />
+                  <th style={{ padding: "2px", background: "#0a0a0a" }} />
                   <th colSpan={showGreeks ? 11 : 7} style={{ padding: "2px 8px", fontSize: 9, fontWeight: 800, color: "#ef4444", textAlign: "center", background: "rgba(239,68,68,0.04)", letterSpacing: "0.1em" }}>
                     PUTS
                   </th>
@@ -1099,15 +1099,15 @@ export default function OptionsPage() {
                         background: isAtm ? "rgba(59,130,246,0.08)" : isMaxPain ? "rgba(234,179,8,0.04)" : callItm ? "rgba(255,255,255,0.01)" : "transparent",
                       }}
                     >
-                      <td style={{ ...tdStyle, color: "#666", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{fmtOI(row.call?.openInterest)}</td>
-                      <td style={{ ...tdStyle, color: row.call?.volume ? "#60a5fa" : "#333", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call?.volume || "--"}</td>
+                      <td style={{ ...tdStyle, color: "rgba(255,255,255,0.4)", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{fmtOI(row.call?.openInterest)}</td>
+                      <td style={{ ...tdStyle, color: row.call?.volume ? "#60a5fa" : "rgba(255,255,255,0.35)", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call?.volume || "--"}</td>
                       <td style={{ ...tdStyle, color: (row.call as OptionData)?.synthetic ? "#1a5c2e" : "#22c55e", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "short")} title={`Sell Call at bid${(row.call as OptionData)?.synthetic ? " (theoretical)" : ""}`}>{row.call?.bid?.toFixed(2) || "--"}</td>
                       <td style={{ ...tdStyle, color: (row.call as OptionData)?.synthetic ? "#7a2020" : "#ef4444", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")} title={`Buy Call at ask${(row.call as OptionData)?.synthetic ? " (theoretical)" : ""}`}>{row.call?.ask?.toFixed(2) || "--"}</td>
-                      <td style={{ ...tdStyle, fontWeight: 600, color: (row.call as OptionData)?.synthetic ? "#666" : "#e5e5e5", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call?.last?.toFixed(2) || (midCall ? <span style={{ color: "#444" }}>{midCall}</span> : "--")}</td>
+                      <td style={{ ...tdStyle, fontWeight: 600, color: (row.call as OptionData)?.synthetic ? "rgba(255,255,255,0.4)" : "#fff", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call?.last?.toFixed(2) || (midCall ? <span style={{ color: "rgba(255,255,255,0.35)" }}>{midCall}</span> : "--")}</td>
                       <td style={{ ...tdStyle, color: "#60a5fa", fontWeight: 600, cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call?.iv ? (row.call.iv * 100).toFixed(1) : "--"}</td>
                       {showGreeks && <>
                         <td style={{ ...tdStyle, color: deltaColor(g?.cd), cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call ? g?.cd.toFixed(3) : "--"}</td>
-                        <td style={{ ...tdStyle, color: "#666", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call ? g?.cg.toFixed(4) : "--"}</td>
+                        <td style={{ ...tdStyle, color: "rgba(255,255,255,0.4)", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call ? g?.cg.toFixed(4) : "--"}</td>
                         <td style={{ ...tdStyle, color: "#ef4444", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call ? g?.ct.toFixed(3) : "--"}</td>
                         <td style={{ ...tdStyle, color: "#a78bfa", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "call", "long")}>{row.call ? g?.cv.toFixed(3) : "--"}</td>
                       </>}
@@ -1122,10 +1122,10 @@ export default function OptionsPage() {
                         textAlign: "center",
                         fontWeight: 800,
                         fontSize: 11,
-                        background: "#12121e",
-                        color: isAtm ? "#60a5fa" : isMaxPain ? "#eab308" : "#ccc",
-                        borderLeft: "1px solid #1e1e2e",
-                        borderRight: "1px solid #1e1e2e",
+                        background: "#0a0a0a",
+                        color: isAtm ? "#60a5fa" : isMaxPain ? "#eab308" : "rgba(255,255,255,0.7)",
+                        borderLeft: "1px solid #30363d",
+                        borderRight: "1px solid #30363d",
                         fontFamily: "monospace",
                         letterSpacing: "0.02em",
                       }}>
@@ -1141,41 +1141,41 @@ export default function OptionsPage() {
                       </td>
                       {showGreeks && <>
                         <td style={{ ...tdStyle, color: deltaColor(g?.pd), cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put ? g?.pd.toFixed(3) : "--"}</td>
-                        <td style={{ ...tdStyle, color: "#666", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put ? g?.pg.toFixed(4) : "--"}</td>
+                        <td style={{ ...tdStyle, color: "rgba(255,255,255,0.4)", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put ? g?.pg.toFixed(4) : "--"}</td>
                         <td style={{ ...tdStyle, color: "#ef4444", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put ? g?.pt.toFixed(3) : "--"}</td>
                         <td style={{ ...tdStyle, color: "#a78bfa", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put ? g?.pv.toFixed(3) : "--"}</td>
                       </>}
                       <td style={{ ...tdStyle, color: "#60a5fa", fontWeight: 600, cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put?.iv ? (row.put.iv * 100).toFixed(1) : "--"}</td>
                       <td style={{ ...tdStyle, color: (row.put as OptionData)?.synthetic ? "#1a5c2e" : "#22c55e", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "short")} title={`Sell Put at bid${(row.put as OptionData)?.synthetic ? " (theoretical)" : ""}`}>{row.put?.bid?.toFixed(2) || "--"}</td>
                       <td style={{ ...tdStyle, color: (row.put as OptionData)?.synthetic ? "#7a2020" : "#ef4444", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")} title={`Buy Put at ask${(row.put as OptionData)?.synthetic ? " (theoretical)" : ""}`}>{row.put?.ask?.toFixed(2) || "--"}</td>
-                      <td style={{ ...tdStyle, fontWeight: 600, color: (row.put as OptionData)?.synthetic ? "#666" : "#e5e5e5", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put?.last?.toFixed(2) || (midPut ? <span style={{ color: "#444" }}>{midPut}</span> : "--")}</td>
-                      <td style={{ ...tdStyle, color: row.put?.volume ? "#60a5fa" : "#333", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put?.volume || "--"}</td>
-                      <td style={{ ...tdStyle, color: "#666", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{fmtOI(row.put?.openInterest)}</td>
+                      <td style={{ ...tdStyle, fontWeight: 600, color: (row.put as OptionData)?.synthetic ? "rgba(255,255,255,0.4)" : "#fff", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put?.last?.toFixed(2) || (midPut ? <span style={{ color: "rgba(255,255,255,0.35)" }}>{midPut}</span> : "--")}</td>
+                      <td style={{ ...tdStyle, color: row.put?.volume ? "#60a5fa" : "rgba(255,255,255,0.35)", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{row.put?.volume || "--"}</td>
+                      <td style={{ ...tdStyle, color: "rgba(255,255,255,0.4)", cursor: "pointer" }} onClick={() => addFromChain(row.strike, "put", "long")}>{fmtOI(row.put?.openInterest)}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
-          <div style={{ padding: "6px 16px", borderTop: "1px solid #1e1e2e", fontSize: 10, color: "#444", display: "flex", justifyContent: "space-between", fontFamily: "monospace" }}>
+          <div style={{ padding: "6px 16px", borderTop: "1px solid #30363d", fontSize: 10, color: "rgba(255,255,255,0.35)", display: "flex", justifyContent: "space-between", fontFamily: "monospace" }}>
             <span>Showing {chain.length} of {data?.chain.length || 0} strikes</span>
             <span>Click B/S to add to P&L calculator</span>
           </div>
         </section>
 
-        <div style={{ fontSize: 10, color: "#333", textAlign: "center", padding: "4px 0 8px", fontFamily: "monospace" }}>
+        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", textAlign: "center", padding: "4px 0 8px", fontFamily: "monospace" }}>
           <span style={{ color: "#1a5c2e" }}>Dimmed</span> bid/ask = Black-Scholes theoretical
           {data?.lastUpdated && <> | Last refresh: {new Date(data.lastUpdated).toLocaleString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</>}
         </div>
 
         {/* Data Sources */}
-        <div style={{ borderTop: "1px solid #1a1a1a", padding: "12px 16px", fontSize: 9, color: "#444", fontFamily: "monospace", lineHeight: 1.8 }}>
-          <span style={{ fontWeight: 700, color: "#555", letterSpacing: "0.06em" }}>DATA SOURCES</span>
+        <div style={{ borderTop: "1px solid #21262d", padding: "12px 16px", fontSize: 9, color: "rgba(255,255,255,0.35)", fontFamily: "monospace", lineHeight: 1.8 }}>
+          <span style={{ fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "0.06em" }}>DATA SOURCES</span>
           <div style={{ marginTop: 4 }}>
-            <span style={{ color: "#666" }}>Options Chain:</span> Yahoo Finance (15-min delayed) &middot;{" "}
-            <span style={{ color: "#666" }}>Pricing Model:</span> Black-Scholes (IV solver, Newton-Raphson) &middot;{" "}
-            <span style={{ color: "#666" }}>Greeks:</span> Analytical B-S (delta, gamma, theta, vega) &middot;{" "}
-            <span style={{ color: "#666" }}>Underlying:</span> Interactive Brokers TWS API, Yahoo Finance
+            <span style={{ color: "rgba(255,255,255,0.4)" }}>Options Chain:</span> Yahoo Finance (15-min delayed) &middot;{" "}
+            <span style={{ color: "rgba(255,255,255,0.4)" }}>Pricing Model:</span> Black-Scholes (IV solver, Newton-Raphson) &middot;{" "}
+            <span style={{ color: "rgba(255,255,255,0.4)" }}>Greeks:</span> Analytical B-S (delta, gamma, theta, vega) &middot;{" "}
+            <span style={{ color: "rgba(255,255,255,0.4)" }}>Underlying:</span> Interactive Brokers TWS API, Yahoo Finance
           </div>
         </div>
       </main>
@@ -1187,9 +1187,9 @@ export default function OptionsPage() {
 function StatCell({ label, value, color, sub }: { label: string; value: string; color?: string; sub?: string }) {
   return (
     <div style={panel}>
-      <div style={{ fontSize: 9, color: "#555", fontFamily: "monospace", letterSpacing: "0.1em", fontWeight: 700 }}>{label}</div>
-      <div style={{ fontSize: 18, fontWeight: 800, color: color || "#e5e5e5", marginTop: 2, fontFamily: "monospace" }}>{value}</div>
-      {sub && <div style={{ fontSize: 9, color: "#444", marginTop: 1, fontFamily: "monospace" }}>{sub}</div>}
+      <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", letterSpacing: "0.1em", fontWeight: 700 }}>{label}</div>
+      <div style={{ fontSize: 18, fontWeight: 800, color: color || "#fff", marginTop: 2, fontFamily: "monospace" }}>{value}</div>
+      {sub && <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginTop: 1, fontFamily: "monospace" }}>{sub}</div>}
     </div>
   );
 }
@@ -1207,45 +1207,47 @@ function fmtNum(n: number | undefined): string {
 }
 
 function deltaColor(delta: number | undefined): string {
-  if (!delta) return "#333";
+  if (!delta) return "#30363d";
   const abs = Math.abs(delta);
-  if (abs > 0.7) return "#22c55e";
+  if (abs > 0.7) return "#10b981";
   if (abs > 0.3) return "#eab308";
   return "#ef4444";
 }
 
 // ─── Style Constants ─────────────────────────────────────────────
 const panel: React.CSSProperties = {
-  background: "#0d0d14",
-  border: "1px solid #1e1e2e",
-  padding: "12px 16px",
+  background: "#161b22",
+  border: "1px solid #30363d",
+  borderRadius: 8,
+  padding: 16,
 };
 
 const secHead: React.CSSProperties = {
   fontSize: 11,
-  fontWeight: 800,
-  letterSpacing: "0.1em",
-  color: "#888",
+  fontWeight: 700,
+  letterSpacing: "0.08em",
+  color: "rgba(255,255,255,0.6)",
   fontFamily: "monospace",
 };
 
 const ttStyle: React.CSSProperties = {
-  background: "#12121e",
-  border: "1px solid #1e1e2e",
-  borderRadius: 0,
+  background: "#0a0a0a",
+  border: "1px solid #30363d",
+  borderRadius: 4,
   fontSize: 11,
   fontFamily: "monospace",
 };
 
 const thStyle: React.CSSProperties = {
   padding: "6px 5px",
-  fontWeight: 700,
-  color: "#555",
+  fontWeight: 600,
+  color: "rgba(255,255,255,0.5)",
   textAlign: "right",
   fontSize: 9,
   letterSpacing: "0.05em",
   whiteSpace: "nowrap",
   fontFamily: "monospace",
+  borderBottom: "1px solid #30363d",
 };
 
 const tdStyle: React.CSSProperties = {
@@ -1253,19 +1255,20 @@ const tdStyle: React.CSSProperties = {
   textAlign: "right",
   fontSize: 11,
   whiteSpace: "nowrap",
-  fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+  fontFamily: "monospace",
+  borderBottom: "1px solid #30363d",
 };
 
 const btnBuy: React.CSSProperties = {
   background: "none",
-  border: "1px solid rgba(34,197,94,0.3)",
-  color: "#22c55e",
+  border: "1px solid rgba(16,185,129,0.3)",
+  color: "#10b981",
   cursor: "pointer",
   fontSize: 9,
   fontWeight: 800,
   padding: "1px 4px",
   fontFamily: "monospace",
-  borderRadius: 1,
+  borderRadius: 2,
 };
 
 const btnSell: React.CSSProperties = {
@@ -1277,24 +1280,24 @@ const btnSell: React.CSSProperties = {
   fontWeight: 800,
   padding: "1px 4px",
   fontFamily: "monospace",
-  borderRadius: 1,
+  borderRadius: 2,
 };
 
 const inp: React.CSSProperties = {
   width: "100%",
-  padding: "5px 8px",
+  padding: "8px 10px",
   fontSize: 12,
-  background: "#0a0a0f",
-  border: "1px solid #1e1e2e",
-  color: "#e5e5e5",
+  background: "#0a0a0a",
+  border: "1px solid #30363d",
+  color: "#fff",
   marginTop: 4,
   fontFamily: "monospace",
-  borderRadius: 0,
+  borderRadius: 5,
 };
 
 const lbl: React.CSSProperties = {
   fontSize: 9,
-  color: "#555",
+  color: "rgba(255,255,255,0.4)",
   fontFamily: "monospace",
   letterSpacing: "0.1em",
   fontWeight: 700,
@@ -1345,11 +1348,11 @@ const qtyBtn: React.CSSProperties = {
   fontSize: 14,
   fontWeight: 700,
   fontFamily: "monospace",
-  border: "1px solid #1e1e2e",
+  border: "1px solid #30363d",
   background: "transparent",
-  color: "#888",
+  color: "rgba(255,255,255,0.5)",
   cursor: "pointer",
-  borderRadius: 0,
+  borderRadius: 4,
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -1361,11 +1364,11 @@ function tabBtn(active: boolean, color: string): React.CSSProperties {
     fontSize: 10,
     fontWeight: active ? 800 : 500,
     fontFamily: "monospace",
-    border: active ? `1px solid ${color}` : "1px solid #1e1e2e",
+    border: active ? `1px solid ${color}` : "1px solid #30363d",
     background: active ? `${color}1a` : "transparent",
-    color: active ? color : "#555",
+    color: active ? color : "rgba(255,255,255,0.35)",
     cursor: "pointer",
-    borderRadius: 0,
+    borderRadius: 4,
     letterSpacing: "0.05em",
   };
 }
