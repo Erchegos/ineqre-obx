@@ -229,6 +229,129 @@ function AreaSparkline({ data, width = 500, height = 140, color = "#3b82f6", cur
   );
 }
 
+/* CarryPnlChart */
+function CarryPnlChart({ data }: { data: { date: string; carry: number; spot: number; total: number }[] }) {
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  if (!data || data.length < 2) return null;
+
+  const W = 460, H = 140;
+  const PAD = { top: 16, right: 16, bottom: 28, left: 46 };
+  const chartW = W - PAD.left - PAD.right;
+  const chartH = H - PAD.top - PAD.bottom;
+
+  const allVals = data.flatMap(d => [d.carry, d.spot, d.total]);
+  const minV = Math.min(...allVals);
+  const maxV = Math.max(...allVals);
+  const range = maxV - minV || 0.01;
+  const padded = range * 0.15;
+  const yMin = minV - padded;
+  const yMax = maxV + padded;
+
+  const xOf = (i: number) => PAD.left + (i / (data.length - 1)) * chartW;
+  const yOf = (v: number) => PAD.top + (1 - (v - yMin) / (yMax - yMin)) * chartH;
+
+  const toPath = (key: "carry" | "spot" | "total") =>
+    data.map((d, i) => `${i === 0 ? "M" : "L"}${xOf(i).toFixed(1)},${yOf(d[key]).toFixed(1)}`).join(" ");
+
+  const yTickCount = 4;
+  const yTickVals = Array.from({ length: yTickCount + 1 }, (_, i) => yMin + (i / yTickCount) * (yMax - yMin));
+  const xTickIdxs = [0, Math.floor(data.length * 0.25), Math.floor(data.length * 0.5), Math.floor(data.length * 0.75), data.length - 1];
+  const fmtDate = (s: string) => { const d = new Date(s); return `${d.getDate()} ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()]}`; };
+  const zeroY = yOf(0);
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left - PAD.left;
+    const pct = Math.max(0, Math.min(1, x / chartW));
+    setHoverIdx(Math.round(pct * (data.length - 1)));
+  };
+
+  const hd = hoverIdx !== null ? data[hoverIdx] : null;
+  const tooltipX = hoverIdx !== null ? xOf(hoverIdx) : 0;
+  const flipTooltip = tooltipX > W * 0.6;
+
+  return (
+    <div style={{ position: "relative", userSelect: "none" as const }}>
+      <svg width={W} height={H} style={{ display: "block", maxWidth: "100%" }}
+        onMouseMove={handleMouseMove} onMouseLeave={() => setHoverIdx(null)}>
+        {/* Y-axis gridlines + labels */}
+        {yTickVals.map((v, i) => {
+          const y = yOf(v);
+          return (
+            <g key={i}>
+              <line x1={PAD.left} x2={W - PAD.right} y1={y} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
+              <text x={PAD.left - 4} y={y + 3.5} textAnchor="end" fontSize={9} fill="rgba(255,255,255,0.35)" fontFamily="monospace">
+                {v >= 0 ? "+" : ""}{(v * 100).toFixed(1)}%
+              </text>
+            </g>
+          );
+        })}
+        {/* Zero reference */}
+        {zeroY >= PAD.top && zeroY <= PAD.top + chartH && (
+          <line x1={PAD.left} x2={W - PAD.right} y1={zeroY} y2={zeroY}
+            stroke="rgba(255,255,255,0.22)" strokeWidth={1} strokeDasharray="4,3" />
+        )}
+        {/* X-axis dates */}
+        {xTickIdxs.map((idx, i) => (
+          <text key={i} x={xOf(idx)} y={H - 6} textAnchor="middle" fontSize={9} fill="rgba(255,255,255,0.32)" fontFamily="monospace">
+            {fmtDate(data[idx].date)}
+          </text>
+        ))}
+        {/* Series lines */}
+        <path d={toPath("carry")} fill="none" stroke="#10b981" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+        <path d={toPath("spot")} fill="none" stroke="#60a5fa" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+        <path d={toPath("total")} fill="none" stroke="rgba(255,255,255,0.88)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+        {/* Hover */}
+        {hoverIdx !== null && hd && (
+          <>
+            <line x1={xOf(hoverIdx)} x2={xOf(hoverIdx)} y1={PAD.top} y2={PAD.top + chartH}
+              stroke="rgba(255,255,255,0.18)" strokeWidth={1} strokeDasharray="3,2" />
+            <circle cx={xOf(hoverIdx)} cy={yOf(hd.carry)} r={3.5} fill="#10b981" />
+            <circle cx={xOf(hoverIdx)} cy={yOf(hd.spot)} r={3.5} fill="#60a5fa" />
+            <circle cx={xOf(hoverIdx)} cy={yOf(hd.total)} r={4} fill="white" />
+          </>
+        )}
+      </svg>
+      {/* Floating tooltip */}
+      {hoverIdx !== null && hd && (
+        <div style={{ position: "absolute", top: 4, left: flipTooltip ? tooltipX - 136 : tooltipX + 10,
+          background: "#161b22", border: "1px solid #30363d", borderRadius: 6, padding: "8px 10px",
+          fontSize: 10, fontFamily: "monospace", pointerEvents: "none", minWidth: 124, zIndex: 10 }}>
+          <div style={{ color: "rgba(255,255,255,0.45)", marginBottom: 6, fontSize: 9 }}>{hd.date}</div>
+          <div style={{ display: "flex", flexDirection: "column" as const, gap: 3 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 14 }}>
+              <span style={{ color: "#10b981" }}>Carry</span>
+              <span style={{ color: "#10b981", fontWeight: 600 }}>{hd.carry >= 0 ? "+" : ""}{(hd.carry * 100).toFixed(2)}%</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 14 }}>
+              <span style={{ color: "#60a5fa" }}>Spot</span>
+              <span style={{ color: "#60a5fa", fontWeight: 600 }}>{hd.spot >= 0 ? "+" : ""}{(hd.spot * 100).toFixed(2)}%</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 14,
+              borderTop: "1px solid #30363d", paddingTop: 4, marginTop: 2 }}>
+              <span style={{ color: "rgba(255,255,255,0.85)", fontWeight: 700 }}>Total</span>
+              <span style={{ color: "rgba(255,255,255,0.85)", fontWeight: 700 }}>{hd.total >= 0 ? "+" : ""}{(hd.total * 100).toFixed(2)}%</span>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Legend */}
+      <div style={{ display: "flex", gap: 16, fontSize: 10, marginTop: 4, paddingLeft: PAD.left }}>
+        {[
+          { color: "#10b981", label: "Carry income" },
+          { color: "#60a5fa", label: "Spot return" },
+          { color: "rgba(255,255,255,0.85)", label: "Total P&L", bold: true },
+        ].map(({ color, label, bold }) => (
+          <span key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <span style={{ display: "inline-block", width: 16, height: 2, background: color, borderRadius: 1 }} />
+            <span style={{ color: bold ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.5)", fontWeight: bold ? 600 : 400 }}>{label}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* SortHeader */
 function SortHeader({ label, col, sort, onSort }: { label: string; col: string; sort: { col: string; asc: boolean }; onSort: (col: string) => void }) {
   const active = sort.col === col;
@@ -2724,21 +2847,8 @@ export default function FXTerminalPage() {
                 {/* Cumulative P&L chart */}
                 {carryData.cumulativePnl?.length > 2 && (
                   <div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", marginBottom: 2 }}>CUMULATIVE P&amp;L (CARRY + SPOT RETURN)</div>
-                    <HelpToggle id="carry-pnl-help" label="How to read this chart" showHelp={showHelp} setShowHelp={setShowHelp}>
-                      Orange line = total return from holding this carry position. Carry income is steady, but spot moves dominate short-term.
-                    </HelpToggle>
-                    <Sparkline
-                      data={carryData.cumulativePnl.map((p: any) => p.total)}
-                      color="#3b82f6"
-                      width={400}
-                      height={80}
-                    />
-                    <div style={{ display: "flex", gap: 20, fontSize: 11, marginTop: 6, padding: "6px 0" }}>
-                      <span><span style={{ display: "inline-block", width: 8, height: 8, background: "#10b981", borderRadius: 1, marginRight: 4 }} />Carry income: <span style={{ fontWeight: 600, color: "#10b981" }}>{fmtPct(carryData.cumulativePnl[carryData.cumulativePnl.length - 1]?.carry)}</span></span>
-                      <span><span style={{ display: "inline-block", width: 8, height: 8, background: "#2196F3", borderRadius: 1, marginRight: 4 }} />Spot return: <span style={{ fontWeight: 600, color: "#2196F3" }}>{fmtPct(carryData.cumulativePnl[carryData.cumulativePnl.length - 1]?.spot)}</span></span>
-                      <span><span style={{ display: "inline-block", width: 8, height: 8, background: "#3b82f6", borderRadius: 1, marginRight: 4 }} />Total: <span style={{ fontWeight: 700, color: "#3b82f6" }}>{fmtPct(carryData.cumulativePnl[carryData.cumulativePnl.length - 1]?.total)}</span></span>
-                    </div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", marginBottom: 6 }}>CUMULATIVE P&amp;L (CARRY + SPOT RETURN)</div>
+                    <CarryPnlChart data={carryData.cumulativePnl} />
                   </div>
                 )}
               </>
