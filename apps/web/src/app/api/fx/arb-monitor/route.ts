@@ -142,7 +142,6 @@ export async function GET(request: Request) {
       constants: {
         cpOisHighBps: CP_OIS_HIGH,
         cpOisMidBps: CP_OIS_MID,
-        cbDepositRates: CB_DEPOSIT_RATES_BPS,
       },
       note: "Positive arb profit accessible only to high-rated banks with CB deposit accounts. For most participants, implementable basis ≤ 0.",
       source: "Rime, Schrimpf & Syrstad (RFS 2022) — Section 2.1, Tables 1 & 3",
