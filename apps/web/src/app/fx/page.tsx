@@ -281,7 +281,7 @@ function CarryPnlChart({ data }: { data: { date: string; carry: number; spot: nu
             <g key={i}>
               <line x1={PAD.left} x2={W - PAD.right} y1={y} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
               <text x={PAD.left - 4} y={y + 3.5} textAnchor="end" fontSize={9} fill="rgba(255,255,255,0.35)" fontFamily="monospace">
-                {v >= 0 ? "+" : ""}{(v * 100).toFixed(1)}%
+                {v >= 0 ? "+" : ""}{v.toFixed(1)}%
               </text>
             </g>
           );
@@ -321,16 +321,16 @@ function CarryPnlChart({ data }: { data: { date: string; carry: number; spot: nu
           <div style={{ display: "flex", flexDirection: "column" as const, gap: 3 }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 14 }}>
               <span style={{ color: "#10b981" }}>Carry</span>
-              <span style={{ color: "#10b981", fontWeight: 600 }}>{hd.carry >= 0 ? "+" : ""}{(hd.carry * 100).toFixed(2)}%</span>
+              <span style={{ color: "#10b981", fontWeight: 600 }}>{hd.carry >= 0 ? "+" : ""}{hd.carry.toFixed(2)}%</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 14 }}>
               <span style={{ color: "#60a5fa" }}>Spot</span>
-              <span style={{ color: "#60a5fa", fontWeight: 600 }}>{hd.spot >= 0 ? "+" : ""}{(hd.spot * 100).toFixed(2)}%</span>
+              <span style={{ color: "#60a5fa", fontWeight: 600 }}>{hd.spot >= 0 ? "+" : ""}{hd.spot.toFixed(2)}%</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 14,
               borderTop: "1px solid #30363d", paddingTop: 4, marginTop: 2 }}>
               <span style={{ color: "rgba(255,255,255,0.85)", fontWeight: 700 }}>Total</span>
-              <span style={{ color: "rgba(255,255,255,0.85)", fontWeight: 700 }}>{hd.total >= 0 ? "+" : ""}{(hd.total * 100).toFixed(2)}%</span>
+              <span style={{ color: "rgba(255,255,255,0.85)", fontWeight: 700 }}>{hd.total >= 0 ? "+" : ""}{hd.total.toFixed(2)}%</span>
             </div>
           </div>
         </div>
