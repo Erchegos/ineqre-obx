@@ -206,7 +206,8 @@ export default function ShippingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [tab, setTab] = useState<"overview" | "map" | "rates" | "contracts">("overview");
+  const [tab, setTab] = useState<"overview" | "map" | "rates" | "contracts" | "earnings">("overview");
+  const [spotScenario, setSpotScenario] = useState(0); // % change on top of current spot rates
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
   const [focusVessel, setFocusVessel] = useState<{ lat: number; lng: number; name: string } | null>(null);
@@ -599,9 +600,9 @@ export default function ShippingPage() {
 
           {/* ─── Tab Bar ────────────────────────────────────── */}
           <div style={{ display: "flex", gap: 6, padding: "6px 8px", background: "#0d1117", borderBottom: "1px solid #30363d", alignItems: "center" }}>
-            {(["overview", "map", "rates", "contracts"] as const).map(t => (
+            {(["overview", "map", "rates", "contracts", "earnings"] as const).map(t => (
               <button key={t} style={S.tabBtn(tab === t)} onClick={() => setTab(t)}>
-                {{ overview: "OVERVIEW", map: "MAP & FLEET", rates: "RATES", contracts: "CONTRACTS" }[t]}
+                {{ overview: "OVERVIEW", map: "MAP & FLEET", rates: "RATES", contracts: "CONTRACTS", earnings: "EARNINGS CALC" }[t]}
               </button>
             ))}
             <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
@@ -1221,6 +1222,284 @@ export default function ShippingPage() {
               })()}
             </div>
           )}
+
+            {/* ================================================================ */}
+          {/* EARNINGS CALCULATOR TAB                                          */}
+          {/* ================================================================ */}
+          {tab === "earnings" && (() => {
+            // OPEX per vessel type ($/day, industry estimates)
+            const OPEX: Record<string, number> = {
+              vlcc: 9500, suezmax: 8500, aframax_lr2: 8000, lr2_tanker: 8000,
+              mr_tanker: 7000, handy_tanker: 6500, lng_carrier: 20000, vlgc: 11000,
+              capesize: 8000, panamax_bulk: 6500, ultramax: 6000, newcastlemax: 8500,
+              pctc: 14000, container_feeder: 6500, chemical_tanker: 9000,
+            };
+            const VOYAGE_COST_PCT = 0.18; // ~18% of spot freight goes to voyage costs
+
+            // Current spot rates by vessel type (from latest Pareto)
+            const MARKET_SPOT: Record<string, number> = {
+              vlcc: 292700, suezmax: 126600, aframax_lr2: 83000, lr2_tanker: 66700,
+              mr_tanker: 30000, handy_tanker: 24000, lng_carrier: 196250, vlgc: 63089,
+              capesize: 45000, panamax_bulk: 22621, ultramax: 16213, newcastlemax: 48000,
+              pctc: 50000, container_feeder: 18000, chemical_tanker: 26000,
+            };
+
+            const scenarioMultiplier = 1 + spotScenario / 100;
+
+            // Build per-company earnings from contracts
+            type EarningsRow = {
+              ticker: string;
+              name: string;
+              sector: string;
+              color: string;
+              fleetSize: number;
+              tcVessels: number;
+              spotVessels: number;
+              tcCovPct: number;
+              avgTcRate: number;
+              avgSpotRate: number;
+              blendedTce: number;
+              dailyRevGross: number;
+              dailyOpex: number;
+              dailyNetTce: number;
+              quarterlyRevGross: number;
+              quarterlyOpex: number;
+              quarterlyNetTce: number;
+            };
+
+            const companyMap: Record<string, { ticker: string; name: string; sector: string; color: string; tcRates: number[]; spotRates: number[]; vesselTypes: string[] }> = {};
+            for (const c of contracts) {
+              if (!companyMap[c.company_ticker]) {
+                const co = companies.find(x => x.ticker === c.company_ticker);
+                companyMap[c.company_ticker] = {
+                  ticker: c.company_ticker,
+                  name: co?.company_name || c.company_ticker,
+                  sector: c.sector,
+                  color: c.color_hex,
+                  tcRates: [],
+                  spotRates: [],
+                  vesselTypes: [],
+                };
+              }
+              const entry = companyMap[c.company_ticker];
+              const vtype = c.vessel_type;
+              entry.vesselTypes.push(vtype);
+              const spotMkt = (MARKET_SPOT[vtype] || 30000) * scenarioMultiplier;
+              const tce = c.contract_type === "spot"
+                ? spotMkt * (1 - VOYAGE_COST_PCT)
+                : (c.rate_usd_per_day || 0);
+              if (c.contract_type === "spot") {
+                entry.spotRates.push(tce);
+              } else {
+                entry.tcRates.push(tce);
+              }
+            }
+
+            const rows: EarningsRow[] = Object.values(companyMap).map(e => {
+              const tc = e.tcRates.length;
+              const spot = e.spotRates.length;
+              const total = tc + spot;
+              const avgTc = tc > 0 ? e.tcRates.reduce((a, b) => a + b, 0) / tc : 0;
+              const avgSpot = spot > 0 ? e.spotRates.reduce((a, b) => a + b, 0) / spot : 0;
+              const allRates = [...e.tcRates, ...e.spotRates];
+              const blended = allRates.length > 0 ? allRates.reduce((a, b) => a + b, 0) / allRates.length : 0;
+
+              // Avg OPEX: average over vessel types
+              const avgOpex = e.vesselTypes.length > 0
+                ? e.vesselTypes.reduce((s, vt) => s + (OPEX[vt] || 8000), 0) / e.vesselTypes.length
+                : 8000;
+
+              const dailyGross = blended * total;
+              const dailyOpex = avgOpex * total;
+              const dailyNet = dailyGross - dailyOpex;
+
+              return {
+                ticker: e.ticker,
+                name: e.name,
+                sector: e.sector,
+                color: e.color,
+                fleetSize: total,
+                tcVessels: tc,
+                spotVessels: spot,
+                tcCovPct: total > 0 ? (tc / total) * 100 : 0,
+                avgTcRate: avgTc,
+                avgSpotRate: avgSpot,
+                blendedTce: blended,
+                dailyRevGross: dailyGross,
+                dailyOpex,
+                dailyNetTce: dailyNet,
+                quarterlyRevGross: dailyGross * 90,
+                quarterlyOpex: dailyOpex * 90,
+                quarterlyNetTce: dailyNet * 90,
+              };
+            }).sort((a, b) => b.quarterlyNetTce - a.quarterlyNetTce);
+
+            const totalQNet = rows.reduce((s, r) => s + r.quarterlyNetTce, 0);
+            const maxQNet = Math.max(...rows.map(r => Math.abs(r.quarterlyNetTce)));
+            const scenarios = [-40, -20, 0, 20, 40, 60];
+
+            return (
+              <div key="earnings" className="sh-tab-content">
+
+                {/* Methodology note */}
+                <div style={{ padding: "8px 10px", background: "rgba(59,130,246,0.06)", borderBottom: "1px solid #21262d", fontSize: 10, color: "rgba(255,255,255,0.5)" }}>
+                  <strong style={{ color: "#3b82f6" }}>METHODOLOGY</strong> — TC vessels earn contracted rate net of OPEX. Spot vessels earn (market rate × (1 − 18% voyage costs)) − OPEX. Market spot rates sourced from Pareto Shipping Daily (2026-03-15). Contract rates are estimated from quarterly fleet reports; not actual disclosed figures. OPEX are industry averages per vessel type.
+                </div>
+
+                {/* Spot rate scenario slider */}
+                <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 10px", borderBottom: "1px solid #30363d", background: "#0d1117" }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.5)", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>SPOT RATE SCENARIO</span>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {scenarios.map(pct => (
+                      <button
+                        key={pct}
+                        onClick={() => setSpotScenario(pct)}
+                        style={{
+                          padding: "3px 8px", borderRadius: 4, border: "none", cursor: "pointer", fontFamily: "monospace", fontSize: 9, fontWeight: 700,
+                          background: spotScenario === pct ? (pct > 0 ? "#22c55e" : pct < 0 ? "#ef4444" : "#3b82f6") : "#21262d",
+                          color: spotScenario === pct ? "#000" : "rgba(255,255,255,0.6)",
+                        }}
+                      >
+                        {pct > 0 ? "+" : ""}{pct}%
+                      </button>
+                    ))}
+                  </div>
+                  <span style={{ fontSize: 10, color: spotScenario === 0 ? "rgba(255,255,255,0.4)" : spotScenario > 0 ? "#22c55e" : "#ef4444" }}>
+                    {spotScenario === 0 ? "BASE CASE (Pareto 15-Mar-2026)" : `Spot rates ${spotScenario > 0 ? "+" : ""}${spotScenario}% vs base`}
+                  </span>
+                  <div style={{ marginLeft: "auto", fontSize: 9, color: "rgba(255,255,255,0.4)" }}>
+                    FLEET QUARTERLY NET TCE: <strong style={{ color: "#3b82f6", fontSize: 11 }}>${(totalQNet / 1e6).toFixed(0)}M</strong>
+                  </div>
+                </div>
+
+                {/* Earnings table */}
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid #30363d", background: "#0d1117" }}>
+                        {[
+                          ["COMPANY", "left"], ["SECTOR", "left"], ["FLEET", "right"], ["TC%", "right"],
+                          ["AVG TC RATE", "right"], ["AVG SPOT TCE", "right"], ["BLENDED TCE", "right"],
+                          ["DAILY GROSS", "right"], ["DAILY OPEX", "right"], ["DAILY NET TCE", "right"],
+                          ["Q NET TCE ($M)", "right"], ["% OF FLEET TOTAL", "right"],
+                        ].map(([h, a]) => (
+                          <th key={h} style={{ padding: "6px 10px", textAlign: a as "left" | "right", fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.5)", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map(r => {
+                        const sharePct = totalQNet > 0 ? (r.quarterlyNetTce / totalQNet) * 100 : 0;
+                        return (
+                          <tr key={r.ticker} style={{ borderBottom: "1px solid #21262d" }}>
+                            <td style={{ padding: "7px 10px" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                <div style={{ width: 3, height: 14, background: r.color, borderRadius: 1, flexShrink: 0 }} />
+                                <span style={{ fontWeight: 700 }}>{r.ticker}</span>
+                              </div>
+                            </td>
+                            <td style={{ padding: "7px 10px" }}>
+                              <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 2, background: SECTOR_COLORS[r.sector] + "25", color: SECTOR_COLORS[r.sector] }}>
+                                {SECTOR_LABELS[r.sector] || r.sector}
+                              </span>
+                            </td>
+                            <td style={{ padding: "7px 10px", textAlign: "right", color: "rgba(255,255,255,0.6)" }}>{r.fleetSize} <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)" }}>({r.tcVessels}TC/{r.spotVessels}S)</span></td>
+                            <td style={{ padding: "7px 10px", textAlign: "right" }}>
+                              <div style={{ width: 48, height: 6, background: "#21262d", borderRadius: 3, display: "inline-block", verticalAlign: "middle", marginRight: 4, position: "relative", overflow: "hidden" }}>
+                                <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${r.tcCovPct}%`, background: "#3b82f6", borderRadius: 3 }} />
+                              </div>
+                              <span style={{ fontWeight: 600 }}>{r.tcCovPct.toFixed(0)}%</span>
+                            </td>
+                            <td style={{ padding: "7px 10px", textAlign: "right", color: "#3b82f6", fontWeight: 600 }}>{r.avgTcRate > 0 ? fmtRate(r.avgTcRate) : "—"}</td>
+                            <td style={{ padding: "7px 10px", textAlign: "right", color: "#f59e0b", fontWeight: 600 }}>{r.avgSpotRate > 0 ? fmtRate(r.avgSpotRate) : "—"}</td>
+                            <td style={{ padding: "7px 10px", textAlign: "right", fontWeight: 700, color: "#fff" }}>{fmtRate(r.blendedTce)}</td>
+                            <td style={{ padding: "7px 10px", textAlign: "right", color: "rgba(255,255,255,0.6)" }}>${(r.dailyRevGross / 1000).toFixed(0)}K</td>
+                            <td style={{ padding: "7px 10px", textAlign: "right", color: "#ef4444" }}>${(r.dailyOpex / 1000).toFixed(0)}K</td>
+                            <td style={{ padding: "7px 10px", textAlign: "right", fontWeight: 700, color: r.dailyNetTce >= 0 ? "#22c55e" : "#ef4444" }}>
+                              ${(r.dailyNetTce / 1000).toFixed(0)}K
+                            </td>
+                            <td style={{ padding: "7px 10px", textAlign: "right" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
+                                <div style={{ width: 60, height: 6, background: "#21262d", borderRadius: 3, position: "relative", overflow: "hidden" }}>
+                                  <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${maxQNet > 0 ? (Math.abs(r.quarterlyNetTce) / maxQNet) * 100 : 0}%`, background: r.quarterlyNetTce >= 0 ? "#22c55e" : "#ef4444", borderRadius: 3 }} />
+                                </div>
+                                <span style={{ fontWeight: 700, color: r.quarterlyNetTce >= 0 ? "#22c55e" : "#ef4444", minWidth: 48, textAlign: "right" }}>
+                                  ${(r.quarterlyNetTce / 1e6).toFixed(1)}M
+                                </span>
+                              </div>
+                            </td>
+                            <td style={{ padding: "7px 10px", textAlign: "right", color: "rgba(255,255,255,0.5)" }}>{totalQNet > 0 ? sharePct.toFixed(1) : "—"}%</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ borderTop: "2px solid #30363d", background: "#0d1117" }}>
+                        <td colSpan={10} style={{ padding: "7px 10px", fontWeight: 700, color: "rgba(255,255,255,0.6)", fontSize: 9, letterSpacing: "0.06em" }}>FLEET TOTAL</td>
+                        <td style={{ padding: "7px 10px", textAlign: "right", fontWeight: 800, color: "#22c55e", fontSize: 13 }}>${(totalQNet / 1e6).toFixed(1)}M</td>
+                        <td style={{ padding: "7px 10px", textAlign: "right", fontWeight: 700, color: "rgba(255,255,255,0.5)" }}>100%</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                {/* Sensitivity grid */}
+                <div style={{ padding: "10px 10px", borderTop: "1px solid #30363d" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>SPOT RATE SENSITIVITY — QUARTERLY NET TCE ($M)</div>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ borderCollapse: "collapse", fontSize: 10 }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid #30363d" }}>
+                          <th style={{ padding: "5px 10px", textAlign: "left", fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.5)", whiteSpace: "nowrap", minWidth: 80 }}>COMPANY</th>
+                          {[-40, -20, 0, 20, 40, 60].map(pct => (
+                            <th key={pct} style={{ padding: "5px 10px", textAlign: "right", fontSize: 9, fontWeight: 700, color: pct > 0 ? "#22c55e" : pct < 0 ? "#ef4444" : "#3b82f6", whiteSpace: "nowrap" }}>
+                              {pct > 0 ? "+" : ""}{pct}%
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map(r => {
+                          return (
+                            <tr key={r.ticker} style={{ borderBottom: "1px solid #21262d" }}>
+                              <td style={{ padding: "5px 10px", fontWeight: 700, color: r.color }}>{r.ticker}</td>
+                              {[-40, -20, 0, 20, 40, 60].map(pct => {
+                                // Recalculate with this scenario
+                                const mult = 1 + pct / 100;
+                                const tcIncome = r.tcVessels * r.avgTcRate;
+                                // avgSpotRate was computed with current scenarioMultiplier — normalize back to base, then reapply pct
+                                const baseSpotTce = r.spotVessels > 0 && scenarioMultiplier !== 0
+                                  ? r.avgSpotRate / scenarioMultiplier
+                                  : r.avgSpotRate;
+                                const newSpotTce = baseSpotTce * mult;
+                                const newBlendedTotal = (tcIncome + r.spotVessels * newSpotTce);
+                                const newDailyNet = newBlendedTotal - r.dailyOpex;
+                                const qNet = newDailyNet * 90;
+                                const isBase = pct === spotScenario;
+                                return (
+                                  <td key={pct} style={{
+                                    padding: "5px 10px", textAlign: "right", fontWeight: 600,
+                                    color: qNet >= 0 ? "#22c55e" : "#ef4444",
+                                    background: isBase ? "rgba(59,130,246,0.08)" : undefined,
+                                  }}>
+                                    ${(qNet / 1e6).toFixed(1)}M
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 9, color: "rgba(255,255,255,0.35)" }}>
+                    Scenario assumes spot rate change applies to all spot-exposed vessels. TC vessels locked at contracted rates (no change). Voyage costs = 18% of gross spot freight.
+                  </div>
+                </div>
+
+              </div>
+            );
+          })()}
 
           {/* ================================================================ */}
           {/* CONTRACTS TAB                                                    */}
