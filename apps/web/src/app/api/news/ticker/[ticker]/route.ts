@@ -67,8 +67,23 @@ export async function GET(
 
     const nwWhere = nwConditions.join(" AND ");
 
-    // ── Run BOTH queries in parallel ───────────────────────
-    const [ibkrResult, nwResult] = await Promise.all([
+    // Pre-compute price series with LAG once per ticker (shared by both queries).
+    // This replaces per-row nested LATERAL subqueries (N×subquery) with a single
+    // index scan + window function, then a simple range lookup per event.
+    const priceSeriesQuery = `
+      SELECT
+        date,
+        close,
+        LAG(close) OVER (ORDER BY date) AS prev_close
+      FROM public.${priceTable}
+      WHERE upper(ticker) = $1
+        AND close IS NOT NULL
+        AND date >= NOW() - INTERVAL '95 days'
+      ORDER BY date
+    `;
+
+    // ── Run BOTH event queries + price series in parallel ───────────────────────
+    const [ibkrResult, nwResult, priceSeriesResult] = await Promise.all([
       pool.query(
         `
         SELECT
@@ -77,12 +92,6 @@ export async function GET(
           e.provider_code, e.url, e.structured_facts,
           tm.relevance_score::float AS relevance,
           tm.impact_direction,
-          pd.close AS price_close,
-          pd.prev_close,
-          CASE WHEN pd.prev_close > 0
-            THEN ((pd.close - pd.prev_close) / pd.prev_close * 100)::float
-            ELSE NULL
-          END AS day_return_pct,
           COALESCE(
             (SELECT json_agg(json_build_object(
               'ticker', t2.ticker,
@@ -100,21 +109,6 @@ export async function GET(
           ) AS sectors
         FROM news_events e
         JOIN news_ticker_map tm ON tm.news_event_id = e.id
-        LEFT JOIN LATERAL (
-          SELECT
-            p1.close,
-            (SELECT p2.close FROM public.${priceTable} p2
-             WHERE upper(p2.ticker) = $1 AND p2.close IS NOT NULL
-               AND p2.date < p1.date ORDER BY p2.date DESC LIMIT 1
-            ) AS prev_close
-          FROM public.${priceTable} p1
-          WHERE upper(p1.ticker) = $1
-            AND p1.close IS NOT NULL
-            AND p1.date <= (e.published_at::date + INTERVAL '1 day')
-            AND p1.date >= (e.published_at::date - INTERVAL '3 days')
-          ORDER BY p1.date DESC
-          LIMIT 1
-        ) pd ON true
         WHERE ${ibkrWhere}
         ORDER BY e.published_at DESC
         LIMIT $${idx}
@@ -136,79 +130,96 @@ export async function GET(
           NULL AS provider_code,
           nf.url,
           nf.structured_facts,
-          nf.issuer_name,
-          pd.close AS price_close,
-          pd.prev_close,
-          CASE WHEN pd.prev_close > 0
-            THEN ((pd.close - pd.prev_close) / pd.prev_close * 100)::float
-            ELSE NULL
-          END AS day_return_pct
+          nf.issuer_name
         FROM newsweb_filings nf
-        LEFT JOIN LATERAL (
-          SELECT
-            p1.close,
-            (SELECT p2.close FROM public.${priceTable} p2
-             WHERE upper(p2.ticker) = $1 AND p2.close IS NOT NULL
-               AND p2.date < p1.date ORDER BY p2.date DESC LIMIT 1
-            ) AS prev_close
-          FROM public.${priceTable} p1
-          WHERE upper(p1.ticker) = $1
-            AND p1.close IS NOT NULL
-            AND p1.date <= (nf.published_at::date + INTERVAL '1 day')
-            AND p1.date >= (nf.published_at::date - INTERVAL '3 days')
-          ORDER BY p1.date DESC
-          LIMIT 1
-        ) pd ON true
         WHERE ${nwWhere}
         ORDER BY nf.published_at DESC
         LIMIT $${nwIdx}
       `,
         [...nwParams, limit]
       ),
+      pool.query(priceSeriesQuery, [tickerUpper]),
     ]);
 
-    // ── Merge + sort by publishedAt DESC ─────────────────────
-    const ibkrEvents = ibkrResult.rows.map((r) => ({
-      id: Number(r.id),
-      publishedAt: r.published_at,
-      source: r.source,
-      headline: r.headline,
-      summary: r.summary,
-      eventType: r.event_type,
-      severity: r.severity,
-      sentiment: r.sentiment,
-      confidence: r.confidence,
-      providerCode: r.provider_code,
-      url: r.url,
-      structuredFacts: r.structured_facts,
-      relevance: r.relevance,
-      impactDirection: r.impact_direction,
-      dayReturnPct: r.day_return_pct != null ? Number(r.day_return_pct) : null,
-      priceClose: r.price_close != null ? Number(r.price_close) : null,
-      tickers: r.all_tickers,
-      sectors: r.sectors,
+    // Build a sorted array for efficient nearest-price lookup
+    type PriceRow = { date: Date; close: number; prev_close: number | null };
+    const priceSeries: PriceRow[] = priceSeriesResult.rows.map((r) => ({
+      date: r.date instanceof Date ? r.date : new Date(r.date),
+      close: Number(r.close),
+      prev_close: r.prev_close != null ? Number(r.prev_close) : null,
     }));
 
-    const nwEvents = nwResult.rows.map((r) => ({
-      id: Number(r.id),
-      publishedAt: r.published_at,
-      source: "newsweb" as string,
-      headline: r.headline,
-      summary: r.summary || null,
-      eventType: r.event_type,
-      severity: r.severity,
-      sentiment: r.sentiment,
-      confidence: r.confidence,
-      providerCode: null,
-      url: r.url,
-      structuredFacts: r.structured_facts,
-      relevance: null,
-      impactDirection: null,
-      dayReturnPct: r.day_return_pct != null ? Number(r.day_return_pct) : null,
-      priceClose: r.price_close != null ? Number(r.price_close) : null,
-      tickers: [{ ticker: tickerUpper, relevance: 1.0, direction: "neutral" }],
-      sectors: [],
-    }));
+    // Find the latest price row within [eventDate-3d, eventDate+1d]
+    const findPrice = (publishedAt: Date): { close: number; prev_close: number | null } | null => {
+      const evMs = publishedAt.getTime();
+      const minMs = evMs - 3 * 86400_000;
+      const maxMs = evMs + 1 * 86400_000;
+      let best: PriceRow | null = null;
+      for (const row of priceSeries) {
+        const ms = row.date.getTime();
+        if (ms >= minMs && ms <= maxMs) {
+          if (!best || ms > best.date.getTime()) best = row;
+        }
+      }
+      return best ? { close: best.close, prev_close: best.prev_close } : null;
+    };
+
+    // ── Merge + sort by publishedAt DESC ─────────────────────
+    const ibkrEvents = ibkrResult.rows.map((r) => {
+      const pd = findPrice(new Date(r.published_at));
+      const dayReturnPct =
+        pd && pd.prev_close && pd.prev_close > 0
+          ? ((pd.close - pd.prev_close) / pd.prev_close) * 100
+          : null;
+      return {
+        id: Number(r.id),
+        publishedAt: r.published_at,
+        source: r.source,
+        headline: r.headline,
+        summary: r.summary,
+        eventType: r.event_type,
+        severity: r.severity,
+        sentiment: r.sentiment,
+        confidence: r.confidence,
+        providerCode: r.provider_code,
+        url: r.url,
+        structuredFacts: r.structured_facts,
+        relevance: r.relevance,
+        impactDirection: r.impact_direction,
+        dayReturnPct,
+        priceClose: pd ? pd.close : null,
+        tickers: r.all_tickers,
+        sectors: r.sectors,
+      };
+    });
+
+    const nwEvents = nwResult.rows.map((r) => {
+      const pd = findPrice(new Date(r.published_at));
+      const dayReturnPct =
+        pd && pd.prev_close && pd.prev_close > 0
+          ? ((pd.close - pd.prev_close) / pd.prev_close) * 100
+          : null;
+      return {
+        id: Number(r.id),
+        publishedAt: r.published_at,
+        source: "newsweb" as string,
+        headline: r.headline,
+        summary: r.summary || null,
+        eventType: r.event_type,
+        severity: r.severity,
+        sentiment: r.sentiment,
+        confidence: r.confidence,
+        providerCode: null,
+        url: r.url,
+        structuredFacts: r.structured_facts,
+        relevance: null,
+        impactDirection: null,
+        dayReturnPct,
+        priceClose: pd ? pd.close : null,
+        tickers: [{ ticker: tickerUpper, relevance: 1.0, direction: "neutral" }],
+        sectors: [],
+      };
+    });
 
     const allEvents = [...ibkrEvents, ...nwEvents]
       .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())

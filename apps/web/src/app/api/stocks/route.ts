@@ -41,31 +41,60 @@ export async function GET(req: NextRequest) {
     console.log('[STOCKS API] Asset types filter:', assetTypes);
 
     // Build query with asset type filter
+    // Uses CTEs with DISTINCT ON for O(N_tickers) index seeks instead of
+    // ARRAY_AGG (O(N_rows × log N)) and LATERAL (N independent subqueries).
     const query = `
+      WITH latest_prices AS (
+        SELECT DISTINCT ON (p.ticker)
+          p.ticker,
+          p.close       AS last_close,
+          p.adj_close   AS last_adj_close,
+          p.date        AS end_date
+        FROM prices_daily p
+        INNER JOIN stocks s ON s.ticker = p.ticker
+        WHERE s.asset_type = ANY($1)
+          AND p.close IS NOT NULL
+          AND p.close > 0
+        ORDER BY p.ticker, p.date DESC
+      ),
+      price_stats AS (
+        SELECT
+          p.ticker,
+          MIN(p.date) AS start_date,
+          COUNT(*)    AS rows
+        FROM prices_daily p
+        INNER JOIN stocks s ON s.ticker = p.ticker
+        WHERE s.asset_type = ANY($1)
+          AND p.close IS NOT NULL
+          AND p.close > 0
+        GROUP BY p.ticker
+        HAVING COUNT(*) >= 100
+      ),
+      latest_mktcap AS (
+        SELECT DISTINCT ON (ff.ticker)
+          ff.ticker,
+          ff.mktcap
+        FROM factor_fundamentals ff
+        WHERE ff.mktcap IS NOT NULL
+        ORDER BY ff.ticker, ff.date DESC
+      )
       SELECT
         s.ticker,
         s.name,
         s.asset_type,
         s.sector,
         s.currency,
-        (ARRAY_AGG(p.close ORDER BY p.date DESC))[1] as last_close,
-        (ARRAY_AGG(p.adj_close ORDER BY p.date DESC))[1] as last_adj_close,
-        MIN(p.date) as start_date,
-        MAX(p.date) as end_date,
-        COUNT(*) as rows,
-        ff.mktcap
+        lp.last_close,
+        COALESCE(lp.last_adj_close, lp.last_close) AS last_adj_close,
+        ps.start_date,
+        lp.end_date,
+        ps.rows,
+        lm.mktcap
       FROM stocks s
-      INNER JOIN prices_daily p ON s.ticker = p.ticker
-      LEFT JOIN LATERAL (
-        SELECT mktcap FROM factor_fundamentals
-        WHERE ticker = s.ticker AND mktcap IS NOT NULL
-        ORDER BY date DESC LIMIT 1
-      ) ff ON true
-      WHERE p.close IS NOT NULL
-        AND p.close > 0
-        AND s.asset_type = ANY($1)
-      GROUP BY s.ticker, s.name, s.asset_type, s.sector, s.currency, ff.mktcap
-      HAVING COUNT(*) >= 100
+      INNER JOIN latest_prices lp ON lp.ticker = s.ticker
+      INNER JOIN price_stats   ps ON ps.ticker  = s.ticker
+      LEFT  JOIN latest_mktcap lm ON lm.ticker  = s.ticker
+      WHERE s.asset_type = ANY($1)
       ORDER BY s.ticker
     `;
 
