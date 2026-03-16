@@ -467,7 +467,11 @@ Run after market close alongside ML pipeline:
 4. **NewsWeb filings**: `pnpm run newsweb:fetch` — Oslo Børs regulatory filings (insider trades, earnings, buybacks, dividends)
 
 ### Automation
-- **GitHub Actions**: ML pipeline daily at 01:00 UTC, Email import every 10 min
+- **GitHub Actions**:
+  - ML + prices: daily at 16:00 UTC (17:00 CET / after market close)
+  - Email import: every 10 min (research PDFs including Pareto Shipping Daily)
+  - **Shipping midday**: Mon–Fri at 10:00 UTC (11:00 CET / 12:00 CEST) — parses latest Pareto Shipping Daily PDF + fetches Ship & Bunker prices
+  - Seafood: weekly Wednesday 12:00 UTC + monthly 21st
 - **Local**: `pnpm run daily-update` (smart IBKR → Yahoo fallback)
 - **Intelligence data**: Run `shorts:fetch` + `commodities:fetch` + `newsweb:fetch` daily after prices are updated
 

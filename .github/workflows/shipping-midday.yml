@@ -1,0 +1,83 @@
+name: Shipping Midday Pipeline
+
+on:
+  schedule:
+    # 10:00 UTC = 11:00 CET (winter) / 12:00 CEST (summer)
+    # Pareto Shipping Daily is published in the morning; email import
+    # runs every 10 min so the PDF is in the DB well before this runs.
+    - cron: '0 10 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      skip_parse_daily:
+        description: 'Skip Pareto Shipping Daily parse'
+        type: boolean
+        default: false
+      skip_bunker:
+        description: 'Skip Ship & Bunker price fetch'
+        type: boolean
+        default: false
+
+jobs:
+  shipping-midday:
+    name: Pareto Shipping Daily → Bunker Prices
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Create env file
+        working-directory: apps/web
+        run: |
+          echo 'DATABASE_URL="${{ secrets.DATABASE_URL }}"' > .env.local
+
+      # ─── Step 1: Parse Pareto Shipping Daily PDF ─────────────────────
+      # Reads the latest Pareto Shipping Daily from research_documents,
+      # extracts 16+ rate indices (VLCC, Suezmax, BDI, BCI, BDTI, BCTI,
+      # VLGC, LNG, Brent, iron ore, etc.) and writes to shipping_market_rates.
+      - name: "Step 1: Parse Pareto Shipping Daily"
+        if: ${{ github.event.inputs.skip_parse_daily != 'true' }}
+        working-directory: apps/web
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: npx tsx scripts/parse-shipping-daily.ts
+
+      # ─── Step 2: Bunker Prices from Ship & Bunker ────────────────────
+      # Scrapes VLSFO/HSFO/MGO spot prices for Singapore, Rotterdam,
+      # Fujairah and Houston. Stored in shipping_market_rates as usd_per_tonne.
+      - name: "Step 2: Fetch bunker prices (Ship & Bunker)"
+        if: ${{ github.event.inputs.skip_bunker != 'true' }}
+        working-directory: apps/web
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: npx tsx scripts/fetch-bunker-prices.ts
+
+      # ─── Summary ─────────────────────────────────────────────────────
+      - name: Pipeline Summary
+        if: always()
+        run: |
+          echo "## Shipping Midday Pipeline" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Step | Task | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 1 | Pareto Shipping Daily (PDF parse) | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 2 | Bunker prices — SIN/RTM/FUJ/HOU | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time**: $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
