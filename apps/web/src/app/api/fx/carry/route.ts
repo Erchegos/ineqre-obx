@@ -8,6 +8,7 @@
 import { NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { carryTradeMetrics } from "@/lib/fxTerminal";
+import { decomposeCarry } from "@/lib/fxPairCalculations";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -78,6 +79,11 @@ export async function GET(request: Request) {
     // Forward premium/discount time series (simplified: constant rate assumption)
     const forwardPremium = ((nokRate - foreignRate) / (1 + foreignRate)) * 100;
 
+    // Carry decomposition: gross vs net after CP funding costs
+    // Rime, Schrimpf & Syrstad (RFS 2022) Table 1: USD CP-OIS spreads
+    const grossCarryBps = (nokRate - foreignRate) * 10000;
+    const carryDecomposition = decomposeCarry(grossCarryBps);
+
     return NextResponse.json({
       pair,
       foreignCurrency,
@@ -96,6 +102,7 @@ export async function GET(request: Request) {
       spotVol: result.spotVol,
       forwardPremiumPct: forwardPremium,
       cumulativePnl: result.cumulativePnl,
+      carryDecomposition,
     });
   } catch (error: any) {
     console.error("[FX Carry API] Error:", error);

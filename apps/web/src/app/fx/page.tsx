@@ -59,6 +59,13 @@ type ForwardTenor = {
   hedgeCostBps: number;
   nokRate: number;
   foreignRate: number;
+  basisDecomposition?: {
+    oisBasisBps: number;
+    implementableBasisHigh: number;
+    implementableBasisMid: number;
+    hasArbitrageHigh: boolean;
+    hasArbitrageMid: boolean;
+  };
 };
 
 type PortfolioConfig = {
@@ -319,6 +326,16 @@ export default function FXTerminalPage() {
   const [interestRates, setInterestRates] = useState<Record<string, any[]>>({});
   const [carryData, setCarryData] = useState<any>(null);
 
+  /* CIP / Basis state (Rime, Schrimpf & Syrstad 2022) */
+  const [qeWarningDismissed, setQeWarningDismissed] = useState(false);
+  const [basisData, setBasisData] = useState<any>(null);
+  const [basisPair, setBasisPair] = useState("NOKUSD");
+  const [basisTenor, setBasisTenor] = useState("3M");
+  const [basisMode, setBasisMode] = useState<"OIS" | "IMPLEMENTABLE">("OIS");
+  const [fundingRegimes, setFundingRegimes] = useState<any[]>([]);
+  const [arbData, setArbData] = useState<any>(null);
+  const [arbTenor, setArbTenor] = useState("3M");
+
   const [expSort, setExpSort] = useState<{ col: string; asc: boolean }>({ col: "ticker", asc: true });
   const [showHelp, setShowHelp] = useState<Record<string, boolean>>({});
   const [showHowTo, setShowHowTo] = useState(false);
@@ -348,6 +365,7 @@ export default function FXTerminalPage() {
           setRegimes(dash.regimes || {});
           setCorrelationMatrix(dash.correlationMatrix || {});
           setExposureHeatmap(dash.exposureHeatmap || []);
+          setFundingRegimes(dash.fundingRegimes || []);
         }
         setLoading(false);
 
@@ -451,6 +469,25 @@ export default function FXTerminalPage() {
     loadForwards();
   }, [tab, fwdPair]);
 
+  /* Load CIP cross-currency basis series */
+  useEffect(() => {
+    if (tab !== "forwards") return;
+    const sf = async (url: string) => {
+      try { const r = await fetch(url); return r.ok ? r.json() : null; } catch { return null; }
+    };
+    setBasisData(null);
+    sf(`/api/fx/basis?pair=${basisPair}&tenor=${basisTenor}`).then(setBasisData);
+  }, [tab, basisPair, basisTenor]);
+
+  /* Load CIP arb monitor */
+  useEffect(() => {
+    if (tab !== "forwards") return;
+    const sf = async (url: string) => {
+      try { const r = await fetch(url); return r.ok ? r.json() : null; } catch { return null; }
+    };
+    sf(`/api/fx/arb-monitor?tenor=${arbTenor}`).then(setArbData);
+  }, [tab, arbTenor]);
+
   /* Load saved portfolio configs when logged in and on portfolio tab */
   useEffect(() => {
     if (tab !== "portfolio" || !token) return;
@@ -471,6 +508,7 @@ export default function FXTerminalPage() {
 
   /* Hedge calculator */
   const runHedge = useCallback(async () => {
+    setQeWarningDismissed(false);
     try {
       const r = await fetch("/api/fx/hedge-calculator", {
         method: "POST",
@@ -1572,6 +1610,34 @@ export default function FXTerminalPage() {
                 <button style={S.button} onClick={runHedge}>CALCULATE</button>
               </div>
 
+              {/* Quarter-end basis widening warning */}
+              {hedgeResult?.quarterEndWarning?.crosses && !qeWarningDismissed && (
+                <div style={{ marginBottom: 16, padding: "12px 16px", background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.35)", borderRadius: 6, display: "flex", gap: 12, alignItems: "flex-start" }}>
+                  <div style={{ fontSize: 16, flexShrink: 0 }}>⚠</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#f59e0b", marginBottom: 4, letterSpacing: "0.05em" }}>
+                      QUARTER-END CROSSING — {hedgeResult.quarterEndWarning.quarterEndLabel}
+                    </div>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", lineHeight: 1.6 }}>
+                      This tenor crosses a quarter-end ({hedgeResult.quarterEndWarning.daysUntilQE}d away). Banks compress balance sheets for regulatory reporting snapshots, historically widening the cross-currency basis by{" "}
+                      <span style={{ color: "#f59e0b", fontWeight: 700 }}>
+                        {hedgeResult.quarterEndWarning.estimatedBasisWideningBps?.low}–{hedgeResult.quarterEndWarning.estimatedBasisWideningBps?.high} bps
+                      </span>{" "}
+                      (median {hedgeResult.quarterEndWarning.estimatedBasisWideningBps?.median} bps).
+                    </div>
+                    {hedgeResult.quarterEndWarning.recommendation && (
+                      <div style={{ marginTop: 6, fontSize: 10, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>
+                        {hedgeResult.quarterEndWarning.recommendation}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setQeWarningDismissed(true)}
+                    style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 14, flexShrink: 0, padding: 0, lineHeight: 1 }}
+                  >✕</button>
+                </div>
+              )}
+
               {hedgeResult && (
                 <div>
                   {/* ===== EXECUTION ORDER — What exactly to do ===== */}
@@ -2362,6 +2428,26 @@ export default function FXTerminalPage() {
   function renderForwards() {
     return (
       <>
+        {/* CB Funding Regimes — compact strip */}
+        {fundingRegimes.length > 0 && (
+          <div style={{ ...S.card, padding: "10px 14px", marginBottom: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.08em", flexShrink: 0 }}>CB BALANCE SHEET / GDP</span>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: 1 }}>
+                {fundingRegimes.map((r: any) => (
+                  <div key={r.currency} style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 8px", background: "#0d1117", borderRadius: 4, border: `1px solid ${r.color}40` }}>
+                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: r.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 10, fontWeight: 700, color: CCY_COLORS[r.currency] || "#fff" }}>{r.currency}</span>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: "#fff" }}>{r.balanceSheetPctGdp?.toFixed(0)}%</span>
+                    <span style={{ fontSize: 9, color: r.color, fontWeight: 600 }}>{r.regime.split(" ")[0]}</span>
+                  </div>
+                ))}
+              </div>
+              <span style={{ fontSize: 9, color: "rgba(255,255,255,0.2)", flexShrink: 0 }}>Expansive CB regimes compress FX funding spreads</span>
+            </div>
+          </div>
+        )}
+
         {/* Pair selector */}
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16, flexWrap: "wrap" }}>
           <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", flexShrink: 0 }}>PAIR:</span>
@@ -2384,10 +2470,25 @@ export default function FXTerminalPage() {
 
         {/* Forward curve */}
         <div style={S.card}>
-          <div style={S.cardTitle}>FORWARD CURVE &mdash; {PAIR_LABELS[fwdPair]}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+            <div style={{ ...S.cardTitle, marginBottom: 0, flex: 1 }}>FORWARD CURVE &mdash; {PAIR_LABELS[fwdPair]}</div>
+            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+              <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)" }}>BASIS:</span>
+              {(["OIS", "IMPLEMENTABLE"] as const).map(m => (
+                <div
+                  key={m}
+                  onClick={() => setBasisMode(m)}
+                  style={{ ...S.badge, cursor: "pointer", background: basisMode === m ? "rgba(59,130,246,0.2)" : "#0d1117", color: basisMode === m ? "#3b82f6" : "rgba(255,255,255,0.35)", border: basisMode === m ? "1px solid #3b82f6" : "1px solid #30363d", fontSize: 9 }}
+                >
+                  {m}
+                </div>
+              ))}
+            </div>
+          </div>
           <HelpToggle id="fwd-curve-help" label="How are forward rates calculated?" showHelp={showHelp} setShowHelp={setShowHelp}>
             Forward rates are derived from interest rate parity (IRP): the forward price reflects the interest rate differential between the two currencies.
             Hedge cost shows the annualized cost of locking in the forward rate to eliminate currency risk.
+            OIS basis = raw LOOP deviation. IMPLEMENTABLE = after subtracting the CP-OIS funding spread (~19 bps for high-rated banks, Rime et al. 2022).
           </HelpToggle>
           {fwdForwards.length > 0 ? (
             <div style={{ overflowX: "auto" as const }}>
@@ -2403,10 +2504,19 @@ export default function FXTerminalPage() {
                   <th style={S.th}>NOK RATE</th>
                   <th style={S.th}>FOREIGN RATE</th>
                   <th style={S.th}>HEDGE COST</th>
+                  <th style={{ ...S.th, color: "#3b82f6" }}>{basisMode} BASIS</th>
                 </tr>
               </thead>
               <tbody>
-                {fwdForwards.map((f) => (
+                {fwdForwards.map((f) => {
+                  const bd = f.basisDecomposition;
+                  const basisVal = bd
+                    ? basisMode === "OIS"
+                      ? bd.oisBasisBps
+                      : bd.implementableBasisHigh
+                    : null;
+                  const basisColor = basisVal == null ? "rgba(255,255,255,0.4)" : basisVal < -5 ? "#ef4444" : basisVal > 5 ? "#10b981" : "rgba(255,255,255,0.6)";
+                  return (
                   <tr key={f.tenor}>
                     <td style={{ ...S.td, fontWeight: 600 }}>{f.tenor}</td>
                     <td style={S.td}>{f.spot.toFixed(4)}</td>
@@ -2423,8 +2533,15 @@ export default function FXTerminalPage() {
                     <td style={S.td}>{f.nokRate.toFixed(2)}%</td>
                     <td style={S.td}>{f.foreignRate.toFixed(2)}%</td>
                     <td style={S.td}>{fmtBps(f.hedgeCostBps)}</td>
+                    <td style={{ ...S.td, color: basisColor, fontWeight: 600 }}>
+                      {basisVal != null ? `${basisVal >= 0 ? "+" : ""}${basisVal.toFixed(1)} bps` : "—"}
+                      {bd && basisMode === "IMPLEMENTABLE" && bd.hasArbitrageHigh && (
+                        <span title="Positive implementable basis — potential arbitrage for high-rated banks" style={{ marginLeft: 4, color: "#10b981", fontSize: 9 }}>ARB</span>
+                      )}
+                    </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             </div>
@@ -2513,6 +2630,66 @@ export default function FXTerminalPage() {
                   </div>
                 </div>
 
+                {/* Net carry decomposition (Rime et al. 2022 — Table 1 CP-OIS spreads) */}
+                {carryData.carryDecomposition && (
+                  <div style={{ padding: 10, background: "#0d1117", borderRadius: 4, border: "1px solid #21262d", marginBottom: 10 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", marginBottom: 8 }}>NET CARRY AFTER FUNDING (RIME ET AL. 2022)</div>
+                    <table style={{ ...S.table, marginBottom: 0 }}>
+                      <thead>
+                        <tr>
+                          <th style={S.th}>CARRY TYPE</th>
+                          <th style={{ ...S.th, textAlign: "right" as const }}>VALUE</th>
+                          <th style={{ ...S.th, textAlign: "right" as const }}>STATUS</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          {
+                            label: "GROSS CARRY (OIS)",
+                            value: carryData.carryDecomposition.grossCarryBps,
+                            desc: "Interest rate differential",
+                            attractive: null,
+                          },
+                          {
+                            label: "NET (HIGH-RATED BANK)",
+                            value: carryData.carryDecomposition.netCarryHighRatedBps,
+                            desc: "−19 bps CP-OIS (A-1/P-1)",
+                            attractive: carryData.carryDecomposition.isAttractiveHighRated,
+                          },
+                          {
+                            label: "NET (MID-RATED BANK)",
+                            value: carryData.carryDecomposition.netCarryMidRatedBps,
+                            desc: "−36 bps CP-OIS (A-2/P-2)",
+                            attractive: carryData.carryDecomposition.isAttractiveMidRated,
+                          },
+                        ].map(row => (
+                          <tr key={row.label}>
+                            <td style={S.td}>
+                              <div style={{ fontSize: 10, fontWeight: 600 }}>{row.label}</div>
+                              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)" }}>{row.desc}</div>
+                            </td>
+                            <td style={{ ...S.td, textAlign: "right" as const, fontWeight: 700, color: (row.value ?? 0) > 0 ? "#10b981" : "#ef4444" }}>
+                              {row.value != null ? `${row.value >= 0 ? "+" : ""}${row.value.toFixed(1)} bps` : "—"}
+                            </td>
+                            <td style={{ ...S.td, textAlign: "right" as const }}>
+                              {row.attractive === null ? (
+                                <span style={{ ...S.badge, background: "rgba(59,130,246,0.15)", color: "#3b82f6" }}>GROSS</span>
+                              ) : row.attractive ? (
+                                <span style={{ ...S.badge, background: "rgba(16,185,129,0.15)", color: "#10b981" }}>ATTRACTIVE</span>
+                              ) : (
+                                <span style={{ ...S.badge, background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>UNATTRACTIVE</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div style={{ marginTop: 6, fontSize: 9, color: "rgba(255,255,255,0.3)", lineHeight: 1.5 }}>
+                      Break-even funding spread: {carryData.carryDecomposition.breakEvenSpreadBps} bps. CP-OIS from Rime, Schrimpf &amp; Syrstad (2022) Table 1.
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ padding: 10, background: "#0d1117", borderRadius: 4, border: "1px solid #21262d", marginBottom: 14 }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", marginBottom: 6 }}>RATE DIFFERENTIAL BREAKDOWN</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
@@ -2569,6 +2746,135 @@ export default function FXTerminalPage() {
               <div style={S.dim}>Loading carry data...</div>
             )}
           </div>
+        </div>
+
+        {/* CIP Arbitrage Monitor (Rime, Schrimpf & Syrstad 2022 — Section 2.1, Table 3) */}
+        <div style={S.card}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+            <div style={{ ...S.cardTitle, marginBottom: 0, flex: 1 }}>CIP ARBITRAGE MONITOR</div>
+            <div style={{ display: "flex", gap: 4 }}>
+              {["1M", "3M", "6M"].map(t => (
+                <div
+                  key={t}
+                  onClick={() => setArbTenor(t)}
+                  style={{ ...S.badge, cursor: "pointer", background: arbTenor === t ? "rgba(59,130,246,0.2)" : "#0d1117", color: arbTenor === t ? "#3b82f6" : "rgba(255,255,255,0.4)", border: arbTenor === t ? "1px solid #3b82f6" : "1px solid #30363d" }}
+                >
+                  {t}
+                </div>
+              ))}
+            </div>
+          </div>
+          <HelpToggle id="arb-monitor-help" label="What is CIP arbitrage?" showHelp={showHelp} setShowHelp={setShowHelp}>
+            CIP arbitrage profit = forward premium minus the cost of dollar funding (OIS + CP-OIS spread). High-rated banks (A-1/P-1) pay ~19 bps above OIS; mid-rated (A-2/P-2) pay ~36 bps (Rime et al. 2022, Table 1). Positive profit signals a genuine covered interest arbitrage opportunity, though balance-sheet constraints may prevent exploitation.
+          </HelpToggle>
+          {arbData?.results ? (
+            <div style={{ overflowX: "auto" as const }}>
+              <table style={S.table}>
+                <thead>
+                  <tr>
+                    <th style={S.th}>PAIR</th>
+                    <th style={{ ...S.th, textAlign: "right" as const }}>SPOT</th>
+                    <th style={{ ...S.th, textAlign: "right" as const }}>FWD PREMIUM</th>
+                    <th style={{ ...S.th, textAlign: "right" as const }}>OIS BASIS</th>
+                    <th style={{ ...S.th, textAlign: "right" as const }}>ARB PROFIT (HIGH)</th>
+                    <th style={{ ...S.th, textAlign: "right" as const }}>ARB PROFIT (MID)</th>
+                    <th style={{ ...S.th, textAlign: "center" as const }}>SIGNAL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {arbData.results.map((p: any) => {
+                    const signalColor = p.signal === "POSITIVE_ARB" ? "#10b981" : p.signal === "MARGINAL" ? "#f59e0b" : "rgba(255,255,255,0.4)";
+                    const signalLabel = p.signal === "POSITIVE_ARB" ? "POSITIVE ARB" : p.signal === "MARGINAL" ? "MARGINAL" : "NO ARB";
+                    return (
+                      <tr key={p.pair}>
+                        <td style={{ ...S.td, fontWeight: 600, color: CCY_COLORS[p.pair.replace("NOK", "")] || "#fff" }}>
+                          {PAIR_LABELS[p.pair] || p.pair}
+                        </td>
+                        <td style={{ ...S.td, textAlign: "right" as const }}>{p.spot?.toFixed(4)}</td>
+                        <td style={{ ...S.td, textAlign: "right" as const, color: (p.forwardPremiumBps ?? 0) > 0 ? "#10b981" : "#ef4444" }}>
+                          {p.forwardPremiumBps != null ? `${p.forwardPremiumBps >= 0 ? "+" : ""}${p.forwardPremiumBps.toFixed(1)} bps` : "—"}
+                        </td>
+                        <td style={{ ...S.td, textAlign: "right" as const, color: (p.oisBasisBps ?? 0) < 0 ? "#ef4444" : "#10b981" }}>
+                          {p.oisBasisBps != null ? `${p.oisBasisBps >= 0 ? "+" : ""}${p.oisBasisBps.toFixed(1)} bps` : "—"}
+                        </td>
+                        <td style={{ ...S.td, textAlign: "right" as const, fontWeight: 700, color: (p.arbProfitHighRatedBps ?? 0) > 0 ? "#10b981" : "#ef4444" }}>
+                          {p.arbProfitHighRatedBps != null ? `${p.arbProfitHighRatedBps >= 0 ? "+" : ""}${p.arbProfitHighRatedBps.toFixed(1)} bps` : "—"}
+                        </td>
+                        <td style={{ ...S.td, textAlign: "right" as const, color: (p.arbProfitMidRatedBps ?? 0) > 0 ? "#10b981" : "#ef4444" }}>
+                          {p.arbProfitMidRatedBps != null ? `${p.arbProfitMidRatedBps >= 0 ? "+" : ""}${p.arbProfitMidRatedBps.toFixed(1)} bps` : "—"}
+                        </td>
+                        <td style={{ ...S.td, textAlign: "center" as const }}>
+                          <span style={{ ...S.badge, background: `${signalColor}18`, color: signalColor, border: `1px solid ${signalColor}40` }}>
+                            {signalLabel}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <div style={{ marginTop: 8, fontSize: 9, color: "rgba(255,255,255,0.3)", lineHeight: 1.5 }}>
+                ARB PROFIT = forward premium − (USD OIS rate + CP-OIS spread − foreign CB deposit rate). Positive &gt;5 bps = POSITIVE ARB. 0–5 bps = MARGINAL.
+              </div>
+
+              {/* Collapsible beginner glossary */}
+              <HelpToggle id="arb-glossary" label="Explain CIP, OIS and CP-OIS in plain English" showHelp={showHelp} setShowHelp={setShowHelp}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+                  <div>
+                    <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 4, fontSize: 11 }}>What is CIP — Covered Interest Parity?</div>
+                    <div style={{ lineHeight: 1.7 }}>
+                      CIP is a fundamental rule of finance: if you borrow in one currency, swap it into another, invest it, then swap back at the end — you should break even. No free lunch.<br/>
+                      <span style={{ color: "rgba(255,255,255,0.5)" }}>Example: Borrow USD → convert to NOK via FX swap → invest in NOK → convert back to USD at a pre-agreed rate. If CIP holds perfectly, the gain from the higher NOK interest rate is exactly offset by the cost of the FX swap. The "basis" measures how far reality deviates from this ideal.</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 4, fontSize: 11 }}>What is the Forward Premium?</div>
+                    <div style={{ lineHeight: 1.7 }}>
+                      The forward rate is a pre-agreed exchange rate for a future date. The forward premium is how much more expensive (or cheaper) the forward rate is vs. the current spot rate, expressed as an annual percentage in basis points (100 bps = 1%).<br/>
+                      <span style={{ color: "rgba(255,255,255,0.5)" }}>For USD/NOK at +38 bps: if you agree today to buy USD in 6 months, it costs you about 0.38% per year more than buying USD right now. This reflects the fact that NOK interest rates are currently lower than USD rates.</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 4, fontSize: 11 }}>What is the OIS Rate?</div>
+                    <div style={{ lineHeight: 1.7 }}>
+                      OIS stands for Overnight Index Swap. It is the market&apos;s best estimate of the risk-free borrowing rate for a given currency over a period — essentially the average expected central bank rate. USD OIS tracks SOFR (the rate US banks pay each other overnight).<br/>
+                      <span style={{ color: "rgba(255,255,255,0.5)" }}>The OIS rate is considered near-risk-free. USD OIS is currently around 4.5%. This is the baseline cost of funding in dollars before any bank credit premium is added.</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 4, fontSize: 11 }}>What is the CP-OIS Spread?</div>
+                    <div style={{ lineHeight: 1.7 }}>
+                      Most banks do not borrow at the pure OIS rate. They borrow by issuing short-term commercial paper (CP) — essentially short-term IOUs sold to money market funds. The CP rate is always somewhat above OIS because investors demand a small premium for lending to a bank rather than a central bank.<br/>
+                      <span style={{ color: "rgba(255,255,255,0.5)" }}>High-rated banks (strongest credit, A-1/P-1 rating): ~19 bps above OIS.<br/>Mid-rated banks (A-2/P-2 rating): ~36 bps above OIS.<br/>So a high-rated bank borrowing USD for 6 months pays roughly 4.5% + 0.19% = 4.69% per year.</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 4, fontSize: 11 }}>Why does the table show NO ARB everywhere?</div>
+                    <div style={{ lineHeight: 1.7 }}>
+                      For a CIP arbitrage to work, the forward premium must exceed the cost of funding in USD. Currently USD rates (~4.5%) are much higher than NOK rates (~4.5% too, but the forward premium reflects only the small differential). After paying the CP-OIS funding spread on top, the total USD funding cost (~4.7%) swamps any profit from the trade.<br/>
+                      <span style={{ color: "rgba(255,255,255,0.5)" }}>CIP deviations that generate real profit are rare and typically only appear during credit stress events (like March 2020 or quarter-ends) when the basis widens sharply. In normal times, the numbers here will show NO ARB — which is the expected, healthy result.</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 4, fontSize: 11 }}>What is the OIS Basis (CIP Deviation)?</div>
+                    <div style={{ lineHeight: 1.7 }}>
+                      The OIS basis measures how far the forward premium deviates from the pure interest rate differential. A perfectly functioning market would give a basis of exactly 0. A negative basis (the common case) means FX swaps are relatively cheap — banks implicitly subsidise dollar funding via the swap market rather than issuing CP directly.<br/>
+                      <span style={{ color: "rgba(255,255,255,0.5)" }}>The small negative numbers here (−1 to −5 bps) are typical of a well-functioning market. During the 2008 crisis or COVID-19 shock, this number reached −100 bps or more.</span>
+                    </div>
+                  </div>
+
+                </div>
+              </HelpToggle>
+            </div>
+          ) : (
+            <div style={S.dim}>Loading arbitrage data... (Ensure interest_rates table is seeded)</div>
+          )}
         </div>
       </>
     );

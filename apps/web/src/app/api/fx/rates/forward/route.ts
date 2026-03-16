@@ -8,6 +8,7 @@
 import { NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { calculateHedgeCostAndBreakeven } from "@/lib/fxTerminal";
+import { calculateCrossCurrencyBasis, decomposeBasis } from "@/lib/fxPairCalculations";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -81,6 +82,11 @@ export async function GET(request: Request) {
 
       const hedge = calculateHedgeCostAndBreakeven(spot, nokRate, foreignRate, 1.0, days);
 
+      // Cross-currency basis and decomposition
+      // Rime, Schrimpf & Syrstad (RFS 2022) — LOOP basis formula
+      const oisBasisBps = calculateCrossCurrencyBasis(spot, hedge.forwardRate, foreignRate, nokRate, days);
+      const basisDecomposition = decomposeBasis(oisBasisBps);
+
       return {
         tenor: label,
         days,
@@ -93,6 +99,7 @@ export async function GET(request: Request) {
         breakEvenPct: hedge.breakEvenPct,
         nokRate: nokRate * 100,
         foreignRate: foreignRate * 100,
+        basisDecomposition,
       };
     });
 

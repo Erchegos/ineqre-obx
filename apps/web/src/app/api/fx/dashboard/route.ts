@@ -205,6 +205,60 @@ export async function GET() {
       sek: parseFloat(r.net_sek_pct),
     }));
 
+    // Funding regime: CB balance sheet / GDP classification
+    // Rime, Schrimpf & Syrstad (RFS 2022) Table 4:
+    //   Large CB balance sheets compress domestic funding spreads and widen the cross-currency basis.
+    let fundingRegimes: object[] = [];
+    try {
+      const cbResult = await pool.query<{
+        currency: string;
+        cb_name: string;
+        balance_sheet_pct_gdp: string;
+        as_of_date: string;
+      }>(
+        `SELECT DISTINCT ON (currency) currency, cb_name, balance_sheet_pct_gdp, as_of_date::text
+         FROM cb_balance_sheets
+         ORDER BY currency, as_of_date DESC`
+      );
+
+      fundingRegimes = cbResult.rows.map((r) => {
+        const pct = parseFloat(r.balance_sheet_pct_gdp);
+        let regime: string;
+        let color: string;
+        let implication: string;
+        if (pct > 80) {
+          regime = "HIGHLY EXPANSIVE";
+          color = "#10b981";
+          implication = "Excess reserves compress local funding costs; strong synthetic USD swap demand";
+        } else if (pct > 40) {
+          regime = "EXPANSIVE";
+          color = "#3b82f6";
+          implication = "Funding costs moderately compressed; elevated FX swap activity";
+        } else if (pct > 15) {
+          regime = "NEUTRAL";
+          color = "#9e9e9e";
+          implication = "Normal funding conditions; standard swap demand";
+        } else {
+          regime = "TIGHT";
+          color = "#ef4444";
+          implication = "Funding expensive; low CB excess reserves; less swap demand";
+        }
+        return {
+          currency: r.currency,
+          cbName: r.cb_name,
+          balanceSheetPctGdp: pct,
+          asOfDate: r.as_of_date,
+          regime,
+          regimeLabel: `${pct.toFixed(0)}% of GDP`,
+          color,
+          implication,
+        };
+      });
+    } catch {
+      // Table may not exist yet — graceful degradation
+      fundingRegimes = [];
+    }
+
     return NextResponse.json({
       status: "ok",
       rateCards,
@@ -213,6 +267,7 @@ export async function GET() {
       regimes,
       correlationMatrix,
       exposureHeatmap,
+      fundingRegimes,
     });
   } catch (error: any) {
     console.error("[FX Dashboard API] Error:", error);

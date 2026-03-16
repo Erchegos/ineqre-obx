@@ -569,3 +569,78 @@ function stdDev(values: number[]): number {
   const variance = values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / (values.length - 1);
   return Math.sqrt(variance);
 }
+
+// ============================================================================
+// QUARTER-END DATE HELPERS
+// Rime, Schrimpf & Syrstad (RFS 2022) — Table 7:
+// CIP basis widens 40–71 bps at quarter-end as global banks window-dress
+// leverage ratio exposures for regulatory reporting snapshots.
+// ============================================================================
+
+/** Returns the next quarter-end date (Mar 31 / Jun 30 / Sep 30 / Dec 31) from a given date */
+export function getNextQuarterEnd(fromDate: Date): Date {
+  const y = fromDate.getFullYear();
+  const m = fromDate.getMonth(); // 0-indexed
+  // Quarter-end months: 2 (Mar), 5 (Jun), 8 (Sep), 11 (Dec)
+  const qEnds = [
+    new Date(y, 2, 31),
+    new Date(y, 5, 30),
+    new Date(y, 8, 30),
+    new Date(y, 11, 31),
+    new Date(y + 1, 2, 31), // next year Q1
+  ];
+  // First QE strictly after fromDate
+  return qEnds.find((d) => d > fromDate) ?? new Date(y + 1, 2, 31);
+}
+
+/** Returns the next N quarter-end dates from a given date */
+export function getUpcomingQuarterEnds(fromDate: Date, count: number): Date[] {
+  const results: Date[] = [];
+  let current = fromDate;
+  for (let i = 0; i < count; i++) {
+    const next = getNextQuarterEnd(current);
+    results.push(next);
+    current = new Date(next.getTime() + 86400000); // day after
+  }
+  return results;
+}
+
+/**
+ * Returns whether [startDate, startDate + tenorDays] crosses a quarter-end.
+ * Rime et al. (RFS 2022): basis widens 40–71 bps when settlement straddles QE.
+ */
+export function hedgeCrossesQuarterEnd(
+  startDate: Date,
+  tenorDays: number
+): { crosses: boolean; quarterEndDate: Date | null; daysUntilQE: number | null } {
+  const endDate = new Date(startDate.getTime() + tenorDays * 86400000);
+  const nextQE = getNextQuarterEnd(startDate);
+  if (nextQE <= endDate) {
+    const daysUntilQE = Math.round((nextQE.getTime() - startDate.getTime()) / 86400000);
+    return { crosses: true, quarterEndDate: nextQE, daysUntilQE };
+  }
+  return { crosses: false, quarterEndDate: null, daysUntilQE: null };
+}
+
+/** Format a quarter-end date as "Q1 2026 end (Mar 31)" */
+export function quarterEndLabel(date: Date): string {
+  const m = date.getMonth(); // 0-indexed
+  const y = date.getFullYear();
+  const qMap: Record<number, { q: string; label: string }> = {
+    2: { q: "Q1", label: "Mar 31" },
+    5: { q: "Q2", label: "Jun 30" },
+    8: { q: "Q3", label: "Sep 30" },
+    11: { q: "Q4", label: "Dec 31" },
+  };
+  const info = qMap[m];
+  if (!info) return date.toISOString().slice(0, 10);
+  return `${info.q} ${y} end (${info.label})`;
+}
+
+/**
+ * Historical average basis widening at quarter-end.
+ * Source: Rime, Schrimpf & Syrstad (RFS 2022) — Table 7.
+ */
+export function quarterEndBasisWidening(): { low: number; high: number; median: number } {
+  return { low: 40, high: 71, median: 55 };
+}

@@ -639,6 +639,105 @@ export function validateIRP(
 }
 
 // ============================================================================
+// 11b. CIP / BASIS ANALYTICS
+// Rime, Schrimpf & Syrstad (RFS 2022)
+// ============================================================================
+
+/**
+ * Cross-currency basis in bps.
+ * Formula: basis_bps = [(F/S) × (1 + r_foreign) − (1 + r_NOK)] × 10000
+ * A negative basis means USD funding is more expensive than IRP suggests
+ * (typical for non-US banks paying a premium for synthetic USD).
+ *
+ * Note: this is the LOOP-based basis (same-risk, balance-sheet neutral).
+ * Rime et al. (RFS 2022) Section 2.2.
+ */
+export function calculateCrossCurrencyBasis(
+  spot: number,
+  forward: number,
+  rForeign: number, // annualized decimal (e.g. 0.05 = 5%)
+  rNOK: number,
+  tenorDays: number
+): number {
+  if (spot <= 0 || tenorDays <= 0) return 0;
+  const tau = tenorDays / 365;
+  // Compute implied foreign rate from forward: F/S = (1+r_NOK×τ)/(1+r_impl×τ)
+  // Basis = [(F/S)×(1+r_foreign×τ) - (1+r_NOK×τ)] × (1/τ) × 10000
+  const fOverS = forward / spot;
+  const basisDecimal = (fOverS * (1 + rForeign * tau) - (1 + rNOK * tau)) / tau;
+  return basisDecimal * 10000;
+}
+
+/**
+ * Decompose OIS basis into implementable (post-CP-funding-cost) basis.
+ *
+ * The OIS basis overstates actual arbitrage profit because it ignores the
+ * CP-OIS funding spread banks pay above OIS to raise USD in the CP market.
+ *
+ * Static offsets from Rime, Schrimpf & Syrstad (RFS 2022) Table 1:
+ *   High-rated (A-1/P-1): CP-OIS spread ~19 bps
+ *   Mid-rated  (A-2/P-2): CP-OIS spread ~36 bps
+ */
+export function decomposeBasis(oisBasisBps: number): {
+  oisBasis: number;
+  cpOisSpreadHigh: number;   // 19 bps — Rime et al. Table 1, high-rated (A-1/P-1)
+  cpOisSpreadMid: number;    // 36 bps — Rime et al. Table 1, mid-rated (A-2/P-2)
+  implementableBasisHigh: number;
+  implementableBasisMid: number;
+  hasArbitrageHigh: boolean; // only positive implementable basis = true arbitrage
+  hasArbitrageMid: boolean;
+} {
+  // Rime, Schrimpf & Syrstad (RFS 2022) Table 1: USD CP-OIS spread
+  const CP_OIS_HIGH = 19; // bps, A-1/P-1 rated banks
+  const CP_OIS_MID  = 36; // bps, A-2/P-2 rated banks
+  return {
+    oisBasis: oisBasisBps,
+    cpOisSpreadHigh: CP_OIS_HIGH,
+    cpOisSpreadMid: CP_OIS_MID,
+    implementableBasisHigh: oisBasisBps - CP_OIS_HIGH,
+    implementableBasisMid:  oisBasisBps - CP_OIS_MID,
+    hasArbitrageHigh: oisBasisBps > CP_OIS_HIGH,
+    hasArbitrageMid:  oisBasisBps > CP_OIS_MID,
+  };
+}
+
+/**
+ * Gross vs net carry after realistic CP funding costs.
+ *
+ * Gross carry = r_NOK − r_foreign (OIS differential, bps)
+ * Net carry   = Gross − CP_OIS_spread (bank must fund at CP, not OIS)
+ * Economically attractive if net carry > bid-ask spread (~10 bps round-trip).
+ *
+ * Rime, Schrimpf & Syrstad (RFS 2022) Table 1.
+ */
+export function decomposeCarry(grossCarryBps: number): {
+  grossCarryBps: number;
+  cpOisSpreadHigh: number;
+  cpOisSpreadMid: number;
+  netCarryHighRatedBps: number;
+  netCarryMidRatedBps: number;
+  isAttractiveHighRated: boolean; // net > 10 bps (post bid-ask)
+  isAttractiveMidRated: boolean;
+  breakEvenSpreadBps: number;     // minimum gross carry to break even for high-rated
+} {
+  const CP_OIS_HIGH = 19; // bps — Rime et al. Table 1
+  const CP_OIS_MID  = 36; // bps — Rime et al. Table 1
+  const BID_ASK     = 10; // bps round-trip — market convention
+  const netHigh = grossCarryBps - CP_OIS_HIGH;
+  const netMid  = grossCarryBps - CP_OIS_MID;
+  return {
+    grossCarryBps,
+    cpOisSpreadHigh: CP_OIS_HIGH,
+    cpOisSpreadMid: CP_OIS_MID,
+    netCarryHighRatedBps: netHigh,
+    netCarryMidRatedBps: netMid,
+    isAttractiveHighRated: netHigh > BID_ASK,
+    isAttractiveMidRated: netMid > BID_ASK,
+    breakEvenSpreadBps: CP_OIS_HIGH + BID_ASK,
+  };
+}
+
+// ============================================================================
 // 12. OUTPUT REQUIREMENTS
 // ============================================================================
 

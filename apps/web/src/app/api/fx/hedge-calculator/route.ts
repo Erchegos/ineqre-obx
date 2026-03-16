@@ -8,7 +8,7 @@
 
 import { NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { calculateHedgeCostAndBreakeven } from "@/lib/fxTerminal";
+import { calculateHedgeCostAndBreakeven, hedgeCrossesQuarterEnd, quarterEndLabel, quarterEndBasisWidening } from "@/lib/fxTerminal";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -150,6 +150,21 @@ export async function POST(request: Request) {
       alternativeExplanation = "Zero-cost collar: buy a put (floor) and sell a call (cap) at offsetting premiums. Protects downside but caps upside within a range.";
     }
 
+    // Quarter-end crossing check
+    // Rime, Schrimpf & Syrstad (RFS 2022) — Table 7: basis widens 40–71 bps at QE
+    const qeCheck = hedgeCrossesQuarterEnd(new Date(), days);
+    const bpsWidening = quarterEndBasisWidening();
+    const quarterEndWarning = {
+      crosses: qeCheck.crosses,
+      quarterEndDate: qeCheck.quarterEndDate ? qeCheck.quarterEndDate.toISOString().slice(0, 10) : null,
+      quarterEndLabel: qeCheck.quarterEndDate ? quarterEndLabel(qeCheck.quarterEndDate) : null,
+      daysUntilQE: qeCheck.daysUntilQE,
+      estimatedBasisWideningBps: qeCheck.crosses ? bpsWidening : null,
+      recommendation: qeCheck.crosses
+        ? `Consider: (1) shorten tenor to mature before ${qeCheck.quarterEndDate ? quarterEndLabel(qeCheck.quarterEndDate) : "quarter-end"}, (2) price in ~${bpsWidening.median} bps basis widening, (3) re-hedge after quarter-turn when spreads normalize.`
+        : null,
+    };
+
     return NextResponse.json({
       ticker: ticker?.toUpperCase() || null,
       currency: ccy,
@@ -168,6 +183,7 @@ export async function POST(request: Request) {
       netExposure,
       volReductionPct: volReduction,
       scenarios,
+      quarterEndWarning,
       // Execution details
       execution: {
         action: netExposure > 0 ? "SELL" : "BUY",

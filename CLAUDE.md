@@ -164,14 +164,17 @@ All endpoints in `apps/web/src/app/api/`
 |----------|---------|
 | `GET /api/fx-pairs` | FX pair data (legacy, still active) |
 | `GET /api/fx-hedging/exposures` | FX exposure analysis (legacy) |
-| `GET /api/fx/dashboard` | FX Terminal dashboard: rates, TWI, correlations, regimes, exposure heatmap |
-| `GET /api/fx/rates/forward?pair=NOKUSD` | Forward rates at 1M/3M/6M/12M via covered IRP |
+| `GET /api/fx/dashboard` | FX Terminal dashboard: rates, TWI, correlations, regimes, exposure heatmap, **+ fundingRegimes** (CB balance sheet / GDP per currency) |
+| `GET /api/fx/rates/forward?pair=NOKUSD` | Forward rates at 1M/3M/6M/12M via covered IRP, **+ basisDecomposition** per tenor (OIS basis, implementable basis, arb flags) |
 | `GET /api/fx/sensitivity/[ticker]` | Multi-currency regression betas + fundamental exposure + divergences |
 | `GET /api/fx/exposure/[ticker]` | Revenue/cost breakdown from fx_fundamental_exposure |
 | `POST /api/fx/portfolio` | Portfolio FX VaR, weighted exposure, stress scenarios (body: tickers + weights) |
 | `POST /api/fx/hedge-calculator` | Forward hedge P&L scenarios, cost, break-even (body: ticker + params) |
-| `GET /api/fx/carry?pair=NOKUSD&days=252` | Carry trade metrics: carry, Sharpe, cumulative P&L |
+| `GET /api/fx/carry?pair=NOKUSD&days=252` | Carry trade metrics: carry, Sharpe, cumulative P&L, **+ carryDecomposition** (gross/net-high/net-mid bps, CP-OIS from Rime et al. 2022 Table 1) |
 | `GET /api/fx/interest-rates` | Current rates per currency/tenor from interest_rates table |
+| `GET /api/fx/basis?pair=NOKUSD&tenor=3M` | 90-day cross-currency basis (CIP deviation) series + summary (current, avg30d, pct rank) |
+| `GET /api/fx/arb-monitor?tenor=3M` | CIP arbitrage profit per pair: forward premium − (OIS + CP-OIS − foreign CB deposit); signal POSITIVE_ARB / MARGINAL / NO_ARB |
+| `POST /api/fx/hedge-calculator` | Forward hedge P&L + **+ quarterEndWarning** (crosses QE, days until, basis widening 40-71 bps estimate) |
 
 ### Seafood APIs
 | Endpoint | Purpose |
@@ -238,8 +241,8 @@ All in `apps/web/src/lib/`
 | `factors.ts` | Momentum (1m/6m/11m/36m), volatility, fundamentals |
 | `factorAdvanced.ts` | Advanced ML-related factor derivations |
 | `fxHedging.ts` | FX exposure, hedge ratios, carry trade P&L |
-| `fxPairCalculations.ts` | Forward pricing, Interest Rate Parity |
-| `fxTerminal.ts` | Multi-currency OLS regression, NOK TWI, portfolio FX VaR, carry trade metrics, hedge cost/break-even |
+| `fxPairCalculations.ts` | Forward pricing, IRP, **+ calculateCrossCurrencyBasis** (LOOP deviation bps), **+ decomposeBasis** (OIS vs implementable, arb flags), **+ decomposeCarry** (gross/net carry after CP-OIS funding cost) |
+| `fxTerminal.ts` | Multi-currency OLS regression, NOK TWI, portfolio FX VaR, carry trade metrics, hedge cost/break-even, **+ quarter-end utilities** (getNextQuarterEnd, hedgeCrossesQuarterEnd, quarterEndBasisWidening — 40/71/55 bps from Rime et al. 2022 Table 7) |
 | `riskManagement.ts` | Position sizing, portfolio risk, drawdown tracking |
 | `positionSizing.ts` | Kelly criterion, volatility-adjusted sizing |
 | `stdChannelStrategy.ts` | Std channel trading strategy backtesting |
@@ -363,6 +366,7 @@ Schema files in `packages/db/src/schema/`
 | `fxCurrencyBetas` | Rolling single-pair currency betas |
 | `fxOptimalHedges` | Optimal hedge ratios |
 | `fxMarketRegimes` | Market regime classification |
+| `cb_balance_sheets` | Central bank balance sheet / GDP ratios by currency (USD/EUR/JPY/GBP/CHF/NOK); regime classification per Rime et al. (2022) Table 4 |
 
 ### Options Data
 | Table | Purpose |
@@ -517,6 +521,7 @@ Run after market close alongside ML pipeline:
 | `fetch-bunker-prices.ts` | Scrape VLSFO/HSFO/MGO bunker prices from Ship & Bunker (Singapore/Rotterdam/Fujairah/Houston), store in `shipping_market_rates` as usd_per_tonne |
 | `fetch-fishpool-reports.ts` | Fetch Fish Pool SISALMON + Price Status PDFs from IMAP, parse spot prices by weight class, forward curve, export volumes |
 | `parse-pareto-seafood.ts` | Parse Pareto Seafood Weekly PDFs from research portal for quarterly salmon price estimates (NOK/EUR/supply growth) |
+| `seed-cb-balance-sheets.ts` | Seed CB balance sheet / GDP ratios for 6 currencies (Fed/ECB/BoJ/BoE/SNB/NB); regime thresholds from Rime et al. (2022) Table 4 |
 | `seed-harvest-data.ts` | Seed wellboat fleet (~30 vessels) and slaughterhouse locations (~18 plants) |
 | `lookup-harvest-mmsi.ts` | Resolve wellboat names → MMSI via Digitraffic + manual lookup |
 | `fetch-harvest-positions.ts` | AIS-based trip detection: proximity state machine (farm→slaughterhouse) with spot price matching |
@@ -605,6 +610,8 @@ pnpm run harvest:track            # Run AIS trip detection (long-running)
 pnpm run harvest:aggregate        # Aggregate quarterly harvest estimates
 pnpm run fx:seed-exposures        # Seed FX fundamental exposures (23 companies)
 pnpm run fx:seed-rates            # Seed interest rates (NOK/USD/EUR/GBP/SEK/DKK)
+pnpm run fx:seed-cb               # Seed CB balance sheet / GDP ratios (6 currencies)
+pnpm run fx:seed-cb:dry           # Dry run
 pnpm run fx:regression            # Run FX multi-currency regression pipeline
 pnpm run fx:regression:dry        # Dry run (no DB writes)
 ```
