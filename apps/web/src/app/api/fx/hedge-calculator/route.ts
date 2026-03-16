@@ -107,7 +107,7 @@ export async function POST(request: Request) {
         newSpot,
         unhedgedPnl,
         hedgedPnl: spotPnl + hedgePnl - hedgeCost,
-        savings: unhedgedPnl - (spotPnl + hedgePnl - hedgeCost),
+        savings: (spotPnl + hedgePnl - hedgeCost) - unhedgedPnl,
       };
     });
 

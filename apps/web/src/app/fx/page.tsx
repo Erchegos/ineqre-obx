@@ -321,6 +321,10 @@ export default function FXTerminalPage() {
 
   const [expSort, setExpSort] = useState<{ col: string; asc: boolean }>({ col: "ticker", asc: true });
   const [showHelp, setShowHelp] = useState<Record<string, boolean>>({});
+  const [showHowTo, setShowHowTo] = useState(false);
+  const [hedgeChartMouse, setHedgeChartMouse] = useState<{ x: number; idx: number } | null>(null);
+  const [sensChartMode, setSensChartMode] = useState<"statistical" | "fundamental">("statistical");
+  const [sensChartMouse, setSensChartMouse] = useState<{ x: number; pct: number } | null>(null);
 
   /* Ref to track whether hedge calc has been auto-run for the current company load */
   const hedgeAutoRanRef = useRef<string>("");
@@ -1144,6 +1148,143 @@ export default function FXTerminalPage() {
               )}
             </div>
 
+            {/* ===== FX WEIGHTED EXPOSURE IMPACT CHART ===== */}
+            {sensDetail.fundamental && (() => {
+              // Only show currencies with meaningful net exposure
+              const allCcys = ["usd", "eur", "gbp", "sek"] as const;
+              const fxMoves = [-20, -15, -10, -5, 0, 5, 10, 15, 20];
+              const series = allCcys
+                .map((key) => {
+                  const netExp = (sensDetail.fundamental.revenue[key] ?? 0) - (sensDetail.fundamental.cost[key] ?? 0);
+                  return {
+                    ccy: key.toUpperCase(),
+                    color: CCY_COLORS[key.toUpperCase()] ?? "rgba(255,255,255,0.4)",
+                    netExp,
+                    // earnings impact % = net exposure (fraction) × FX move %
+                    pts: fxMoves.map((m) => ({ x: m, y: netExp * m })),
+                  };
+                })
+                .filter((s) => Math.abs(s.netExp) >= 0.01); // skip near-zero
+
+              // Combined total impact
+              const combinedPts = fxMoves.map((m, i) => ({ x: m, y: series.reduce((sum, s) => sum + s.pts[i].y, 0) }));
+
+              const W = 600, H = 160, PL = 46, PR = 12, PT = 12, PB = 26;
+              const cW = W - PL - PR, cH = H - PT - PB;
+              const allVals = [...series.flatMap((s) => s.pts.map((p) => p.y)), ...combinedPts.map((p) => p.y)];
+              const rawMin = Math.min(...allVals), rawMax = Math.max(...allVals);
+              const pad = (rawMax - rawMin) * 0.12 || 0.5;
+              const yMin = rawMin - pad, yMax = rawMax + pad;
+              const toX = (v: number) => PL + ((v + 20) / 40) * cW;
+              const toY = (v: number) => PT + (1 - (v - yMin) / (yMax - yMin)) * cH;
+              const zeroY = toY(0);
+              const curvePath = (pts: { x: number; y: number }[]) => {
+                if (pts.length < 2) return "";
+                let d = `M ${toX(pts[0].x)} ${toY(pts[0].y)}`;
+                for (let i = 1; i < pts.length; i++) {
+                  const x0 = toX(pts[i - 1].x), y0 = toY(pts[i - 1].y);
+                  const x1 = toX(pts[i].x), y1 = toY(pts[i].y);
+                  d += ` C ${x0 + (x1 - x0) / 3} ${y0} ${x1 - (x1 - x0) / 3} ${y1} ${x1} ${y1}`;
+                }
+                return d;
+              };
+              const fmtPct = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
+              const hovered = sensChartMouse
+                ? fxMoves.reduce((b, m) => Math.abs(m - sensChartMouse.pct) < Math.abs(b - sensChartMouse.pct) ? m : b, fxMoves[0])
+                : null;
+              const hovIdx = hovered !== null ? fxMoves.indexOf(hovered) : -1;
+              const hvX = hovered !== null ? toX(hovered) : null;
+              return (
+                <div style={{ marginTop: 12, background: "#0d1117", borderRadius: 6, border: "1px solid #21262d", padding: "10px 12px 8px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>
+                      Earnings impact % — weighted FX exposure per currency move
+                    </div>
+                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                      {series.map((s) => (
+                        <span key={s.ccy} style={{ fontSize: 8, color: s.color }}>
+                          <span style={{ display: "inline-block", width: 7, height: 1.5, background: s.color, verticalAlign: "middle", marginRight: 2 }} />
+                          {s.ccy} ({s.netExp >= 0 ? "+" : ""}{(s.netExp * 100).toFixed(0)}%)
+                        </span>
+                      ))}
+                      <span style={{ fontSize: 8, color: "rgba(255,255,255,0.3)" }}>
+                        <span style={{ display: "inline-block", width: 7, height: 1.5, background: "rgba(255,255,255,0.35)", verticalAlign: "middle", marginRight: 2, borderTop: "1px dashed rgba(255,255,255,0.35)" }} />Total
+                      </span>
+                    </div>
+                  </div>
+                  <svg
+                    viewBox={`0 0 ${W} ${H}`}
+                    style={{ width: "100%", display: "block", cursor: "crosshair" }}
+                    onMouseMove={(e) => {
+                      const rect = (e.currentTarget as SVGElement).getBoundingClientRect();
+                      const svgX = ((e.clientX - rect.left) / rect.width) * W;
+                      setSensChartMouse({ x: svgX, pct: -20 + ((svgX - PL) / cW) * 40 });
+                    }}
+                    onMouseLeave={() => setSensChartMouse(null)}
+                  >
+                    <defs><clipPath id="scClip"><rect x={PL} y={PT} width={cW} height={cH} /></clipPath></defs>
+
+                    {/* Vertical grid + x-axis */}
+                    {[-20, -10, 0, 10, 20].map((v) => (
+                      <g key={v}>
+                        <line x1={toX(v)} y1={PT} x2={toX(v)} y2={PT + cH} stroke="#1a1f27" strokeWidth={1} />
+                        <text x={toX(v)} y={H - 4} textAnchor="middle" fill="rgba(255,255,255,0.2)" fontSize={7} fontFamily="monospace">{v > 0 ? `+${v}` : v}%</text>
+                      </g>
+                    ))}
+
+                    {/* Zero line */}
+                    {zeroY >= PT && zeroY <= PT + cH && (
+                      <line x1={PL} y1={zeroY} x2={PL + cW} y2={zeroY} stroke="rgba(255,255,255,0.1)" strokeWidth={1} strokeDasharray="3 3" />
+                    )}
+
+                    {/* Y-axis labels */}
+                    {[0.25, 0.5, 0.75].map((t, i) => {
+                      const v = yMin + t * (yMax - yMin);
+                      return <text key={i} x={PL - 3} y={toY(v) + 3} textAnchor="end" fill="rgba(255,255,255,0.2)" fontSize={7} fontFamily="monospace">{fmtPct(v)}</text>;
+                    })}
+
+                    {/* Per-currency lines */}
+                    {series.map((s) => (
+                      <path key={s.ccy} d={curvePath(s.pts)} fill="none" stroke={s.color} strokeWidth={1.5} clipPath="url(#scClip)" />
+                    ))}
+
+                    {/* Total combined line (dashed white) */}
+                    <path d={curvePath(combinedPts)} fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth={1.2} strokeDasharray="4 2" clipPath="url(#scClip)" />
+
+                    {/* Crosshair + tooltip */}
+                    {hovered !== null && hvX !== null && hovIdx >= 0 && (() => {
+                      const tipH = 26 + (series.length + 1) * 13;
+                      const tipW = 140;
+                      const tipX = hvX + 8 + tipW > W - PR ? hvX - tipW - 8 : hvX + 8;
+                      const tipY = PT + 2;
+                      return (
+                        <>
+                          <line x1={hvX} y1={PT} x2={hvX} y2={PT + cH} stroke="rgba(255,255,255,0.15)" strokeWidth={1} />
+                          {series.map((s) => <circle key={s.ccy} cx={hvX} cy={toY(s.pts[hovIdx].y)} r={2.5} fill={s.color} />)}
+                          <circle cx={hvX} cy={toY(combinedPts[hovIdx].y)} r={2} fill="rgba(255,255,255,0.5)" />
+                          <rect x={tipX} y={tipY} width={tipW} height={tipH} rx={3} fill="#0d1117" stroke="#30363d" strokeWidth={0.8} />
+                          <text x={tipX + 7} y={tipY + 12} fill="rgba(255,255,255,0.6)" fontSize={8} fontFamily="monospace" fontWeight={700}>
+                            {hovered > 0 ? "+" : ""}{hovered}% move vs NOK
+                          </text>
+                          {series.map((s, i) => (
+                            <text key={s.ccy} x={tipX + 7} y={tipY + 25 + i * 13} fill={s.color} fontSize={8} fontFamily="monospace">
+                              {s.ccy}  {fmtPct(s.pts[hovIdx].y)} earnings
+                            </text>
+                          ))}
+                          <text x={tipX + 7} y={tipY + 25 + series.length * 13} fill="rgba(255,255,255,0.5)" fontSize={8} fontFamily="monospace">
+                            Total  {fmtPct(combinedPts[hovIdx].y)}
+                          </text>
+                        </>
+                      );
+                    })()}
+                  </svg>
+                  <div style={{ fontSize: 8, color: "rgba(255,255,255,0.18)", marginTop: 2 }}>
+                    Net exposure (revenue − cost) × FX move % = estimated earnings impact. Source: {sensDetail.fundamental.source} FY{sensDetail.fundamental.fiscalYear}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Divergence alerts */}
             {sensDetail.divergences?.length > 0 && (
               <div style={{ marginTop: 12, padding: 14, background: "rgba(59,130,246,0.06)", borderRadius: 4, border: "1px solid rgba(59,130,246,0.15)" }}>
@@ -1517,21 +1658,31 @@ export default function FXTerminalPage() {
 
                   {/* ===== HOW TO EXECUTE ===== */}
                   {hedgeResult.execution && (
-                    <div style={{ marginBottom: 16, padding: 14, background: "#0d1117", borderRadius: 6, border: "1px solid #21262d" }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.5)", letterSpacing: "0.05em", marginBottom: 8 }}>HOW TO EXECUTE</div>
-                      <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "6px 12px", fontSize: 11, color: "rgba(255,255,255,0.6)", lineHeight: 1.5 }}>
-                        <div style={{ fontWeight: 700, color: "#3b82f6" }}>1.</div>
-                        <div><b style={{ color: "rgba(255,255,255,0.8)" }}>Call your bank&apos;s FX desk</b> (DNB Markets, Nordea Markets, SEB, or your primary bank). Ask for a quote on a {hedgeTenor} {hedgeCurrency}/NOK forward for {hedgeCurrency} {Math.round(hedgeResult.execution.amountFCY).toLocaleString("no-NO")}.</div>
-                        <div style={{ fontWeight: 700, color: "#3b82f6" }}>2.</div>
-                        <div><b style={{ color: "rgba(255,255,255,0.8)" }}>Compare the quoted rate</b> to the theoretical forward of {hedgeResult.execution.forwardRate?.toFixed(4)}. Bank quotes include a spread &mdash; expect 2-10 pips markup depending on relationship and size.</div>
-                        <div style={{ fontWeight: 700, color: "#3b82f6" }}>3.</div>
-                        <div><b style={{ color: "rgba(255,255,255,0.8)" }}>Confirm the trade</b> verbally or via the bank&apos;s e-trading platform (e.g., DNB FX Online, Nordea Markets Online). You&apos;ll receive a trade confirmation by email.</div>
-                        <div style={{ fontWeight: 700, color: "#3b82f6" }}>4.</div>
-                        <div><b style={{ color: "rgba(255,255,255,0.8)" }}>On settlement date ({hedgeResult.execution.settlementDate})</b>, the exchange happens automatically. Your bank debits/credits the agreed amounts. No action needed on your part.</div>
-                      </div>
-                      <div style={{ marginTop: 10, fontSize: 10, color: "rgba(255,255,255,0.35)", lineHeight: 1.5 }}>
-                        Minimum size: Most banks require {">"}NOK 100,000 for FX forwards. No upfront margin for standard corporate forwards (credit line based). ISDA/GMSLA agreement may be required for first-time hedging.
-                      </div>
+                    <div style={{ marginBottom: 16, borderRadius: 6, border: "1px solid #21262d", overflow: "hidden" }}>
+                      <button
+                        onClick={() => setShowHowTo(v => !v)}
+                        style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "#0d1117", border: "none", cursor: "pointer", fontFamily: "monospace" }}
+                      >
+                        <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.5)", letterSpacing: "0.05em" }}>HOW TO EXECUTE</span>
+                        <span style={{ fontSize: 10, color: showHowTo ? "#3b82f6" : "rgba(255,255,255,0.35)", transition: "transform 0.15s", display: "inline-block", transform: showHowTo ? "rotate(90deg)" : "rotate(0deg)" }}>▶</span>
+                      </button>
+                      {showHowTo && (
+                        <div style={{ padding: 14, background: "#0d1117", borderTop: "1px solid #21262d" }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "6px 12px", fontSize: 11, color: "rgba(255,255,255,0.6)", lineHeight: 1.5 }}>
+                            <div style={{ fontWeight: 700, color: "#3b82f6" }}>1.</div>
+                            <div><b style={{ color: "rgba(255,255,255,0.8)" }}>Call your bank&apos;s FX desk</b> (DNB Markets, Nordea Markets, SEB, or your primary bank). Ask for a quote on a {hedgeTenor} {hedgeCurrency}/NOK forward for {hedgeCurrency} {Math.round(hedgeResult.execution.amountFCY).toLocaleString("no-NO")}.</div>
+                            <div style={{ fontWeight: 700, color: "#3b82f6" }}>2.</div>
+                            <div><b style={{ color: "rgba(255,255,255,0.8)" }}>Compare the quoted rate</b> to the theoretical forward of {hedgeResult.execution.forwardRate?.toFixed(4)}. Bank quotes include a spread &mdash; expect 2-10 pips markup depending on relationship and size.</div>
+                            <div style={{ fontWeight: 700, color: "#3b82f6" }}>3.</div>
+                            <div><b style={{ color: "rgba(255,255,255,0.8)" }}>Confirm the trade</b> verbally or via the bank&apos;s e-trading platform (e.g., DNB FX Online, Nordea Markets Online). You&apos;ll receive a trade confirmation by email.</div>
+                            <div style={{ fontWeight: 700, color: "#3b82f6" }}>4.</div>
+                            <div><b style={{ color: "rgba(255,255,255,0.8)" }}>On settlement date ({hedgeResult.execution.settlementDate})</b>, the exchange happens automatically. Your bank debits/credits the agreed amounts. No action needed on your part.</div>
+                          </div>
+                          <div style={{ marginTop: 10, fontSize: 10, color: "rgba(255,255,255,0.35)", lineHeight: 1.5 }}>
+                            Minimum size: Most banks require {">"}NOK 100,000 for FX forwards. No upfront margin for standard corporate forwards (credit line based). ISDA/GMSLA agreement may be required for first-time hedging.
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -1561,12 +1712,146 @@ export default function FXTerminalPage() {
                             {Math.round(s.hedgedPnl).toLocaleString("no-NO")} NOK
                           </td>
                           <td style={{ ...S.td, color: s.savings > 0 ? "#10b981" : "#ef4444" }}>
-                            {Math.round(s.savings).toLocaleString("no-NO")} NOK
+                            {s.savings > 0 ? "+" : ""}{Math.round(s.savings).toLocaleString("no-NO")} NOK
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
+
+                  {/* ===== HEDGE P&L CHART ===== */}
+                  {hedgeResult.scenarios && hedgeResult.scenarios.length > 0 && (() => {
+                    const scens: { fxMovePct: number; unhedgedPnl: number; hedgedPnl: number; savings: number }[] = hedgeResult.scenarios;
+                    const W = 600, H = 180, PL = 58, PR = 12, PT = 14, PB = 28;
+                    const cW = W - PL - PR, cH = H - PT - PB;
+                    const allVals = scens.flatMap(s => [s.unhedgedPnl, s.hedgedPnl, s.savings]);
+                    const rawMin = Math.min(...allVals), rawMax = Math.max(...allVals);
+                    const pad = (rawMax - rawMin) * 0.08 || 1;
+                    const yMin = rawMin - pad, yMax = rawMax + pad;
+                    const xMin = scens[0].fxMovePct, xMax = scens[scens.length - 1].fxMovePct;
+                    const toX = (v: number) => PL + ((v - xMin) / (xMax - xMin)) * cW;
+                    const toY = (v: number) => PT + (1 - (v - yMin) / (yMax - yMin)) * cH;
+                    const zeroY = toY(0);
+                    const zeroX = toX(0);
+                    const fmtK = (v: number) => {
+                      const abs = Math.abs(v);
+                      const sign = v < 0 ? "-" : v > 0 ? "+" : "";
+                      if (abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toFixed(1)}M`;
+                      if (abs >= 1_000) return `${sign}${(abs / 1_000).toFixed(0)}K`;
+                      return `${sign}${Math.round(abs)}`;
+                    };
+                    const curvePath = (pts: { x: number; y: number }[]) => {
+                      if (pts.length < 2) return "";
+                      let d = `M ${pts[0].x} ${pts[0].y}`;
+                      for (let i = 1; i < pts.length; i++) {
+                        const p0 = pts[i - 1], p1 = pts[i];
+                        const cp1x = p0.x + (p1.x - p0.x) / 3;
+                        const cp2x = p1.x - (p1.x - p0.x) / 3;
+                        d += ` C ${cp1x} ${p0.y} ${cp2x} ${p1.y} ${p1.x} ${p1.y}`;
+                      }
+                      return d;
+                    };
+                    const unhedgedPts = scens.map(s => ({ x: toX(s.fxMovePct), y: toY(s.unhedgedPnl) }));
+                    const hedgedPts = scens.map(s => ({ x: toX(s.fxMovePct), y: toY(s.hedgedPnl) }));
+                    const savingsPts = scens.map(s => ({ x: toX(s.fxMovePct), y: toY(s.savings) }));
+                    const areaD = curvePath(unhedgedPts) + " L " + hedgedPts.slice().reverse().map(p => `${p.x} ${p.y}`).join(" L ") + " Z";
+                    const yTickVals = Array.from({ length: 5 }, (_, i) => yMin + (i / 4) * (yMax - yMin));
+                    const hovered = hedgeChartMouse ? scens[hedgeChartMouse.idx] : null;
+                    const hvX = hovered ? toX(hovered.fxMovePct) : null;
+                    return (
+                      <div style={{ marginTop: 12, background: "#0d1117", borderRadius: 6, border: "1px solid #21262d", padding: "10px 12px 8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                          <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>P&L chart — {hedgeCurrency}/NOK move scenarios</div>
+                          <div style={{ display: "flex", gap: 12, fontSize: 9, color: "rgba(255,255,255,0.4)" }}>
+                            <span><span style={{ display: "inline-block", width: 8, height: 1.5, background: "#ef4444", verticalAlign: "middle", marginRight: 3 }} />Unhedged</span>
+                            <span><span style={{ display: "inline-block", width: 8, height: 1.5, background: "#3b82f6", verticalAlign: "middle", marginRight: 3 }} />Hedged</span>
+                            <span><span style={{ display: "inline-block", width: 8, height: 1.5, background: "#10b981", verticalAlign: "middle", marginRight: 3, opacity: 0.7 }} />Savings</span>
+                          </div>
+                        </div>
+                        <svg
+                          viewBox={`0 0 ${W} ${H}`}
+                          style={{ width: "100%", display: "block", cursor: "crosshair" }}
+                          onMouseMove={(e) => {
+                            const rect = (e.currentTarget as SVGElement).getBoundingClientRect();
+                            const svgX = ((e.clientX - rect.left) / rect.width) * W;
+                            const fxVal = xMin + ((svgX - PL) / cW) * (xMax - xMin);
+                            let best = 0, bestDist = Infinity;
+                            scens.forEach((s, i) => { const d = Math.abs(s.fxMovePct - fxVal); if (d < bestDist) { bestDist = d; best = i; } });
+                            setHedgeChartMouse({ x: svgX, idx: best });
+                          }}
+                          onMouseLeave={() => setHedgeChartMouse(null)}
+                        >
+                          <defs>
+                            <linearGradient id="hpGrad" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#10b981" stopOpacity={0.12} />
+                              <stop offset="100%" stopColor="#10b981" stopOpacity={0.01} />
+                            </linearGradient>
+                            <clipPath id="hpClip"><rect x={PL} y={PT} width={cW} height={cH} /></clipPath>
+                          </defs>
+
+                          {/* Grid + Y-axis */}
+                          {yTickVals.map((v, i) => {
+                            const y = toY(v);
+                            return (
+                              <g key={i}>
+                                <line x1={PL} y1={y} x2={PL + cW} y2={y} stroke="#1a1f27" strokeWidth={1} />
+                                <text x={PL - 3} y={y + 3} textAnchor="end" fill="rgba(255,255,255,0.25)" fontSize={7} fontFamily="monospace">{fmtK(v)}</text>
+                              </g>
+                            );
+                          })}
+
+                          {/* X-axis labels */}
+                          {scens.map((s) => (
+                            <text key={s.fxMovePct} x={toX(s.fxMovePct)} y={H - 4} textAnchor="middle" fill="rgba(255,255,255,0.22)" fontSize={7} fontFamily="monospace">
+                              {s.fxMovePct > 0 ? `+${s.fxMovePct}` : s.fxMovePct}%
+                            </text>
+                          ))}
+
+                          {/* Zero P&L line */}
+                          {zeroY >= PT && zeroY <= PT + cH && (
+                            <line x1={PL} y1={zeroY} x2={PL + cW} y2={zeroY} stroke="rgba(255,255,255,0.12)" strokeWidth={1} strokeDasharray="3 3" />
+                          )}
+                          {/* Zero FX move line */}
+                          {zeroX >= PL && zeroX <= PL + cW && (
+                            <line x1={zeroX} y1={PT} x2={zeroX} y2={PT + cH} stroke="rgba(255,255,255,0.08)" strokeWidth={1} strokeDasharray="2 3" />
+                          )}
+
+                          {/* Protection fill */}
+                          <path d={areaD} fill="url(#hpGrad)" clipPath="url(#hpClip)" />
+
+                          {/* Lines */}
+                          <path d={curvePath(savingsPts)} fill="none" stroke="#10b981" strokeWidth={1} strokeDasharray="4 3" strokeOpacity={0.7} clipPath="url(#hpClip)" />
+                          <path d={curvePath(hedgedPts)} fill="none" stroke="#3b82f6" strokeWidth={1.5} clipPath="url(#hpClip)" />
+                          <path d={curvePath(unhedgedPts)} fill="none" stroke="#ef4444" strokeWidth={1.5} clipPath="url(#hpClip)" />
+
+                          {/* Crosshair */}
+                          {hovered && hvX != null && (() => {
+                            const tipW = 136, tipH = 66;
+                            const tipX = hvX + 8 + tipW > W - PR ? hvX - tipW - 8 : hvX + 8;
+                            const tipY = PT + 2;
+                            return (
+                              <>
+                                <line x1={hvX} y1={PT} x2={hvX} y2={PT + cH} stroke="rgba(255,255,255,0.15)" strokeWidth={1} />
+                                <circle cx={hvX} cy={toY(hovered.unhedgedPnl)} r={2.5} fill="#ef4444" />
+                                <circle cx={hvX} cy={toY(hovered.hedgedPnl)} r={2.5} fill="#3b82f6" />
+                                <circle cx={hvX} cy={toY(hovered.savings)} r={2} fill="#10b981" />
+                                <rect x={tipX} y={tipY} width={tipW} height={tipH} rx={3} fill="#0d1117" stroke="#30363d" strokeWidth={0.8} />
+                                <text x={tipX + 7} y={tipY + 12} fill="rgba(255,255,255,0.6)" fontSize={8} fontFamily="monospace" fontWeight={700}>
+                                  {hovered.fxMovePct > 0 ? "+" : ""}{hovered.fxMovePct}% {hedgeCurrency}/NOK
+                                </text>
+                                <text x={tipX + 7} y={tipY + 26} fill="#ef4444" fontSize={8} fontFamily="monospace">Unhedged   {fmtK(hovered.unhedgedPnl)} NOK</text>
+                                <text x={tipX + 7} y={tipY + 38} fill="#3b82f6" fontSize={8} fontFamily="monospace">Hedged     {fmtK(hovered.hedgedPnl)} NOK</text>
+                                <text x={tipX + 7} y={tipY + 50} fill="#10b981" fontSize={8} fontFamily="monospace">Savings    {fmtK(hovered.savings)} NOK</text>
+                                <text x={tipX + 7} y={tipY + 62} fill={hovered.savings > 0 ? "#10b981" : "#f59e0b"} fontSize={7} fontFamily="monospace">
+                                  {hovered.savings > 0 ? "▲ hedge protects" : "▼ hedge costs upside"}
+                                </text>
+                              </>
+                            );
+                          })()}
+                        </svg>
+                      </div>
+                    );
+                  })()}
 
                   {/* Plain-language summary */}
                   <div style={{ marginTop: 12, padding: 10, background: "#0d1117", borderRadius: 4, border: "1px solid #21262d", fontSize: 12, color: "rgba(255,255,255,0.6)", lineHeight: 1.6 }}>
