@@ -259,6 +259,7 @@ All in `apps/web/src/lib/`
 | `market.ts` | Market-level calculations |
 | `price-data-adapter.ts` | Price data normalization |
 | `portfolioOptimizer.ts` | Markowitz optimization: covariance (sample/Ledoit-Wolf/EWMA), 5 modes (EW/MinVar/MaxSharpe/RiskParity/MaxDiv), closed-form solutions + iterative constraint projection, risk decomposition, efficient frontier |
+| `shippingTCE.ts` | Baltic Exchange-based TCE calculation library: Worldscale→TCE formula, 14 vessel types, 10 reference routes (TD3C/TD20/TD6/TC1/C5 etc), VLSFO bunker cost, voyage costs, fleet quarterly earnings aggregation |
 
 ---
 
@@ -508,7 +509,8 @@ Run after market close alongside ML pipeline:
 | `fetch-ais-positions.ts` | AISStream.io WebSocket snapshot: connects for 5min, collects real vessel positions |
 | `lookup-vessel-mmsi.ts` | Resolve vessel IMO→MMSI via Digitraffic + verified manual table |
 | `fetch-vessel-positions.ts` | Digitraffic AIS positions (Finnish coastal range) |
-| `parse-shipping-daily.ts` | Parse Pareto Shipping Daily PDFs from research portal for 16+ rate indices (tanker, drybulk, LPG, LNG, commodities) |
+| `parse-shipping-daily.ts` | Parse Pareto Shipping Daily PDFs: 16+ rate indices + BCI/BDTI/BCTI + VLSFO bunker prices (BDI bug fix: capped at 12,000, excludes subindex lines) |
+| `fetch-bunker-prices.ts` | Scrape VLSFO/HSFO/MGO bunker prices from Ship & Bunker (Singapore/Rotterdam/Fujairah/Houston), store in `shipping_market_rates` as usd_per_tonne |
 | `fetch-fishpool-reports.ts` | Fetch Fish Pool SISALMON + Price Status PDFs from IMAP, parse spot prices by weight class, forward curve, export volumes |
 | `parse-pareto-seafood.ts` | Parse Pareto Seafood Weekly PDFs from research portal for quarterly salmon price estimates (NOK/EUR/supply growth) |
 | `seed-harvest-data.ts` | Seed wellboat fleet (~30 vessels) and slaughterhouse locations (~18 plants) |

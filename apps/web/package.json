@@ -59,6 +59,8 @@
     "shipping:parse-daily": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/parse-shipping-daily.ts",
     "shipping:parse-daily:all": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/parse-shipping-daily.ts --all",
     "shipping:parse-daily:dry": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/parse-shipping-daily.ts --dry-run",
+    "shipping:bunker-prices": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-bunker-prices.ts",
+    "shipping:bunker-prices:dry": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-bunker-prices.ts --dry-run",
     "ais:lookup-mmsi": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/lookup-vessel-mmsi.ts",
     "ais:lookup-mmsi:dry": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/lookup-vessel-mmsi.ts --dry-run",
     "ais:snapshot": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-ais-positions.ts",

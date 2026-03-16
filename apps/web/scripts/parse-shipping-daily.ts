@@ -108,15 +108,48 @@ function extractRates(text: string): ParsedRate[] {
       if (val && val > 5000) rates.push({ index_name: "MR_TC2_TCE", index_display_name: "MR TC2 37kt UKC-USAC", rate_value: val, rate_unit: "usd_per_day" });
     }
 
-    // ── DRYBULK ──
-    if (/Baltic Dry Index/i.test(line)) {
-      // BDI is a plain number (not $), find it after the label on this line or nearby
+    // ── DRYBULK INDICES ──
+    // BDI: Baltic Dry Index — all-time high 11,440 (Nov 2008); any value above 12,000 is a parse artifact
+    if (/Baltic Dry Index/i.test(line) && !/Capesize|Panamax|Supramax|Handysize/i.test(line)) {
       const afterLabel = line.slice(line.search(/Baltic Dry Index/i) + 17);
-      const numMatch = afterLabel.match(/([\d][\d\s,]*\d)/);
+      const numMatch = afterLabel.match(/([\d][\d\s,]*)/);
       if (numMatch) {
         const val = parseNumber(numMatch[1]);
-        if (val && val > 100 && val < 100000) {
+        if (val && val > 100 && val < 12000) {
           rates.push({ index_name: "BDI", index_display_name: "Baltic Dry Index", rate_value: val, rate_unit: "index_points" });
+        }
+      }
+    }
+    // BCI: Baltic Capesize Index — separate from BDI; can range 500-80,000 in index points
+    if (/Baltic Capesize Index/i.test(line)) {
+      const afterLabel = line.slice(line.search(/Baltic Capesize Index/i) + 22);
+      const numMatch = afterLabel.match(/([\d][\d\s,]*)/);
+      if (numMatch) {
+        const val = parseNumber(numMatch[1]);
+        if (val && val > 200 && val < 80000) {
+          rates.push({ index_name: "BCI", index_display_name: "Baltic Capesize Index", rate_value: val, rate_unit: "index_points" });
+        }
+      }
+    }
+    // BDTI: Baltic Dirty Tanker Index — typically 500-2,500 range
+    if (/Baltic Dirty Tanker Index/i.test(line)) {
+      const afterLabel = line.slice(line.search(/Baltic Dirty Tanker Index/i) + 26);
+      const numMatch = afterLabel.match(/([\d][\d\s,]*)/);
+      if (numMatch) {
+        const val = parseNumber(numMatch[1]);
+        if (val && val > 50 && val < 5000) {
+          rates.push({ index_name: "BDTI", index_display_name: "Baltic Dirty Tanker Index", rate_value: val, rate_unit: "index_points" });
+        }
+      }
+    }
+    // BCTI: Baltic Clean Tanker Index — typically 500-3,000 range
+    if (/Baltic Clean Tanker Index/i.test(line)) {
+      const afterLabel = line.slice(line.search(/Baltic Clean Tanker Index/i) + 26);
+      const numMatch = afterLabel.match(/([\d][\d\s,]*)/);
+      if (numMatch) {
+        const val = parseNumber(numMatch[1]);
+        if (val && val > 50 && val < 6000) {
+          rates.push({ index_name: "BCTI", index_display_name: "Baltic Clean Tanker Index", rate_value: val, rate_unit: "index_points" });
         }
       }
     }
@@ -173,6 +206,16 @@ function extractRates(text: string): ParsedRate[] {
       const val = parseDollarAmount(afterLabel);
       if (val && val > 0.5 && val < 100) rates.push({ index_name: "HENRY_HUB", index_display_name: "Henry Hub Natural Gas", rate_value: val, rate_unit: "usd_per_mmbtu" });
     }
+    // ── BUNKER PRICES ──
+    if (/VLSFO/i.test(line) && /Singapore|Rotterdam|Fujairah/i.test(line) && /\$/.test(line)) {
+      const portMatch = line.match(/Singapore|Rotterdam|Fujairah/i);
+      const port = portMatch ? portMatch[0] : "Singapore";
+      const val = parseDollarAmount(line.slice(line.search(/VLSFO/i)));
+      if (val && val > 200 && val < 1500) {
+        rates.push({ index_name: `VLSFO_${port.toUpperCase()}`, index_display_name: `VLSFO Bunker Price ${port}`, rate_value: val, rate_unit: "usd_per_tonne" });
+      }
+    }
+
     if (/TTF\b/i.test(line) && /nat.*gas|EU/i.test(line) && /\$/.test(line)) {
       const afterLabel = line.slice(line.search(/TTF/i));
       const val = parseDollarAmount(afterLabel);
