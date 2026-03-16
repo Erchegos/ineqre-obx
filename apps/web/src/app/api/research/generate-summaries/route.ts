@@ -147,37 +147,36 @@ Content:
 ${cleanedText.substring(0, 15000)}`;
   }
 
-  try {
-    const message = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: isBorsXtra ? 2048 : 1024,
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-    });
+  const MAX_RETRIES = 3;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      const message = await anthropic.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: isBorsXtra ? 2048 : 1024,
+        messages: [{ role: "user", content: prompt }],
+      });
 
-    const firstBlock = message.content[0];
-    if (firstBlock.type !== 'text') {
+      const firstBlock = message.content[0];
+      if (firstBlock.type !== 'text') return null;
+      let summary = firstBlock.text;
+      summary = summary.replace(/^(Here is|Below is|Summary of)[^:]*:\s*\n*/i, "");
+      summary = summary.split(/\n*(This (message|report|document) is confidential|Please refer to|Disclaimer|Legal Notice|Important (Notice|Disclosure))/i)[0];
+      summary = summary.replace(/\n{3,}/g, "\n\n");
+      return summary.trim();
+    } catch (error: any) {
+      const isRateLimit = error?.status === 429 || error?.message?.includes('rate limit') || error?.message?.includes('token');
+      if (isRateLimit && attempt < MAX_RETRIES - 1) {
+        const retryAfter = parseInt(error?.headers?.['retry-after'] || '0', 10);
+        const waitMs = retryAfter > 0 ? retryAfter * 1000 : Math.pow(2, attempt + 1) * 10000; // 20s, 40s
+        console.warn(`Claude rate limit hit, waiting ${waitMs}ms before retry ${attempt + 1}/${MAX_RETRIES - 1}`);
+        await new Promise(r => setTimeout(r, waitMs));
+        continue;
+      }
+      console.error(`Claude API error: ${error.message}`);
       return null;
     }
-    let summary = firstBlock.text;
-
-    // Remove any preamble the model might add
-    summary = summary.replace(/^(Here is|Below is|Summary of)[^:]*:\s*\n*/i, "");
-
-    // Strip any disclaimers/legal text that slipped through
-    summary = summary.split(/\n*(This (message|report|document) is confidential|Please refer to|Disclaimer|Legal Notice|Important (Notice|Disclosure))/i)[0];
-
-    summary = summary.replace(/\n{3,}/g, "\n\n");
-
-    return summary.trim();
-  } catch (error: any) {
-    console.error(`Claude API error: ${error.message}`);
-    return null;
   }
+  return null;
 }
 
 export async function POST(req: NextRequest) {

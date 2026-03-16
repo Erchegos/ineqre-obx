@@ -234,8 +234,8 @@ function CarryPnlChart({ data }: { data: { date: string; carry: number; spot: nu
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   if (!data || data.length < 2) return null;
 
-  const W = 460, H = 140;
-  const PAD = { top: 16, right: 16, bottom: 28, left: 46 };
+  const W = 600, H = 190;
+  const PAD = { top: 18, right: 20, bottom: 30, left: 50 };
   const chartW = W - PAD.left - PAD.right;
   const chartH = H - PAD.top - PAD.bottom;
 
@@ -261,18 +261,20 @@ function CarryPnlChart({ data }: { data: { date: string; carry: number; spot: nu
 
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left - PAD.left;
+    const scale = W / rect.width; // viewBox → rendered px
+    const x = (e.clientX - rect.left) * scale - PAD.left;
     const pct = Math.max(0, Math.min(1, x / chartW));
     setHoverIdx(Math.round(pct * (data.length - 1)));
   };
 
   const hd = hoverIdx !== null ? data[hoverIdx] : null;
-  const tooltipX = hoverIdx !== null ? xOf(hoverIdx) : 0;
-  const flipTooltip = tooltipX > W * 0.6;
+  // tooltip position in % of rendered container width (not SVG coords)
+  const tooltipPct = hoverIdx !== null ? xOf(hoverIdx) / W : 0;
+  const flipTooltip = tooltipPct > 0.6;
 
   return (
     <div style={{ position: "relative", userSelect: "none" as const }}>
-      <svg width={W} height={H} style={{ display: "block", maxWidth: "100%" }}
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ display: "block", width: "100%", height: "auto" }}
         onMouseMove={handleMouseMove} onMouseLeave={() => setHoverIdx(null)}>
         {/* Y-axis gridlines + labels */}
         {yTickVals.map((v, i) => {
@@ -314,7 +316,8 @@ function CarryPnlChart({ data }: { data: { date: string; carry: number; spot: nu
       </svg>
       {/* Floating tooltip */}
       {hoverIdx !== null && hd && (
-        <div style={{ position: "absolute", top: 4, left: flipTooltip ? tooltipX - 136 : tooltipX + 10,
+        <div style={{ position: "absolute", top: 4,
+          left: flipTooltip ? `calc(${(tooltipPct * 100).toFixed(1)}% - 140px)` : `calc(${(tooltipPct * 100).toFixed(1)}% + 8px)`,
           background: "#161b22", border: "1px solid #30363d", borderRadius: 6, padding: "8px 10px",
           fontSize: 10, fontFamily: "monospace", pointerEvents: "none", minWidth: 124, zIndex: 10 }}>
           <div style={{ color: "rgba(255,255,255,0.45)", marginBottom: 6, fontSize: 9 }}>{hd.date}</div>
