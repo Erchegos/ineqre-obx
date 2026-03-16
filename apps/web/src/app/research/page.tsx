@@ -37,6 +37,7 @@ export default function ResearchPortalPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [fetchingDocs, setFetchingDocs] = useState(false);
   const [error, setError] = useState('');
   const [documents, setDocuments] = useState<ResearchDocument[]>([]);
   const [selectedSource, setSelectedSource] = useState<string>('all');
@@ -499,6 +500,7 @@ export default function ResearchPortalPage() {
   };
 
   const fetchDocuments = async (token: string) => {
+    setFetchingDocs(true);
     try {
       const res = await fetch('/api/research/documents?limit=2000', {
         headers: { 'Authorization': `Bearer ${token}` },
@@ -521,6 +523,8 @@ export default function ResearchPortalPage() {
       autoGenerateSummaries(token, data);
     } catch (err: any) {
       setError(err.message || 'Failed to load documents');
+    } finally {
+      setFetchingDocs(false);
     }
   };
 
@@ -950,7 +954,10 @@ export default function ResearchPortalPage() {
             </span>
           </div>
           <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>
-            {documents.length} documents • {filteredDocuments.length} shown
+            {fetchingDocs
+              ? <span style={{ color: 'rgba(139,92,246,0.7)' }}>Fetching documents...</span>
+              : <>{documents.length} documents • {filteredDocuments.length} shown</>
+            }
           </p>
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
@@ -1145,7 +1152,99 @@ export default function ResearchPortalPage() {
       </div>
 
       {/* Documents List */}
-      {filteredDocuments.length === 0 ? (
+      {fetchingDocs ? (
+        <div>
+          <style>{`
+            @keyframes _res_shimmer {
+              0%   { background-position: -700px 0; }
+              100% { background-position: 700px 0; }
+            }
+            @keyframes _res_scan {
+              0%   { transform: translateX(-100%); }
+              100% { transform: translateX(110vw); }
+            }
+            @keyframes _res_pulse {
+              0%, 100% { opacity: 0.5; transform: scale(0.85); }
+              50%       { opacity: 1;   transform: scale(1.15); }
+            }
+            @keyframes _res_fadein {
+              from { opacity: 0; transform: translateY(6px); }
+              to   { opacity: 1; transform: translateY(0); }
+            }
+            ._res_sh {
+              background: linear-gradient(90deg,#161b22 0%,#1e2730 40%,#2a3441 50%,#1e2730 60%,#161b22 100%);
+              background-size: 700px 100%;
+              animation: _res_shimmer 1.4s infinite linear;
+              border-radius: 4px;
+            }
+            ._res_card { animation: _res_fadein 0.3s ease both; }
+          `}</style>
+
+          {/* Scanning status */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
+            <div style={{
+              width: 7, height: 7, borderRadius: '50%', background: '#8b5cf6',
+              animation: '_res_pulse 0.9s ease-in-out infinite',
+            }} />
+            <span style={{ color: 'rgba(139,92,246,0.75)', fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+              Loading research documents...
+            </span>
+          </div>
+
+          {/* Skeleton cards */}
+          <div style={{ display: 'grid', gap: 14 }}>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className="_res_card"
+                style={{
+                  background: '#161b22',
+                  border: '1px solid #21262d',
+                  borderRadius: 12,
+                  padding: '18px 22px',
+                  animationDelay: `${i * 60}ms`,
+                }}
+              >
+                {/* source badge + rating + date */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <div className="_res_sh" style={{ width: 62, height: 20 }} />
+                    {i % 3 !== 2 && (
+                      <div className="_res_sh" style={{
+                        width: 36, height: 20,
+                        background: i % 3 === 0
+                          ? 'linear-gradient(90deg,#0d2a1a 0%,#10b98133 50%,#0d2a1a 100%)'
+                          : 'linear-gradient(90deg,#2a1a0d 0%,#f59e0b33 50%,#2a1a0d 100%)',
+                        backgroundSize: '700px 100%',
+                        animation: '_res_shimmer 1.4s infinite linear',
+                      }} />
+                    )}
+                    {i % 5 === 0 && <div className="_res_sh" style={{ width: 72, height: 20 }} />}
+                  </div>
+                  <div className="_res_sh" style={{ width: 88, height: 10 }} />
+                </div>
+
+                {/* subject line */}
+                <div className="_res_sh" style={{ width: `${58 + (i % 5) * 7}%`, height: 15, marginBottom: 10 }} />
+
+                {/* body preview */}
+                <div className="_res_sh" style={{ width: '94%', height: 10, marginBottom: 6 }} />
+                {i % 2 === 0 && <div className="_res_sh" style={{ width: `${50 + (i % 4) * 9}%`, height: 10, marginBottom: 6 }} />}
+
+                {/* footer: ticker tags + PDF */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {Array.from({ length: 1 + (i % 3) }).map((_, j) => (
+                      <div key={j} className="_res_sh" style={{ width: 44 + j * 10, height: 20, borderRadius: 6 }} />
+                    ))}
+                  </div>
+                  {i % 2 === 0 && <div className="_res_sh" style={{ width: 58, height: 10 }} />}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : filteredDocuments.length === 0 ? (
         <div style={{
           padding: 60,
           textAlign: 'center',
