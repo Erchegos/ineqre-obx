@@ -434,6 +434,25 @@ export default function IntelligencePage() {
           .intel-3col { grid-template-columns: 1fr !important; }
           .ticker-strip { display: none !important; }
         }
+        @keyframes _n_sh {
+          0%   { background-position: -500px 0; }
+          100% { background-position: 500px 0; }
+        }
+        @keyframes _n_fi {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+        @keyframes _n_pulse {
+          0%,100% { opacity:0.4; } 50% { opacity:0.9; }
+        }
+        .n_sh {
+          background: linear-gradient(90deg,#161b22 0%,#1e2730 40%,#263040 50%,#1e2730 60%,#161b22 100%);
+          background-size: 500px 100%;
+          animation: _n_sh 1.3s infinite linear;
+          border-radius: 3px;
+          display: inline-block;
+        }
+        .n_fi { animation: _n_fi 0.25s ease both; }
       `}</style>
 
       <main style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: MONO, fontSize: 12 }}>
@@ -603,7 +622,26 @@ export default function IntelligencePage() {
               </div>
 
               <div className="panel-scroll" style={{ flex: 1, minHeight: 0 }}>
-                {filteredEvents.length === 0 ? (
+                {events.length === 0 ? (
+                  /* ── News skeleton ── */
+                  <div>
+                    {Array.from({ length: 14 }).map((_, i) => (
+                      <div key={i} className="n_fi" style={{
+                        display: "grid", gridTemplateColumns: "36px 3px 1fr 54px",
+                        padding: "6px 8px", borderBottom: "1px solid #0d1117",
+                        animationDelay: `${i * 40}ms`, alignItems: "start", gap: 0,
+                      }}>
+                        <span className="n_sh" style={{ width: 22, height: 9, marginTop: 2 }} />
+                        <div style={{ width: 3, height: 14, background: i%5===0?"#ef4444":i%3===0?"#f97316":"#30363d", borderRadius:1, marginTop:2 }} />
+                        <div style={{ paddingLeft: 6 }}>
+                          <span className="n_sh" style={{ width: `${55 + (i%6)*7}%`, height: 10, marginBottom: 4, display:"block" }} />
+                          <span className="n_sh" style={{ width: `${28 + (i%4)*8}%`, height: 8 }} />
+                        </div>
+                        <span className="n_sh" style={{ width: 32, height: 9, marginTop: 2, marginLeft: "auto" }} />
+                      </div>
+                    ))}
+                  </div>
+                ) : filteredEvents.length === 0 ? (
                   <div style={{ padding: 30, textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: 10 }}>No events match filters</div>
                 ) : (
                   filteredEvents.map(ev => {
@@ -701,7 +739,26 @@ export default function IntelligencePage() {
                     as of {new Date(sectorTradeDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: TZ })}
                   </div>
                 )}
-                {filteredSectors.length === 0 ? (
+                {sectors.length === 0 ? (
+                  <div>
+                    {Array.from({ length: 10 }).map((_, i) => (
+                      <div key={i} className="n_fi" style={{
+                        display:"grid", gridTemplateColumns:"1fr 50px 50px 56px",
+                        padding:"5px 10px", borderBottom:"1px solid #0d1117",
+                        animationDelay:`${i*35}ms`, alignItems:"center",
+                      }}>
+                        <span className="n_sh" style={{ width: 60+(i%4)*12, height:9 }} />
+                        <span className="n_sh" style={{ width:28, height:8, margin:"0 auto" }} />
+                        <span className="n_sh" style={{ width:24, height:8, margin:"0 auto" }} />
+                        <span className="n_sh" style={{ width:36, height:9, marginLeft:"auto",
+                          background: i%3===0 ? "linear-gradient(90deg,#0d2a1a 0%,#10b98133 50%,#0d2a1a 100%)"
+                                             : "linear-gradient(90deg,#2a0d0d 0%,#ef444433 50%,#2a0d0d 100%)",
+                          backgroundSize:"500px 100%", animation:"_n_sh 1.3s infinite linear",
+                        }} />
+                      </div>
+                    ))}
+                  </div>
+                ) : filteredSectors.length === 0 ? (
                   <div style={{ padding: 16, textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: 10 }}>No sector data</div>
                 ) : (
                   filteredSectors.map(sec => {
@@ -758,6 +815,34 @@ export default function IntelligencePage() {
 
                 {/* ── TOP MOVERS ──────────────────────────────────── */}
                 <SectionHeader title="TOP MOVERS" count={movers.gainers.length + movers.losers.length} />
+                {movers.gainers.length === 0 && movers.losers.length === 0 ? (
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr" }}>
+                    {["#22c55e08","#ef444408"].map((bg, col) => (
+                      <div key={col} style={{ borderRight: col===0?"1px solid #0d1117":undefined }}>
+                        <div style={{ height:20, background:bg, padding:"3px 10px" }}>
+                          <span className="n_sh" style={{ width:44, height:8 }} />
+                        </div>
+                        {Array.from({length:8}).map((_,i) => (
+                          <div key={i} className="n_fi" style={{
+                            display:"grid", gridTemplateColumns:"1fr auto auto auto", gap:6,
+                            padding:"4px 10px", borderBottom:"1px solid #161b22",
+                            animationDelay:`${i*30}ms`,
+                          }}>
+                            <span className="n_sh" style={{ width:32+(i%3)*8, height:9 }} />
+                            <span className="n_sh" style={{ width:28, height:8 }} />
+                            <span className="n_sh" style={{ width:16, height:7 }} />
+                            <span className="n_sh" style={{ width:30, height:9,
+                              background: col===0
+                                ? "linear-gradient(90deg,#0d2a1a 0%,#10b98133 50%,#0d2a1a 100%)"
+                                : "linear-gradient(90deg,#2a0d0d 0%,#ef444433 50%,#2a0d0d 100%)",
+                              backgroundSize:"500px 100%", animation:"_n_sh 1.3s infinite linear",
+                            }} />
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
                   {/* Gainers */}
                   <div style={{ borderRight: "1px solid #0d1117" }}>
@@ -790,11 +875,26 @@ export default function IntelligencePage() {
                     ))}
                   </div>
                 </div>
+                )}
 
                 {/* ── FX RATES ────────────────────────────────────── */}
                 <SectionHeader title="FX RATES" />
                 {fxRates.length === 0 ? (
-                  <div style={{ padding: 16, textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: 10 }}>No FX data</div>
+                  <div>
+                    {["NOKUSD","NOKEUR","NOKGBP"].map((pair,i) => (
+                      <div key={pair} className="n_fi" style={{
+                        display:"grid", gridTemplateColumns:"68px 1fr auto auto auto",
+                        padding:"5px 10px", borderBottom:"1px solid #0d1117",
+                        alignItems:"center", gap:8, animationDelay:`${i*60}ms`,
+                      }}>
+                        <span style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.25)" }}>{pair}</span>
+                        <span className="n_sh" style={{ width:52, height:11 }} />
+                        <span className="n_sh" style={{ width:28, height:8 }} />
+                        <span className="n_sh" style={{ width:34, height:9 }} />
+                        <span className="n_sh" style={{ width:48, height:12 }} />
+                      </div>
+                    ))}
+                  </div>
                 ) : (
                   fxRates.map(fx => {
                     const spotData = fx.timeSeries?.spot?.map(s => s.value) || [];
@@ -817,7 +917,30 @@ export default function IntelligencePage() {
 
                 {/* ── INSIDER TRADES ──────────────────────────────── */}
                 <SectionHeader title="INSIDER TRADES" count={filteredInsiders.length} />
-                {filteredInsiders.length === 0 ? (
+                {insiders.length === 0 ? (
+                  <div>
+                    {Array.from({length:7}).map((_,i) => (
+                      <div key={i} className="n_fi" style={{
+                        padding:"5px 10px", borderBottom:"1px solid #0d1117",
+                        animationDelay:`${i*40}ms`,
+                      }}>
+                        <div style={{ display:"flex", gap:6, alignItems:"center", marginBottom:4 }}>
+                          <span className="n_sh" style={{ width:32, height:9 }} />
+                          <span className="n_sh" style={{ width:28, height:14, borderRadius:2,
+                            background: i%3===0
+                              ? "linear-gradient(90deg,#0d2a1a 0%,#10b98133 50%,#0d2a1a 100%)"
+                              : i%3===1
+                              ? "linear-gradient(90deg,#2a0d0d 0%,#ef444433 50%,#2a0d0d 100%)"
+                              : "linear-gradient(90deg,#1a0d2a 0%,#ec489933 50%,#1a0d2a 100%)",
+                            backgroundSize:"500px 100%", animation:"_n_sh 1.3s infinite linear",
+                          }} />
+                          <span className="n_sh" style={{ width:`${45+(i%5)*8}%`, height:9 }} />
+                        </div>
+                        <span className="n_sh" style={{ width:`${30+(i%4)*9}%`, height:8 }} />
+                      </div>
+                    ))}
+                  </div>
+                ) : filteredInsiders.length === 0 ? (
                   <div style={{ padding: 16, textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: 10 }}>No insider trades found</div>
                 ) : (
                   filteredInsiders.slice(0, 15).map(trade => {
@@ -943,6 +1066,27 @@ export default function IntelligencePage() {
 
                 {/* ── COMMODITIES ─────────────────────────────────── */}
                 <SectionHeader title="COMMODITIES" count={filteredCommodities.length} />
+                {commodities.length === 0 ? (
+                  <div>
+                    {["Aluminium","Brent Crude Oil","WTI Crude Oil","Gold","Salmon","Silver"].map((name,i) => (
+                      <div key={name} className="n_fi" style={{
+                        display:"grid", gridTemplateColumns:"1fr auto auto",
+                        padding:"5px 10px 4px", borderBottom:"1px solid #0d1117",
+                        alignItems:"center", gap:8, animationDelay:`${i*50}ms`,
+                      }}>
+                        <div>
+                          <div style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.2)", marginBottom:2 }}>{name}</div>
+                          <span className="n_sh" style={{ width:28, height:7 }} />
+                        </div>
+                        <div style={{ textAlign:"right" }}>
+                          <span className="n_sh" style={{ width:44, height:11, display:"block", marginBottom:3 }} />
+                          <span className="n_sh" style={{ width:32, height:9 }} />
+                        </div>
+                        <span className="n_sh" style={{ width:48, height:14 }} />
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
                 {filteredCommodities.map(c => {
                   const retColor = (c.dayReturnPct ?? 0) >= 0 ? "#22c55e" : "#ef4444";
                   const histData = c.history?.map(h => h.close) || [];
@@ -992,7 +1136,39 @@ export default function IntelligencePage() {
 
                 {/* ── SHORT INTEREST ──────────────────────────────── */}
                 <SectionHeader title="SHORT INTEREST" count={filteredShorts.length} />
-                {filteredShorts.length === 0 ? (
+                {shorts.length === 0 ? (
+                  <div>
+                    {Array.from({length:8}).map((_,i) => (
+                      <div key={i} className="n_fi" style={{
+                        padding:"6px 10px", borderBottom:"1px solid #161b22",
+                        animationDelay:`${i*45}ms`,
+                      }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:4 }}>
+                          <span style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.2)", minWidth:44 }}>
+                            {["LINK","HEX","NOD","NEL","BAKKA","SALME","TGS","GSF"][i]}
+                          </span>
+                          <div style={{ flex:1, height:10, background:"#0d1117", borderRadius:2, overflow:"hidden" }}>
+                            <div className="n_sh" style={{
+                              height:"100%", width:`${70-(i*7)}%`, borderRadius:2,
+                              background: i<2
+                                ? "linear-gradient(90deg,#2a0d0d 0%,#ef444455 50%,#2a0d0d 100%)"
+                                : "linear-gradient(90deg,#2a1a0d 0%,#f9730055 50%,#2a1a0d 100%)",
+                              backgroundSize:"500px 100%", animation:"_n_sh 1.3s infinite linear",
+                            }} />
+                          </div>
+                          <span className="n_sh" style={{ width:32, height:9, marginLeft:2 }} />
+                          <span className="n_sh" style={{ width:26, height:9 }} />
+                        </div>
+                        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                          <span className="n_sh" style={{ width:`${55+(i%4)*10}%`, height:8, flex:1 }} />
+                          <span className="n_sh" style={{ width:40, height:7 }} />
+                          <span className="n_sh" style={{ width:20, height:7 }} />
+                          <span className="n_sh" style={{ width:48, height:10 }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : filteredShorts.length === 0 ? (
                   <div style={{ padding: 16, textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: 10 }}>No short data</div>
                 ) : (
                   filteredShorts.slice(0, 15).map(s => {
@@ -1089,10 +1265,17 @@ export default function IntelligencePage() {
                             ) : (
                               <div style={{ fontSize: 8, color: "rgba(255,255,255,0.3)" }}>No holder breakdown available</div>
                             )}
-                            {/* Link to stock page */}
-                            <Link href={`/stocks/${s.ticker}`} style={{ display: "block", marginTop: 6, fontSize: 8, color: "#3b82f6", textDecoration: "none" }}>
-                              View {s.ticker} details →
-                            </Link>
+                            {/* Links: SSR register + stock page */}
+                            <div style={{ display:"flex", gap:12, marginTop:6 }}>
+                              <a href="https://ssr.finanstilsynet.no/" target="_blank" rel="noopener noreferrer"
+                                style={{ fontSize:8, color:"#f97316", textDecoration:"none" }}>
+                                SSR Register ↗
+                              </a>
+                              <Link href={`/stocks/${s.ticker}`}
+                                style={{ fontSize:8, color:"#3b82f6", textDecoration:"none" }}>
+                                {s.ticker} stock page →
+                              </Link>
+                            </div>
                           </div>
                         )}
                       </div>
