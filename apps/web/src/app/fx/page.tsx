@@ -1127,10 +1127,10 @@ export default function FXTerminalPage() {
                           <td style={{ ...S.td, color: CCY_COLORS[c.toUpperCase()] || "rgba(255,255,255,0.5)", fontWeight: 600 }}>
                             {c.toUpperCase()}
                           </td>
-                          <td style={S.td}>{(sensDetail.fundamental.revenue[c] * 100).toFixed(0)}%</td>
-                          <td style={S.td}>{(sensDetail.fundamental.cost[c] * 100).toFixed(0)}%</td>
+                          <td style={S.td}>{(sensDetail.fundamental.revenue[c] * 100).toFixed(1)}%</td>
+                          <td style={S.td}>{(sensDetail.fundamental.cost[c] * 100).toFixed(1)}%</td>
                           <td style={{ ...S.td, fontWeight: 600, color: (sensDetail.fundamental.revenue[c] - sensDetail.fundamental.cost[c]) > 0 ? "#10b981" : "#ef4444" }}>
-                            {((sensDetail.fundamental.revenue[c] - sensDetail.fundamental.cost[c]) * 100).toFixed(0)}%
+                            {((sensDetail.fundamental.revenue[c] - sensDetail.fundamental.cost[c]) * 100).toFixed(1)}%
                           </td>
                         </tr>
                       ))}
@@ -1204,7 +1204,7 @@ export default function FXTerminalPage() {
                       {series.map((s) => (
                         <span key={s.ccy} style={{ fontSize: 8, color: s.color }}>
                           <span style={{ display: "inline-block", width: 7, height: 1.5, background: s.color, verticalAlign: "middle", marginRight: 2 }} />
-                          {s.ccy} ({s.netExp >= 0 ? "+" : ""}{(s.netExp * 100).toFixed(0)}%)
+                          {s.ccy} ({s.netExp >= 0 ? "+" : ""}{(s.netExp * 100).toFixed(1)}%)
                         </span>
                       ))}
                       <span style={{ fontSize: 8, color: "rgba(255,255,255,0.3)" }}>
@@ -1310,7 +1310,7 @@ export default function FXTerminalPage() {
                         <tr key={d.currency}>
                           <td style={{ ...S.td, color: CCY_COLORS[d.currency] || "rgba(255,255,255,0.5)", fontWeight: 600 }}>{d.currency}</td>
                           <td style={S.td}>{d.statistical >= 0 ? "+" : ""}{d.statistical.toFixed(3)}</td>
-                          <td style={S.td}>{d.fundamental >= 0 ? "+" : ""}{(d.fundamental * 100).toFixed(0)}%</td>
+                          <td style={S.td}>{d.fundamental >= 0 ? "+" : ""}{(d.fundamental * 100).toFixed(1)}%</td>
                           <td style={{ ...S.td, fontWeight: 600, color: Math.abs(diff) > 0.3 ? "#ef4444" : "#3b82f6" }}>
                             {diff >= 0 ? "+" : ""}{diff.toFixed(3)}
                           </td>
@@ -1396,7 +1396,7 @@ export default function FXTerminalPage() {
                           opacity: 0.7,
                         }} />
                       </div>
-                      <span style={{ width: 40, textAlign: "right", fontSize: 11 }}>{pct.toFixed(0)}%</span>
+                      <span style={{ width: 44, textAlign: "right", fontSize: 11 }}>{pct.toFixed(1)}%</span>
                     </div>
                   );
                 })}
@@ -1417,7 +1417,7 @@ export default function FXTerminalPage() {
                           opacity: 0.5,
                         }} />
                       </div>
-                      <span style={{ width: 40, textAlign: "right", fontSize: 11 }}>{pct.toFixed(0)}%</span>
+                      <span style={{ width: 44, textAlign: "right", fontSize: 11 }}>{pct.toFixed(1)}%</span>
                     </div>
                   );
                 })}
@@ -1446,8 +1446,8 @@ export default function FXTerminalPage() {
                         }} />
                         <div style={{ position: "absolute", left: "50%", top: 0, width: 1, height: "100%", background: "#30363d" }} />
                       </div>
-                      <span style={{ width: 50, textAlign: "right", fontSize: 11, color: net >= 0 ? "#10b981" : "#ef4444", fontWeight: 600 }}>
-                        {net >= 0 ? "+" : ""}{(net * 100).toFixed(0)}%
+                      <span style={{ width: 54, textAlign: "right", fontSize: 11, color: net >= 0 ? "#10b981" : "#ef4444", fontWeight: 600 }}>
+                        {net >= 0 ? "+" : ""}{(net * 100).toFixed(1)}%
                       </span>
                     </div>
                   );
@@ -2275,7 +2275,7 @@ export default function FXTerminalPage() {
                     <div style={{ flex: 1, height: 16, background: "#0d1117", borderRadius: 2, overflow: "hidden" }}>
                       <div style={{ width: `${v as number}%`, height: "100%", background: CCY_COLORS[c.toUpperCase()] || "rgba(255,255,255,0.5)", opacity: 0.6 }} />
                     </div>
-                    <span style={{ width: 40, textAlign: "right", fontSize: 11 }}>{(v as number).toFixed(0)}%</span>
+                    <span style={{ width: 44, textAlign: "right", fontSize: 11 }}>{(v as number).toFixed(1)}%</span>
                   </div>
                 ))}
               </div>

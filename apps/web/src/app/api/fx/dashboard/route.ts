@@ -193,10 +193,9 @@ export async function GET() {
       net_gbp_pct: string;
       net_sek_pct: string;
     }>(
-      `SELECT ticker, net_usd_pct, net_eur_pct, net_gbp_pct, net_sek_pct
+      `SELECT DISTINCT ON (ticker) ticker, net_usd_pct, net_eur_pct, net_gbp_pct, net_sek_pct
        FROM fx_fundamental_exposure
-       ORDER BY ABS(net_usd_pct) + ABS(net_eur_pct) + ABS(net_gbp_pct) + ABS(net_sek_pct) DESC
-       LIMIT 20`
+       ORDER BY ticker, fiscal_year DESC`
     );
     const exposureHeatmap = exposureResult.rows.map((r) => ({
       ticker: r.ticker,
