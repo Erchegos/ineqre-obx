@@ -447,7 +447,7 @@ export default function FXTerminalPage() {
   const [authLoading, setAuthLoading] = useState(false);
 
   /* Forwards state */
-  const [fwdPair, setFwdPair] = useState("NOKUSD");
+  const [fwdPair, setFwdPair] = useState("NOKEUR");
   const [fwdForwards, setFwdForwards] = useState<ForwardTenor[]>([]);
   const [interestRates, setInterestRates] = useState<Record<string, any[]>>({});
   const [carryData, setCarryData] = useState<any>(null);
