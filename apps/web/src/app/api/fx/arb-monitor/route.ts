@@ -40,17 +40,6 @@ const TENOR_DAYS: Record<string, number> = {
   "12M": 365,
 };
 
-// Static CB deposit facility rates (bps) — update quarterly
-// Rime, Schrimpf & Syrstad (RFS 2022) Table 3 vehicle: CB deposit account
-// These reflect approximate current policy stances (2025–2026)
-const CB_DEPOSIT_RATES_BPS: Record<string, number> = {
-  USD: 10,   // Fed overnight reverse repo ~10 bps above floor
-  EUR: -50,  // ECB deposit facility (historically negative, may vary)
-  GBP: 10,   // BoE reserve remuneration ~Bank Rate
-  SEK: -50,  // Riksbank deposit facility (approximate)
-  NOK: 0,    // Not used directly (NOK is domestic currency here)
-};
-
 // USD CP-OIS spreads — Rime, Schrimpf & Syrstad (RFS 2022) Table 1
 const CP_OIS_HIGH = 19; // bps, A-1/P-1 banks
 const CP_OIS_MID  = 36; // bps, A-2/P-2 banks
@@ -117,21 +106,14 @@ export async function GET(request: Request) {
       // basis_bps = forwardPremium - (r_NOK - r_foreign) × 10000
       const oisBasisBps = forwardPremiumBps - (nokRate - foreignRate) * 10000;
 
-      // USD CP funding cost above OIS (bank must fund in CP, not OIS)
-      // r_USD_CP = USD OIS + CP_spread
-      const usdOisRate = rates["USD"] ?? 0.04;
-      const usdCpHighBps = usdOisRate * 10000 + CP_OIS_HIGH;
-      const usdCpMidBps  = usdOisRate * 10000 + CP_OIS_MID;
-
-      // Foreign CB deposit rate
-      const foreignCbDepositBps = CB_DEPOSIT_RATES_BPS[foreignCcy] ?? 0;
-
-      // CIP arb profit = forward premium − (r_USD_CP − r_foreign_CB_deposit)
-      // Rime et al. (RFS 2022) Section 2.1, Table 3
-      const fundingCostHigh = usdCpHighBps - foreignCbDepositBps;
-      const fundingCostMid  = usdCpMidBps  - foreignCbDepositBps;
-      const arbProfitHigh = forwardPremiumBps - fundingCostHigh;
-      const arbProfitMid  = forwardPremiumBps - fundingCostMid;
+      // CIP arb profit = OIS basis − CP-OIS spread
+      // Rime et al. (RFS 2022) Section 2.1, Table 3:
+      // The OIS basis is the max a bank can earn from the FX swap (vs OIS rate).
+      // After paying the CP-OIS spread to fund in USD commercial paper, the
+      // implementable profit is: basis - CP_OIS_spread.
+      // Positive only when the CIP deviation exceeds the funding spread.
+      const arbProfitHigh = oisBasisBps - CP_OIS_HIGH;
+      const arbProfitMid  = oisBasisBps - CP_OIS_MID;
 
       // Signal
       let signal: "POSITIVE_ARB" | "MARGINAL" | "NO_ARB";
@@ -147,9 +129,6 @@ export async function GET(request: Request) {
         forward: parseFloat(forward.toFixed(4)),
         forwardPremiumBps: parseFloat(forwardPremiumBps.toFixed(2)),
         oisBasisBps: parseFloat(oisBasisBps.toFixed(2)),
-        usdCpHighBps: parseFloat(usdCpHighBps.toFixed(2)),
-        usdCpMidBps: parseFloat(usdCpMidBps.toFixed(2)),
-        foreignCbDepositBps,
         arbProfitHighRatedBps: parseFloat(arbProfitHigh.toFixed(2)),
         arbProfitMidRatedBps: parseFloat(arbProfitMid.toFixed(2)),
         signal,
