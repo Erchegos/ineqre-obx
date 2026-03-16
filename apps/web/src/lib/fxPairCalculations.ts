@@ -679,7 +679,7 @@ export function calculateCrossCurrencyBasis(
  *   Mid-rated  (A-2/P-2): CP-OIS spread ~36 bps
  */
 export function decomposeBasis(oisBasisBps: number): {
-  oisBasis: number;
+  oisBasisBps: number;
   cpOisSpreadHigh: number;   // 19 bps — Rime et al. Table 1, high-rated (A-1/P-1)
   cpOisSpreadMid: number;    // 36 bps — Rime et al. Table 1, mid-rated (A-2/P-2)
   implementableBasisHigh: number;
@@ -691,7 +691,7 @@ export function decomposeBasis(oisBasisBps: number): {
   const CP_OIS_HIGH = 19; // bps, A-1/P-1 rated banks
   const CP_OIS_MID  = 36; // bps, A-2/P-2 rated banks
   return {
-    oisBasis: oisBasisBps,
+    oisBasisBps: oisBasisBps,
     cpOisSpreadHigh: CP_OIS_HIGH,
     cpOisSpreadMid: CP_OIS_MID,
     implementableBasisHigh: oisBasisBps - CP_OIS_HIGH,
