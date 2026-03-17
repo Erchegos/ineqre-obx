@@ -59,13 +59,32 @@ export default function StockSpreadsheet({ ticker, token, profileName, authReady
     });
   }, []);
 
+  // Scale first sheet's column widths to fill the viewport width
+  const scaleColumnsToViewport = useCallback((sheets: any[]): any[] => {
+    if (!sheets.length) return sheets;
+    const first = sheets[0];
+    const colWidths: Record<string, number> = { ...(first?.config?.columnlen || {}) };
+    const colCount = Object.keys(colWidths).length;
+    if (colCount === 0) return sheets;
+    const total = Object.values(colWidths).reduce((s, w) => s + (Number(w) || 0), 0);
+    if (total <= 0) return sheets;
+    // Target: full window minus Fortune-Sheet row-header (~46px) and scrollbar (~17px)
+    const target = Math.max(window.innerWidth - 63, total);
+    if (target <= total) return sheets; // already wider than viewport — don't shrink
+    const scale = target / total;
+    const scaled: Record<string, number> = {};
+    Object.keys(colWidths).forEach((k) => { scaled[k] = Math.floor(Number(colWidths[k]) * scale); });
+    return [{ ...first, config: { ...(first.config || {}), columnlen: scaled } }, ...sheets.slice(1)];
+  }, []);
+
   // Load sheets into state with fresh clone
   const applySheets = useCallback((data: Sheet[]) => {
     const fixed = ensureCelldata(data);
     const cloned = JSON.parse(JSON.stringify(fixed));
-    setSheets(cloned);
+    const scaled = scaleColumnsToViewport(cloned);
+    setSheets(scaled);
     setMountKey((k) => k + 1);
-  }, [ensureCelldata]);
+  }, [ensureCelldata, scaleColumnsToViewport]);
 
   // Load spreadsheet data
   useEffect(() => {

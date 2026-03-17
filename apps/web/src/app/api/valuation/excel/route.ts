@@ -51,9 +51,11 @@ type CellValue = {
 
 function rgbToHex(rgb: string): string {
   if (!rgb) return "";
-  // SheetJS gives RGB as "RRGGBB" or "AARRGGBB" — strip alpha prefix
-  const clean = rgb.replace(/^(FF|00)/i, "").replace(/^#/, "");
-  return "#" + (clean.length === 6 ? clean : clean.slice(-6));
+  const clean = rgb.replace(/^#/, "");
+  // 8-char AARRGGBB (xlsx ARGB format): strip the 2-char alpha prefix
+  if (clean.length === 8) return "#" + clean.slice(2);
+  // 6-char RRGGBB: use directly (do NOT strip "FF" prefix — it is part of the color)
+  return "#" + clean;
 }
 
 /**
