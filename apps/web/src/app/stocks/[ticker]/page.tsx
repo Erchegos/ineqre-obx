@@ -994,7 +994,7 @@ export default function StockTickerPage() {
   }, [activeStats, data]);
 
   return (
-    <main style={{ padding: "16px 32px", maxWidth: 1600, margin: "0 auto", minHeight: "100vh", background: "#0a0a0a", color: "#fff", overflowX: "hidden" }}>
+    <main style={{ padding: viewMode === "model" ? "8px 16px" : "16px 32px", maxWidth: viewMode === "model" ? "100%" : 1600, margin: "0 auto", minHeight: "100vh", background: "#0a0a0a", color: "#fff", overflowX: "hidden" }}>
       <style>{`
         .stock-hero-metrics { display: flex; flex-wrap: wrap; }
         .stock-chart-news { display: grid; grid-template-columns: 3fr 1.5fr; gap: 10px; }

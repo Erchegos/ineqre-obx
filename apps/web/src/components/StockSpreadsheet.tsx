@@ -735,7 +735,7 @@ export default function StockSpreadsheet({ ticker, token, profileName, authReady
         setCtxMenu({ x: e.clientX, y: e.clientY });
         setShowSettings(false);
       }} style={{
-        width: "100%", height: 600,
+        width: "100%", height: "calc(100vh - 160px)", minHeight: 700,
         border: "1px solid #30363d", borderRadius: "0 0 4px 4px",
         position: "relative",
       }}>
