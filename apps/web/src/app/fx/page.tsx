@@ -103,8 +103,7 @@ const S: Record<string, React.CSSProperties> = {
   title: { fontSize: 18, fontWeight: 700, color: "#fff", letterSpacing: 2 },
   subtitle: { fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 2 },
   tabs: { display: "flex", gap: 0, borderBottom: "1px solid #30363d", padding: "0 16px", overflowX: "auto" as const, WebkitOverflowScrolling: "touch" as any },
-  tab: { padding: "10px 12px", cursor: "pointer", fontSize: 12, letterSpacing: 1, fontWeight: 600, color: "rgba(255,255,255,0.5)", borderBottom: "2px solid transparent", transition: "all 0.2s", fontFamily: "monospace", whiteSpace: "nowrap" as const, flexShrink: 0 },
-  tabActive: { color: "#3b82f6", borderBottomColor: "#3b82f6" },
+  tab: (active: boolean) => ({ padding: "10px 14px", cursor: "pointer", fontSize: 10, letterSpacing: "0.06em", fontWeight: 700, color: active ? "#3b82f6" : "rgba(255,255,255,0.5)", borderBottom: active ? "2px solid #3b82f6" : "2px solid transparent", background: "transparent", border: "none", borderRadius: 0, fontFamily: "monospace", whiteSpace: "nowrap" as const, flexShrink: 0 }) as React.CSSProperties,
   content: { padding: "20px 16px", maxWidth: 1400, margin: "0 auto", overflowX: "hidden" as const, boxSizing: "border-box" as const },
   card: { background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 16, marginBottom: 12, boxSizing: "border-box" as const, minWidth: 0 },
   cardTitle: { fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", letterSpacing: "0.08em", textTransform: "uppercase" as const, marginBottom: 8, fontFamily: "monospace" },
@@ -895,23 +894,20 @@ export default function FXTerminalPage() {
       {/* Tab bar */}
       <div style={S.tabs}>
         {TABS.map(t => (
-          <div
-            key={t.key}
-            style={{ ...S.tab, ...(tab === t.key ? S.tabActive : {}) }}
-            onClick={() => setTab(t.key)}
-          >
+          <button key={t.key} style={S.tab(tab === t.key)} onClick={() => setTab(t.key)}>
             {t.label}
-          </div>
+          </button>
         ))}
       </div>
 
       {/* Content */}
       <div style={S.content}>
-        {tab === "dashboard" && renderDashboard()}
-        {tab === "sensitivity" && renderSensitivity()}
-        {tab === "company" && renderCompany()}
-        {tab === "portfolio" && renderPortfolio()}
-        {tab === "forwards" && renderForwards()}
+        <style>{`@keyframes fx-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } } .fx-tab { animation: fx-fade-in 0.25s ease-out; }`}</style>
+        {tab === "dashboard" && <div key="dashboard" className="fx-tab">{renderDashboard()}</div>}
+        {tab === "sensitivity" && <div key="sensitivity" className="fx-tab">{renderSensitivity()}</div>}
+        {tab === "company" && <div key="company" className="fx-tab">{renderCompany()}</div>}
+        {tab === "portfolio" && <div key="portfolio" className="fx-tab">{renderPortfolio()}</div>}
+        {tab === "forwards" && <div key="forwards" className="fx-tab">{renderForwards()}</div>}
       </div>
     </div>
   );
