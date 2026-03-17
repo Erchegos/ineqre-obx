@@ -1741,7 +1741,7 @@ export default function FXTerminalPage() {
                 const qe = hedgeResult.quarterEndWarning;
                 // Compute days dynamically so it stays current without recalculating
                 const daysNow = qe.quarterEndDate
-                  ? Math.ceil((new Date(qe.quarterEndDate).getTime() - Date.now()) / 86400000)
+                  ? Math.round((new Date(qe.quarterEndDate).getTime() - Date.now()) / 86400000)
                   : qe.daysUntilQE;
                 const [qeExpanded, setQeExpanded] = [
                   (showHelp["qe-warning"] ?? false),
