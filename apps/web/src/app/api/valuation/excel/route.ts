@@ -172,8 +172,6 @@ function convertSheet(
           if (align?.horizontal === "center") cv.ht = 0;
           else if (align?.horizontal === "right") cv.ht = 2;
           else if (align?.horizontal === "left") cv.ht = 1;
-          // "2"=wrap, "1"=overflow into adjacent empty cells (Excel default)
-          cv.tb = align?.wrapText ? "2" : "1";
         }
       } else {
         // Fallback: SheetJS fill-based font info (less reliable)
@@ -184,8 +182,11 @@ function convertSheet(
         if (s?.alignment?.horizontal === "center") cv.ht = 0;
         else if (s?.alignment?.horizontal === "right") cv.ht = 2;
         else if (s?.alignment?.horizontal === "left") cv.ht = 1;
-        cv.tb = s?.alignment?.wrapText ? "2" : "1";
       }
+      // Always overflow (tb="1"): text flows into adjacent empty cells, matching
+      // Excel's default. Using tb="2" (wrap) breaks merged cells — Fortune-Sheet
+      // wraps at single-column width instead of the full merged width.
+      cv.tb = "1";
 
       if (!cv.bg) cv.bg = "#FFFFFF";
       if (!cv.fc) cv.fc = "#000000";
