@@ -85,6 +85,9 @@
     "harvest:lookup-mmsi": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/lookup-harvest-mmsi.ts",
     "harvest:track": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-harvest-positions.ts",
     "harvest:aggregate": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/aggregate-harvest-estimates.ts",
+    "harvest:backfill": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/backfill-harvest-trips.ts",
+    "harvest:backfill:dry": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/backfill-harvest-trips.ts --dry-run",
+    "harvest:backfill:replay": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/backfill-harvest-trips.ts --replay-only",
     "data:fix-spikes": "node scripts/fix-ohlc-spikes.mjs",
     "data:fix-spikes:fix": "node scripts/fix-ohlc-spikes.mjs --fix"
   },

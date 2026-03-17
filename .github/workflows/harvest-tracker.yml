@@ -47,7 +47,7 @@ jobs:
           NODE_TLS_REJECT_UNAUTHORIZED: '0'
         run: >
           npx tsx scripts/fetch-harvest-positions.ts
-          --duration=${{ github.event.inputs.duration || 600 }}
+          --duration=${{ github.event.inputs.duration || 1200 }}
 
       - name: Run quarterly aggregation
         working-directory: apps/web
