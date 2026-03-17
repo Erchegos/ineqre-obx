@@ -47,6 +47,7 @@ type CellValue = {
   ct?: { fa?: string; t?: string };
   ht?: number;
   fs?: number;
+  tb?: string; // text break: "0"=clip, "1"=overflow, "2"=wrap
 };
 
 function rgbToHex(rgb: string): string {
@@ -171,6 +172,8 @@ function convertSheet(
           if (align?.horizontal === "center") cv.ht = 0;
           else if (align?.horizontal === "right") cv.ht = 2;
           else if (align?.horizontal === "left") cv.ht = 1;
+          // "2"=wrap, "1"=overflow into adjacent empty cells (Excel default)
+          cv.tb = align?.wrapText ? "2" : "1";
         }
       } else {
         // Fallback: SheetJS fill-based font info (less reliable)
@@ -181,6 +184,7 @@ function convertSheet(
         if (s?.alignment?.horizontal === "center") cv.ht = 0;
         else if (s?.alignment?.horizontal === "right") cv.ht = 2;
         else if (s?.alignment?.horizontal === "left") cv.ht = 1;
+        cv.tb = s?.alignment?.wrapText ? "2" : "1";
       }
 
       if (!cv.bg) cv.bg = "#FFFFFF";
