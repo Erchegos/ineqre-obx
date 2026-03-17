@@ -1737,32 +1737,54 @@ export default function FXTerminalPage() {
               </div>
 
               {/* Quarter-end basis widening warning */}
-              {hedgeResult?.quarterEndWarning?.crosses && !qeWarningDismissed && (
-                <div style={{ marginBottom: 16, padding: "12px 16px", background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.35)", borderRadius: 6, display: "flex", gap: 12, alignItems: "flex-start" }}>
-                  <div style={{ fontSize: 16, flexShrink: 0 }}>⚠</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "#f59e0b", marginBottom: 4, letterSpacing: "0.05em" }}>
-                      QUARTER-END CROSSING — {hedgeResult.quarterEndWarning.quarterEndLabel}
+              {hedgeResult?.quarterEndWarning?.crosses && !qeWarningDismissed && (() => {
+                const qe = hedgeResult.quarterEndWarning;
+                // Compute days dynamically so it stays current without recalculating
+                const daysNow = qe.quarterEndDate
+                  ? Math.ceil((new Date(qe.quarterEndDate).getTime() - Date.now()) / 86400000)
+                  : qe.daysUntilQE;
+                const [qeExpanded, setQeExpanded] = [
+                  (showHelp["qe-warning"] ?? false),
+                  (v: boolean) => setShowHelp(p => ({ ...p, "qe-warning": v })),
+                ];
+                return (
+                  <div style={{ marginBottom: 16, background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.35)", borderRadius: 6, overflow: "hidden" }}>
+                    {/* Collapsed header — always visible */}
+                    <div
+                      onClick={() => setQeExpanded(!qeExpanded)}
+                      style={{ padding: "9px 14px", display: "flex", gap: 10, alignItems: "center", cursor: "pointer" }}
+                    >
+                      <span style={{ fontSize: 13, flexShrink: 0 }}>⚠</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "#f59e0b", letterSpacing: "0.05em", flex: 1 }}>
+                        QUARTER-END CROSSING — {qe.quarterEndLabel}
+                        <span style={{ fontWeight: 400, color: "rgba(245,158,11,0.7)", marginLeft: 8 }}>{daysNow}d away</span>
+                      </span>
+                      <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginRight: 6 }}>{qeExpanded ? "▲ hide" : "▼ details"}</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setQeWarningDismissed(true); }}
+                        style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 13, padding: 0, lineHeight: 1, flexShrink: 0 }}
+                      >✕</button>
                     </div>
-                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", lineHeight: 1.6 }}>
-                      This tenor crosses a quarter-end ({hedgeResult.quarterEndWarning.daysUntilQE}d away). Banks compress balance sheets for regulatory reporting snapshots, historically widening the cross-currency basis by{" "}
-                      <span style={{ color: "#f59e0b", fontWeight: 700 }}>
-                        {hedgeResult.quarterEndWarning.estimatedBasisWideningBps?.low}–{hedgeResult.quarterEndWarning.estimatedBasisWideningBps?.high} bps
-                      </span>{" "}
-                      (median {hedgeResult.quarterEndWarning.estimatedBasisWideningBps?.median} bps).
-                    </div>
-                    {hedgeResult.quarterEndWarning.recommendation && (
-                      <div style={{ marginTop: 6, fontSize: 10, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>
-                        {hedgeResult.quarterEndWarning.recommendation}
+                    {/* Expanded body */}
+                    {qeExpanded && (
+                      <div style={{ padding: "0 14px 12px 37px", borderTop: "1px solid rgba(245,158,11,0.2)" }}>
+                        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", lineHeight: 1.6, paddingTop: 10 }}>
+                          Banks compress balance sheets for regulatory reporting snapshots, historically widening the cross-currency basis by{" "}
+                          <span style={{ color: "#f59e0b", fontWeight: 700 }}>
+                            {qe.estimatedBasisWideningBps?.low}–{qe.estimatedBasisWideningBps?.high} bps
+                          </span>{" "}
+                          (median {qe.estimatedBasisWideningBps?.median} bps).
+                        </div>
+                        {qe.recommendation && (
+                          <div style={{ marginTop: 6, fontSize: 10, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>
+                            {qe.recommendation}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
-                  <button
-                    onClick={() => setQeWarningDismissed(true)}
-                    style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 14, flexShrink: 0, padding: 0, lineHeight: 1 }}
-                  >✕</button>
-                </div>
-              )}
+                );
+              })()}
 
               {hedgeResult && (
                 <div>
