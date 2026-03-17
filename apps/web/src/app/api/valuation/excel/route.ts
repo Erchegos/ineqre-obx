@@ -51,188 +51,196 @@ type CellValue = {
 
 function rgbToHex(rgb: string): string {
   if (!rgb) return "";
-  // SheetJS gives RGB as "RRGGBB" or "AARRGGBB"
-  const clean = rgb.replace(/^FF/, "").replace(/^#/, "");
+  // SheetJS gives RGB as "RRGGBB" or "AARRGGBB" — strip alpha prefix
+  const clean = rgb.replace(/^(FF|00)/i, "").replace(/^#/, "");
   return "#" + (clean.length === 6 ? clean : clean.slice(-6));
+}
+
+/**
+ * Parse each worksheet XML from the raw xlsx ZIP (via XLSX.CFB) to build
+ * a map of cellAddress → xf-index. SheetJS only surfaces fill info in cell.s,
+ * so we need the raw <c s="N"> attribute to resolve full font properties.
+ */
+function buildCellStyleMaps(buffer: Buffer, sheetPaths: string[]): Map<string, number>[] {
+  try {
+    const cfb = (XLSX as any).CFB.read(buffer, { type: "buffer" });
+    return sheetPaths.map((sheetPath) => {
+      const map = new Map<string, number>();
+      const fileName = sheetPath.split("/").pop();
+      const entry = cfb.FileIndex?.find((f: any) =>
+        f.name === fileName || f.name?.endsWith("/" + fileName)
+      );
+      if (!entry) return map;
+      const xml = Buffer.from(entry.content || cfb.Files?.[entry.name] || []).toString("utf8");
+      // Match cells with a style attribute: <c r="B5" ... s="12" ...>
+      const re = /<c\s[^>]*\br="([A-Z]+\d+)"[^>]*\bs="(\d+)"/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(xml)) !== null) {
+        map.set(m[1], parseInt(m[2], 10));
+      }
+      return map;
+    });
+  } catch {
+    return sheetPaths.map(() => new Map());
+  }
+}
+
+function resolveFont(styles: any, xfIdx: number) {
+  const xf = styles?.CellXf?.[xfIdx];
+  if (!xf) return null;
+  const fontId = parseInt(xf.fontId ?? xf.fontid ?? "0", 10);
+  const font = styles?.Fonts?.[fontId];
+  const align = xf.alignment;
+  return { font, align };
+}
+
+function convertSheet(
+  ws: any,
+  idx: number,
+  name: string,
+  cellStyleMap: Map<string, number>,
+  styles: any
+) {
+  const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
+  const celldata: { r: number; c: number; v: CellValue }[] = [];
+
+  // Column widths
+  const columnlen: Record<string, number> = {};
+  if (ws["!cols"]) {
+    ws["!cols"].forEach((col: any, i: number) => {
+      if (col?.wpx) columnlen[String(i)] = col.wpx;
+      else if (col?.wch) columnlen[String(i)] = col.wch * 8;
+    });
+  }
+
+  // Row heights
+  const rowlen: Record<string, number> = {};
+  if (ws["!rows"]) {
+    ws["!rows"].forEach((row: any, i: number) => {
+      if (row?.hpx) rowlen[String(i)] = row.hpx;
+    });
+  }
+
+  // Merged cells
+  const merge: Record<string, { r: number; c: number; rs: number; cs: number }> = {};
+  if (ws["!merges"]) {
+    ws["!merges"].forEach((m: any) => {
+      merge[`${m.s.r}_${m.s.c}`] = {
+        r: m.s.r, c: m.s.c,
+        rs: m.e.r - m.s.r + 1,
+        cs: m.e.c - m.s.c + 1,
+      };
+    });
+  }
+
+  for (let r = range.s.r; r <= range.e.r; r++) {
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      const cell = ws[addr];
+      if (!cell) continue;
+
+      const cv: CellValue = {
+        v: cell.v,
+        m: cell.w || (cell.v != null ? String(cell.v) : ""),
+      };
+
+      if (cell.f) cv.f = "=" + cell.f;
+      if (typeof cell.v === "number" && cell.z) {
+        cv.ct = { fa: cell.z, t: "n" };
+        if (cell.w) cv.m = cell.w;
+      }
+
+      // === Background color from SheetJS fill (reliable) ===
+      const s = cell.s;
+      if (s?.patternType === "solid" && s.fgColor?.rgb) {
+        cv.bg = rgbToHex(s.fgColor.rgb);
+      }
+
+      // === Font info from raw xf index (reliable — SheetJS misses this) ===
+      const xfIdx = cellStyleMap.get(addr);
+      if (xfIdx !== undefined) {
+        const resolved = resolveFont(styles, xfIdx);
+        if (resolved) {
+          const { font, align } = resolved;
+          if (font?.color?.rgb) cv.fc = rgbToHex(font.color.rgb);
+          if (font?.bold) cv.bl = 1;
+          if (font?.italic) cv.it = 1;
+          if (font?.sz) cv.fs = font.sz;
+          if (align?.horizontal === "center") cv.ht = 0;
+          else if (align?.horizontal === "right") cv.ht = 2;
+          else if (align?.horizontal === "left") cv.ht = 1;
+        }
+      } else {
+        // Fallback: SheetJS fill-based font info (less reliable)
+        if (s?.color?.rgb) cv.fc = rgbToHex(s.color.rgb);
+        if (s?.bold) cv.bl = 1;
+        if (s?.italic) cv.it = 1;
+        if (s?.sz) cv.fs = s.sz;
+        if (s?.alignment?.horizontal === "center") cv.ht = 0;
+        else if (s?.alignment?.horizontal === "right") cv.ht = 2;
+        else if (s?.alignment?.horizontal === "left") cv.ht = 1;
+      }
+
+      if (!cv.bg) cv.bg = "#FFFFFF";
+      if (!cv.fc) cv.fc = "#000000";
+
+      celldata.push({ r, c, v: cv });
+    }
+  }
+
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    if (!columnlen[String(c)]) {
+      columnlen[String(c)] = c === 0 ? 260 : 120;
+    }
+  }
+
+  return {
+    name,
+    id: `sheet_${idx}`,
+    celldata,
+    row: range.e.r + 1,
+    column: range.e.c + 1,
+    order: idx,
+    status: idx === 0 ? 1 : 0,
+    config: {
+      columnlen,
+      rowlen,
+      merge: Object.keys(merge).length > 0 ? merge : undefined,
+    },
+  };
 }
 
 function xlsxToFortuneSheets(filePath: string) {
   const buffer = fs.readFileSync(filePath);
   const workbook = XLSX.read(buffer, { cellFormula: true, cellStyles: true, cellNF: true });
+  const styles = (workbook as any).Styles;
+  const sheetPaths = (workbook as any).Directory?.sheets ?? [];
+  const cellStyleMaps = buildCellStyleMaps(buffer, sheetPaths);
 
   return workbook.SheetNames.map((name, idx) => {
     const ws = workbook.Sheets[name];
-    const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
-    const celldata: { r: number; c: number; v: CellValue }[] = [];
-
-    // Column widths
-    const columnlen: Record<string, number> = {};
-    if (ws["!cols"]) {
-      ws["!cols"].forEach((col: any, i: number) => {
-        if (col?.wpx) columnlen[String(i)] = col.wpx;
-        else if (col?.wch) columnlen[String(i)] = col.wch * 8;
-      });
-    }
-
-    // Row heights
-    const rowlen: Record<string, number> = {};
-    if (ws["!rows"]) {
-      ws["!rows"].forEach((row: any, i: number) => {
-        if (row?.hpx) rowlen[String(i)] = row.hpx;
-      });
-    }
-
-    // Merged cells
-    const merge: Record<string, { r: number; c: number; rs: number; cs: number }> = {};
-    if (ws["!merges"]) {
-      ws["!merges"].forEach((m: any) => {
-        merge[`${m.s.r}_${m.s.c}`] = {
-          r: m.s.r, c: m.s.c,
-          rs: m.e.r - m.s.r + 1,
-          cs: m.e.c - m.s.c + 1,
-        };
-      });
-    }
-
-    for (let r = range.s.r; r <= range.e.r; r++) {
-      for (let c = range.s.c; c <= range.e.c; c++) {
-        const addr = XLSX.utils.encode_cell({ r, c });
-        const cell = ws[addr];
-        if (!cell) continue;
-
-        const cv: CellValue = {
-          v: cell.v,
-          m: cell.w || (cell.v != null ? String(cell.v) : ""),
-        };
-
-        // Formula
-        if (cell.f) cv.f = "=" + cell.f;
-
-        // Number formatting — use Excel's pre-formatted string (cell.w)
-        if (typeof cell.v === "number" && cell.z) {
-          cv.ct = { fa: cell.z, t: "n" };
-          // Use Excel's formatted output if available
-          if (cell.w) cv.m = cell.w;
-        }
-
-        // === Preserve original Excel styles ===
-        const s = cell.s;
-        if (s) {
-          // Background color
-          if (s.patternType === "solid" && s.fgColor?.rgb) {
-            cv.bg = rgbToHex(s.fgColor.rgb);
-          }
-
-          // Font color
-          if (s.color?.rgb) {
-            cv.fc = rgbToHex(s.color.rgb);
-          }
-
-          // Bold / Italic
-          if (s.bold) cv.bl = 1;
-          if (s.italic) cv.it = 1;
-
-          // Font size
-          if (s.sz) cv.fs = s.sz;
-
-          // Alignment
-          if (s.alignment?.horizontal === "center") cv.ht = 0;
-          else if (s.alignment?.horizontal === "right") cv.ht = 2;
-          else if (s.alignment?.horizontal === "left") cv.ht = 1;
-        }
-
-        // If no background from styles, give data cells white bg
-        if (!cv.bg) {
-          cv.bg = "#FFFFFF";
-        }
-
-        // Default font color to black if not set
-        if (!cv.fc) {
-          cv.fc = "#000000";
-        }
-
-        celldata.push({ r, c, v: cv });
-      }
-    }
-
-    // Default column widths for columns within data range
-    for (let c = range.s.c; c <= range.e.c; c++) {
-      if (!columnlen[String(c)]) {
-        columnlen[String(c)] = c === 0 ? 260 : 120;
-      }
-    }
-
-    return {
-      name,
-      id: `sheet_${idx}`,
-      celldata,
-      row: range.e.r + 1,
-      column: range.e.c + 1,
-      order: idx,
-      status: idx === 0 ? 1 : 0,
-      config: {
-        columnlen,
-        rowlen,
-        merge: Object.keys(merge).length > 0 ? merge : undefined,
-      },
-    };
+    const styleMap = cellStyleMaps[idx] ?? new Map();
+    return convertSheet(ws, idx, name, styleMap, styles);
   });
 }
 
 // Parse uploaded xlsx buffer (for user uploads)
 function parseUploadedXlsx(buffer: Buffer): any[] {
   const workbook = XLSX.read(buffer, { cellFormula: true, cellStyles: true, cellNF: true });
-  // Same conversion as local files
+  const styles = (workbook as any).Styles;
+  const sheetPaths = (workbook as any).Directory?.sheets ?? [];
+  const cellStyleMaps = buildCellStyleMaps(buffer, sheetPaths);
   return workbook.SheetNames.map((name, idx) => {
     const ws = workbook.Sheets[name];
-    const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
-    const celldata: { r: number; c: number; v: CellValue }[] = [];
-    const columnlen: Record<string, number> = {};
-    const rowlen: Record<string, number> = {};
-    const merge: Record<string, { r: number; c: number; rs: number; cs: number }> = {};
-
-    if (ws["!cols"]) ws["!cols"].forEach((col: any, i: number) => {
-      if (col?.wpx) columnlen[String(i)] = col.wpx;
-      else if (col?.wch) columnlen[String(i)] = col.wch * 8;
-    });
-    if (ws["!rows"]) ws["!rows"].forEach((row: any, i: number) => {
-      if (row?.hpx) rowlen[String(i)] = row.hpx;
-    });
-    if (ws["!merges"]) ws["!merges"].forEach((m: any) => {
-      merge[`${m.s.r}_${m.s.c}`] = { r: m.s.r, c: m.s.c, rs: m.e.r - m.s.r + 1, cs: m.e.c - m.s.c + 1 };
-    });
-
-    for (let r = range.s.r; r <= range.e.r; r++) {
-      for (let c = range.s.c; c <= range.e.c; c++) {
-        const cell = ws[XLSX.utils.encode_cell({ r, c })];
-        if (!cell) continue;
-        const cv: CellValue = { v: cell.v, m: cell.w || (cell.v != null ? String(cell.v) : "") };
-        if (cell.f) cv.f = "=" + cell.f;
-        if (typeof cell.v === "number" && cell.z) { cv.ct = { fa: cell.z, t: "n" }; if (cell.w) cv.m = cell.w; }
-        const s = cell.s;
-        if (s) {
-          if (s.patternType === "solid" && s.fgColor?.rgb) cv.bg = rgbToHex(s.fgColor.rgb);
-          if (s.color?.rgb) cv.fc = rgbToHex(s.color.rgb);
-          if (s.bold) cv.bl = 1;
-          if (s.italic) cv.it = 1;
-          if (s.sz) cv.fs = s.sz;
-        }
-        if (!cv.bg) cv.bg = "#FFFFFF";
-        if (!cv.fc) cv.fc = "#000000";
-        celldata.push({ r, c, v: cv });
+    const styleMap = cellStyleMaps[idx] ?? new Map();
+    const sheet = convertSheet(ws, idx, name, styleMap, styles);
+    // Uploaded files: use smaller default column widths
+    for (const key of Object.keys(sheet.config.columnlen)) {
+      if (sheet.config.columnlen[key] > 200 && parseInt(key) > 0) {
+        sheet.config.columnlen[key] = Math.min(sheet.config.columnlen[key], 150);
       }
     }
-
-    for (let c = range.s.c; c <= range.e.c; c++) {
-      if (!columnlen[String(c)]) columnlen[String(c)] = c === 0 ? 200 : 100;
-    }
-
-    return {
-      name, id: `sheet_${idx}`, celldata,
-      row: range.e.r + 1, column: range.e.c + 1,
-      order: idx, status: idx === 0 ? 1 : 0,
-      config: { columnlen, rowlen, merge: Object.keys(merge).length > 0 ? merge : undefined },
-    };
+    return sheet;
   });
 }
 
