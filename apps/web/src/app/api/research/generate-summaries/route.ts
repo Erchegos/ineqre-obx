@@ -159,6 +159,18 @@ ${cleanedText.substring(0, 15000)}`;
       const firstBlock = message.content[0];
       if (firstBlock.type !== 'text') return null;
       let summary = firstBlock.text;
+
+      // Detect refusal responses — Claude saying it can't summarize without real content
+      const isRefusal =
+        /I (appreciate your request|don't see an actual|cannot provide|can't provide)/i.test(summary) ||
+        /only a header describing/i.test(summary) ||
+        /Please share the full report/i.test(summary) ||
+        /I would need the actual/i.test(summary) ||
+        /no actual equity research/i.test(summary) ||
+        /To provide the summary.{0,60}I would need/i.test(summary) ||
+        /not (see|find) (a|an|the) (actual|real|full) (report|content|document)/i.test(summary);
+      if (isRefusal) return null;
+
       summary = summary.replace(/^(Here is|Below is|Summary of)[^:]*:\s*\n*/i, "");
       summary = summary.split(/\n*(This (message|report|document) is confidential|Please refer to|Disclaimer|Legal Notice|Important (Notice|Disclosure))/i)[0];
       summary = summary.replace(/\n{3,}/g, "\n\n");
