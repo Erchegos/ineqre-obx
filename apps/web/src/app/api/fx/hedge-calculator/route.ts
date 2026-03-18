@@ -92,7 +92,7 @@ export async function POST(request: Request) {
     }
 
     // P&L scenarios
-    const fxMoves = [-20, -15, -10, -5, 0, 5, 10, 15, 20];
+    const fxMoves = [-15, -12.5, -10, -7.5, -5, -2.5, 0, 2.5, 5, 7.5, 10, 12.5, 15];
     const scenarios = fxMoves.map((movePct) => {
       const newSpot = spot * (1 + movePct / 100);
       const unhedgedPnl = (netExposure * notional * movePct) / 100;
