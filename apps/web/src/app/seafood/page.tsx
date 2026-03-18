@@ -481,8 +481,8 @@ export default function SeafoodPage() {
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", borderBottom: "1px solid #30363d" }}>
                       {[
                         { label: "PARETO SPOT EST.", value: paretoData?.spot?.spot_nok, src: (() => { if (!paretoData?.spot?.report_date) return "Pareto W/W"; const d = new Date(new Date(paretoData.spot.report_date).getTime() + 3600000); const jan4 = new Date(d.getFullYear(), 0, 4); const wk = Math.ceil(((d.getTime() - jan4.getTime()) / 86400000 + jan4.getDay() + 1) / 7); return `Est. W${wk}`; })() },
-                        { label: "FISH POOL AVG", value: fishPoolSpot?.latest?.sisalmon_avg, src: `SISALMON W${fishPoolSpot?.latest?.week ?? ""}` },
-                        { label: "FISH POOL 3-6KG", value: fishPoolSpot?.latest?.sisalmon_3_6kg, src: `SISALMON W${fishPoolSpot?.latest?.week ?? ""}` },
+                        { label: "FISH POOL AVG", value: fishPoolSpot?.latest?.sisalmon_avg, src: `Sitagri/Euronext · W${fishPoolSpot?.latest?.week ?? ""}` },
+                        { label: "FISH POOL 3-6KG", value: fishPoolSpot?.latest?.sisalmon_3_6kg, src: `Sitagri/Euronext · W${fishPoolSpot?.latest?.week ?? ""}` },
                         { label: "QTD PRICE", value: paretoData?.spot?.qtd_price_nok, src: "Pareto QTD" },
                         { label: "CONSENSUS", value: paretoData?.spot?.consensus_nok != null && paretoData.spot.consensus_nok > 10 ? paretoData.spot.consensus_nok : null, src: "PAS FCA Oslo" },
                       ].map((m, i) => (
@@ -620,6 +620,11 @@ export default function SeafoodPage() {
                                   </div>
                                 );
                               })() : <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 12, padding: "20px 0" }}>No forward data</div>}
+                              {forwardPrices?.forwards && forwardPrices.forwards.length > 0 && (
+                                <div style={{ marginTop: 10, paddingTop: 6, borderTop: "1px solid #21262d", fontSize: 9, color: "rgba(255,255,255,0.3)", letterSpacing: "0.04em" }}>
+                                  Source: Fish Pool / Euronext Salmondesk · salmondesk@euronext.com
+                                </div>
+                              )}
                             </>
                           );
                         })()}
@@ -664,6 +669,9 @@ export default function SeafoodPage() {
                               <span style={{ textAlign: "right", color: "#3b82f6", fontVariantNumeric: "tabular-nums" }}>
                                 {fishPoolSpot.latest.sisalmon_avg?.toFixed(1) ?? "\u2014"}
                               </span>
+                            </div>
+                            <div style={{ marginTop: 8, paddingTop: 6, borderTop: "1px solid #21262d", fontSize: 9, color: "rgba(255,255,255,0.3)", letterSpacing: "0.04em" }}>
+                              Source: Sitagri SISALMON / Euronext Salmondesk · sisalmoni@sitagri.com
                             </div>
                           </div>
                         ) : <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 12, padding: "20px 0" }}>No spot data</div>}
