@@ -176,9 +176,7 @@ export default function SeafoodPage() {
   const [quarterlyOps, setQuarterlyOps] = useState<Record<string, any[]>>({});
   const [fishPoolSpot, setFishPoolSpot] = useState<{ spotPrices: SpotWeekly[]; latest: SpotWeekly | null } | null>(null);
   const [forwardPrices, setForwardPrices] = useState<{ forwards: ForwardPrice[] } | null>(null);
-  const [forwardHistory, setForwardHistory] = useState<{ byDate: Record<string, { period: string; priceEurTonne: number }[]>; byPeriod: Record<string, { report_date: string; priceEurTonne: number }[]>; dates: string[]; periods: string[] } | null>(null);
   const [paretoData, setParetoData] = useState<ParetoData | null>(null);
-  const [priceHistoryView, setPriceHistoryView] = useState<"spot" | "curve">("curve");
   const [htLive, setHtLive] = useState<HarvestTrackerLive | null>(null);
   const [htTrips, setHtTrips] = useState<HarvestTrip[]>([]);
   const [htEstimates, setHtEstimates] = useState<HarvestEstimate[]>([]);
@@ -254,7 +252,7 @@ export default function SeafoodPage() {
         if (fp) setFishPoolSpot(fp);
         if (fwd) setForwardPrices(fwd);
         if (par) setParetoData(par);
-        if (fwdHist) setForwardHistory(fwdHist);
+        void fwdHist;
         // Harvest tracker data (non-blocking)
         const [htL, htT, htE, htAct, htSH] = await Promise.all([
           sf("/api/seafood/harvest-tracker/live"),
@@ -684,193 +682,6 @@ export default function SeafoodPage() {
                     </div>
                   </div>
 
-                  {/* ── Price History Charts ── (removed: chart was noisy, table formatting poor) */}
-                  {false && (fishPoolSpot?.spotPrices?.length || forwardHistory?.dates?.length) && (
-                    <div style={{ borderBottom: "1px solid #30363d" }}>
-                      {/* Header + tab toggle */}
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid #21262d" }}>
-                        <span style={S.section as React.CSSProperties}>PRICE HISTORY</span>
-                        <div style={{ display: "flex", gap: 4 }}>
-                          {(["curve", "spot"] as const).map(v => (
-                            <button key={v} onClick={() => setPriceHistoryView(v)} style={{
-                              fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", padding: "3px 10px",
-                              borderRadius: 4, border: "none", cursor: "pointer",
-                              background: priceHistoryView === v ? "#3b82f6" : "#21262d",
-                              color: priceHistoryView === v ? "#fff" : "rgba(255,255,255,0.5)",
-                            }}>
-                              {v === "curve" ? "FORWARD CURVES" : "SPOT HISTORY"}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Forward Curve Fan */}
-                      {priceHistoryView === "curve" && forwardHistory && (() => {
-                        const DATE_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#a78bfa", "#06b6d4"];
-                        const { byDate, dates, periods } = forwardHistory;
-                        // Build chart data: one row per period, one key per date
-                        const chartData = periods.map(p => {
-                          const row: Record<string, string | number> = { period: p };
-                          for (const d of dates) {
-                            const entry = byDate[d]?.find(e => e.period === p);
-                            if (entry) row[d] = Math.round(entry.priceEurTonne / 10) / 100; // EUR/kg with 2dp
-                          }
-                          return row;
-                        });
-                        const fmtDate = (d: string) => {
-                          const dt = new Date(d);
-                          return `W${Math.ceil((dt.getDate() + new Date(dt.getFullYear(), dt.getMonth(), 1).getDay()) / 7)} ${dt.toLocaleString("en", { month: "short" })}`;
-                        };
-                        return (
-                          <div style={{ padding: "12px 14px" }}>
-                            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>
-                              Forward curve snapshots — EUR/kg · Fish Pool / Euronext
-                            </div>
-                            <ResponsiveContainer width="100%" height={240}>
-                              <LineChart data={chartData} margin={{ top: 4, right: 20, bottom: 20, left: 0 }}>
-                                <CartesianGrid stroke="#21262d" strokeDasharray="2 4" />
-                                <XAxis dataKey="period" tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 9 }} angle={-35} textAnchor="end" interval={0} />
-                                <YAxis tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 9 }} tickFormatter={v => `€${v.toFixed(1)}`} domain={["auto", "auto"]} width={42} />
-                                <Tooltip
-                                  contentStyle={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 6, fontSize: 11 }}
-                                  formatter={(v: unknown, name: unknown) => [`€${(v as number).toFixed(2)}/kg`, fmtDate(name as string)]}
-                                  labelStyle={{ color: "rgba(255,255,255,0.7)", fontWeight: 700, marginBottom: 4 }}
-                                />
-                                <Legend formatter={(v) => <span style={{ fontSize: 10, color: "rgba(255,255,255,0.6)" }}>{fmtDate(v)}</span>} />
-                                {dates.map((d, i) => (
-                                  <Line key={d} dataKey={d} stroke={DATE_COLORS[i % DATE_COLORS.length]}
-                                    strokeWidth={i === dates.length - 1 ? 2.5 : 1.5}
-                                    dot={false} connectNulls
-                                    strokeDasharray={i === dates.length - 1 ? undefined : "4 2"}
-                                  />
-                                ))}
-                              </LineChart>
-                            </ResponsiveContainer>
-                            {/* Per-contract delta table */}
-                            {dates.length >= 2 && (
-                              <div style={{ marginTop: 10, overflowX: "auto" }}>
-                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
-                                  <thead>
-                                    <tr>
-                                      <th style={{ textAlign: "left", color: "rgba(255,255,255,0.4)", padding: "4px 6px", fontWeight: 600 }}>CONTRACT</th>
-                                      {dates.map(d => (
-                                        <th key={d} style={{ textAlign: "right", color: "rgba(255,255,255,0.4)", padding: "4px 6px", fontWeight: 600 }}>{fmtDate(d)}</th>
-                                      ))}
-                                      <th style={{ textAlign: "right", color: "rgba(255,255,255,0.4)", padding: "4px 6px", fontWeight: 600 }}>CHANGE</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {periods.map(p => {
-                                      const vals = dates.map(d => byDate[d]?.find(e => e.period === p)?.priceEurTonne ?? null);
-                                      const first = vals.find(v => v != null);
-                                      const last = vals.slice().reverse().find(v => v != null);
-                                      const delta = first != null && last != null ? last - first : null;
-                                      return (
-                                        <tr key={p} style={{ borderTop: "1px solid #21262d" }}>
-                                          <td style={{ padding: "4px 6px", color: "#fff", fontWeight: 600 }}>{p}</td>
-                                          {vals.map((v, i) => (
-                                            <td key={i} style={{ textAlign: "right", padding: "4px 6px", color: v != null ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.2)" }}>
-                                              {v != null ? v.toLocaleString() : "—"}
-                                            </td>
-                                          ))}
-                                          <td style={{ textAlign: "right", padding: "4px 6px", fontWeight: 700,
-                                            color: delta == null ? "rgba(255,255,255,0.3)" : delta > 0 ? "#10b981" : delta < 0 ? "#ef4444" : "rgba(255,255,255,0.5)" }}>
-                                            {delta == null ? "—" : `${delta > 0 ? "+" : ""}${delta.toFixed(0)}`}
-                                          </td>
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
-
-                      {/* Spot Price History */}
-                      {priceHistoryView === "spot" && fishPoolSpot?.spotPrices && (() => {
-                        const rows = fishPoolSpot.spotPrices;
-                        const LINES = [
-                          { key: "sisalmon_avg", label: "AVG", color: "#3b82f6", width: 2.5 },
-                          { key: "price_3_4kg", label: "3-4kg", color: "#10b981", width: 1.5 },
-                          { key: "price_4_5kg", label: "4-5kg", color: "#22c55e", width: 1.5 },
-                          { key: "price_5_6kg", label: "5-6kg", color: "#f59e0b", width: 1.5 },
-                          { key: "price_6_7kg", label: "6-7kg", color: "#a78bfa", width: 1.5 },
-                        ];
-                        const chartData = rows.map(r => ({
-                          label: `W${r.week}`,
-                          ...Object.fromEntries(LINES.map(l => [l.key, (r as Record<string, unknown>)[l.key] as number | null])),
-                        }));
-                        const latestAvg = rows[rows.length - 1]?.sisalmon_avg;
-                        return (
-                          <div style={{ padding: "12px 14px" }}>
-                            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>
-                              SISALMON weekly spot prices — NOK/kg · Sitagri/Euronext
-                            </div>
-                            {latestAvg != null && (
-                              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginBottom: 6 }}>
-                                Latest AVG: <span style={{ color: "#3b82f6", fontWeight: 700 }}>NOK {latestAvg.toFixed(1)}</span>
-                              </div>
-                            )}
-                            <ResponsiveContainer width="100%" height={220}>
-                              <LineChart data={chartData} margin={{ top: 4, right: 20, bottom: 4, left: 0 }}>
-                                <CartesianGrid stroke="#21262d" strokeDasharray="2 4" />
-                                <XAxis dataKey="label" tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 9 }} />
-                                <YAxis tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 9 }} tickFormatter={v => `${v}`} domain={["auto", "auto"]} width={38} />
-                                {latestAvg != null && (
-                                  <ReferenceLine y={latestAvg} stroke="#3b82f6" strokeDasharray="3 3" strokeOpacity={0.4} />
-                                )}
-                                <Tooltip
-                                  contentStyle={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 6, fontSize: 11 }}
-                                  formatter={(v: unknown, name: unknown) => {
-                                    const l = LINES.find(x => x.key === name);
-                                    return [`NOK ${(v as number)?.toFixed(1) ?? "—"}`, l?.label ?? String(name)];
-                                  }}
-                                  labelStyle={{ color: "rgba(255,255,255,0.7)", fontWeight: 700, marginBottom: 4 }}
-                                />
-                                <Legend formatter={(v) => { const l = LINES.find(x => x.key === v); return <span style={{ fontSize: 10, color: "rgba(255,255,255,0.6)" }}>{l?.label ?? v}</span>; }} />
-                                {LINES.map(l => (
-                                  <Line key={l.key} dataKey={l.key} stroke={l.color} strokeWidth={l.width} dot={false} connectNulls />
-                                ))}
-                              </LineChart>
-                            </ResponsiveContainer>
-                            {/* Weight class table for latest week */}
-                            {rows.length >= 2 && (() => {
-                              const prev = rows[rows.length - 2];
-                              const curr = rows[rows.length - 1];
-                              const classes = [
-                                { key: "price_1_2kg", label: "1-2 kg" }, { key: "price_2_3kg", label: "2-3 kg" },
-                                { key: "price_3_4kg", label: "3-4 kg" }, { key: "price_4_5kg", label: "4-5 kg" },
-                                { key: "price_5_6kg", label: "5-6 kg" }, { key: "price_6_7kg", label: "6-7 kg" },
-                                { key: "price_7_8kg", label: "7-8 kg" }, { key: "price_8_9kg", label: "8-9 kg" },
-                              ] as const;
-                              return (
-                                <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 4 }}>
-                                  {classes.map(c => {
-                                    const cv = (curr as Record<string, unknown>)[c.key] as number | null;
-                                    const pv = (prev as Record<string, unknown>)[c.key] as number | null;
-                                    const delta = cv != null && pv != null ? cv - pv : null;
-                                    return (
-                                      <div key={c.key} style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 4, padding: "6px 8px" }}>
-                                        <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginBottom: 2 }}>{c.label}</div>
-                                        <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{cv?.toFixed(1) ?? "—"}</div>
-                                        {delta != null && (
-                                          <div style={{ fontSize: 9, color: delta >= 0 ? "#10b981" : "#ef4444" }}>
-                                            {delta >= 0 ? "+" : ""}{delta.toFixed(1)} W/W
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
 
                   {/* Biomass & Export Teaser */}
                   <div style={{ borderBottom: "1px solid #30363d" }}>
