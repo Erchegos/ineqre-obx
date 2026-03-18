@@ -602,6 +602,22 @@ export default function SeafoodPage() {
                               })()}
                               {(() => {
                                 const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+                                const MONTH_IDX: Record<string, number> = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
+                                const periodSortKey = (p: string): number => {
+                                  // Q1-26 or Q1'26
+                                  const qm = p.match(/^Q([1-4])[-'](\d{2})$/);
+                                  if (qm) return (2000 + parseInt(qm[2])) * 100 + (parseInt(qm[1]) - 1) * 3;
+                                  // H1-26 or H1'26
+                                  const hm = p.match(/^H([12])[-'](\d{2})$/);
+                                  if (hm) return (2000 + parseInt(hm[2])) * 100 + (parseInt(hm[1]) - 1) * 6;
+                                  // Y2026 or Y-26 or Y'26
+                                  const ym = p.match(/^Y[-']?(\d{2,4})$/);
+                                  if (ym) { const y = ym[1].length === 4 ? parseInt(ym[1]) : 2000 + parseInt(ym[1]); return y * 100 + 6; }
+                                  // Apr-26 or Apr'26
+                                  const mm = p.match(/^([A-Za-z]{3})[-'](\d{2})$/);
+                                  if (mm) return (2000 + parseInt(mm[2])) * 100 + (MONTH_IDX[mm[1]] ?? 0);
+                                  return 9999;
+                                };
                                 const fmtLabel = (p: string) => {
                                   let label = p;
                                   label = label.replace(/^(\d{2})\+(\d{2})-(\d{2})$/, (_m, m1, m2, y) => `${months[parseInt(m1)-1]}-${months[parseInt(m2)-1]}'${y}`);
@@ -616,7 +632,7 @@ export default function SeafoodPage() {
 
                                 // If a historical date is selected, render from forwardHistory
                                 if (selectedFwdDate && forwardHistory?.byDate[selectedFwdDate]) {
-                                  const entries = forwardHistory.byDate[selectedFwdDate];
+                                  const entries = [...forwardHistory.byDate[selectedFwdDate]].sort((a, b) => periodSortKey(a.period) - periodSortKey(b.period));
                                   const prevDate = forwardHistory.dates[forwardHistory.dates.indexOf(selectedFwdDate) - 1];
                                   const prevEntries = prevDate ? forwardHistory.byDate[prevDate] : null;
                                   return (
@@ -651,7 +667,7 @@ export default function SeafoodPage() {
                                 const fwds = forwardPrices.forwards.map(f => {
                                   const nokKg = f.price_eur_tonne ? f.price_eur_tonne * EURNOK / 1000 : null;
                                   return { ...f, label: fmtLabel(f.period), nokKg };
-                                });
+                                }).sort((a, b) => periodSortKey(a.period) - periodSortKey(b.period));
                                 return (
                                   <div>
                                     <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 1fr 60px", gap: 0, padding: "5px 0", borderBottom: "1px solid #30363d", fontSize: 10, color: "rgba(255,255,255,0.4)", fontWeight: 700 }}>
