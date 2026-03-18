@@ -6,7 +6,16 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Intelligence Equity Research",
   description: "Quantitative equity research platform for Oslo Børs. Historical price analysis with dividend adjustments, volatility tracking, Monte Carlo simulations, standard deviation channels, and sector correlation analysis powered by real-time Interactive Brokers data.",
-
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "InEqRe",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+    "theme-color": "#0a0a0a",
+  },
 };
 
 export default function RootLayout({
