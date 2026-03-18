@@ -12,9 +12,15 @@ import { readFileSync } from 'fs';
 
 const { Pool } = pg;
 
-// Load .env.local
-const envContent = readFileSync('.env.local', 'utf-8');
-const dbUrl = envContent.match(/DATABASE_URL="([^"]+)"/)?.[1];
+// Load DATABASE_URL: env var (VPS/CI) takes priority, fallback to .env.local (local dev)
+let dbUrl = process.env.DATABASE_URL;
+if (!dbUrl) {
+  try {
+    const envContent = readFileSync('.env.local', 'utf-8');
+    dbUrl = envContent.match(/DATABASE_URL="?([^"\n]+)"?/)?.[1]?.trim();
+  } catch { /* .env.local not present */ }
+}
+if (!dbUrl) throw new Error('DATABASE_URL not set — set env var or create .env.local');
 
 const pool = new Pool({
   connectionString: dbUrl,
