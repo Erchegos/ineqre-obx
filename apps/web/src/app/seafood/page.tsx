@@ -2,7 +2,6 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, ReferenceLine } from "recharts";
 import SalmonPriceChart from "@/components/SalmonPriceChart";
 import LiceChart from "@/components/LiceChart";
 import ProductionAreaMap from "@/components/ProductionAreaMap";
@@ -685,8 +684,8 @@ export default function SeafoodPage() {
                     </div>
                   </div>
 
-                  {/* ── Price History Charts ── */}
-                  {(fishPoolSpot?.spotPrices?.length || forwardHistory?.dates?.length) && (
+                  {/* ── Price History Charts ── (removed: chart was noisy, table formatting poor) */}
+                  {false && (fishPoolSpot?.spotPrices?.length || forwardHistory?.dates?.length) && (
                     <div style={{ borderBottom: "1px solid #30363d" }}>
                       {/* Header + tab toggle */}
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid #21262d" }}>
