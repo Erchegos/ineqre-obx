@@ -5,9 +5,7 @@
  */
 
 import { spawn } from 'child_process';
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const pg = require('pg');
+import pg from 'pg';
 import { readFileSync } from 'fs';
 
 const { Pool } = pg;
