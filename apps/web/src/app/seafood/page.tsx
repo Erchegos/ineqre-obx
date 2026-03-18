@@ -176,6 +176,8 @@ export default function SeafoodPage() {
   const [quarterlyOps, setQuarterlyOps] = useState<Record<string, any[]>>({});
   const [fishPoolSpot, setFishPoolSpot] = useState<{ spotPrices: SpotWeekly[]; latest: SpotWeekly | null } | null>(null);
   const [forwardPrices, setForwardPrices] = useState<{ forwards: ForwardPrice[] } | null>(null);
+  const [forwardHistory, setForwardHistory] = useState<{ byDate: Record<string, { period: string; priceEurTonne: number }[]>; dates: string[] } | null>(null);
+  const [selectedFwdDate, setSelectedFwdDate] = useState<string | null>(null);
   const [paretoData, setParetoData] = useState<ParetoData | null>(null);
   const [htLive, setHtLive] = useState<HarvestTrackerLive | null>(null);
   const [htTrips, setHtTrips] = useState<HarvestTrip[]>([]);
@@ -252,7 +254,7 @@ export default function SeafoodPage() {
         if (fp) setFishPoolSpot(fp);
         if (fwd) setForwardPrices(fwd);
         if (par) setParetoData(par);
-        void fwdHist;
+        if (fwdHist) setForwardHistory(fwdHist);
         // Harvest tracker data (non-blocking)
         const [htL, htT, htE, htAct, htSH] = await Promise.all([
           sf("/api/seafood/harvest-tracker/live"),
@@ -570,32 +572,85 @@ export default function SeafoodPage() {
                             : 11.7;
                           return (
                             <>
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+                              {/* Header row */}
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
                                 <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 700, letterSpacing: "0.06em" }}>FORWARD CURVE</span>
                                 <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>EUR/NOK {EURNOK.toFixed(2)}</span>
                               </div>
-                              {forwardPrices?.forwards && forwardPrices.forwards.length > 0 ? (() => {
-                                const fwds = forwardPrices.forwards.map(f => {
-                                  let label = f.period;
-                                  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-                                  // "01+02-27" → "Jan-Feb'27"
-                                  label = label.replace(/^(\d{2})\+(\d{2})-(\d{2})$/, (_m, m1, m2, y) =>
-                                    `${months[parseInt(m1)-1]}-${months[parseInt(m2)-1]}'${y}`);
-                                  // "Q1+Q2-27" → "H1'27"
-                                  label = label.replace(/^Q([1-2])\+Q([2-4])-(\d{2})$/, (_m, _q1, _q2, y) => {
-                                    const q1n = parseInt(_q1); return `H${q1n <= 2 ? 1 : 2}'${y}`;
-                                  });
-                                  // "Q3+Q4-27" → "H2'27"
+                              {/* Week selector */}
+                              {forwardHistory && forwardHistory.dates.length > 0 && (() => {
+                                const fmtBtn = (d: string) => {
+                                  const dt = new Date(d);
+                                  return dt.toLocaleDateString("en", { day: "numeric", month: "short" });
+                                };
+                                const isLatest = selectedFwdDate === null || selectedFwdDate === forwardHistory.dates[forwardHistory.dates.length - 1];
+                                return (
+                                  <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginBottom: 8 }}>
+                                    {forwardHistory.dates.map(d => {
+                                      const active = selectedFwdDate === d || (isLatest && d === forwardHistory.dates[forwardHistory.dates.length - 1]);
+                                      return (
+                                        <button key={d} onClick={() => setSelectedFwdDate(d === forwardHistory.dates[forwardHistory.dates.length - 1] ? null : d)}
+                                          style={{ fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 3, border: "none", cursor: "pointer",
+                                            background: active ? "#3b82f6" : "#21262d",
+                                            color: active ? "#fff" : "rgba(255,255,255,0.45)" }}>
+                                          {fmtBtn(d)}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })()}
+                              {(() => {
+                                const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+                                const fmtLabel = (p: string) => {
+                                  let label = p;
+                                  label = label.replace(/^(\d{2})\+(\d{2})-(\d{2})$/, (_m, m1, m2, y) => `${months[parseInt(m1)-1]}-${months[parseInt(m2)-1]}'${y}`);
+                                  label = label.replace(/^Q([1-2])\+Q([2-4])-(\d{2})$/, (_m, _q1, _q2, y) => { const q1n = parseInt(_q1); return `H${q1n <= 2 ? 1 : 2}'${y}`; });
                                   label = label.replace(/^Q([3-4])\+Q([3-4])-(\d{2})$/, (_m, _q1, _q2, y) => `H2'${y}`);
-                                  // "Q1-27" → "Q1'27"
                                   label = label.replace(/^Q([1-4])-(\d{2})$/, "Q$1'$2");
-                                  // "Apr-26" → "Apr'26", "Jun-26" → "Jun'26"
                                   label = label.replace(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-(\d{2})$/, "$1'$2");
-                                  // "04-26" → "Apr'26"
-                                  label = label.replace(/^(0[1-9]|1[0-2])-(\d{2})$/, (_m, mo, y) =>
-                                    `${months[parseInt(mo)-1]}'${y}`);
-                                  const nokKg = f.price_eur_tonne ? (f.price_eur_tonne * EURNOK / 1000) : null;
-                                  return { ...f, label, nokKg };
+                                  label = label.replace(/^(0[1-9]|1[0-2])-(\d{2})$/, (_m, mo, y) => `${months[parseInt(mo)-1]}'${y}`);
+                                  label = label.replace(/^Y(\d{4})$/, "Y$1");
+                                  return label;
+                                };
+
+                                // If a historical date is selected, render from forwardHistory
+                                if (selectedFwdDate && forwardHistory?.byDate[selectedFwdDate]) {
+                                  const entries = forwardHistory.byDate[selectedFwdDate];
+                                  const prevDate = forwardHistory.dates[forwardHistory.dates.indexOf(selectedFwdDate) - 1];
+                                  const prevEntries = prevDate ? forwardHistory.byDate[prevDate] : null;
+                                  return (
+                                    <div>
+                                      <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 1fr 60px", gap: 0, padding: "5px 0", borderBottom: "1px solid #30363d", fontSize: 10, color: "rgba(255,255,255,0.4)", fontWeight: 700 }}>
+                                        <span>CONTRACT</span>
+                                        <span style={{ textAlign: "right" }}>EUR/T</span>
+                                        <span style={{ textAlign: "right" }}>NOK/KG</span>
+                                        <span style={{ textAlign: "right" }}>W/W</span>
+                                      </div>
+                                      {entries.map((e, i) => {
+                                        const nokKg = e.priceEurTonne ? e.priceEurTonne * EURNOK / 1000 : null;
+                                        const prev = prevEntries?.find(p => p.period === e.period);
+                                        const ww = prev ? ((e.priceEurTonne - prev.priceEurTonne) / prev.priceEurTonne) * 100 : null;
+                                        return (
+                                          <div key={i} style={{ display: "grid", gridTemplateColumns: "80px 1fr 1fr 60px", gap: 0, padding: "4px 0", borderBottom: "1px solid #181818", fontSize: 12 }}>
+                                            <span style={{ color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: 11 }}>{fmtLabel(e.period)}</span>
+                                            <span style={{ textAlign: "right", color: "#fff", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{e.priceEurTonne.toLocaleString()}</span>
+                                            <span style={{ textAlign: "right", color: "#3b82f6", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{nokKg?.toFixed(1) ?? "—"}</span>
+                                            <span style={{ textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums", color: ww == null ? "rgba(255,255,255,0.35)" : ww >= 0 ? "#22c55e" : "#ef4444" }}>
+                                              {ww != null ? `${ww >= 0 ? "+" : ""}${ww.toFixed(1)}%` : "—"}
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                }
+
+                                // Default: current week from forwardPrices
+                                if (!forwardPrices?.forwards?.length) return <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 12, padding: "20px 0" }}>No forward data</div>;
+                                const fwds = forwardPrices.forwards.map(f => {
+                                  const nokKg = f.price_eur_tonne ? f.price_eur_tonne * EURNOK / 1000 : null;
+                                  return { ...f, label: fmtLabel(f.period), nokKg };
                                 });
                                 return (
                                   <div>
@@ -608,25 +663,19 @@ export default function SeafoodPage() {
                                     {fwds.slice(0, 12).map((f, i) => (
                                       <div key={i} style={{ display: "grid", gridTemplateColumns: "80px 1fr 1fr 60px", gap: 0, padding: "4px 0", borderBottom: "1px solid #181818", fontSize: 12 }}>
                                         <span style={{ color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: 11 }}>{f.label}</span>
-                                        <span style={{ textAlign: "right", color: "#fff", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
-                                          {f.price_eur_tonne?.toLocaleString() ?? "\u2014"}
-                                        </span>
-                                        <span style={{ textAlign: "right", color: "#3b82f6", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
-                                          {f.nokKg != null ? f.nokKg.toFixed(1) : "\u2014"}
-                                        </span>
-                                        <span style={{ textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums", color: f.change_pct == null ? "rgba(255,255,255,0.35)" : (f.change_pct >= 0 ? "#22c55e" : "#ef4444") }}>
-                                          {f.change_pct != null ? `${f.change_pct >= 0 ? "+" : ""}${f.change_pct.toFixed(1)}%` : "\u2014"}
+                                        <span style={{ textAlign: "right", color: "#fff", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{f.price_eur_tonne?.toLocaleString() ?? "—"}</span>
+                                        <span style={{ textAlign: "right", color: "#3b82f6", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{f.nokKg?.toFixed(1) ?? "—"}</span>
+                                        <span style={{ textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums", color: f.change_pct == null ? "rgba(255,255,255,0.35)" : f.change_pct >= 0 ? "#22c55e" : "#ef4444" }}>
+                                          {f.change_pct != null ? `${f.change_pct >= 0 ? "+" : ""}${f.change_pct.toFixed(1)}%` : "—"}
                                         </span>
                                       </div>
                                     ))}
                                   </div>
                                 );
-                              })() : <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 12, padding: "20px 0" }}>No forward data</div>}
-                              {forwardPrices?.forwards && forwardPrices.forwards.length > 0 && (
-                                <div style={{ marginTop: 10, paddingTop: 6, borderTop: "1px solid #21262d", fontSize: 9, color: "rgba(255,255,255,0.3)", letterSpacing: "0.04em" }}>
-                                  Source: Fish Pool / Euronext Salmondesk · salmondesk@euronext.com
-                                </div>
-                              )}
+                              })()}
+                              <div style={{ marginTop: 10, paddingTop: 6, borderTop: "1px solid #21262d", fontSize: 9, color: "rgba(255,255,255,0.3)", letterSpacing: "0.04em" }}>
+                                Source: Fish Pool / Euronext Salmondesk · salmondesk@euronext.com
+                              </div>
                             </>
                           );
                         })()}
