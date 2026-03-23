@@ -978,7 +978,7 @@ export default function AlphaPage() {
                               itemStyle={{ color: "#fff" }}
                               formatter={((v: number) => [(v * 100).toFixed(2) + "%", "Excess"]) as Parameters<typeof Tooltip>[0]["formatter"]} />
                             <Bar dataKey="excess" radius={[2, 2, 0, 0]}>
-                              {portfolioBacktest.monthlyReturns.map((d, i) => <Cell key={i} fill={d.excess >= 0 ? "#34d399" : "#f87171"} />)}
+                              {portfolioBacktest.monthlyReturns.map((d, i) => <Cell key={i} fill={d.excess >= 0 ? "#10b981" : "#ef4444"} />)}
                             </Bar>
                           </BarChart>
                         </ResponsiveContainer>
@@ -996,7 +996,7 @@ export default function AlphaPage() {
                               itemStyle={{ color: "#fff" }}
                               formatter={((v: number) => [Number(v).toFixed(3), "IC"]) as Parameters<typeof Tooltip>[0]["formatter"]} />
                             <Bar dataKey="ic" radius={[2, 2, 0, 0]}>
-                              {portfolioBacktest.monthlyReturns.map((d, i) => <Cell key={i} fill={d.ic >= 0 ? "#60a5fa" : "#f87171"} />)}
+                              {portfolioBacktest.monthlyReturns.map((d, i) => <Cell key={i} fill={d.ic >= 0 ? "#3b82f6" : "#ef4444"} />)}
                             </Bar>
                           </BarChart>
                         </ResponsiveContainer>
