@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/useAuth";
 /* Types                                                               */
 /* ------------------------------------------------------------------ */
 
-type Tab = "dashboard" | "sensitivity" | "company" | "portfolio" | "forwards";
+type Tab = "dashboard" | "sensitivity" | "company" | "portfolio" | "forwards" | "pairs";
 
 type RateCard = {
   pair: string;
@@ -395,6 +395,170 @@ function HelpToggle({ id, label, children, showHelp, setShowHelp }: {
 }
 
 /* ------------------------------------------------------------------ */
+/* Pairs Trading Chart Sub-Components (stateless, defined outside     */
+/* main component to avoid identity issues during playback)           */
+/* ------------------------------------------------------------------ */
+
+function PairsZChart({ series, activeTrade }: { series: any[]; activeTrade: any }) {
+  if (series.length < 2) return null;
+  const WIN = 90;
+  const shown = series.length > WIN ? series.slice(-WIN) : series;
+  const W = 700, H = 190;
+  const PAD = { top: 16, right: 16, bottom: 28, left: 46 };
+  const cW = W - PAD.left - PAD.right, cH = H - PAD.top - PAD.bottom;
+  const zvals = shown.map((s: any) => s.zscore);
+  const absMax = Math.max(4.8, Math.max(...zvals.map(Math.abs)));
+  const yMin = -absMax, yMax = absMax;
+  const xOf = (i: number) => PAD.left + (i / Math.max(1, shown.length - 1)) * cW;
+  const yOf = (v: number) => PAD.top + (1 - (v - yMin) / (yMax - yMin)) * cH;
+  const linePts = shown.map((s: any, i: number) => `${i === 0 ? "M" : "L"}${xOf(i).toFixed(1)},${yOf(s.zscore).toFixed(1)}`).join(" ");
+  const fmtD = (s: string) => { const d = new Date(s); return `${d.getDate()} ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()]}`; };
+  const xTicks = [0, Math.floor(shown.length*0.25), Math.floor(shown.length*0.5), Math.floor(shown.length*0.75), shown.length-1];
+  // Position shading
+  const posRects: React.ReactElement[] = [];
+  if (activeTrade) {
+    let start = -1;
+    for (let i = 0; i < shown.length; i++) {
+      if (shown[i].date >= activeTrade.entryDate && start === -1) start = i;
+    }
+    if (start >= 0) {
+      const x1 = xOf(start), x2 = xOf(shown.length - 1);
+      posRects.push(<rect key="pos" x={x1} y={PAD.top} width={Math.max(0, x2 - x1)} height={cH}
+        fill={activeTrade.direction === "long" ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)"} />);
+    }
+  }
+  const lastPt = shown[shown.length - 1];
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ display: "block", width: "100%", height: "auto" }}>
+      {posRects}
+      {[-4,-2,-0.5,0,0.5,2,4].map(v => (
+        <g key={v}>
+          <line x1={PAD.left} x2={W-PAD.right} y1={yOf(v)} y2={yOf(v)}
+            stroke={v===0 ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.05)"} strokeWidth={v===0?1:0.8} strokeDasharray={v!==0?"3 3":undefined} />
+          <text x={PAD.left-4} y={yOf(v)+3.5} textAnchor="end" fontSize={8} fill={Math.abs(v)>=2?"rgba(255,255,255,0.4)":"rgba(255,255,255,0.22)"} fontFamily="monospace">
+            {v>0?`+${v}`:v}
+          </text>
+        </g>
+      ))}
+      <line x1={PAD.left} x2={W-PAD.right} y1={yOf(2)} y2={yOf(2)} stroke="#10b981" strokeWidth={1} opacity={0.5} />
+      <line x1={PAD.left} x2={W-PAD.right} y1={yOf(-2)} y2={yOf(-2)} stroke="#10b981" strokeWidth={1} opacity={0.5} />
+      <line x1={PAD.left} x2={W-PAD.right} y1={yOf(4)} y2={yOf(4)} stroke="#ef4444" strokeWidth={0.8} strokeDasharray="4 3" opacity={0.5} />
+      <line x1={PAD.left} x2={W-PAD.right} y1={yOf(-4)} y2={yOf(-4)} stroke="#ef4444" strokeWidth={0.8} strokeDasharray="4 3" opacity={0.5} />
+      <path d={linePts} fill="none" stroke="#3b82f6" strokeWidth={1.5} />
+      <line x1={xOf(shown.length-1)} x2={xOf(shown.length-1)} y1={PAD.top} y2={PAD.top+cH} stroke="rgba(255,255,255,0.35)" strokeWidth={1} strokeDasharray="2 2" />
+      {lastPt && <circle cx={xOf(shown.length-1)} cy={yOf(lastPt.zscore)} r={4} fill="#3b82f6" />}
+      {xTicks.map(i => shown[i] && (
+        <text key={i} x={xOf(i)} y={H-4} textAnchor="middle" fontSize={8} fill="rgba(255,255,255,0.28)" fontFamily="monospace">{fmtD(shown[i].date)}</text>
+      ))}
+    </svg>
+  );
+}
+
+function PairsEquityChart({ curve }: { curve: { date: string; value: number }[] }) {
+  if (curve.length < 2) return null;
+  const W = 400, H = 150;
+  const PAD = { top: 14, right: 52, bottom: 22, left: 46 };
+  const cW = W-PAD.left-PAD.right, cH = H-PAD.top-PAD.bottom;
+
+  // Work in % return space (value - 100)
+  const rets = curve.map(e => e.value - 100);
+  const rMin = Math.min(...rets, -1), rMax = Math.max(...rets, 1);
+  const range = rMax - rMin || 1;
+  const xOf = (i: number) => PAD.left + (i / Math.max(1, curve.length-1)) * cW;
+  const yOf = (r: number) => PAD.top + (1 - (r-rMin)/range) * cH;
+
+  const linePts = curve.map((e,i) => `${i===0?"M":"L"}${xOf(i).toFixed(1)},${yOf(rets[i]).toFixed(1)}`).join(" ");
+  const aB = PAD.top + cH;
+  const zero0Y = yOf(0);
+  const areaPts = `${PAD.left},${zero0Y} ${curve.map((e,i)=>`${xOf(i).toFixed(1)},${yOf(rets[i]).toFixed(1)}`).join(" ")} ${xOf(curve.length-1)},${zero0Y}`;
+  const endRet = rets[rets.length-1];
+  const lc = endRet >= 0 ? "#10b981" : "#ef4444";
+
+  // Y-axis ticks in % — pick ~4 nice values
+  const tickStep = Math.max(0.05, parseFloat((range / 4).toPrecision(1)));
+  const tickStart = Math.ceil(rMin / tickStep) * tickStep;
+  const yTicks: number[] = [];
+  for (let t = tickStart; t <= rMax + 0.001; t += tickStep) yTicks.push(Math.round(t * 1000) / 1000);
+
+  // Date ticks
+  const fmtD = (s: string) => { const d = new Date(s); return `${d.getDate()} ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()]}`; };
+  const xTicks = [0, Math.floor(curve.length*0.33), Math.floor(curve.length*0.66), curve.length-1];
+
+  const lastX = xOf(curve.length-1), lastY = yOf(endRet);
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ display: "block", width: "100%", height: "auto" }}>
+      <defs>
+        <linearGradient id="pEqG" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={lc} stopOpacity={0.3} />
+          <stop offset="100%" stopColor={lc} stopOpacity={0.02} />
+        </linearGradient>
+      </defs>
+      {/* Zero line */}
+      {zero0Y >= PAD.top && zero0Y <= PAD.top+cH && (
+        <line x1={PAD.left} x2={W-PAD.right} y1={zero0Y} y2={zero0Y} stroke="rgba(255,255,255,0.2)" strokeWidth={0.8} strokeDasharray="3 3" />
+      )}
+      {/* Y-axis ticks */}
+      {yTicks.map(t => {
+        const y = yOf(t);
+        if (y < PAD.top - 2 || y > PAD.top+cH+2) return null;
+        const label = (t >= 0 ? "+" : "") + t.toFixed(t === Math.floor(t) ? 0 : 1) + "%";
+        return (
+          <g key={t}>
+            <line x1={PAD.left-3} x2={PAD.left} y1={y} y2={y} stroke="rgba(255,255,255,0.2)" strokeWidth={0.6} />
+            <text x={PAD.left-5} y={y+3.5} textAnchor="end" fontSize={8} fill={t === 0 ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.25)"} fontFamily="monospace">{label}</text>
+          </g>
+        );
+      })}
+      {/* X-axis date ticks */}
+      {xTicks.map(i => curve[i] && (
+        <text key={i} x={xOf(i)} y={H-4} textAnchor="middle" fontSize={7} fill="rgba(255,255,255,0.2)" fontFamily="monospace">{fmtD(curve[i].date)}</text>
+      ))}
+      <polygon points={areaPts} fill="url(#pEqG)" />
+      <path d={linePts} fill="none" stroke={lc} strokeWidth={2} />
+      <circle cx={lastX} cy={lastY} r={3.5} fill={lc} />
+      {/* Final return label */}
+      <text x={lastX+6} y={lastY+4} fontSize={10} fontWeight={700} fill={lc} fontFamily="monospace">
+        {endRet >= 0 ? "+" : ""}{endRet.toFixed(2)}%
+      </text>
+    </svg>
+  );
+}
+
+function PairsBetaChart({ series }: { series: any[] }) {
+  if (series.length < 2) return null;
+  const WIN = 90;
+  const shown = series.length > WIN ? series.slice(-WIN) : series;
+  const W = 400, H = 130;
+  const PAD = { top: 10, right: 12, bottom: 20, left: 54 };
+  const cW = W-PAD.left-PAD.right, cH = H-PAD.top-PAD.bottom;
+  const bvals = shown.map((s: any) => s.beta);
+  const bMin = Math.min(...bvals)-0.001, bMax = Math.max(...bvals)+0.001;
+  const range = bMax - bMin || 0.001;
+  const xOf = (i: number) => PAD.left + (i / Math.max(1, shown.length-1)) * cW;
+  const yOf = (v: number) => PAD.top + (1-(v-bMin)/range)*cH;
+  const linePts = shown.map((s: any, i: number) => `${i===0?"M":"L"}${xOf(i).toFixed(1)},${yOf(s.beta).toFixed(1)}`).join(" ");
+  const aB = PAD.top+cH;
+  const areaPts = `${PAD.left},${aB} ${shown.map((s: any,i: number)=>`${xOf(i).toFixed(1)},${yOf(s.beta).toFixed(1)}`).join(" ")} ${xOf(shown.length-1)},${aB}`;
+  const lastBeta = shown[shown.length-1].beta;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ display: "block", width: "100%", height: "auto" }}>
+      <defs>
+        <linearGradient id="pBetaG" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.2} />
+          <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.02} />
+        </linearGradient>
+      </defs>
+      <polygon points={areaPts} fill="url(#pBetaG)" />
+      <path d={linePts} fill="none" stroke="#3b82f6" strokeWidth={1.5} />
+      <circle cx={xOf(shown.length-1)} cy={yOf(lastBeta)} r={3} fill="#3b82f6" />
+      <text x={PAD.left-4} y={PAD.top+3.5} textAnchor="end" fontSize={8} fill="rgba(255,255,255,0.3)" fontFamily="monospace">{bMax.toFixed(4)}</text>
+      <text x={PAD.left-4} y={PAD.top+cH+3.5} textAnchor="end" fontSize={8} fill="rgba(255,255,255,0.3)" fontFamily="monospace">{bMin.toFixed(4)}</text>
+    </svg>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Page Component                                                      */
 /* ------------------------------------------------------------------ */
 
@@ -467,6 +631,22 @@ export default function FXTerminalPage() {
   const [fundingRegimes, setFundingRegimes] = useState<any[]>([]);
   const [arbData, setArbData] = useState<any>(null);
   const [arbTenor, setArbTenor] = useState("3M");
+
+  /* Pairs trading live simulation */
+  const [pairsSelectedPair, setPairsSelectedPair] = useState("NOKGBP_NOKUSD");
+  const [pairsData, setPairsData] = useState<any>(null);
+  const [pairsDataLoading, setPairsDataLoading] = useState(false);
+  const [pairsPlayIdx, setPairsPlayIdx] = useState(-1); // -1 = not started, blank slate
+  const [pairsIsPlaying, setPairsIsPlaying] = useState(false);
+  const [pairsSpeed, setPairsSpeed] = useState(3);
+  const pairsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  /* Friction / cost parameters */
+  const [pairsDays, setPairsDays] = useState(252);            // history window in trading days
+  const [pairsPosSize, setPairsPosSize] = useState(10);       // % of NAV per trade
+  const [pairsBidAskBps, setPairsBidAskBps] = useState(2.5); // bps per side
+  const [pairsSlippageBps, setPairsSlippageBps] = useState(2.0); // bps
+  const [pairsCommBps, setPairsCommBps] = useState(1.0);     // bps
+  const pairsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [expSort, setExpSort] = useState<{ col: string; asc: boolean }>({ col: "ticker", asc: true });
   const [showHelp, setShowHelp] = useState<Record<string, boolean>>({});
@@ -619,6 +799,50 @@ export default function FXTerminalPage() {
     };
     sf(`/api/fx/arb-monitor?tenor=${arbTenor}`).then(setArbData);
   }, [tab, arbTenor]);
+
+  /* Pairs trading: build fetch URL including friction params */
+  const pairsFetchUrl = useMemo(() => {
+    const [pY, pX] = pairsSelectedPair.split("_");
+    const totalCostBps = (pairsBidAskBps * 2 + pairsSlippageBps + pairsCommBps).toFixed(1);
+    return `/api/fx/pairs-trade?pairY=${pY}&pairX=${pX}&delta=0.0001&ve=0.001&days=${pairsDays}&pos=${pairsPosSize}&cost=${totalCostBps}`;
+  }, [pairsSelectedPair, pairsDays, pairsPosSize, pairsBidAskBps, pairsSlippageBps, pairsCommBps]);
+
+  /* Pairs trading: load dataset when tab opens, pair changes, or friction params change */
+  useEffect(() => {
+    if (tab !== "pairs") return;
+    setPairsIsPlaying(false);
+    setPairsDataLoading(true);
+    // Keep old data visible while loading — don't blank it
+    const ctrl = new AbortController();
+    fetch(pairsFetchUrl, { signal: ctrl.signal })
+      .then(r => r.json())
+      .then(d => {
+        if (!d.error) {
+          setPairsData(d);
+          setPairsPlayIdx(-1); // blank slate — user must press PLAY
+        }
+      })
+      .catch(() => {})
+      .finally(() => setPairsDataLoading(false));
+    return () => ctrl.abort();
+  }, [tab, pairsFetchUrl]);
+
+  /* Pairs trading: playback engine */
+  useEffect(() => {
+    if (pairsIntervalRef.current) clearInterval(pairsIntervalRef.current);
+    if (!pairsIsPlaying || !pairsData) return;
+    pairsIntervalRef.current = setInterval(() => {
+      setPairsPlayIdx(prev => {
+        const next = prev + pairsSpeed;
+        if (next >= (pairsData.series?.length ?? 0) - 1) {
+          setPairsIsPlaying(false);
+          return (pairsData.series?.length ?? 1) - 1;
+        }
+        return next;
+      });
+    }, 80);
+    return () => { if (pairsIntervalRef.current) clearInterval(pairsIntervalRef.current); };
+  }, [pairsIsPlaying, pairsSpeed, pairsData]);
 
   /* Load saved portfolio configs when logged in and on portfolio tab */
   useEffect(() => {
@@ -875,6 +1099,7 @@ export default function FXTerminalPage() {
     { key: "company", label: "COMPANY" },
     { key: "portfolio", label: "PORTFOLIO" },
     { key: "forwards", label: "FORWARDS" },
+    { key: "pairs", label: "PAIRS TRADING" },
   ];
 
   return (
@@ -915,6 +1140,7 @@ export default function FXTerminalPage() {
         {tab === "company" && <div key="company" className="fx-tab">{renderCompany()}</div>}
         {tab === "portfolio" && <div key="portfolio" className="fx-tab">{renderPortfolio()}</div>}
         {tab === "forwards" && <div key="forwards" className="fx-tab">{renderForwards()}</div>}
+        {tab === "pairs" && <div key="pairs" className="fx-tab">{renderPairs()}</div>}
       </div>
     </div>
   );
@@ -3014,6 +3240,441 @@ export default function FXTerminalPage() {
             <div style={S.dim}>Loading arbitrage data... (Ensure interest_rates table is seeded)</div>
           )}
         </div>
+      </>
+    );
+  }
+
+  /* ================================================================ */
+  /* TAB 6: PAIRS TRADING                                             */
+  /* ================================================================ */
+  /* TAB 6: PAIRS TRADING — LIVE SIMULATION                          */
+  /* ================================================================ */
+
+  function renderPairs() {
+    const PAIR_CONFIGS = [
+      { key: "NOKGBP_NOKUSD", labelY: "GBP/NOK", labelX: "USD/NOK", short: "GBP ↔ USD", color: "#9C27B0", desc: "Best Sharpe — two commodity/risk currencies" },
+      { key: "NOKEUR_NOKUSD", labelY: "EUR/NOK", labelX: "USD/NOK", short: "EUR ↔ USD", color: "#3b82f6", desc: "Global risk appetite pair — high liquidity" },
+      { key: "NOKGBP_NOKEUR", labelY: "GBP/NOK", labelX: "EUR/NOK", short: "GBP ↔ EUR", color: "#10b981", desc: "European divergence — post-Brexit dynamics" },
+    ];
+    const config = PAIR_CONFIGS.find(p => p.key === pairsSelectedPair) ?? PAIR_CONFIGS[0];
+    const series: any[] = pairsData?.series ?? [];
+    const allTrades: any[] = pairsData?.trades ?? [];
+    const hasStarted = pairsPlayIdx >= 0;
+    const liveSeries = hasStarted ? series.slice(0, pairsPlayIdx + 1) : [];
+    const currentPt = liveSeries[liveSeries.length - 1] ?? null;
+
+    // Active trade at current sim point
+    const activeTrade = currentPt
+      ? allTrades.find((t: any) => t.entryDate <= currentPt.date && t.exitDate > currentPt.date) ?? null
+      : null;
+
+    // Completed trades up to now
+    const completedTrades = currentPt
+      ? allTrades.filter((t: any) => t.exitDate <= currentPt.date)
+      : [];
+
+    // Running equity from closed trades
+    let equityVal = 100;
+    const equityCurve: { date: string; value: number }[] = [{ date: series[0]?.date ?? "", value: 100 }];
+    for (const t of completedTrades) {
+      equityVal *= (1 + t.pnlPct / 100);
+      equityCurve.push({ date: t.exitDate, value: Math.round(equityVal * 100) / 100 });
+    }
+
+    // Friction totals for display
+    const totalCostBps = pairsBidAskBps * 2 + pairsSlippageBps + pairsCommBps;
+
+    // Unrealized P&L for active trade — same normalized formula as closed trades
+    let unrealPnl = 0;
+    if (activeTrade && currentPt) {
+      const entryPt = series.find((s: any) => s.date === activeTrade.entryDate);
+      if (entryPt) {
+        const sc = (currentPt.logY - entryPt.logY) - activeTrade.entryBeta * (currentPt.logX - entryPt.logX);
+        const sv = activeTrade.entrySpreadVol || currentPt.spreadVol || 0.05;
+        const capture = sv > 0 ? sc / sv : sc;
+        unrealPnl = (activeTrade.direction === "long" ? capture : -capture) * (pairsPosSize * 0.01) * 100;
+      }
+    }
+
+    const totalEquity = equityVal * (1 + unrealPnl / 100);
+    const totalReturn = totalEquity - 100;
+    const wins = completedTrades.filter((t: any) => t.pnlPct > 0).length;
+    const winRate = completedTrades.length > 0 ? wins / completedTrades.length * 100 : 0;
+    let maxDD = 0, peak = 100;
+    for (const e of equityCurve) { if (e.value > peak) peak = e.value; const dd = (e.value - peak) / peak * 100; if (dd < maxDD) maxDD = dd; }
+    const progress = (hasStarted && series.length > 0) ? (pairsPlayIdx / (series.length - 1)) * 100 : 0;
+    const posColor = activeTrade ? (activeTrade.direction === "long" ? "#10b981" : "#ef4444") : "#30363d";
+    const posBg = activeTrade ? (activeTrade.direction === "long" ? "rgba(16,185,129,0.07)" : "rgba(239,68,68,0.07)") : "transparent";
+    const holdDays = activeTrade && currentPt ? liveSeries.filter((s: any) => s.date >= activeTrade.entryDate).length : 0;
+    const longProx = currentPt ? Math.max(0, Math.min(1, (-currentPt.zscore - 1) / 1)) : 0;
+    const shortProx = currentPt ? Math.max(0, Math.min(1, (currentPt.zscore - 1) / 1)) : 0;
+
+    return (
+      <>
+        <style>{`
+          @keyframes pGlow { 0%,100% { box-shadow: 0 0 8px ${posColor}50; } 50% { box-shadow: 0 0 22px ${posColor}90, 0 0 40px ${posColor}30; } }
+          @keyframes pBlink { 0%,100% { opacity:1; } 50% { opacity:0.15; } }
+          @keyframes pSlide { from { opacity:0; transform:translateY(-5px); } to { opacity:1; transform:translateY(0); } }
+        `}</style>
+
+        {/* Pair selector + timeframe */}
+        <div style={{ display: "flex", alignItems: "stretch", borderBottom: "1px solid #30363d", marginBottom: 0, flexWrap: "wrap" as const }}>
+          {PAIR_CONFIGS.map(p => (
+            <button key={p.key} onClick={() => { if (pairsSelectedPair !== p.key) { setPairsSelectedPair(p.key); setPairsIsPlaying(false); } }}
+              style={{ padding: "10px 18px", background: pairsSelectedPair === p.key ? "rgba(59,130,246,0.1)" : "transparent",
+                border: "none", borderBottom: pairsSelectedPair === p.key ? `2px solid ${p.color}` : "2px solid transparent",
+                color: pairsSelectedPair === p.key ? "#fff" : "rgba(255,255,255,0.35)", cursor: "pointer",
+                fontSize: 11, fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.06em", whiteSpace: "nowrap" as const }}>
+              {p.short}
+            </button>
+          ))}
+          {/* Separator */}
+          <div style={{ width: 1, background: "#30363d", margin: "8px 8px" }} />
+          {/* Timeframe buttons */}
+          {([{ label: "1Y", days: 252 }, { label: "2Y", days: 504 }, { label: "3Y", days: 756 }, { label: "5Y", days: 1260 }] as { label: string; days: number }[]).map(tf => (
+            <button key={tf.days} onClick={() => { setPairsDays(tf.days); setPairsIsPlaying(false); }}
+              style={{ padding: "10px 14px", background: pairsDays === tf.days ? "rgba(59,130,246,0.1)" : "transparent",
+                border: "none", borderBottom: pairsDays === tf.days ? "2px solid #3b82f6" : "2px solid transparent",
+                color: pairsDays === tf.days ? "#3b82f6" : "rgba(255,255,255,0.3)", cursor: "pointer",
+                fontSize: 10, fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.06em" }}>
+              {tf.label}
+            </button>
+          ))}
+          <div style={{ padding: "0 14px", fontSize: 9, color: "rgba(255,255,255,0.25)", alignSelf: "center", marginLeft: "auto" }}>
+            {config.desc} · δ=1e-4 · Ve=1e-3 · ±2σ ENTRY · ±0.5σ EXIT · ±4σ STOP
+          </div>
+        </div>
+
+        {/* Friction & cost parameters */}
+        <div style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 6, padding: "12px 16px", margin: "8px 0 4px" }}>
+          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", letterSpacing: "0.08em", marginBottom: 10, textTransform: "uppercase" as const }}>
+            Real-World Friction Parameters
+            <span style={{ marginLeft: 12, color: "#f59e0b", fontSize: 9 }}>
+              TOTAL COST: {totalCostBps.toFixed(1)} bps/trade = {(totalCostBps / 100).toFixed(3)}% · POSITION: {pairsPosSize}% NAV
+            </span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+            {/* Position Size */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>
+                <span>POSITION SIZE</span>
+                <span style={{ color: "#3b82f6", fontWeight: 700 }}>{pairsPosSize}% NAV</span>
+              </div>
+              <input type="range" min={2} max={40} step={1} value={pairsPosSize}
+                onChange={e => setPairsPosSize(+e.target.value)}
+                style={{ ...S.slider, display: "block", width: "100%" }} />
+              <div style={{ fontSize: 8, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>Higher → larger returns & risk</div>
+            </div>
+            {/* Bid-Ask */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>
+                <span>BID/ASK SPREAD</span>
+                <span style={{ color: "#f59e0b", fontWeight: 700 }}>{pairsBidAskBps.toFixed(1)} bps/side</span>
+              </div>
+              <input type="range" min={0.5} max={10} step={0.5} value={pairsBidAskBps}
+                onChange={e => setPairsBidAskBps(+e.target.value)}
+                style={{ ...S.slider, display: "block", width: "100%" }} />
+              <div style={{ fontSize: 8, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>×2 round-trip = {(pairsBidAskBps * 2).toFixed(1)} bps</div>
+            </div>
+            {/* Slippage */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>
+                <span>MARKET IMPACT</span>
+                <span style={{ color: "#f59e0b", fontWeight: 700 }}>{pairsSlippageBps.toFixed(1)} bps</span>
+              </div>
+              <input type="range" min={0} max={10} step={0.5} value={pairsSlippageBps}
+                onChange={e => setPairsSlippageBps(+e.target.value)}
+                style={{ ...S.slider, display: "block", width: "100%" }} />
+              <div style={{ fontSize: 8, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>Order book impact / slippage</div>
+            </div>
+            {/* Commission */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>
+                <span>COMMISSION</span>
+                <span style={{ color: "#f59e0b", fontWeight: 700 }}>{pairsCommBps.toFixed(1)} bps</span>
+              </div>
+              <input type="range" min={0} max={5} step={0.25} value={pairsCommBps}
+                onChange={e => setPairsCommBps(+e.target.value)}
+                style={{ ...S.slider, display: "block", width: "100%" }} />
+              <div style={{ fontSize: 8, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>Prime broker / clearing fees</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Control bar */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0 16px", flexWrap: "wrap" as const }}>
+          <button onClick={() => {
+              if (pairsPlayIdx < 0) {
+                // First play — start from beginning
+                setPairsPlayIdx(0);
+                setPairsIsPlaying(true);
+              } else {
+                setPairsIsPlaying(p => !p);
+              }
+            }}
+            disabled={!pairsData || (hasStarted && pairsPlayIdx >= series.length - 1)}
+            style={{ ...S.button, padding: "8px 20px", minWidth: 96, opacity: !pairsData ? 0.5 : 1, fontSize: 12, letterSpacing: 1 }}>
+            {pairsIsPlaying ? "⏸ PAUSE" : "▶  PLAY"}
+          </button>
+          <button onClick={() => { setPairsIsPlaying(false); setTimeout(() => setPairsPlayIdx(-1), 50); }}
+            style={{ background: "#21262d", border: "1px solid #30363d", color: "rgba(255,255,255,0.6)", borderRadius: 6, padding: "8px 14px", fontSize: 11, cursor: "pointer", fontFamily: "monospace" }}>
+            ⏹ RESET
+          </button>
+          <div style={{ display: "flex", gap: 3 }}>
+            {[1, 3, 5, 10].map(s => (
+              <button key={s} onClick={() => setPairsSpeed(s)}
+                style={{ padding: "6px 11px", background: pairsSpeed === s ? "rgba(59,130,246,0.25)" : "#0d1117",
+                  border: `1px solid ${pairsSpeed === s ? "#3b82f6" : "#30363d"}`,
+                  color: pairsSpeed === s ? "#3b82f6" : "rgba(255,255,255,0.35)", borderRadius: 4,
+                  fontSize: 10, fontWeight: 700, cursor: "pointer", fontFamily: "monospace" }}>
+                {s}×
+              </button>
+            ))}
+          </div>
+          {/* Progress bar */}
+          <div style={{ flex: 1, minWidth: 100 }}>
+            <div style={{ background: "#21262d", borderRadius: 3, height: 5, overflow: "hidden" }}>
+              <div style={{ width: `${progress.toFixed(1)}%`, height: "100%", background: "linear-gradient(90deg, #3b82f6, #10b981)", transition: "width 0.08s linear", borderRadius: 3 }} />
+            </div>
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: pairsDataLoading ? "#f59e0b" : "#fff", fontFamily: "monospace", letterSpacing: 1.5, minWidth: 130, textAlign: "right" as const }}>
+            {pairsDataLoading ? "⟳ RECALCULATING" : (currentPt?.date ?? "—")}
+          </div>
+        </div>
+
+        {/* 3-column live status */}
+        <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr 0.9fr", gap: 12, marginBottom: 12 }}>
+
+          {/* POSITION MONITOR */}
+          <div style={{ ...S.card, background: posBg, border: `1px solid ${posColor}`, animation: activeTrade ? "pGlow 2s ease-in-out infinite" : "none", padding: 18 }}>
+            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", letterSpacing: "0.1em", marginBottom: 10 }}>POSITION MONITOR</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <div style={{ width: 10, height: 10, borderRadius: "50%", background: posColor, flexShrink: 0,
+                animation: activeTrade ? "pBlink 1.2s ease-in-out infinite" : "none" }} />
+              <div style={{ fontSize: 18, fontWeight: 800, color: posColor, letterSpacing: 2 }}>
+                {activeTrade ? (activeTrade.direction === "long" ? "▲  LONG" : "▼  SHORT") : "◌  FLAT"}
+              </div>
+            </div>
+            {activeTrade ? (
+              <>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginBottom: 10 }}>
+                  {config.labelY}  ↔  {config.labelX}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 12 }}>
+                  {[
+                    { l: "ENTRY Z", v: String(activeTrade.entryZ), c: posColor },
+                    { l: "NOW Z", v: currentPt ? (currentPt.zscore >= 0 ? "+" : "") + currentPt.zscore.toFixed(3) : "—", c: "#fff" },
+                    { l: "β ENTRY", v: String(activeTrade.entryBeta), c: "#3b82f6" },
+                    { l: "HOLD", v: `${holdDays}d`, c: "rgba(255,255,255,0.7)" },
+                  ].map((m, i) => (
+                    <div key={i} style={{ background: "rgba(0,0,0,0.3)", borderRadius: 4, padding: "6px 8px" }}>
+                      <div style={{ fontSize: 7, color: "rgba(255,255,255,0.3)", letterSpacing: "0.05em" }}>{m.l}</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: m.c, fontFamily: "monospace" }}>{m.v}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginBottom: 4, letterSpacing: "0.05em" }}>UNREALIZED P&L</div>
+                <div style={{ fontSize: 26, fontWeight: 800, color: unrealPnl >= 0 ? "#10b981" : "#ef4444", fontFamily: "monospace", letterSpacing: 1 }}>
+                  {unrealPnl >= 0 ? "+" : ""}{unrealPnl.toFixed(2)}%
+                </div>
+                <div style={{ marginTop: 8, background: "rgba(0,0,0,0.4)", borderRadius: 3, height: 5, overflow: "hidden" }}>
+                  <div style={{ width: `${Math.min(100, Math.abs(unrealPnl) / 20 * 100).toFixed(0)}%`, height: "100%", background: unrealPnl >= 0 ? "#10b981" : "#ef4444", borderRadius: 3, transition: "width 0.1s ease" }} />
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 12 }}>
+                  {pairsDataLoading ? "Recalculating..." : !hasStarted && series.length > 0 ? "Press ▶ PLAY to begin" : "Awaiting ±2σ signal"}
+                </div>
+                {currentPt && (
+                  <>
+                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 4 }}>CURRENT Z-SCORE</div>
+                    <div style={{ fontSize: 24, fontWeight: 800, fontFamily: "monospace",
+                      color: Math.abs(currentPt.zscore) > 1.5 ? "#f59e0b" : "rgba(255,255,255,0.5)" }}>
+                      {(currentPt.zscore >= 0 ? "+" : "") + currentPt.zscore.toFixed(3)}
+                    </div>
+                    <div style={{ marginTop: 8, fontSize: 9, color: "rgba(255,255,255,0.3)" }}>
+                      {Math.abs(currentPt.zscore) > 1.5 ? "⚡ approaching entry threshold" : "signal within ±2σ band"}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* LIVE PERFORMANCE */}
+          <div style={S.card}>
+            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", letterSpacing: "0.1em", marginBottom: 10 }}>LIVE PERFORMANCE</div>
+            <div style={{ fontSize: 30, fontWeight: 800, fontFamily: "monospace", letterSpacing: 1,
+              color: !hasStarted ? "rgba(255,255,255,0.1)" : totalReturn >= 0 ? "#10b981" : "#ef4444", marginBottom: 2 }}>
+              {!hasStarted ? "—" : (totalReturn >= 0 ? "+" : "") + totalReturn.toFixed(2) + "%"}
+            </div>
+            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.25)", marginBottom: 14, letterSpacing: "0.05em" }}>
+              TOTAL RETURN · INCL UNREALIZED
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {[
+                { l: "Portfolio", v: totalEquity.toFixed(2), c: totalReturn >= 0 ? "#10b981" : "#ef4444" },
+                { l: "Trades", v: `${completedTrades.length} / ${allTrades.length}`, c: "#3b82f6" },
+                { l: "Win Rate", v: completedTrades.length > 0 ? `${winRate.toFixed(1)}%` : "—", c: winRate >= 50 ? "#10b981" : "#ef4444" },
+                { l: "Max DD", v: `${maxDD.toFixed(2)}%`, c: "#ef4444" },
+                { l: "Avg P&L", v: completedTrades.length > 0 ? `${(completedTrades.reduce((s: number, t: any) => s + t.pnlPct, 0) / completedTrades.length).toFixed(2)}%` : "—", c: "#fff" },
+                { l: "Stops hit", v: `${completedTrades.filter((t: any) => t.exitReason === "stop").length}`, c: "#ef4444" },
+              ].map((m, i) => (
+                <div key={i} style={{ background: "#0d1117", borderRadius: 4, padding: "8px 10px" }}>
+                  <div style={{ fontSize: 7, color: "rgba(255,255,255,0.3)", marginBottom: 2, letterSpacing: "0.05em", textTransform: "uppercase" as const }}>{m.l}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: m.c, fontFamily: "monospace" }}>{m.v}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* KALMAN STATE */}
+          <div style={S.card}>
+            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", letterSpacing: "0.1em", marginBottom: 10 }}>KALMAN STATE</div>
+            {currentPt ? (
+              <>
+                <div style={{ display: "flex", flexDirection: "column" as const, gap: 6, marginBottom: 12 }}>
+                  {[
+                    { l: "HEDGE RATIO β", v: currentPt.beta?.toFixed(5), c: "#3b82f6" },
+                    { l: "INTERCEPT α", v: currentPt.alpha?.toFixed(5), c: "rgba(255,255,255,0.65)" },
+                    { l: "Z-SCORE", v: (currentPt.zscore >= 0 ? "+" : "") + currentPt.zscore?.toFixed(3), c: Math.abs(currentPt.zscore) > 2 ? "#f59e0b" : "rgba(255,255,255,0.7)" },
+                    { l: "SPREAD VOL √S", v: currentPt.spreadVol?.toFixed(5), c: "rgba(255,255,255,0.65)" },
+                  ].map((m, i) => (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #21262d", paddingBottom: 5 }}>
+                      <div style={{ fontSize: 8, color: "rgba(255,255,255,0.35)", letterSpacing: "0.04em" }}>{m.l}</div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: m.c, fontFamily: "monospace" }}>{m.v}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginBottom: 6, letterSpacing: "0.05em" }}>SIGNAL PROXIMITY</div>
+                {[
+                  { l: "LONG (z < −2σ)", v: longProx, c: "#10b981" },
+                  { l: "SHORT (z > +2σ)", v: shortProx, c: "#ef4444" },
+                ].map((b, i) => (
+                  <div key={i} style={{ marginBottom: 8 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "rgba(255,255,255,0.3)", marginBottom: 3 }}>
+                      <span>{b.l}</span><span>{(b.v * 100).toFixed(0)}%</span>
+                    </div>
+                    <div style={{ background: "#0d1117", borderRadius: 2, height: 6, overflow: "hidden" }}>
+                      <div style={{ width: `${(b.v * 100).toFixed(0)}%`, height: "100%", background: b.c, borderRadius: 2, transition: "width 0.12s ease",
+                        boxShadow: b.v > 0.7 ? `0 0 8px ${b.c}` : "none" }} />
+                    </div>
+                  </div>
+                ))}
+              </>
+            ) : (
+              <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, marginTop: 20, textAlign: "center" as const }}>
+                {pairsDataLoading ? "⟳  Loading..." : "—"}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Z-score live chart */}
+        <div style={S.card}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap" as const, gap: 8 }}>
+            <div style={S.cardTitle}>Z-SCORE LIVE VIEW — {config.labelY} vs {config.labelX} · TRAILING 90 DAYS</div>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" as const }}>
+              {[{ c: "#3b82f6", l: "Z-score" }, { c: "#10b981", l: "±2σ entry" }, { c: "#ef4444", l: "±4σ stop" },
+                { c: "rgba(16,185,129,0.3)", l: "Long pos" }, { c: "rgba(239,68,68,0.3)", l: "Short pos" }].map((l, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 8, color: "rgba(255,255,255,0.35)" }}>
+                  <div style={{ width: 14, height: 3, background: l.c, borderRadius: 1 }} />{l.l}
+                </div>
+              ))}
+            </div>
+          </div>
+          {liveSeries.length > 1 ? (
+            <PairsZChart series={liveSeries} activeTrade={activeTrade} />
+          ) : (
+            <div style={{ height: 160, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.15)", fontSize: 12 }}>
+              {pairsDataLoading ? "Loading 1-year dataset..." : "Press ▶ PLAY to begin the simulation"}
+            </div>
+          )}
+        </div>
+
+        {/* Equity + β row */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+          <div style={S.card}>
+            <div style={{ ...S.cardTitle, marginBottom: 6 }}>EQUITY CURVE (closed trades)</div>
+            {equityCurve.length > 1 ? (
+              <PairsEquityChart curve={equityCurve} />
+            ) : (
+              <div style={{ height: 100, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.15)", fontSize: 10 }}>No closed trades yet</div>
+            )}
+            <div style={{ marginTop: 5, fontSize: 8, color: "rgba(255,255,255,0.25)" }}>Compounded P&L · closed trades only · indexed 100</div>
+          </div>
+          <div style={S.card}>
+            <div style={{ ...S.cardTitle, marginBottom: 6 }}>ROLLING HEDGE RATIO β</div>
+            {liveSeries.length > 1 ? (
+              <PairsBetaChart series={liveSeries} />
+            ) : (
+              <div style={{ height: 100, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.15)", fontSize: 10 }}>No data yet</div>
+            )}
+            <div style={{ marginTop: 5, fontSize: 8, color: "rgba(255,255,255,0.25)" }}>Adaptive Kalman estimate · updates each observation</div>
+          </div>
+        </div>
+
+        {/* Trade blotter — only visible after simulation started */}
+        {hasStarted && (completedTrades.length > 0 || activeTrade) && (
+          <div style={S.card}>
+            <div style={{ ...S.cardTitle, marginBottom: 8 }}>
+              TRADE BLOTTER — {completedTrades.length} CLOSED
+              {activeTrade && <span style={{ color: posColor, marginLeft: 8 }}>· 1 LIVE</span>}
+            </div>
+            <div style={{ overflowY: "auto" as const, maxHeight: 320 }}>
+              <table style={S.table}>
+                <thead style={{ position: "sticky" as const, top: 0, background: "#161b22", zIndex: 1 }}>
+                  <tr>
+                    {["", "DIR", "ENTRY DATE", "EXIT DATE", "DAYS", "ENTRY Z", "P&L", "EXIT"].map(h => (
+                      <th key={h} style={S.th}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeTrade && (
+                    <tr style={{ background: activeTrade.direction === "long" ? "rgba(16,185,129,0.06)" : "rgba(239,68,68,0.06)", animation: "pSlide 0.3s ease-out" }}>
+                      <td style={S.td}><div style={{ width: 7, height: 7, borderRadius: "50%", background: posColor, animation: "pBlink 1.2s infinite" }} /></td>
+                      <td style={{ ...S.td, color: posColor, fontWeight: 800 }}>{activeTrade.direction === "long" ? "▲ LONG" : "▼ SHORT"}</td>
+                      <td style={S.td}>{activeTrade.entryDate}</td>
+                      <td style={{ ...S.td, color: "rgba(255,255,255,0.25)" }}>OPEN</td>
+                      <td style={S.td}>{holdDays}d</td>
+                      <td style={S.td}>{activeTrade.entryZ}</td>
+                      <td style={{ ...S.td, color: unrealPnl >= 0 ? "#10b981" : "#ef4444", fontWeight: 700 }}>
+                        {unrealPnl >= 0 ? "+" : ""}{unrealPnl.toFixed(2)}% *
+                      </td>
+                      <td style={S.td}><span style={{ background: "rgba(59,130,246,0.2)", color: "#3b82f6", padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700 }}>LIVE</span></td>
+                    </tr>
+                  )}
+                  {[...completedTrades].reverse().slice(0, 20).map((t: any, i: number) => {
+                    const rc = t.exitReason === "stop" ? "#ef4444" : t.exitReason === "signal" ? "#3b82f6" : "#f59e0b";
+                    const rl = t.exitReason === "stop" ? "STOP" : t.exitReason === "signal" ? "SIG" : "TIME";
+                    return (
+                      <tr key={i} style={{ background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)", animation: i === 0 ? "pSlide 0.25s ease-out" : "none" }}>
+                        <td style={S.td}><div style={{ width: 6, height: 6, borderRadius: "50%", background: t.pnlPct >= 0 ? "#10b981" : "#ef4444" }} /></td>
+                        <td style={{ ...S.td, color: t.direction === "long" ? "#10b981" : "#ef4444", fontWeight: 700 }}>{t.direction === "long" ? "▲" : "▼"}</td>
+                        <td style={S.td}>{t.entryDate}</td>
+                        <td style={S.td}>{t.exitDate}</td>
+                        <td style={S.td}>{t.daysHeld}d</td>
+                        <td style={S.td}>{t.entryZ}</td>
+                        <td style={{ ...S.td, color: t.pnlPct >= 0 ? "#10b981" : "#ef4444", fontWeight: 700 }}>{t.pnlPct >= 0 ? "+" : ""}{t.pnlPct}%</td>
+                        <td style={S.td}><span style={{ background: rc + "22", color: rc, padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700 }}>{rl}</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Initial load state — only shown before first dataset arrives */}
+        {!pairsData && pairsDataLoading && (
+          <div style={{ ...S.card, textAlign: "center" as const, padding: "60px 20px" }}>
+            <div style={{ fontSize: 28, marginBottom: 12, color: "rgba(255,255,255,0.15)" }}>⟳</div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.2)" }}>Loading 1-year Kalman filter dataset…</div>
+          </div>
+        )}
       </>
     );
   }
