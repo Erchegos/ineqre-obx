@@ -86,6 +86,10 @@ export async function GET(
       closes.length >= 50
         ? closes.slice(-50).reduce((a, b) => a + b, 0) / 50
         : null;
+    const sma200 =
+      closes.length >= 200
+        ? closes.slice(-200).reduce((a, b) => a + b, 0) / 200
+        : null;
 
     // YTD return
     const yearStart = prices.find(
@@ -107,6 +111,7 @@ export async function GET(
       stats: {
         sma20,
         sma50,
+        sma200,
         ytdReturnPct: ytdReturn,
         high52w: Math.max(...closes.slice(-252)),
         low52w: Math.min(...closes.slice(-252)),

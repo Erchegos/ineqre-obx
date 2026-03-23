@@ -171,7 +171,7 @@ export default function HomeContent({ stats }: { stats: SystemStats }) {
               <FeatureCard href="/research" title="Research Portal"
                 description="AI-summarized broker research from Pareto Securities, DNB Carnegie, DNB Markets, Redeye, and Xtrainvestor. Full-text search across 1,500+ reports with PDF viewer. Automated email ingestion, web scraping, and Claude-powered English summaries."
                 tags={[{ label: "AI Summaries", color: "#10b981" }, { label: "PDF", color: "#f59e0b" }, { label: "6 Sources", color: "#06b6d4" }]}
-                visible={modulesReveal.visible} delay={1} />
+                visible={modulesReveal.visible} delay={1} isPrivate />
               <FeatureCard href="/news" title="Intelligence Terminal"
                 description="Real-time market intelligence hub. AI-classified NewsWeb filings with sentiment analysis, Finanstilsynet short positions with sparklines, commodity prices (Brent, gas, metals) with stock sensitivity betas."
                 tags={[{ label: "Shorts", color: "#ef4444" }, { label: "Commodities", color: "#f59e0b" }, { label: "Live", color: "#10b981" }]}
@@ -203,6 +203,10 @@ export default function HomeContent({ stats }: { stats: SystemStats }) {
                 description="Currency risk terminal for NOK portfolios. Multi-currency regression betas, forward curves via IRP, revenue/cost exposure decomposition, portfolio FX VaR, carry trade analytics, and interactive hedge calculators."
                 tags={[{ label: "NOK/FX", color: "#f59e0b" }, { label: "IRP", color: "#3b82f6" }, { label: "Hedging", color: "#10b981" }]}
                 visible={modulesReveal.visible} delay={7} />
+              <FeatureCard href="/alpha" title="Alpha Engine — Yggdrasil"
+                description="Cross-sectional ML signal explorer with interactive trade simulation. Signal crossing entry/exit with dotted P&L connectors, sector-browser ticker search, 365-day cumulative performance chart (10 equal-weight slots, vol-targeted), and a 15-position concentrated portfolio strategy with 5-year monthly backtest."
+                tags={[{ label: "ML Alpha", color: "#10b981" }, { label: "Trade Sim", color: "#f59e0b" }, { label: "228 Stocks", color: "#3b82f6" }]}
+                visible={modulesReveal.visible} delay={8} isPrivate />
             </div>
           </section>
 
@@ -210,14 +214,18 @@ export default function HomeContent({ stats }: { stats: SystemStats }) {
           <section style={{ marginBottom: 48 }}>
             <SectionHeading visible={modulesReveal.visible}>Sector Intelligence</SectionHeading>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+              <FeatureCard href="/commodities" title="Commodity & Sector Terminal"
+                description="Bloomberg-style commodity dashboard with interactive treemap heatmap, commodity-equity flow diagram, correlation matrix, momentum scatter plot, and sector intelligence. Maps Brent, Gas, Metals, Salmon to 26 OSE stocks across 4 sectors."
+                tags={[{ label: "Treemap", color: "#f59e0b" }, { label: "Flow Analysis", color: "#3b82f6" }, { label: "15 Commodities", color: "#10b981" }]}
+                visible={modulesReveal.visible} delay={9} />
               <FeatureCard href="/seafood" title="Seafood Intelligence"
                 description="Norwegian aquaculture dashboard. Salmon spot/forward prices, sea lice monitoring, production area traffic lights, disease outbreaks, company risk matrix, biomass tracking, and live wellboat harvest detection via AIS."
                 tags={[{ label: "Salmon", color: "#f59e0b" }, { label: "Lice", color: "#ef4444" }, { label: "Harvest", color: "#10b981" }]}
-                visible={modulesReveal.visible} delay={8} />
+                visible={modulesReveal.visible} delay={9} />
               <FeatureCard href="/shipping" title="Shipping Intelligence"
                 description="OSE shipping terminal. Fleet tracking on global map with vessel-level charter rates, BDI/BDTI/BCTI indices, rate exposure matrix, contract expiry tracking, and quarterly TCE comparison across 10 companies."
                 tags={[{ label: "Fleet Map", color: "#06b6d4" }, { label: "Rates", color: "#f59e0b" }, { label: "10 Companies", color: "#10b981" }]}
-                visible={modulesReveal.visible} delay={9} />
+                visible={modulesReveal.visible} delay={10} />
             </div>
           </section>
 
@@ -319,9 +327,9 @@ function StatBox({ label, value, suffix, live }: { label: string; value: string 
   );
 }
 
-function FeatureCard({ href, title, description, tags, visible, delay }: {
+function FeatureCard({ href, title, description, tags, visible, delay, isPrivate }: {
   href: string; title: string; description: string;
-  tags: { label: string; color: string }[]; visible: boolean; delay: number;
+  tags: { label: string; color: string }[]; visible: boolean; delay: number; isPrivate?: boolean;
 }) {
   return (
     <Link href={href} className="feature-card" style={{
@@ -329,7 +337,19 @@ function FeatureCard({ href, title, description, tags, visible, delay }: {
       borderRadius: 8, padding: "22px 24px", textDecoration: "none", color: "inherit",
       opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(20px)",
       transition: `opacity 0.5s ease ${delay * 0.1}s, transform 0.5s ease ${delay * 0.1}s, border-color 0.25s ease, box-shadow 0.25s ease`,
+      position: "relative",
     }}>
+      {isPrivate && (
+        <span style={{
+          position: "absolute", top: 12, right: 12,
+          fontSize: 8, fontWeight: 700, letterSpacing: "0.08em", fontFamily: "monospace",
+          padding: "2px 7px", borderRadius: 10,
+          background: "rgba(239,68,68,0.12)", color: "#ef4444",
+          border: "1px solid rgba(239,68,68,0.3)",
+        }}>
+          PRIVATE
+        </span>
+      )}
       <div style={{ display: "flex", gap: 4, marginBottom: 10, flexWrap: "wrap", alignItems: "center", minHeight: 16 }}>
         {tags.map(t => <TagPill key={t.label} label={t.label} color={t.color} />)}
       </div>

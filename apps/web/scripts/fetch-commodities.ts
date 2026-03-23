@@ -84,6 +84,77 @@ const COMMODITIES: CommodityDef[] = [
     currency: "USD",
     relatedTickers: [],
   },
+  // ── New commodities for Sector Intelligence Terminal ──
+  {
+    symbol: "NG=F",
+    yahooSymbol: "NG=F",
+    name: "Natural Gas",
+    currency: "USD",
+    relatedTickers: ["EQNR", "AKRBP", "VAR"],
+  },
+  {
+    symbol: "HG=F",
+    yahooSymbol: "HG=F",
+    name: "Copper",
+    currency: "USD",
+    relatedTickers: ["NHY"],
+  },
+  {
+    symbol: "RB=F",
+    yahooSymbol: "RB=F",
+    name: "Gasoline",
+    currency: "USD",
+    relatedTickers: ["EQNR"],
+  },
+  {
+    symbol: "HO=F",
+    yahooSymbol: "HO=F",
+    name: "Heating Oil",
+    currency: "USD",
+    relatedTickers: ["EQNR"],
+  },
+  {
+    symbol: "ZS=F",
+    yahooSymbol: "ZS=F",
+    name: "Soybeans",
+    currency: "USD",
+    relatedTickers: [],
+  },
+  {
+    symbol: "ZW=F",
+    yahooSymbol: "ZW=F",
+    name: "Wheat",
+    currency: "USD",
+    relatedTickers: [],
+  },
+  {
+    symbol: "LBS=F",
+    yahooSymbol: "LBR=F",
+    name: "Lumber",
+    currency: "USD",
+    relatedTickers: [],
+  },
+  {
+    symbol: "TIO=F",
+    yahooSymbol: "TIO=F",
+    name: "Iron Ore",
+    currency: "USD",
+    relatedTickers: ["NHY"],
+  },
+  {
+    symbol: "TTF=F",
+    yahooSymbol: "TTF=F",
+    name: "TTF Gas",
+    currency: "EUR",
+    relatedTickers: ["EQNR", "AKRBP"],
+  },
+  {
+    symbol: "MTF=F",
+    yahooSymbol: "MTF=F",
+    name: "Coal",
+    currency: "USD",
+    relatedTickers: [],
+  },
 ];
 
 // ── Yahoo Finance v8 chart API ──
@@ -130,6 +201,146 @@ async function fetchYahooChart(
   }
 
   return rows;
+}
+
+// ── TradingEconomics Scraper ──
+// Scrapes current commodity snapshot from TradingEconomics overview page.
+// Used for Steel (no Yahoo source) and as supplementary validation.
+interface TECommodity {
+  name: string;
+  path: string;
+  price: number;
+  unit: string;
+  currency: string;
+  dailyPct: number;
+  weeklyPct: number;
+  monthlyPct: number;
+}
+
+const TE_SYMBOL_MAP: Record<string, string> = {
+  "/commodity/steel": "STEEL",
+  "/commodity/hrc-steel": "HRC",
+  "/commodity/iron-ore": "IORE",
+};
+
+async function fetchTradingEconomics(): Promise<TECommodity[]> {
+  console.log("Scraping TradingEconomics for Steel/Iron Ore...");
+  try {
+    const resp = await fetch("https://tradingeconomics.com/commodities", {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept: "text/html",
+      },
+    });
+    if (!resp.ok) {
+      console.error(`  TE scrape failed: ${resp.status}`);
+      return [];
+    }
+    const html = await resp.text();
+
+    // Parse table rows
+    const rowPattern = /<tr[^>]*>([\s\S]*?)<\/tr>/g;
+    const commodities: TECommodity[] = [];
+    let match;
+
+    while ((match = rowPattern.exec(html)) !== null) {
+      const row = match[1];
+      const linkMatch = row.match(
+        /href="(\/commodity\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/
+      );
+      if (!linkMatch) continue;
+
+      const path = linkMatch[1];
+      const name = linkMatch[2].replace(/<[^>]+>/g, "").trim();
+
+      // Only process commodities we care about
+      if (!TE_SYMBOL_MAP[path]) continue;
+
+      const tdPattern = /<td[^>]*>([\s\S]*?)<\/td>/g;
+      const tds: string[] = [];
+      let tdMatch;
+      while ((tdMatch = tdPattern.exec(row)) !== null) {
+        tds.push(tdMatch[1].replace(/<[^>]+>/g, "").trim());
+      }
+
+      if (tds.length < 6) continue;
+
+      // Parse unit/currency from first td
+      const unitMatch = tds[0].match(
+        /(USD|EUR|GBP|CNY|MYR|INR|USd|GBp)\s*\/\s*(\S+)/
+      );
+      const currency = unitMatch
+        ? unitMatch[1].replace("USd", "USD").replace("GBp", "GBP")
+        : "USD";
+
+      try {
+        const price = parseFloat(tds[1].replace(/,/g, ""));
+        const dailyPct = parseFloat(tds[3].replace(/%/g, ""));
+        const weeklyPct = parseFloat(tds[4].replace(/%/g, ""));
+        const monthlyPct = parseFloat(tds[5].replace(/%/g, ""));
+
+        if (isNaN(price)) continue;
+
+        commodities.push({
+          name,
+          path,
+          price,
+          unit: unitMatch ? unitMatch[0] : "",
+          currency,
+          dailyPct: isNaN(dailyPct) ? 0 : dailyPct,
+          weeklyPct: isNaN(weeklyPct) ? 0 : weeklyPct,
+          monthlyPct: isNaN(monthlyPct) ? 0 : monthlyPct,
+        });
+
+        console.log(
+          `  ${name}: ${price} ${currency} (d=${dailyPct}% w=${weeklyPct}%)`
+        );
+      } catch {
+        continue;
+      }
+    }
+
+    return commodities;
+  } catch (err) {
+    console.error("  TE scrape error:", err);
+    return [];
+  }
+}
+
+async function insertTECommodities(
+  teCommodities: TECommodity[],
+  existingKeys: Set<string>
+): Promise<number> {
+  const today = new Date().toISOString().slice(0, 10);
+  let inserted = 0;
+
+  for (const te of teCommodities) {
+    const symbol = TE_SYMBOL_MAP[te.path];
+    if (!symbol) continue;
+
+    const key = `${symbol}|${today}`;
+    if (existingKeys.has(key)) {
+      console.log(`  ${symbol} already exists for ${today}, skipping`);
+      continue;
+    }
+
+    if (DRY_RUN) {
+      console.log(`  [DRY] ${symbol} ${today}: ${te.price} ${te.currency}`);
+    } else {
+      await pool.query(
+        `INSERT INTO commodity_prices (symbol, date, open, high, low, close, volume, currency, source)
+         VALUES ($1, $2, $3, $3, $3, $3, NULL, $4, 'tradingeconomics')
+         ON CONFLICT (symbol, date) DO UPDATE SET close = EXCLUDED.close`,
+        [symbol, today, te.price, te.currency]
+      );
+      existingKeys.add(key);
+      inserted++;
+    }
+  }
+
+  console.log(`  ${inserted} TE commodity rows inserted\n`);
+  return inserted;
 }
 
 // ── Salmon from SSB (Statistics Norway) ──
@@ -345,6 +556,13 @@ async function main() {
   // ── Salmon from SSB ──
   const salmonInserted = await fetchSalmonSSB(existingKeys, Math.ceil(DAYS_BACK / 7));
   totalInserted += salmonInserted;
+
+  // ── TradingEconomics (Steel, HRC Steel) ──
+  const teCommodities = await fetchTradingEconomics();
+  if (teCommodities.length > 0) {
+    const teInserted = await insertTECommodities(teCommodities, existingKeys);
+    totalInserted += teInserted;
+  }
 
   console.log(`Total commodity prices inserted: ${totalInserted}\n`);
 

@@ -77,6 +77,9 @@ InEqRe_OBX/
 | **Intelligence Terminal** | `/news` | `apps/web/src/app/news/page.tsx` |
 | **Seafood Intelligence** | `/seafood` | `apps/web/src/app/seafood/page.tsx` |
 | **Shipping Intelligence** | `/shipping` | `apps/web/src/app/shipping/page.tsx` |
+| **Commodity Terminal** | `/commodities` | `apps/web/src/app/commodities/page.tsx` |
+| **Commodity Detail** | `/commodities/[symbol]` | `apps/web/src/app/commodities/[symbol]/page.tsx` |
+| **Sector Intelligence** | `/sectors` | `apps/web/src/app/sectors/page.tsx` |
 
 ---
 
@@ -156,8 +159,10 @@ All endpoints in `apps/web/src/app/api/`
 | `GET /api/news/ticker/[ticker]` | Per-ticker news: merges IBKR news + NewsWeb filings, sorted by date |
 | `GET /api/shorts` | Latest short positions for all stocks (Finanstilsynet SSR) |
 | `GET /api/shorts/[ticker]` | Per-stock short position history with holder breakdown |
-| `GET /api/commodities` | All commodity prices with stock sensitivity data |
-| `GET /api/commodities/[symbol]` | Per-commodity detail with price history and stock betas |
+| `GET /api/commodities` | All commodity prices (17 symbols) with multi-period returns, sparklines, stock sensitivity |
+| `GET /api/commodities/[symbol]` | Per-commodity detail with price history, SMAs, and stock betas |
+| `GET /api/commodities/correlation` | NxN Pearson correlation matrix on log-returns (?days=90, ?equities=EQNR,MOWI) |
+| `GET /api/sectors/overview` | Per-sector aggregate intelligence: performance, commodity driver, best/worst |
 
 ### FX APIs
 | Endpoint | Purpose |
@@ -263,6 +268,7 @@ All in `apps/web/src/lib/`
 | `price-data-adapter.ts` | Price data normalization |
 | `portfolioOptimizer.ts` | Markowitz optimization: covariance (sample/Ledoit-Wolf/EWMA), 5 modes (EW/MinVar/MaxSharpe/RiskParity/MaxDiv), closed-form solutions + iterative constraint projection, risk decomposition, efficient frontier |
 | `shippingTCE.ts` | Baltic Exchange-based TCE calculation library: Worldscale→TCE formula, 14 vessel types, 10 reference routes (TD3C/TD20/TD6/TC1/C5 etc), VLSFO bunker cost, voyage costs, fleet quarterly earnings aggregation |
+| `sectorMapping.ts` | Sector-commodity-ticker mapping constants: 4 sectors (Energy/Seafood/Shipping/Materials), 17 commodities with metadata (category/importance/unit), used by commodity & sector dashboards |
 
 ---
 
@@ -438,7 +444,8 @@ Schema files in `packages/db/src/schema/`
 
 ### Data Sources
 1. **IBKR Gateway** (port 4002) - Primary real-time data
-2. **Yahoo Finance** - Fallback for prices/fundamentals + commodity prices (BZ=F, CL=F, NG=F, ALI=F, GC=F, SI=F)
+2. **Yahoo Finance** - Fallback for prices/fundamentals + commodity OHLCV (15 symbols: BZ=F, CL=F, NG=F, RB=F, HO=F, TTF=F, MTF=F, ALI=F, GC=F, SI=F, HG=F, TIO=F, LBR=F, ZS=F, ZW=F)
+2b. **TradingEconomics** - Web scraper for Steel (CNY/t), HRC Steel (USD/t), Iron Ore (USD/t) — commodities not on Yahoo
 3. **Norges Bank** - FX rates (NOK/USD, EUR, GBP)
 4. **Gmail IMAP** - Research emails from Pareto/DNB/Arctic/ABG/SpareBank 1/Redeye/MFN
 5. **Redeye GraphQL** - Commissioned research scraper (redeye.se/api/graphql, OSE-only filter)
@@ -504,7 +511,7 @@ Run after market close alongside ML pipeline:
 | `seed-fx-interest-rates.ts` | Seed interest_rates with policy/market rates for NOK/USD/EUR/GBP/SEK/DKK |
 | `calculate-fx-regressions.ts` | Rolling multi-currency regression pipeline (252D windows, 21D step) |
 | `fetch-ssr-shorts.ts` | Fetch short positions from Finanstilsynet SSR API |
-| `fetch-commodities.ts` | Fetch commodity prices from Yahoo + calculate stock sensitivity |
+| `fetch-commodities.ts` | Fetch 17 commodity prices from Yahoo + SSB + TradingEconomics scraper (Steel) + calculate stock sensitivity |
 | `fetch-newsweb-filings.ts` | Fetch regulatory filings from Oslo Børs NewsWeb API into `newsweb_filings` |
 | `fetch-barentswatch-seafood.ts` | Fetch lice/disease/locality data from BarentsWatch (OAuth2) |
 | `fetch-biomass-fiskeridir.ts` | Fetch monthly biomass/harvest/mortality from Fiskeridirektoratet (no auth) |
@@ -1013,6 +1020,48 @@ All pages must follow this dark terminal theme. Reference: `/portfolio` and `/fx
 - Old dark grays (`#111`, `#222`, `#333`, `#1a1a1a`) — use `#161b22`, `#30363d`, `#0d1117`
 - Old muted text (`#888`, `#666`, `#555`) — use `rgba(255,255,255,0.5/0.4/0.35)`
 - Geist Mono font family — use `monospace`
+
+---
+
+## Planned Features
+
+### FX Pairs Trading Simulator (Kalman Filter)
+
+Add a PAIRS TRADING tab to the `/fx` page. Adaptive Kalman filter replaces static OLS hedge ratios — treats β (hedge ratio) and α (intercept) as hidden states that drift with macro regime changes.
+
+**Reference**: quantframe.io/knowledge-hub/journal/pairs-trading-kalman-filter
+
+**Files to create:**
+1. `apps/web/src/lib/fxKalmanPairs.ts` — Kalman filter engine + backtest runner
+2. `apps/web/src/app/api/fx/pairs-trade/route.ts` — API endpoint
+3. Modify `apps/web/src/app/fx/page.tsx` — Add PAIRS TRADING tab
+
+**Kalman Filter:**
+- State: θ = [α_t, β_t], random walk evolution: θ_t = θ_{t-1} + η_t
+- Observation: y_t = [1, x_t] · θ_t + ε_t
+- Predict → Update cycle with Kalman gain K_t
+- Z-score: z_t = e_t / √S_t (innovation normalized by variance)
+- Use Joseph form for numerically stable covariance update
+
+**Trading signals:**
+- Long spread entry: z < -2.0
+- Short spread entry: z > +2.0
+- Exit: |z| < 0.5
+- Stop loss: |z| > 4.0
+
+**Parameters (tunable via UI sliders):**
+- δ (delta): state drift variance, default 1e-4
+- V_e: observation noise variance, default 1e-3
+
+**UI (new tab on /fx page):**
+- Pair selector (two FX rates from Norges Bank data: NOKUSD, NOKEUR, NOKGBP, NOKSEK, NOKDKK + cross-rates)
+- Z-score chart with entry/exit/stop bands
+- Rolling hedge ratio β chart
+- Cumulative P&L chart
+- Trade log table (entry/exit dates, z at entry, holding period, P&L)
+- Backtest stats cards: Sharpe, max drawdown, win rate, avg holding period, total return
+
+**Data:** Uses existing `fxSpotRates` table (daily NOK-based rates, ~3+ years).
 
 ---
 
