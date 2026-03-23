@@ -658,37 +658,35 @@ export default function AlphaPage() {
       {/* ================================================================ */}
       {tab === "strategy" && (
         <div>
-          <div style={{ ...cardStyle, marginBottom: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+
+          {/* ══════════════════════════════════════════════════════════════════
+              SECTION 1 — ML SIGNAL PAPER TRADING  (research / exploration)
+          ══════════════════════════════════════════════════════════════════ */}
+          <div style={{ ...cardStyle, marginBottom: 0, borderColor: "#2d3748", borderLeft: "3px solid #f59e0b" }}>
+            {/* Section header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
               <div>
-                <div style={sectionTitle}>Cross-Sectional Portfolio Strategy — Monthly Rebalancing</div>
-                <div style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", marginTop: -8, marginBottom: 4 }}>
-                  Ranks all OSE stocks monthly on 6 alpha factors. Top quintile overweight (60%), bottom excluded. 15bps costs per rebalance.
+                <div style={{ fontSize: 13, fontWeight: 800, fontFamily: "monospace", letterSpacing: "0.04em", color: "#f59e0b" }}>
+                  SECTION 1 — ML SIGNAL PAPER TRADING
+                </div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", marginTop: 3 }}>
+                  Research tool · 12-month window · ML signals only · Simple rule-based trading
                 </div>
               </div>
-              <button onClick={() => runPortfolioBacktest(true)} disabled={portfolioBacktestLoading}
-                style={{ ...btnPrimary, fontSize: 10, padding: "6px 14px", opacity: portfolioBacktestLoading ? 0.5 : 1 }}>
-                {portfolioBacktestLoading ? "Running..." : "Refresh"}
-              </button>
+              <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: 5, padding: "4px 10px", fontSize: 9, color: "#f59e0b", fontFamily: "monospace", fontWeight: 700 }}>
+                EXPLORATORY
+              </div>
             </div>
 
-            {/* Factor Weights */}
-            {portfolioBacktest?.config && (
-              <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-                {[
-                  { key: "ml", label: "ML Signal" },
-                  { key: "lowVol", label: "Low Volatility" },
-                  { key: "momentum", label: "Vol-Adj Momentum" },
-                  { key: "value", label: "Sector Value" },
-                  { key: "liquidity", label: "Liquidity" },
-                ].map(({ key, label }) => (
-                  <div key={key} style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 4, padding: "4px 12px", fontSize: 9, fontFamily: "monospace" }}>
-                    <span style={{ color: "rgba(255,255,255,0.4)" }}>{label}: </span>
-                    <span style={{ color: "#3b82f6", fontWeight: 700 }}>{((portfolioBacktest.config.weights as Record<string, number>)[key] * 100).toFixed(0)}%</span>
-                  </div>
-                ))}
-              </div>
-            )}
+            {/* Context explanation */}
+            <div style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 6, padding: "10px 14px", marginBottom: 14, fontSize: 10, fontFamily: "monospace", lineHeight: 1.7, color: "rgba(255,255,255,0.55)" }}>
+              <span style={{ color: "#f59e0b", fontWeight: 700 }}>What this shows:</span> Per-stock paper trading using <em>only</em> the raw ML prediction signal (Yggdrasil v7).
+              Entry triggered when the predicted return crosses above <span style={{ color: "#e6edf3" }}>+1%</span>,
+              exit on signal drop or hard rules (−5% stop loss, 21-day max hold).
+              Covers the <span style={{ color: "#e6edf3" }}>last 12 months</span> per stock individually — each stock is run independently, not as a portfolio.{" "}
+              <span style={{ color: "#ef4444", fontWeight: 600 }}>Limitations:</span> short history, no portfolio construction, no diversification logic, survivor-selection bias in ranking.
+              Use this to <span style={{ color: "#e6edf3" }}>research which stocks the signal works best on</span> and to explore individual trading patterns in the Explorer tab.
+            </div>
 
             {/* ── TOP 10 ALPHA STOCKS ── */}
             <div style={{ ...cardStyle, marginBottom: 16 }}>
@@ -919,6 +917,75 @@ export default function AlphaPage() {
                 </div>
               );
             })()}
+
+          </div>{/* end Section 1 card */}
+
+          {/* ══ SECTION DIVIDER ═════════════════════════════════════════════════ */}
+          <div style={{ margin: "20px 0", display: "flex", alignItems: "center", gap: 16 }}>
+            <div style={{ flex: 1, height: 1, background: "linear-gradient(90deg, #30363d, transparent)" }} />
+            <div style={{ background: "#0d1117", border: "1px solid #30363d", borderRadius: 6, padding: "8px 16px", textAlign: "center", minWidth: 320 }}>
+              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", fontFamily: "monospace", letterSpacing: "0.06em", marginBottom: 3 }}>SECTION 1 vs SECTION 2</div>
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.6)", fontFamily: "monospace" }}>
+                <span style={{ color: "#f59e0b" }}>↑ ML signals only</span>
+                <span style={{ color: "rgba(255,255,255,0.3)", margin: "0 8px" }}>|</span>
+                <span style={{ color: "#10b981" }}>↓ 6-factor portfolio (more trusted)</span>
+              </div>
+            </div>
+            <div style={{ flex: 1, height: 1, background: "linear-gradient(90deg, transparent, #30363d)" }} />
+          </div>
+
+          {/* ══════════════════════════════════════════════════════════════════
+              SECTION 2 — CROSS-SECTIONAL FACTOR STRATEGY  (trusted)
+          ══════════════════════════════════════════════════════════════════ */}
+          <div style={{ ...cardStyle, borderColor: "#1a3a2a", borderLeft: "3px solid #10b981", marginBottom: 16 }}>
+            {/* Section header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 800, fontFamily: "monospace", letterSpacing: "0.04em", color: "#10b981" }}>
+                  SECTION 2 — CROSS-SECTIONAL FACTOR STRATEGY
+                </div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", marginTop: 3 }}>
+                  Trusted backtest · 5-year history · 6 alpha factors · Monthly portfolio rebalancing
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: 5, padding: "4px 10px", fontSize: 9, color: "#10b981", fontFamily: "monospace", fontWeight: 700 }}>
+                  TRUSTED
+                </div>
+                <button onClick={() => runPortfolioBacktest(true)} disabled={portfolioBacktestLoading}
+                  style={{ ...btnPrimary, fontSize: 10, padding: "6px 14px", opacity: portfolioBacktestLoading ? 0.5 : 1 }}>
+                  {portfolioBacktestLoading ? "Running..." : "Refresh"}
+                </button>
+              </div>
+            </div>
+
+            {/* Context explanation */}
+            <div style={{ background: "#0d1117", border: "1px solid rgba(16,185,129,0.15)", borderRadius: 6, padding: "10px 14px", marginBottom: 14, fontSize: 10, fontFamily: "monospace", lineHeight: 1.7, color: "rgba(255,255,255,0.55)" }}>
+              <span style={{ color: "#10b981", fontWeight: 700 }}>What this shows:</span> A proper cross-sectional equity strategy ranking <em>all</em> OSE stocks monthly across{" "}
+              <span style={{ color: "#e6edf3" }}>6 alpha factors</span> (ML prediction, low volatility, vol-adjusted momentum, sector-relative valuation, liquidity).
+              The top quintile is overweighted (60%+), bottom quintile excluded. Portfolio rebalances monthly with 15bps transaction costs.
+              Covers <span style={{ color: "#e6edf3" }}>~5 years</span> of walk-forward out-of-sample performance vs an equal-weight OSE benchmark.{" "}
+              <span style={{ color: "#10b981", fontWeight: 600 }}>Why more trusted:</span> Longer history, true portfolio construction with diversification constraints,
+              no look-ahead bias, benchmark comparison with IC tracking. Use this for <span style={{ color: "#e6edf3" }}>strategic allocation decisions</span>.
+            </div>
+
+            {/* Factor Weights */}
+            {portfolioBacktest?.config && (
+              <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+                {[
+                  { key: "ml", label: "ML Signal" },
+                  { key: "lowVol", label: "Low Volatility" },
+                  { key: "momentum", label: "Vol-Adj Momentum" },
+                  { key: "value", label: "Sector Value" },
+                  { key: "liquidity", label: "Liquidity" },
+                ].map(({ key, label }) => (
+                  <div key={key} style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 4, padding: "4px 12px", fontSize: 9, fontFamily: "monospace" }}>
+                    <span style={{ color: "rgba(255,255,255,0.4)" }}>{label}: </span>
+                    <span style={{ color: "#10b981", fontWeight: 700 }}>{((portfolioBacktest.config.weights as Record<string, number>)[key] * 100).toFixed(0)}%</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {portfolioBacktestLoading && (
               <div style={{ textAlign: "center", padding: 60, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", fontSize: 12 }}>
