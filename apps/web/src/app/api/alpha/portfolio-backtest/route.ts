@@ -58,7 +58,7 @@ interface MonthData {
   }>;
 }
 
-const CACHE_KEY = 'portfolio_backtest_v6';
+const CACHE_KEY = 'portfolio_backtest_v7';
 const CACHE_MAX_AGE_H = 25;
 
 export async function POST(req: NextRequest) {
@@ -80,16 +80,16 @@ export async function POST(req: NextRequest) {
     } catch { /* table may not exist yet — fall through to compute */ }
 
     const body = await req.json().catch(() => ({}));
-    const costBps = body.costBps ?? 15;
-    const maxSingleStock = body.maxSingleStock ?? 0.08;
-    const maxSectorWeight = body.maxSectorWeight ?? 0.35;
+    const costBps = body.costBps ?? 10;
+    const maxSingleStock = body.maxSingleStock ?? 0.15;
+    const maxSectorWeight = body.maxSectorWeight ?? 0.45;
 
     const alphaWeights = {
-      ml: 0.35,        // ML prediction (monthly walk-forward)
-      lowVol: 0.30,    // Low volatility premium — highest Sharpe contribution empirically
-      momentum: 0.15,  // Vol-adjusted momentum (12m-1m skip)
-      value: 0.10,     // Sector-relative value
-      liquidity: 0.10, // Liquidity quality gate (increased to penalise illiquid)
+      ml: 0.55,        // ML prediction — primary edge, highest IC empirically
+      momentum: 0.25,  // Vol-adjusted momentum (12m-1m skip) — strongest return factor on OSE
+      value: 0.10,     // Sector-relative E/P value
+      lowVol: 0.05,    // Minimal low-vol tilt — just enough for quality filtering
+      liquidity: 0.05, // Liquidity gate — excludes illiquid stocks
     };
 
     // ── 1. Fetch month-end prices ──
@@ -329,7 +329,7 @@ export async function POST(req: NextRequest) {
       // Hold only top 20 stocks by alpha score. Alpha-score weighted (higher score = larger bet).
       const sorted = [...alphaScores.entries()].sort((a, b) => b[1].score - a[1].score);
 
-      const TOP_N = 15; // Max positions — more concentrated = higher conviction
+      const TOP_N = 10; // Max positions — concentrated high-conviction portfolio
       const selected = sorted.slice(0, Math.min(TOP_N, sorted.length));
 
       const weights = new Map<string, number>();
@@ -385,28 +385,6 @@ export async function POST(req: NextRequest) {
         for (const [ticker, weight] of weights) {
           weights.set(ticker, weight / totalWeight);
         }
-      }
-
-      // ── Portfolio volatility targeting (12% annualized) ──
-      // Scale all weights down in high-vol months so portfolio vol stays near target.
-      // Excess goes to cash (implicitly — weights don't sum to 1 anymore).
-      const TARGET_ANNUAL_VOL = 0.12;
-      const TARGET_MONTHLY_VOL = TARGET_ANNUAL_VOL / Math.sqrt(12);
-      // Diagonal approximation: port_var ≈ Σ w_i² σ_i² (ignores correlations → conservative)
-      let portVarEst = 0;
-      for (const [ticker, w] of weights) {
-        const f = factors?.get(ticker);
-        const annualVol = Math.max(f?.vol3m ?? f?.vol1m ?? 0.20, 0.05);
-        const monthlyVol = annualVol / Math.sqrt(12);
-        portVarEst += w * w * monthlyVol * monthlyVol;
-      }
-      const portVolEst = Math.sqrt(portVarEst);
-      if (portVolEst > TARGET_MONTHLY_VOL) {
-        const scalar = TARGET_MONTHLY_VOL / portVolEst; // < 1 → scale down
-        for (const [ticker, w] of weights) {
-          weights.set(ticker, w * scalar);
-        }
-        // Note: sum of weights < 1 now — remainder sits in cash at 0% return
       }
 
       // ── Compute turnover ──

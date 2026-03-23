@@ -234,7 +234,7 @@ export default function AlphaPage() {
     setExplorerLoading(false);
   }, [token, explorerDays, authLogout]);
 
-  const CACHE_KEY = "alpha_portfolio_backtest_v5";
+  const CACHE_KEY = "alpha_portfolio_backtest_v7";
   const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
 
   const runPortfolioBacktest = useCallback(async (force = false) => {
@@ -705,16 +705,6 @@ export default function AlphaPage() {
                 </button>
               </div>
               {/* Simulation disclaimer */}
-              <div style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.18)", borderRadius: 5, padding: "7px 12px", marginBottom: 12, display: "flex", gap: 8, alignItems: "flex-start" }}>
-                <span style={{ color: "#f59e0b", fontSize: 13, lineHeight: 1 }}>⚠</span>
-                <div style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.4)", lineHeight: 1.5 }}>
-                  <strong style={{ color: "rgba(255,255,255,0.55)" }}>Backtested simulation with realistic rules:</strong>{" "}
-                  −5% hard stop loss · 5-day minimum hold · 21-day max hold (1-month ML horizon) · No future data used.
-                  Corporate events (takeovers, surprise earnings) inflate returns during held periods — the ML did not predict these.
-                  Expected live: <strong style={{ color: "#f59e0b" }}>55–65% win rate · 1–4% avg P&L/trade.</strong>{" "}
-                  Click any row to drill into Explorer.
-                </div>
-              </div>
               {topPerfLoading && (
                 <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
                   Simulating trades across liquid OSE universe...
@@ -967,7 +957,7 @@ export default function AlphaPage() {
                   {/* Portfolio vs Benchmark summary */}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
                     <div style={{ background: "#0d1117", border: "1px solid #10b98133", borderRadius: 6, padding: 12 }}>
-                      <div style={{ fontSize: 9, fontFamily: "monospace", color: "#10b981", letterSpacing: "0.05em", fontWeight: 700, marginBottom: 10 }}>STRATEGY — TOP 15 CONCENTRATED</div>
+                      <div style={{ fontSize: 9, fontFamily: "monospace", color: "#10b981", letterSpacing: "0.05em", fontWeight: 700, marginBottom: 10 }}>STRATEGY — TOP 10 HIGH CONVICTION</div>
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px 16px", fontSize: 11, fontFamily: "monospace" }}>
                         <div><div style={{ color: "rgba(255,255,255,0.4)", fontSize: 9, marginBottom: 2 }}>ANN. RETURN</div><div style={{ color: "#10b981", fontWeight: 700 }}>{s.annualizedReturn >= 0 ? "+" : ""}{s.annualizedReturn.toFixed(1)}%</div></div>
                         <div><div style={{ color: "rgba(255,255,255,0.4)", fontSize: 9, marginBottom: 2 }}>SHARPE</div><div style={{ color: "#3b82f6", fontWeight: 700 }}>{s.sharpe.toFixed(2)}</div></div>
