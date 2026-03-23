@@ -429,7 +429,7 @@ async function warmupEquityCurve(tickers: { ticker: string }[]) {
 // ── Warmup: Portfolio Backtest ─────────────────────────────────────────────────
 
 async function warmupPortfolioBacktest(tickers: { ticker: string; name: string; sector: string }[]) {
-  const CACHE_KEY = 'portfolio_backtest_v5';
+  const CACHE_KEY = 'portfolio_backtest_v6';
   const tickerList = tickers.map(t => t.ticker);
   const tickerMeta = new Map(tickers.map(t => [t.ticker, t]));
 

@@ -58,7 +58,7 @@ interface MonthData {
   }>;
 }
 
-const CACHE_KEY = 'portfolio_backtest_v5';
+const CACHE_KEY = 'portfolio_backtest_v6';
 const CACHE_MAX_AGE_H = 25;
 
 export async function POST(req: NextRequest) {
