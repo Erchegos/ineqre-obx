@@ -222,6 +222,10 @@ export default function HomeContent({ stats }: { stats: SystemStats }) {
                 description="OSE shipping terminal. Fleet tracking on global map with vessel-level charter rates, BDI/BDTI/BCTI indices, rate exposure matrix, contract expiry tracking, and quarterly TCE comparison across 10 companies."
                 tags={[{ label: "Fleet Map", color: "#06b6d4" }, { label: "Rates", color: "#f59e0b" }, { label: "10 Companies", color: "#10b981" }]}
                 visible={modulesReveal.visible} delay={10} />
+              <FeatureCard href="/commodities" title="Commodity & Sector Terminal"
+                description="Bloomberg-style commodity dashboard with treemap heatmap, 5-day return pulse, commodity-equity flow diagram, and sector intelligence for Energy, Seafood, Shipping & Materials. Sortable quotes table, scatter plot, and correlation matrix."
+                tags={[{ label: "Treemap", color: "#f59e0b" }, { label: "Flow Analysis", color: "#3b82f6" }, { label: "4 Sectors", color: "#10b981" }]}
+                visible={modulesReveal.visible} delay={11} />
             </div>
           </section>
 
