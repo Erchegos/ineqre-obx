@@ -170,8 +170,10 @@ export default function AlphaPage() {
   // Equity curve
   type EqCurvePoint = { date: string; value: number; positions: number };
   type EqCurveStats = { totalReturn: number; maxDrawdown: number; winRate: number; trades: number };
+  type TradeLogEntry = { ticker: string; entryDate: string; exitDate: string; entryPrice: number; exitPrice: number; pnlPct: number; daysHeld: number; exitReason: 'signal' | 'stop' | 'time' };
   const [equityCurve, setEquityCurve] = useState<EqCurvePoint[]>([]);
   const [equityCurveStats, setEquityCurveStats] = useState<EqCurveStats | null>(null);
+  const [tradeLog, setTradeLog] = useState<TradeLogEntry[]>([]);
   const [equityCurveLoading, setEquityCurveLoading] = useState(false);
 
   // ============================================================================
@@ -321,8 +323,8 @@ export default function AlphaPage() {
       try {
         const raw = localStorage.getItem(EQ_CACHE_KEY);
         if (raw) {
-          const { curve, stats, ts } = JSON.parse(raw);
-          if (Date.now() - ts < EQ_CACHE_TTL) { setEquityCurve(curve); setEquityCurveStats(stats); return; }
+          const { curve, stats, tradeLog: tl, ts } = JSON.parse(raw);
+          if (Date.now() - ts < EQ_CACHE_TTL) { setEquityCurve(curve); setEquityCurveStats(stats); if (tl) setTradeLog(tl); return; }
         }
       } catch { /* ignore */ }
     }
@@ -333,7 +335,8 @@ export default function AlphaPage() {
         const data = await res.json();
         setEquityCurve(data.equityCurve || []);
         setEquityCurveStats(data.stats || null);
-        try { localStorage.setItem(EQ_CACHE_KEY, JSON.stringify({ curve: data.equityCurve || [], stats: data.stats || null, ts: Date.now() })); } catch { /* ignore */ }
+        setTradeLog(data.tradeLog || []);
+        try { localStorage.setItem(EQ_CACHE_KEY, JSON.stringify({ curve: data.equityCurve || [], stats: data.stats || null, tradeLog: data.tradeLog || [], ts: Date.now() })); } catch { /* ignore */ }
       }
     } catch (e) { console.error("Equity curve failed:", e); }
     setEquityCurveLoading(false);
@@ -871,6 +874,55 @@ export default function AlphaPage() {
                   {!equityCurveLoading && equityCurve.length === 0 && (
                     <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
                       Loading equity curve...
+                    </div>
+                  )}
+
+                  {/* Trade Log */}
+                  {tradeLog.length > 0 && (
+                    <div style={{ marginTop: 24 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, fontFamily: "monospace", color: "rgba(255,255,255,0.5)", letterSpacing: "0.08em", marginBottom: 8 }}>
+                        TRADE LOG — {tradeLog.length} CLOSED POSITIONS · LAST 365 DAYS · MAX 10 SLOTS
+                      </div>
+                      <div style={{ overflowY: "auto", maxHeight: 420, border: "1px solid #21262d", borderRadius: 6 }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10, fontFamily: "monospace" }}>
+                          <thead style={{ position: "sticky", top: 0, background: "#161b22", zIndex: 1 }}>
+                            <tr>
+                              {["#", "Ticker", "Entry", "Exit", "Days", "P&L", "Reason"].map(h => (
+                                <th key={h} style={{ padding: "6px 10px", textAlign: h === "P&L" || h === "Days" || h === "#" ? "right" : "left", fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em", borderBottom: "1px solid #30363d", whiteSpace: "nowrap" }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {tradeLog.map((t, i) => {
+                              const isWin = t.pnlPct >= 0;
+                              const reasonColor = t.exitReason === 'stop' ? '#ef4444' : t.exitReason === 'time' ? '#f59e0b' : '#3b82f6';
+                              const reasonLabel = t.exitReason === 'stop' ? 'STOP' : t.exitReason === 'time' ? 'TIME' : 'SIG';
+                              return (
+                                <tr key={i} style={{ borderBottom: "1px solid #21262d", background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)" }}>
+                                  <td style={{ padding: "5px 10px", textAlign: "right", color: "rgba(255,255,255,0.25)", fontSize: 9 }}>{tradeLog.length - i}</td>
+                                  <td style={{ padding: "5px 10px", fontWeight: 700, color: "#3b82f6", letterSpacing: "0.04em" }}>{t.ticker}</td>
+                                  <td style={{ padding: "5px 10px", color: "rgba(255,255,255,0.5)" }}>{t.entryDate}</td>
+                                  <td style={{ padding: "5px 10px", color: "rgba(255,255,255,0.5)" }}>{t.exitDate}</td>
+                                  <td style={{ padding: "5px 10px", textAlign: "right", color: "rgba(255,255,255,0.4)" }}>{t.daysHeld}d</td>
+                                  <td style={{ padding: "5px 10px", textAlign: "right", fontWeight: 700, color: isWin ? "#10b981" : "#ef4444" }}>
+                                    {isWin ? "+" : ""}{t.pnlPct.toFixed(2)}%
+                                  </td>
+                                  <td style={{ padding: "5px 10px" }}>
+                                    <span style={{ background: `${reasonColor}22`, color: reasonColor, border: `1px solid ${reasonColor}44`, borderRadius: 3, padding: "1px 6px", fontSize: 8, fontWeight: 700, letterSpacing: "0.05em" }}>
+                                      {reasonLabel}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.35)" }}>
+                        <span><span style={{ color: "#3b82f6", fontWeight: 700 }}>SIG</span> — signal dropped below exit threshold</span>
+                        <span><span style={{ color: "#f59e0b", fontWeight: 700 }}>TIME</span> — 21-day max hold reached</span>
+                        <span><span style={{ color: "#ef4444", fontWeight: 700 }}>STOP</span> — −5% hard stop loss triggered</span>
+                      </div>
                     </div>
                   )}
                 </div>

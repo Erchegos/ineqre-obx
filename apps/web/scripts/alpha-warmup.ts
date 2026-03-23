@@ -264,7 +264,7 @@ async function warmupTopPerformers(tickers: { ticker: string; name: string; sect
 // ── Warmup: Equity Curve ───────────────────────────────────────────────────────
 
 async function warmupEquityCurve(tickers: { ticker: string }[]) {
-  const cacheKey = `equity_curve_v1_${MODEL}`;
+  const cacheKey = `equity_curve_v2_${MODEL}`;
   const tickerList = tickers.map(t => t.ticker);
 
   const [sigRes, priceRes] = await Promise.all([

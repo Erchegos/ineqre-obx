@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
     const model = url.searchParams.get('model') || 'yggdrasil_v7';
-    const cacheKey = `equity_curve_v1_${model}`;
+    const cacheKey = `equity_curve_v2_${model}`;
 
     // Check DB cache first
     try {
@@ -156,10 +156,12 @@ export async function GET(req: NextRequest) {
     const INIT_SLOT = 100 / MAX_SLOTS;
     const slotBalance = Array<number>(MAX_SLOTS).fill(INIT_SLOT);
 
-    interface SlotPos { ticker: string; entryPrice: number; entrySimIdx: number }
+    interface SlotPos { ticker: string; entryPrice: number; entrySimIdx: number; entryDate: string }
     const slotPos = Array<SlotPos | null>(MAX_SLOTS).fill(null);
 
     const equityCurve: { date: string; value: number; positions: number }[] = [];
+    interface TradeLog { ticker: string; entryDate: string; exitDate: string; entryPrice: number; exitPrice: number; pnlPct: number; daysHeld: number; exitReason: 'signal' | 'stop' | 'time' }
+    const tradeLog: TradeLog[] = [];
     let tradeCount = 0, winCount = 0;
 
     for (let si = 0; si < simDates.length; si++) {
@@ -176,14 +178,24 @@ export async function GET(req: NextRequest) {
         const priceReturn = (price - pos.entryPrice) / pos.entryPrice;
         const [curr, prev] = getSignalCurrPrev(pos.ticker, si);
 
-        let exit = false;
-        if (priceReturn <= STOP_LOSS) exit = true;
-        else if (daysHeld >= MAX_HOLD) exit = true;
+        let exitReason: TradeLog['exitReason'] | null = null;
+        if (priceReturn <= STOP_LOSS) exitReason = 'stop';
+        else if (daysHeld >= MAX_HOLD) exitReason = 'time';
         else if (daysHeld >= MIN_HOLD && prev !== null && curr !== null
-                 && prev > EXIT_PCT && curr <= EXIT_PCT) exit = true;
+                 && prev > EXIT_PCT && curr <= EXIT_PCT) exitReason = 'signal';
 
-        if (exit) {
-          slotBalance[s] *= (1 + priceReturn); // compound gain/loss into slot
+        if (exitReason) {
+          tradeLog.push({
+            ticker: pos.ticker,
+            entryDate: pos.entryDate,
+            exitDate: date,
+            entryPrice: Math.round(pos.entryPrice * 100) / 100,
+            exitPrice: Math.round(price * 100) / 100,
+            pnlPct: Math.round(priceReturn * 10000) / 100,
+            daysHeld,
+            exitReason,
+          });
+          slotBalance[s] *= (1 + priceReturn);
           slotPos[s] = null;
           tradeCount++;
           if (priceReturn > 0) winCount++;
@@ -202,7 +214,7 @@ export async function GET(req: NextRequest) {
           if (activeTickers.has(ticker)) continue;
           const price = priceByTicker.get(ticker)?.get(date);
           if (!price) continue;
-          slotPos[freeSlots[fi]] = { ticker, entryPrice: price, entrySimIdx: si };
+          slotPos[freeSlots[fi]] = { ticker, entryPrice: price, entrySimIdx: si, entryDate: date };
           activeTickers.add(ticker);
           fi++;
         }
@@ -235,8 +247,12 @@ export async function GET(req: NextRequest) {
       if (dd < maxDD) maxDD = dd;
     }
 
+    // Sort trades newest first
+    tradeLog.sort((a, b) => b.exitDate.localeCompare(a.exitDate));
+
     const result = {
       equityCurve,
+      tradeLog,
       stats: {
         totalReturn: Math.round(totalReturn * 10) / 10,
         maxDrawdown: Math.round(maxDD * 10) / 10,
