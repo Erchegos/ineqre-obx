@@ -407,12 +407,13 @@ export default function AlphaPage() {
   const sectors = useMemo(() => [...new Set(signals.map(s => s.sector).filter(Boolean))].sort(), [signals]);
   const availableTickers = signals.map(s => s.ticker).sort();
 
-  // Trade thresholds & rules — must match top-performers API exactly
-  const TRADE_ENTRY_PCT = 1.0;   // Enter when ML predicts >+1% monthly return
-  const TRADE_EXIT_PCT  = 0.25;  // Signal exit threshold
-  const TRADE_STOP_LOSS = -0.05; // Hard stop: -5% from entry (daily close)
-  const TRADE_MIN_HOLD  = 5;     // Min trading days before signal exit allowed
-  const TRADE_MAX_HOLD  = 21;    // Max trading days (1-month ML horizon)
+  // Trade thresholds & rules — user-adjustable, defaults match top-performers API
+  const [TRADE_ENTRY_PCT, setTradeEntryPct] = useState(1.0);
+  const [TRADE_EXIT_PCT,  setTradeExitPct]  = useState(0.25);
+  const [tradeStopLossPct, setTradeStopLossPct] = useState(5.0); // stored as positive %, displayed as -X%
+  const TRADE_STOP_LOSS = -(tradeStopLossPct / 100);
+  const [TRADE_MIN_HOLD, setTradeMinHold] = useState(5);
+  const [TRADE_MAX_HOLD, setTradeMaxHold] = useState(21);
 
   const explorerChartData = useMemo(() => {
     if (!tickerHistory) return [];
@@ -497,7 +498,7 @@ export default function AlphaPage() {
     }
 
     return raw;
-  }, [tickerHistory, selectedModel, TRADE_ENTRY_PCT, TRADE_EXIT_PCT, TRADE_STOP_LOSS, TRADE_MIN_HOLD, TRADE_MAX_HOLD]);
+  }, [tickerHistory, selectedModel, TRADE_ENTRY_PCT, TRADE_EXIT_PCT, TRADE_STOP_LOSS, TRADE_MIN_HOLD, TRADE_MAX_HOLD, tradeStopLossPct]);
 
   // ── Simulated trade log — tracks max intra-trade drawdown ──
   const explorerTrades = useMemo(() => {
@@ -1559,9 +1560,32 @@ export default function AlphaPage() {
                   const avgDD = closed > 0 ? explorerTrades.filter(t => !t.open).reduce((s, t) => s + t.maxDrawdown, 0) / closed : 0;
                   return (
                     <>
+                      {/* ── Strategy Parameter Controls ── */}
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, flexWrap: "wrap", background: "#0d1117", border: "1px solid #21262d", borderRadius: 6, padding: "8px 12px" }}>
+                        <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.4)", letterSpacing: "0.06em", textTransform: "uppercase", marginRight: 4 }}>Strategy</span>
+                        {([
+                          { label: "Entry >", unit: "%", value: TRADE_ENTRY_PCT, set: setTradeEntryPct, min: 0.1, max: 5, step: 0.1, decimals: 1 },
+                          { label: "Stop", unit: "%", value: tradeStopLossPct, set: setTradeStopLossPct, min: 1, max: 20, step: 0.5, decimals: 1, prefix: "-" },
+                          { label: "Exit <", unit: "%", value: TRADE_EXIT_PCT, set: setTradeExitPct, min: 0, max: 2, step: 0.05, decimals: 2 },
+                          { label: "Min Hold", unit: "d", value: TRADE_MIN_HOLD, set: setTradeMinHold, min: 1, max: 15, step: 1, decimals: 0 },
+                          { label: "Max Hold", unit: "d", value: TRADE_MAX_HOLD, set: setTradeMaxHold, min: 5, max: 63, step: 1, decimals: 0 },
+                        ] as { label: string; unit: string; value: number; set: (v: number) => void; min: number; max: number; step: number; decimals: number; prefix?: string }[]).map(p => (
+                          <div key={p.label} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.45)" }}>{p.label}</span>
+                            <button onClick={() => p.set(Math.max(p.min, parseFloat((p.value - p.step).toFixed(p.decimals))))}
+                              style={{ width: 18, height: 18, background: "#21262d", border: "1px solid #30363d", borderRadius: 3, color: "rgba(255,255,255,0.6)", cursor: "pointer", fontSize: 11, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "monospace" }}>−</button>
+                            <span style={{ fontSize: 10, fontFamily: "monospace", color: "#fff", fontWeight: 700, minWidth: 32, textAlign: "center" }}>{p.prefix ?? ""}{p.value.toFixed(p.decimals)}{p.unit}</span>
+                            <button onClick={() => p.set(Math.min(p.max, parseFloat((p.value + p.step).toFixed(p.decimals))))}
+                              style={{ width: 18, height: 18, background: "#21262d", border: "1px solid #30363d", borderRadius: 3, color: "rgba(255,255,255,0.6)", cursor: "pointer", fontSize: 11, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "monospace" }}>+</button>
+                          </div>
+                        ))}
+                        <button onClick={() => { setTradeEntryPct(1.0); setTradeStopLossPct(5.0); setTradeExitPct(0.25); setTradeMinHold(5); setTradeMaxHold(21); }}
+                          style={{ marginLeft: "auto", fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.35)", background: "none", border: "1px solid #30363d", borderRadius: 3, padding: "2px 8px", cursor: "pointer" }}>RESET</button>
+                      </div>
+
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                         <div>
-                          <div style={sectionTitle}>Simulated Trade Log — Entry &gt;{TRADE_ENTRY_PCT}% · Stop {TRADE_STOP_LOSS*100}% · Min {TRADE_MIN_HOLD}d · Max {TRADE_MAX_HOLD}d</div>
+                          <div style={sectionTitle}>Simulated Trade Log — Entry &gt;{TRADE_ENTRY_PCT}% · Stop -{tradeStopLossPct}% · Min {TRADE_MIN_HOLD}d · Max {TRADE_MAX_HOLD}d</div>
                           <div style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.25)", marginTop: -8 }}>
                             Click a row (or ▲▼ on chart) to highlight the trade with a dotted connector line
                           </div>

@@ -182,7 +182,7 @@ export default function HomeContent({ stats }: { stats: SystemStats }) {
           {/* Quantitative Analytics */}
           <section style={{ marginBottom: 48 }}>
             <SectionHeading visible={modulesReveal.visible}>Quantitative Analytics & Portfolio Tools</SectionHeading>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(350px, 1fr))", gap: 16 }}>
               <FeatureCard href="/volatility/obx" title="OBX Volatility Dashboard"
                 description="Index-level volatility intelligence with 6-regime classification (Crisis to Low & Stable). Constituent heatmap, vol cone (5th-95th percentile), systemic risk via rolling correlation, GARCH/MSGARCH models."
                 tags={[{ label: "Regime", color: "#f59e0b" }, { label: "GARCH", color: "#3b82f6" }, { label: "Systemic", color: "#06b6d4" }]}
@@ -203,7 +203,7 @@ export default function HomeContent({ stats }: { stats: SystemStats }) {
                 description="Currency risk terminal for NOK portfolios. Multi-currency regression betas, forward curves via IRP, revenue/cost exposure decomposition, portfolio FX VaR, carry trade analytics, and interactive hedge calculators."
                 tags={[{ label: "NOK/FX", color: "#f59e0b" }, { label: "IRP", color: "#3b82f6" }, { label: "Hedging", color: "#10b981" }]}
                 visible={modulesReveal.visible} delay={7} />
-              <FeatureCard href="/alpha" title="Alpha Engine — Yggdrasil"
+              <FeatureCard href="/alpha" title="Alpha Engine Yggdrasil"
                 description="Cross-sectional ML signal explorer with interactive trade simulation. Signal crossing entry/exit with dotted P&L connectors, sector-browser ticker search, 365-day cumulative performance chart (10 equal-weight slots, vol-targeted), and a 15-position concentrated portfolio strategy with 5-year monthly backtest."
                 tags={[{ label: "ML Alpha", color: "#10b981" }, { label: "Trade Sim", color: "#f59e0b" }, { label: "228 Stocks", color: "#3b82f6" }]}
                 visible={modulesReveal.visible} delay={8} isPrivate />
