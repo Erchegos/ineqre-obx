@@ -182,7 +182,7 @@ export default function HomeContent({ stats }: { stats: SystemStats }) {
           {/* Quantitative Analytics */}
           <section style={{ marginBottom: 48 }}>
             <SectionHeading visible={modulesReveal.visible}>Quantitative Analytics & Portfolio Tools</SectionHeading>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
               <FeatureCard href="/volatility/obx" title="OBX Volatility Dashboard"
                 description="Index-level volatility intelligence with 6-regime classification (Crisis to Low & Stable). Constituent heatmap, vol cone (5th-95th percentile), systemic risk via rolling correlation, GARCH/MSGARCH models."
                 tags={[{ label: "Regime", color: "#f59e0b" }, { label: "GARCH", color: "#3b82f6" }, { label: "Systemic", color: "#06b6d4" }]}
@@ -337,21 +337,22 @@ function FeatureCard({ href, title, description, tags, visible, delay, isPrivate
       borderRadius: 8, padding: "22px 24px", textDecoration: "none", color: "inherit",
       opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(20px)",
       transition: `opacity 0.5s ease ${delay * 0.1}s, transform 0.5s ease ${delay * 0.1}s, border-color 0.25s ease, box-shadow 0.25s ease`,
-      position: "relative",
     }}>
-      {isPrivate && (
-        <span style={{
-          position: "absolute", top: 12, right: 12,
-          fontSize: 8, fontWeight: 700, letterSpacing: "0.08em", fontFamily: "monospace",
-          padding: "2px 7px", borderRadius: 10,
-          background: "rgba(239,68,68,0.12)", color: "#ef4444",
-          border: "1px solid rgba(239,68,68,0.3)",
-        }}>
-          PRIVATE
-        </span>
-      )}
-      <div style={{ display: "flex", gap: 4, marginBottom: 10, flexWrap: "wrap", alignItems: "center", minHeight: 16 }}>
-        {tags.map(t => <TagPill key={t.label} label={t.label} color={t.color} />)}
+      <div style={{ display: "flex", gap: 4, marginBottom: 10, flexWrap: "wrap", alignItems: "center", minHeight: 20, justifyContent: "space-between" }}>
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+          {tags.map(t => <TagPill key={t.label} label={t.label} color={t.color} />)}
+        </div>
+        {isPrivate && (
+          <span style={{
+            flexShrink: 0,
+            fontSize: 8, fontWeight: 700, letterSpacing: "0.08em", fontFamily: "monospace",
+            padding: "2px 7px", borderRadius: 10,
+            background: "rgba(239,68,68,0.12)", color: "#ef4444",
+            border: "1px solid rgba(239,68,68,0.3)",
+          }}>
+            PRIVATE
+          </span>
+        )}
       </div>
       <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "#e6edf3", fontFamily: "system-ui, -apple-system, sans-serif", letterSpacing: "0.01em" }}>
         {title}
