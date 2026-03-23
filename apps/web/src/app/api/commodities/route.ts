@@ -11,7 +11,16 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { COMMODITY_META } from "@/lib/sectorMapping";
+const COMMODITY_META: Record<string, { category: string; importance: number; unit: string }> = {
+  "BZ=F":  { category: "Energy",  importance: 100, unit: "USD/bbl" },
+  "CL=F":  { category: "Energy",  importance: 80,  unit: "USD/bbl" },
+  "NG=F":  { category: "Energy",  importance: 60,  unit: "USD/MMBtu" },
+  "ALI=F": { category: "Metals",  importance: 70,  unit: "USD/t" },
+  "HG=F":  { category: "Metals",  importance: 55,  unit: "USD/lb" },
+  "GC=F":  { category: "Metals",  importance: 65,  unit: "USD/oz" },
+  "SI=F":  { category: "Metals",  importance: 40,  unit: "USD/oz" },
+  "SALMON":{ category: "Seafood", importance: 90,  unit: "NOK/kg" },
+};
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
