@@ -965,36 +965,36 @@ export default function AlphaPage() {
                   {/* Monthly Charts */}
                   {portfolioBacktest.monthlyReturns.length > 0 && (
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-                      <div>
-                        <div style={{ fontSize: 10, fontWeight: 700, fontFamily: "monospace", color: "rgba(255,255,255,0.6)", letterSpacing: "0.06em", marginBottom: 8 }}>MONTHLY EXCESS RETURN</div>
+                      <div style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 6, padding: "12px 8px 8px" }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, fontFamily: "monospace", color: "rgba(255,255,255,0.7)", letterSpacing: "0.06em", marginBottom: 8, paddingLeft: 4 }}>MONTHLY EXCESS RETURN</div>
                         <ResponsiveContainer width="100%" height={160}>
                           <BarChart data={portfolioBacktest.monthlyReturns} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                            <XAxis dataKey="date" tick={{ fontSize: 8, fill: "rgba(255,255,255,0.65)", fontFamily: "monospace" }} tickFormatter={d => d?.slice(2, 7)} interval="preserveStartEnd" />
-                            <YAxis tick={{ fontSize: 9, fill: "rgba(255,255,255,0.65)", fontFamily: "monospace" }} tickFormatter={v => (v * 100).toFixed(0) + "%"} width={38} />
-                            <ReferenceLine y={0} stroke="rgba(255,255,255,0.2)" />
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.12)" />
+                            <XAxis dataKey="date" tick={{ fontSize: 8, fill: "rgba(255,255,255,0.7)", fontFamily: "monospace" }} tickFormatter={d => d?.slice(2, 7)} interval="preserveStartEnd" />
+                            <YAxis tick={{ fontSize: 9, fill: "rgba(255,255,255,0.7)", fontFamily: "monospace" }} tickFormatter={v => (v * 100).toFixed(0) + "%"} width={38} />
+                            <ReferenceLine y={0} stroke="rgba(255,255,255,0.35)" strokeWidth={1} />
                             <Tooltip contentStyle={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 6, fontFamily: "monospace", fontSize: 11, color: "#e6edf3" }}
                               labelStyle={{ color: "rgba(255,255,255,0.7)", marginBottom: 4 }}
                               formatter={((v: number) => [(v * 100).toFixed(2) + "%", "Excess"]) as Parameters<typeof Tooltip>[0]["formatter"]} />
                             <Bar dataKey="excess" radius={[2, 2, 0, 0]}>
-                              {portfolioBacktest.monthlyReturns.map((d, i) => <Cell key={i} fill={d.excess >= 0 ? "#10b981" : "#ef4444"} fillOpacity={0.85} />)}
+                              {portfolioBacktest.monthlyReturns.map((d, i) => <Cell key={i} fill={d.excess >= 0 ? "#34d399" : "#f87171"} />)}
                             </Bar>
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
-                      <div>
-                        <div style={{ fontSize: 10, fontWeight: 700, fontFamily: "monospace", color: "rgba(255,255,255,0.6)", letterSpacing: "0.06em", marginBottom: 8 }}>MONTHLY INFORMATION COEFFICIENT</div>
+                      <div style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 6, padding: "12px 8px 8px" }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, fontFamily: "monospace", color: "rgba(255,255,255,0.7)", letterSpacing: "0.06em", marginBottom: 8, paddingLeft: 4 }}>MONTHLY INFORMATION COEFFICIENT</div>
                         <ResponsiveContainer width="100%" height={160}>
                           <BarChart data={portfolioBacktest.monthlyReturns} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                            <XAxis dataKey="date" tick={{ fontSize: 8, fill: "rgba(255,255,255,0.65)", fontFamily: "monospace" }} tickFormatter={d => d?.slice(2, 7)} interval="preserveStartEnd" />
-                            <YAxis tick={{ fontSize: 9, fill: "rgba(255,255,255,0.65)", fontFamily: "monospace" }} width={38} />
-                            <ReferenceLine y={0} stroke="rgba(255,255,255,0.2)" />
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.12)" />
+                            <XAxis dataKey="date" tick={{ fontSize: 8, fill: "rgba(255,255,255,0.7)", fontFamily: "monospace" }} tickFormatter={d => d?.slice(2, 7)} interval="preserveStartEnd" />
+                            <YAxis tick={{ fontSize: 9, fill: "rgba(255,255,255,0.7)", fontFamily: "monospace" }} width={38} />
+                            <ReferenceLine y={0} stroke="rgba(255,255,255,0.35)" strokeWidth={1} />
                             <Tooltip contentStyle={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 6, fontFamily: "monospace", fontSize: 11, color: "#e6edf3" }}
                               labelStyle={{ color: "rgba(255,255,255,0.7)", marginBottom: 4 }}
                               formatter={((v: number) => [Number(v).toFixed(3), "IC"]) as Parameters<typeof Tooltip>[0]["formatter"]} />
                             <Bar dataKey="ic" radius={[2, 2, 0, 0]}>
-                              {portfolioBacktest.monthlyReturns.map((d, i) => <Cell key={i} fill={d.ic >= 0 ? "#3b82f6" : "#ef4444"} fillOpacity={0.85} />)}
+                              {portfolioBacktest.monthlyReturns.map((d, i) => <Cell key={i} fill={d.ic >= 0 ? "#60a5fa" : "#f87171"} />)}
                             </Bar>
                           </BarChart>
                         </ResponsiveContainer>
