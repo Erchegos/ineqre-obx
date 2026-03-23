@@ -1100,9 +1100,9 @@ export default function AlphaPage() {
                       <div style={{ fontSize: 10, fontWeight: 700, fontFamily: "monospace", color: "rgba(255,255,255,0.5)", letterSpacing: "0.06em", marginBottom: 8 }}>SECTOR ALLOCATION</div>
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                         {portfolioBacktest.sectorAllocation.map(sa => (
-                          <div key={sa.sector} style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 4, padding: "6px 14px", borderLeft: `3px solid ${sa.color}` }}>
+                          <div key={sa.sector} style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 4, padding: "6px 14px", borderLeft: `3px solid ${sectorColor(sa.sector)}` }}>
                             <div style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.4)" }}>{sa.sector}</div>
-                            <div style={{ fontSize: 16, fontWeight: 800, fontFamily: "monospace", color: sa.color }}>{sa.weight.toFixed(1)}%</div>
+                            <div style={{ fontSize: 16, fontWeight: 800, fontFamily: "monospace", color: sectorColor(sa.sector) }}>{sa.weight.toFixed(1)}%</div>
                           </div>
                         ))}
                       </div>
