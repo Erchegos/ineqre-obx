@@ -99,7 +99,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NODE_TLS_REJECT_UNAUTHORIZED: '0'
-        run: npx tsx scripts/fetch-commodities.ts --days=7
+        run: npx tsx scripts/fetch-commodities.ts --days=7 --force
 
       # ─── Summary ───────────────────────────────────────────────────────
       - name: Summary

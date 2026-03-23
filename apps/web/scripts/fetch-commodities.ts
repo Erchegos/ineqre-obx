@@ -33,6 +33,8 @@ const DAYS_BACK = parseInt(
 );
 const DRY_RUN = process.argv.includes("--dry-run");
 const SKIP_SENSITIVITY = process.argv.includes("--skip-sensitivity");
+// --force: overwrite existing prices (bypass existingKeys skip, ON CONFLICT DO UPDATE handles dedup)
+const FORCE = process.argv.includes("--force");
 
 // ── DB setup ──
 const dbUrl = (process.env.DATABASE_URL || "").trim().replace(/^["']|["']$/g, "");
@@ -320,7 +322,7 @@ async function insertTECommodities(
     if (!symbol) continue;
 
     const key = `${symbol}|${today}`;
-    if (existingKeys.has(key)) {
+    if (!FORCE && existingKeys.has(key)) {
       console.log(`  ${symbol} already exists for ${today}, skipping`);
       continue;
     }
@@ -415,7 +417,7 @@ async function fetchSalmonSSB(
     const dateStr = friday.toISOString().slice(0, 10);
 
     const key = `SALMON|${dateStr}`;
-    if (existingKeys.has(key)) continue;
+    if (!FORCE && existingKeys.has(key)) continue;
 
     if (DRY_RUN) {
       console.log(`  [DRY] SALMON ${dateStr} (${weekCode}): NOK ${price.toFixed(2)}/kg`);
@@ -517,7 +519,7 @@ async function main() {
     let inserted = 0;
     for (const row of rows) {
       const key = `${comm.symbol}|${row.date}`;
-      if (existingKeys.has(key)) continue;
+      if (!FORCE && existingKeys.has(key)) continue;
 
       if (DRY_RUN) {
         console.log(
