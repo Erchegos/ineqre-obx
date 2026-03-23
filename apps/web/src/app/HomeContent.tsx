@@ -214,10 +214,6 @@ export default function HomeContent({ stats }: { stats: SystemStats }) {
           <section style={{ marginBottom: 48 }}>
             <SectionHeading visible={modulesReveal.visible}>Sector Intelligence</SectionHeading>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
-              <FeatureCard href="/commodities" title="Commodity & Sector Terminal"
-                description="Bloomberg-style commodity dashboard with interactive treemap heatmap, commodity-equity flow diagram, correlation matrix, momentum scatter plot, and sector intelligence. Maps Brent, Gas, Metals, Salmon to 26 OSE stocks across 4 sectors."
-                tags={[{ label: "Treemap", color: "#f59e0b" }, { label: "Flow Analysis", color: "#3b82f6" }, { label: "15 Commodities", color: "#10b981" }]}
-                visible={modulesReveal.visible} delay={9} />
               <FeatureCard href="/seafood" title="Seafood Intelligence"
                 description="Norwegian aquaculture dashboard. Salmon spot/forward prices, sea lice monitoring, production area traffic lights, disease outbreaks, company risk matrix, biomass tracking, and live wellboat harvest detection via AIS."
                 tags={[{ label: "Salmon", color: "#f59e0b" }, { label: "Lice", color: "#ef4444" }, { label: "Harvest", color: "#10b981" }]}
