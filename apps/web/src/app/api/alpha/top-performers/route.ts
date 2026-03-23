@@ -25,6 +25,8 @@ const MIN_HOLD     = 5;      // Minimum trading days before signal-exit allowed
 const MAX_HOLD     = 21;     // Maximum trading days (1-month horizon)
 const LOOKBACK     = 5;      // Days to look back for previous signal (same as Explorer)
 
+const CACHE_MAX_AGE_H = 25;
+
 export async function GET(req: NextRequest) {
   const authError = requireAuth(req);
   if (authError) return authError;
@@ -32,6 +34,20 @@ export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
     const model = url.searchParams.get('model') || 'ensemble_v3';
+    const cacheKey = `top_performers_v1_${model}`;
+
+    // Check DB cache first
+    try {
+      await pool.query(`CREATE TABLE IF NOT EXISTS alpha_result_cache (
+        cache_key TEXT PRIMARY KEY, result JSONB NOT NULL, computed_at TIMESTAMPTZ DEFAULT NOW()
+      )`);
+      const cached = await pool.query(
+        `SELECT result FROM alpha_result_cache
+         WHERE cache_key = $1 AND computed_at > NOW() - INTERVAL '${CACHE_MAX_AGE_H} hours'`,
+        [cacheKey]
+      );
+      if (cached.rows.length > 0) return secureJsonResponse(cached.rows[0].result);
+    } catch { /* fall through to compute */ }
 
     // 1. Top 50 liquid OSE equities by avg NOK daily volume (last 3 months)
     const liquidRes = await pool.query(`
@@ -234,13 +250,22 @@ export async function GET(req: NextRequest) {
     results.sort((a, b) => b.score - a.score);
     const top10 = results.slice(0, 10).map(({ score, ...r }) => r); // eslint-disable-line @typescript-eslint/no-unused-vars
 
-    return secureJsonResponse({
+    const result = {
       topPerformers: top10,
       meta: {
         model, universe: tickers.length, qualified: results.length,
         rules: { entryPct: ENTRY_PCT, exitPct: EXIT_PCT, stopLoss: STOP_LOSS * 100, minHold: MIN_HOLD, maxHold: MAX_HOLD },
       },
-    });
+    };
+    try {
+      await pool.query(
+        `INSERT INTO alpha_result_cache (cache_key, result, computed_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (cache_key) DO UPDATE SET result = $2, computed_at = NOW()`,
+        [cacheKey, JSON.stringify(result)]
+      );
+    } catch { /* non-fatal */ }
+    return secureJsonResponse(result);
   } catch (error) {
     return safeErrorResponse(error, 'Top performers failed');
   }

@@ -58,11 +58,27 @@ interface MonthData {
   }>;
 }
 
+const CACHE_KEY = 'portfolio_backtest_v5';
+const CACHE_MAX_AGE_H = 25;
+
 export async function POST(req: NextRequest) {
   const authError = requireAuth(req);
   if (authError) return authError;
 
   try {
+    // ── Serve from DB cache if fresh (pre-computed by nightly warmup) ──────────
+    try {
+      await pool.query(`CREATE TABLE IF NOT EXISTS alpha_result_cache (
+        cache_key TEXT PRIMARY KEY, result JSONB NOT NULL, computed_at TIMESTAMPTZ DEFAULT NOW()
+      )`);
+      const cached = await pool.query(
+        `SELECT result FROM alpha_result_cache
+         WHERE cache_key = $1 AND computed_at > NOW() - INTERVAL '${CACHE_MAX_AGE_H} hours'`,
+        [CACHE_KEY]
+      );
+      if (cached.rows.length > 0) return secureJsonResponse(cached.rows[0].result);
+    } catch { /* table may not exist yet — fall through to compute */ }
+
     const body = await req.json().catch(() => ({}));
     const costBps = body.costBps ?? 15;
     const maxSingleStock = body.maxSingleStock ?? 0.08;
@@ -534,14 +550,16 @@ export async function POST(req: NextRequest) {
     const sectorAlloc = new Map<string, number>();
     const sectorColors: Record<string, string> = {
       Energy: '#ef4444', Seafood: '#22c55e', Shipping: '#3b82f6', Materials: '#f59e0b',
-      Finance: '#8b5cf6', Telecom: '#06b6d4', Consumer: '#ec4899', Other: '#6b7280',
-      Technology: '#14b8a6', Healthcare: '#f43f5e', Industrials: '#a855f7',
+      Banks: '#8b5cf6', Finance: '#7c3aed', Telecom: '#06b6d4', Consumer: '#ec4899',
+      Industrial: '#f97316', Industrials: '#fb923c', Technology: '#14b8a6', Tech: '#a855f7',
+      Investment: '#e879f9', 'Renewable Energy': '#4ade80', Healthcare: '#f43f5e',
+      Other: '#64748b',
     };
     for (const h of latestHoldings) {
       sectorAlloc.set(h.sector, (sectorAlloc.get(h.sector) || 0) + h.weight);
     }
 
-    return secureJsonResponse({
+    const result = {
       config: {
         weights: alphaWeights,
         maxSingleStock,
@@ -577,8 +595,19 @@ export async function POST(req: NextRequest) {
           weight: Math.round(weight * 10) / 10,
           color: sectorColors[sector] || '#6b7280',
         })),
-    });
+    };
+    // Store in DB cache so next request is instant (warmup script + self-populating)
+    try {
+      await pool.query(
+        `INSERT INTO alpha_result_cache (cache_key, result, computed_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (cache_key) DO UPDATE SET result = $2, computed_at = NOW()`,
+        [CACHE_KEY, JSON.stringify(result)]
+      );
+    } catch { /* non-fatal */ }
+    return secureJsonResponse(result);
   } catch (error) {
     return safeErrorResponse(error, 'Portfolio backtest failed');
   }
 }
+

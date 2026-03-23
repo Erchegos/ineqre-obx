@@ -112,8 +112,10 @@ const btnSecondary: React.CSSProperties = {
 
 const SECTOR_COLORS: Record<string, string> = {
   Energy: "#ef4444", Seafood: "#22c55e", Shipping: "#3b82f6", Materials: "#f59e0b",
-  Banks: "#8b5cf6", Telecom: "#06b6d4", Consumer: "#ec4899", Industrial: "#f97316",
-  Tech: "#a855f7", Default: "#6b7280",
+  Banks: "#8b5cf6", Finance: "#7c3aed", Telecom: "#06b6d4", Consumer: "#ec4899",
+  Industrial: "#f97316", Industrials: "#fb923c", Technology: "#14b8a6", Tech: "#a855f7",
+  Investment: "#e879f9", "Renewable Energy": "#4ade80", Healthcare: "#f43f5e",
+  Other: "#64748b", Default: "#94a3b8",
 };
 function sectorColor(s: string) { return SECTOR_COLORS[s] || SECTOR_COLORS.Default; }
 function pct(v: number, d = 1) { return (Number(v) * 100).toFixed(d) + "%"; }
@@ -716,7 +718,7 @@ export default function AlphaPage() {
               )}
               {!topPerfLoading && topPerformers.length === 0 && (
                 <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
-                  No data yet — loading on first visit...
+                  Loading signal data...
                 </div>
               )}
               {topPerformers.length > 0 && (
@@ -868,7 +870,7 @@ export default function AlphaPage() {
 
                   {!equityCurveLoading && equityCurve.length === 0 && (
                     <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
-                      No data — click Refresh to compute
+                      Loading equity curve...
                     </div>
                   )}
                 </div>

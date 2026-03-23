@@ -20,6 +20,8 @@ const MAX_HOLD  = 21;
 const LOOKBACK  = 5;
 const MAX_SLOTS = 10;
 
+const CACHE_MAX_AGE_H = 25;
+
 export async function GET(req: NextRequest) {
   const authError = requireAuth(req);
   if (authError) return authError;
@@ -27,6 +29,20 @@ export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
     const model = url.searchParams.get('model') || 'yggdrasil_v7';
+    const cacheKey = `equity_curve_v1_${model}`;
+
+    // Check DB cache first
+    try {
+      await pool.query(`CREATE TABLE IF NOT EXISTS alpha_result_cache (
+        cache_key TEXT PRIMARY KEY, result JSONB NOT NULL, computed_at TIMESTAMPTZ DEFAULT NOW()
+      )`);
+      const cached = await pool.query(
+        `SELECT result FROM alpha_result_cache
+         WHERE cache_key = $1 AND computed_at > NOW() - INTERVAL '${CACHE_MAX_AGE_H} hours'`,
+        [cacheKey]
+      );
+      if (cached.rows.length > 0) return secureJsonResponse(cached.rows[0].result);
+    } catch { /* fall through to compute */ }
 
     // 1. Top 50 liquid OSE tickers (same filter as top-performers)
     const liquidRes = await pool.query(`
@@ -219,7 +235,7 @@ export async function GET(req: NextRequest) {
       if (dd < maxDD) maxDD = dd;
     }
 
-    return secureJsonResponse({
+    const result = {
       equityCurve,
       stats: {
         totalReturn: Math.round(totalReturn * 10) / 10,
@@ -229,7 +245,16 @@ export async function GET(req: NextRequest) {
         model,
         universe: tickers.length,
       },
-    });
+    };
+    try {
+      await pool.query(
+        `INSERT INTO alpha_result_cache (cache_key, result, computed_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (cache_key) DO UPDATE SET result = $2, computed_at = NOW()`,
+        [cacheKey, JSON.stringify(result)]
+      );
+    } catch { /* non-fatal */ }
+    return secureJsonResponse(result);
   } catch (error) {
     return safeErrorResponse(error, 'Equity curve failed');
   }
