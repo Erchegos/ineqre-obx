@@ -3404,8 +3404,12 @@ export default function FXTerminalPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0 16px", flexWrap: "wrap" as const }}>
           <button onClick={() => {
               if (pairsPlayIdx < 0) {
-                // First play — start from beginning
-                setPairsPlayIdx(0);
+                // First play — skip burn-in, jump to ~30 bars before first trade
+                const firstTrade = [...(pairsData?.trades ?? [])].sort((a, b) => a.entryDate.localeCompare(b.entryDate))[0];
+                const startIdx = firstTrade
+                  ? Math.max(0, (pairsData?.series ?? []).findIndex((s: any) => s.date >= firstTrade.entryDate) - 30)
+                  : 0;
+                setPairsPlayIdx(startIdx);
                 setPairsIsPlaying(true);
               } else {
                 setPairsIsPlaying(p => !p);
@@ -3444,152 +3448,146 @@ export default function FXTerminalPage() {
         {/* 3-column live status */}
         <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr 0.9fr", gap: 12, marginBottom: 12 }}>
 
-          {/* POSITION MONITOR */}
-          <div style={{ ...S.card, background: posBg, border: `1px solid ${posColor}`, animation: activeTrade ? "pGlow 2s ease-in-out infinite" : "none", padding: 18 }}>
-            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", letterSpacing: "0.1em", marginBottom: 10 }}>POSITION MONITOR</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-              <div style={{ width: 10, height: 10, borderRadius: "50%", background: posColor, flexShrink: 0,
-                animation: activeTrade ? "pBlink 1.2s ease-in-out infinite" : "none" }} />
-              <div style={{ fontSize: 18, fontWeight: 800, color: posColor, letterSpacing: 2 }}>
-                {activeTrade ? (activeTrade.direction === "long" ? "▲  LONG" : "▼  SHORT") : "◌  FLAT"}
+          {/* POSITION MONITOR — fixed layout, no jumping */}
+          <div style={{ ...S.card, background: posBg, border: `1px solid ${posColor}`, animation: activeTrade ? "pGlow 2s ease-in-out infinite" : "none", padding: "16px 18px", minHeight: 260 }}>
+            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", letterSpacing: "0.1em", marginBottom: 8 }}>POSITION MONITOR</div>
+
+            {/* Status header — stable height, no layout shift */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 9, height: 9, borderRadius: "50%", background: posColor, flexShrink: 0,
+                  animation: activeTrade ? "pBlink 1.2s ease-in-out infinite" : "none" }} />
+                <div style={{ fontSize: 17, fontWeight: 800, color: posColor, letterSpacing: 2 }}>
+                  {activeTrade ? (activeTrade.direction === "long" ? "▲  LONG" : "▼  SHORT") : "◌  FLAT"}
+                </div>
+              </div>
+              {/* Inline metadata — no popup boxes */}
+              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", fontFamily: "monospace", textAlign: "right" as const }}>
+                {activeTrade
+                  ? <>{holdDays}d · β={activeTrade.entryBeta}</>
+                  : <>{pairsDataLoading ? "loading…" : !hasStarted ? "press PLAY" : "±1.2σ entry"}</>}
               </div>
             </div>
-            {activeTrade ? (
-              <>
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginBottom: 10 }}>
-                  {config.labelY}  ↔  {config.labelX}
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 12 }}>
-                  {[
-                    { l: "ENTRY Z", v: String(activeTrade.entryZ), c: posColor },
-                    { l: "NOW Z", v: currentPt ? (currentPt.zscore >= 0 ? "+" : "") + currentPt.zscore.toFixed(3) : "—", c: "#fff" },
-                    { l: "β ENTRY", v: String(activeTrade.entryBeta), c: "#3b82f6" },
-                    { l: "HOLD", v: `${holdDays}d`, c: "rgba(255,255,255,0.7)" },
-                  ].map((m, i) => (
-                    <div key={i} style={{ background: "rgba(0,0,0,0.3)", borderRadius: 4, padding: "6px 8px" }}>
-                      <div style={{ fontSize: 7, color: "rgba(255,255,255,0.3)", letterSpacing: "0.05em" }}>{m.l}</div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: m.c, fontFamily: "monospace" }}>{m.v}</div>
-                    </div>
-                  ))}
-                </div>
-                {/* Mini bell curve: current z vs entry/exit/stop during active trade */}
-                {currentPt && (() => {
-                  const W = 188, H = 44, PX = 6, cW = W - 2 * PX, RANGE = 4;
-                  const zToX = (zv: number) => PX + ((zv + RANGE) / (2 * RANGE)) * cW;
-                  const pdf = (zv: number) => Math.exp(-0.5 * zv * zv);
-                  const EXIT = 0.2, STOP = 3.0;
-                  const curvePts: string[] = [];
-                  for (let i = 0; i <= 100; i++) {
-                    const zv = -RANGE + (2 * RANGE * i) / 100;
-                    const y = (H - 6) - pdf(zv) * (H - 14);
-                    curvePts.push(`${i === 0 ? "M" : "L"}${zToX(zv).toFixed(1)},${y.toFixed(1)}`);
-                  }
-                  const cz = Math.max(-RANGE, Math.min(RANGE, currentPt.zscore));
-                  const ez = Math.max(-RANGE, Math.min(RANGE, activeTrade.entryZ));
-                  const dotY = (H - 6) - pdf(cz) * (H - 14);
-                  const isLong = activeTrade.direction === "long";
-                  const progressing = isLong ? currentPt.zscore > activeTrade.entryZ : currentPt.zscore < activeTrade.entryZ;
-                  const dotColor = progressing ? "#10b981" : "#ef4444";
-                  return (
-                    <svg width={W} height={H} style={{ display: "block", overflow: "visible", marginBottom: 6 }}>
-                      <line x1={PX} y1={H - 6} x2={W - PX} y2={H - 6} stroke="rgba(255,255,255,0.08)" strokeWidth={0.5} />
-                      <path d={curvePts.join(" ")} stroke="rgba(255,255,255,0.2)" strokeWidth={1.2} fill="none" />
-                      <line x1={zToX(-EXIT)} y1={2} x2={zToX(-EXIT)} y2={H - 6} stroke="rgba(255,255,255,0.2)" strokeWidth={0.5} strokeDasharray="2,3" />
-                      <line x1={zToX(EXIT)} y1={2} x2={zToX(EXIT)} y2={H - 6} stroke="rgba(255,255,255,0.2)" strokeWidth={0.5} strokeDasharray="2,3" />
-                      <line x1={zToX(ez)} y1={2} x2={zToX(ez)} y2={H - 6} stroke={isLong ? "#10b981" : "#ef4444"} strokeWidth={1} strokeDasharray="2,2" opacity={0.7} />
-                      <line x1={zToX(isLong ? -STOP : STOP)} y1={2} x2={zToX(isLong ? -STOP : STOP)} y2={H - 6} stroke="#ef4444" strokeWidth={0.5} opacity={0.4} />
-                      <line x1={zToX(cz)} y1={dotY + 4} x2={zToX(cz)} y2={H - 6} stroke={dotColor} strokeWidth={1} opacity={0.7} />
-                      <circle cx={zToX(cz)} cy={dotY} r={3} fill={dotColor} />
-                      <text x={zToX(ez)} y={H + 1} fontSize={5.5} fill={isLong ? "#10b981" : "#ef4444"} textAnchor="middle" fontFamily="monospace">entry</text>
-                      <text x={zToX(cz)} y={H + 1} fontSize={5.5} fill={dotColor} textAnchor="middle" fontFamily="monospace">now</text>
-                    </svg>
-                  );
-                })()}
-                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginBottom: 4, letterSpacing: "0.05em" }}>UNREALIZED P&L</div>
-                <div style={{ fontSize: 26, fontWeight: 800, color: unrealPnl >= 0 ? "#10b981" : "#ef4444", fontFamily: "monospace", letterSpacing: 1 }}>
-                  {unrealPnl >= 0 ? "+" : ""}{unrealPnl.toFixed(2)}%
-                </div>
-                <div style={{ marginTop: 8, background: "rgba(0,0,0,0.4)", borderRadius: 3, height: 5, overflow: "hidden" }}>
-                  <div style={{ width: `${Math.min(100, Math.abs(unrealPnl) / 20 * 100).toFixed(0)}%`, height: "100%", background: unrealPnl >= 0 ? "#10b981" : "#ef4444", borderRadius: 3, transition: "width 0.1s ease" }} />
-                </div>
-              </>
-            ) : (
-              <>
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 8 }}>
-                  {pairsDataLoading ? "Recalculating..." : !hasStarted && series.length > 0 ? "Press ▶ PLAY to begin" : "Awaiting ±1.2σ signal"}
-                </div>
-                {currentPt && (() => {
-                  // Inline bell curve gauge
-                  const W = 188, H = 52, PX = 6;
-                  const cW = W - 2 * PX;
-                  const RANGE = 4;
-                  const zToX = (zv: number) => PX + ((zv + RANGE) / (2 * RANGE)) * cW;
-                  const pdf = (zv: number) => Math.exp(-0.5 * zv * zv);
-                  const ENTRY = 1.2, STOP = 3.0;
-                  const curvePts: string[] = [];
-                  for (let i = 0; i <= 120; i++) {
-                    const zv = -RANGE + (2 * RANGE * i) / 120;
-                    const y = (H - 8) - pdf(zv) * (H - 16);
-                    curvePts.push(`${i === 0 ? "M" : "L"}${zToX(zv).toFixed(1)},${y.toFixed(1)}`);
-                  }
-                  const fillPoly = (z1: number, z2: number) => {
-                    const pts: string[] = [];
-                    for (let i = 0; i <= 30; i++) {
-                      const zv = z1 + (z2 - z1) * i / 30;
-                      const y = (H - 8) - pdf(zv) * (H - 16);
-                      pts.push(`${zToX(zv).toFixed(1)},${y.toFixed(1)}`);
-                    }
-                    pts.push(`${zToX(z2).toFixed(1)},${(H - 8).toFixed(1)}`);
-                    pts.push(`${zToX(z1).toFixed(1)},${(H - 8).toFixed(1)}`);
-                    return pts.join(" ");
-                  };
-                  const clampedZ = Math.max(-RANGE, Math.min(RANGE, currentPt.zscore));
-                  const dotX = zToX(clampedZ);
-                  const dotY = (H - 8) - pdf(clampedZ) * (H - 16);
-                  const nearEntry = Math.abs(currentPt.zscore) > ENTRY * 0.75;
-                  const dotColor = Math.abs(currentPt.zscore) >= ENTRY ? "#f59e0b" : nearEntry ? "#3b82f6" : "rgba(255,255,255,0.5)";
-                  return (
+
+            {/* Subtitle */}
+            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 8 }}>
+              {activeTrade ? `${config.labelY} ↔ ${config.labelX} · entry z=${activeTrade.entryZ}` : config.labelY + " vs " + config.labelX}
+            </div>
+
+            {/* Bell curve — always rendered, same dimensions, content updates in place */}
+            {(() => {
+              const RANGE = 4, ENTRY = 1.2, EXIT = 0.2, STOP = 3.0;
+              const VW = 100, VH = 72; // viewBox units
+              const PX = 4, baseline = VH - 10;
+              const zToX = (zv: number) => PX + ((zv + RANGE) / (2 * RANGE)) * (VW - 2 * PX);
+              const pdf = (zv: number) => Math.exp(-0.5 * zv * zv);
+              const curveH = baseline - 6; // max curve height from baseline
+
+              const curvePts: string[] = [];
+              for (let i = 0; i <= 140; i++) {
+                const zv = -RANGE + (2 * RANGE * i) / 140;
+                const y = baseline - pdf(zv) * curveH;
+                curvePts.push(`${i === 0 ? "M" : "L"}${zToX(zv).toFixed(2)},${y.toFixed(2)}`);
+              }
+              const fillArea = (z1: number, z2: number) => {
+                const pts: string[] = [];
+                for (let i = 0; i <= 40; i++) {
+                  const zv = z1 + (z2 - z1) * i / 40;
+                  pts.push(`${zToX(zv).toFixed(2)},${(baseline - pdf(zv) * curveH).toFixed(2)}`);
+                }
+                return pts.join(" ") + ` ${zToX(z2).toFixed(2)},${baseline} ${zToX(z1).toFixed(2)},${baseline}`;
+              };
+
+              // Current z dot
+              const cz = currentPt ? Math.max(-RANGE, Math.min(RANGE, currentPt.zscore)) : 0;
+              const dotY = baseline - pdf(cz) * curveH;
+              const isLong = activeTrade?.direction === "long";
+              const progressing = activeTrade
+                ? (isLong ? (currentPt?.zscore ?? 0) > activeTrade.entryZ : (currentPt?.zscore ?? 0) < activeTrade.entryZ)
+                : false;
+              const dotColor = activeTrade
+                ? (progressing ? "#10b981" : "#ef4444")
+                : currentPt
+                  ? (Math.abs(currentPt.zscore) >= ENTRY ? "#f59e0b" : Math.abs(currentPt.zscore) > 0.9 ? "#3b82f6" : "rgba(255,255,255,0.45)")
+                  : "rgba(255,255,255,0.2)";
+
+              return (
+                <svg viewBox={`0 0 ${VW} ${VH}`} width="100%" style={{ display: "block", overflow: "visible" }}>
+                  {/* Zone fills — same in both states */}
+                  <polygon points={fillArea(-STOP, -ENTRY)} fill="rgba(16,185,129,0.17)" />
+                  <polygon points={fillArea(ENTRY, STOP)} fill="rgba(239,68,68,0.17)" />
+                  <polygon points={fillArea(-RANGE, -STOP)} fill="rgba(239,68,68,0.06)" />
+                  <polygon points={fillArea(STOP, RANGE)} fill="rgba(239,68,68,0.06)" />
+                  {/* Baseline */}
+                  <line x1={PX} y1={baseline} x2={VW - PX} y2={baseline} stroke="rgba(255,255,255,0.08)" strokeWidth={0.4} />
+                  {/* Bell curve */}
+                  <path d={curvePts.join(" ")} stroke="rgba(255,255,255,0.28)" strokeWidth={1.3} fill="none" />
+                  {/* Exit lines (always) */}
+                  <line x1={zToX(-EXIT)} y1={3} x2={zToX(-EXIT)} y2={baseline} stroke="rgba(255,255,255,0.18)" strokeWidth={0.4} strokeDasharray="1.5,2.5" />
+                  <line x1={zToX(EXIT)} y1={3} x2={zToX(EXIT)} y2={baseline} stroke="rgba(255,255,255,0.18)" strokeWidth={0.4} strokeDasharray="1.5,2.5" />
+                  {/* Entry / stop lines — differ by state */}
+                  {activeTrade ? (
                     <>
-                      <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 3, letterSpacing: "0.04em" }}>Z-SCORE DISTRIBUTION</div>
-                      <svg width={W} height={H} style={{ display: "block", overflow: "visible" }}>
-                        {/* Entry zones (long = green, short = red) */}
-                        <polygon points={fillPoly(-STOP, -ENTRY)} fill="rgba(16,185,129,0.18)" />
-                        <polygon points={fillPoly(ENTRY, STOP)} fill="rgba(239,68,68,0.18)" />
-                        {/* Beyond stop */}
-                        <polygon points={fillPoly(-RANGE, -STOP)} fill="rgba(239,68,68,0.07)" />
-                        <polygon points={fillPoly(STOP, RANGE)} fill="rgba(239,68,68,0.07)" />
-                        {/* Baseline */}
-                        <line x1={PX} y1={H - 8} x2={W - PX} y2={H - 8} stroke="rgba(255,255,255,0.1)" strokeWidth={0.5} />
-                        {/* Bell curve */}
-                        <path d={curvePts.join(" ")} stroke="rgba(255,255,255,0.3)" strokeWidth={1.5} fill="none" />
-                        {/* Entry threshold lines */}
-                        <line x1={zToX(-ENTRY)} y1={4} x2={zToX(-ENTRY)} y2={H - 8} stroke="#10b981" strokeWidth={1} strokeDasharray="2,2" opacity={0.8} />
-                        <line x1={zToX(ENTRY)} y1={4} x2={zToX(ENTRY)} y2={H - 8} stroke="#ef4444" strokeWidth={1} strokeDasharray="2,2" opacity={0.8} />
-                        {/* Stop lines */}
-                        <line x1={zToX(-STOP)} y1={4} x2={zToX(-STOP)} y2={H - 8} stroke="#ef4444" strokeWidth={0.5} opacity={0.35} />
-                        <line x1={zToX(STOP)} y1={4} x2={zToX(STOP)} y2={H - 8} stroke="#ef4444" strokeWidth={0.5} opacity={0.35} />
-                        {/* Current z dot + stem */}
-                        <line x1={dotX} y1={dotY + 4} x2={dotX} y2={H - 8} stroke={dotColor} strokeWidth={1} opacity={0.6} />
-                        <circle cx={dotX} cy={dotY} r={3.5} fill={dotColor} />
-                        {/* Axis labels */}
-                        <text x={zToX(-ENTRY)} y={H} fontSize={6} fill="#10b981" textAnchor="middle" fontFamily="monospace">−{ENTRY}σ</text>
-                        <text x={zToX(ENTRY)} y={H} fontSize={6} fill="#ef4444" textAnchor="middle" fontFamily="monospace">+{ENTRY}σ</text>
-                        <text x={dotX} y={H - 1} fontSize={6} fill={dotColor} textAnchor="middle" fontFamily="monospace" fontWeight="bold">
-                          {currentPt.zscore >= 0 ? "+" : ""}{currentPt.zscore.toFixed(2)}
-                        </text>
-                      </svg>
-                      <div style={{ marginTop: 6, fontSize: 9, color: dotColor }}>
-                        {Math.abs(currentPt.zscore) >= ENTRY
-                          ? `⚡ ${currentPt.zscore < 0 ? "LONG" : "SHORT"} signal — entering`
-                          : nearEntry
-                          ? `↗ approaching ±${ENTRY}σ threshold`
-                          : `signal within ±${ENTRY}σ band`}
-                      </div>
+                      {/* Entry pin at trade's actual entry z */}
+                      <line x1={zToX(Math.max(-RANGE+0.1, Math.min(RANGE-0.1, activeTrade.entryZ)))} y1={3}
+                        x2={zToX(Math.max(-RANGE+0.1, Math.min(RANGE-0.1, activeTrade.entryZ)))} y2={baseline}
+                        stroke={isLong ? "#10b981" : "#ef4444"} strokeWidth={1.2} strokeDasharray="2,2" opacity={0.75} />
+                      {/* Stop line (one-sided) */}
+                      <line x1={zToX(isLong ? -STOP : STOP)} y1={3} x2={zToX(isLong ? -STOP : STOP)} y2={baseline}
+                        stroke="#ef4444" strokeWidth={0.6} opacity={0.3} />
+                      {/* Entry label */}
+                      <text x={zToX(Math.max(-RANGE+0.5, Math.min(RANGE-0.5, activeTrade.entryZ)))} y={VH - 1}
+                        fontSize={4.5} fill={isLong ? "#10b981" : "#ef4444"} textAnchor="middle" fontFamily="monospace">entry</text>
                     </>
-                  );
-                })()}
-              </>
-            )}
+                  ) : (
+                    <>
+                      {/* Symmetric entry/stop lines */}
+                      <line x1={zToX(-ENTRY)} y1={3} x2={zToX(-ENTRY)} y2={baseline} stroke="#10b981" strokeWidth={1} strokeDasharray="2,2" opacity={0.75} />
+                      <line x1={zToX(ENTRY)} y1={3} x2={zToX(ENTRY)} y2={baseline} stroke="#ef4444" strokeWidth={1} strokeDasharray="2,2" opacity={0.75} />
+                      <line x1={zToX(-STOP)} y1={3} x2={zToX(-STOP)} y2={baseline} stroke="#ef4444" strokeWidth={0.5} opacity={0.28} />
+                      <line x1={zToX(STOP)} y1={3} x2={zToX(STOP)} y2={baseline} stroke="#ef4444" strokeWidth={0.5} opacity={0.28} />
+                      {/* Entry labels */}
+                      <text x={zToX(-ENTRY)} y={VH - 1} fontSize={4.5} fill="#10b981" textAnchor="middle" fontFamily="monospace">−{ENTRY}σ</text>
+                      <text x={zToX(ENTRY)} y={VH - 1} fontSize={4.5} fill="#ef4444" textAnchor="middle" fontFamily="monospace">+{ENTRY}σ</text>
+                    </>
+                  )}
+                  {/* Current z dot — always present when data exists */}
+                  {currentPt && (
+                    <>
+                      <line x1={zToX(cz)} y1={dotY + 3.5} x2={zToX(cz)} y2={baseline} stroke={dotColor} strokeWidth={0.9} opacity={0.65} />
+                      <circle cx={zToX(cz)} cy={dotY} r={3} fill={dotColor} />
+                      {/* Z label above dot */}
+                      <text x={zToX(cz)} y={dotY - 4} fontSize={5} fill={dotColor} textAnchor="middle" fontFamily="monospace" fontWeight="bold">
+                        {currentPt.zscore >= 0 ? "+" : ""}{currentPt.zscore.toFixed(2)}σ
+                      </text>
+                    </>
+                  )}
+                </svg>
+              );
+            })()}
+
+            {/* Bottom — unrealized P&L when active, status text when flat */}
+            <div style={{ marginTop: 4 }}>
+              {activeTrade ? (
+                <>
+                  <div style={{ fontSize: 8, color: "rgba(255,255,255,0.3)", letterSpacing: "0.05em", marginBottom: 2 }}>UNREALIZED P&L</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: unrealPnl >= 0 ? "#10b981" : "#ef4444", fontFamily: "monospace" }}>
+                    {unrealPnl >= 0 ? "+" : ""}{unrealPnl.toFixed(2)}%
+                  </div>
+                  <div style={{ marginTop: 5, background: "rgba(0,0,0,0.4)", borderRadius: 3, height: 4, overflow: "hidden" }}>
+                    <div style={{ width: `${Math.min(100, Math.abs(unrealPnl) / 20 * 100)}%`, height: "100%",
+                      background: unrealPnl >= 0 ? "#10b981" : "#ef4444", borderRadius: 3 }} />
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: 9, color: currentPt && Math.abs(currentPt.zscore) >= 1.2 ? "#f59e0b" : Math.abs(currentPt?.zscore ?? 0) > 0.9 ? "#3b82f6" : "rgba(255,255,255,0.3)" }}>
+                  {!currentPt ? "—"
+                    : Math.abs(currentPt.zscore) >= 1.2 ? `⚡ ${currentPt.zscore < 0 ? "LONG" : "SHORT"} signal`
+                    : Math.abs(currentPt.zscore) > 0.9 ? "↗ approaching ±1.2σ"
+                    : "signal within band"}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* LIVE PERFORMANCE */}
