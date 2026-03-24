@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     const pairX = sp.get("pairX") || "NOKEUR";
     const delta = Math.max(1e-7, Math.min(1e-1, parseFloat(sp.get("delta") || "0.00001")));
     const Ve    = Math.max(1e-6, Math.min(1e-0, parseFloat(sp.get("ve")    || "0.001")));
-    const days  = Math.min(1260, Math.max(60, parseInt(sp.get("days") || "252")));
+    const days  = Math.min(2600, Math.max(60, parseInt(sp.get("days") || "2520")));
     const positionSizePct = Math.max(1, Math.min(50, parseFloat(sp.get("pos") || "15")));
     const totalCostBps    = Math.max(0, Math.min(50, parseFloat(sp.get("cost") || "5")));
     const entryZ = Math.max(0.5, Math.min(5.0, parseFloat(sp.get("entryz") || "1.8")));
