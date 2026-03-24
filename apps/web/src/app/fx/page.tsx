@@ -3492,15 +3492,14 @@ export default function FXTerminalPage() {
           </div>
         </div>
 
-        {/* ── 2-column master layout ──────────────────────────────────────────── */}
-        {/* LEFT: z-score chart + trade blotter   RIGHT: panels + mini charts  */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 10, alignItems: "start" }}>
-
-        {/* ── LEFT COLUMN ── */}
+        {/* ── Row-aligned layout: each row is its own 2-col grid so panels share height ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
 
+        {/* ROW 1: Z-score chart | Position Monitor — stretch to same height */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 10, alignItems: "stretch" }}>
+
           {/* Z-score live chart */}
-          <div style={S.card}>
+          <div style={{ ...S.card, display: "flex", flexDirection: "column" as const }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap" as const, gap: 8 }}>
               <div style={S.cardTitle}>Z-SCORE LIVE VIEW — {config.labelY} vs {config.labelX} · TRAILING 90 DAYS</div>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
@@ -3512,86 +3511,19 @@ export default function FXTerminalPage() {
                 ))}
               </div>
             </div>
-            {liveSeries.length > 1 ? (
-              <PairsZChart series={liveSeries} activeTrade={activeTrade} />
-            ) : (
-              <div style={{ height: 200, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.15)", fontSize: 12 }}>
-                {pairsDataLoading ? "Loading dataset..." : "Press ▶ PLAY to begin the simulation"}
-              </div>
-            )}
-          </div>
-
-          {/* Equity + β row */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <div style={S.card}>
-              <div style={{ ...S.cardTitle, marginBottom: 6 }}>EQUITY CURVE (closed trades)</div>
-              {equityCurve.length > 1 ? <PairsEquityChart curve={equityCurve} /> : (
-                <div style={{ height: 90, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.15)", fontSize: 10 }}>No closed trades yet</div>
+            <div style={{ flex: 1, minHeight: 200 }}>
+              {liveSeries.length > 1 ? (
+                <PairsZChart series={liveSeries} activeTrade={activeTrade} />
+              ) : (
+                <div style={{ height: "100%", minHeight: 200, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.15)", fontSize: 12 }}>
+                  {pairsDataLoading ? "Loading dataset..." : "Press ▶ PLAY to begin the simulation"}
+                </div>
               )}
-              <div style={{ marginTop: 4, fontSize: 8, color: "rgba(255,255,255,0.25)" }}>Compounded P&L · closed trades only · indexed 100</div>
-            </div>
-            <div style={S.card}>
-              <div style={{ ...S.cardTitle, marginBottom: 6 }}>ROLLING HEDGE RATIO β</div>
-              {liveSeries.length > 1 ? <PairsBetaChart series={liveSeries} /> : (
-                <div style={{ height: 90, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.15)", fontSize: 10 }}>No data yet</div>
-              )}
-              <div style={{ marginTop: 4, fontSize: 8, color: "rgba(255,255,255,0.25)" }}>Adaptive Kalman estimate · updates each observation</div>
             </div>
           </div>
 
-          {/* Trade blotter */}
-          {hasStarted && (completedTrades.length > 0 || activeTrade) && (
-            <div style={S.card}>
-              <div style={{ ...S.cardTitle, marginBottom: 8 }}>
-                TRADE BLOTTER — {completedTrades.length} CLOSED
-                {activeTrade && <span style={{ color: posColor, marginLeft: 8 }}>· 1 LIVE</span>}
-              </div>
-              <div style={{ overflowY: "auto" as const, maxHeight: 260 }}>
-                <table style={S.table}>
-                  <thead style={{ position: "sticky" as const, top: 0, background: "#161b22", zIndex: 1 }}>
-                    <tr>{["", "DIR", "ENTRY DATE", "EXIT DATE", "DAYS", "ENTRY Z", "P&L", "EXIT"].map(h => <th key={h} style={S.th}>{h}</th>)}</tr>
-                  </thead>
-                  <tbody>
-                    {activeTrade && (
-                      <tr style={{ background: activeTrade.direction === "long" ? "rgba(16,185,129,0.06)" : "rgba(239,68,68,0.06)", animation: "pSlide 0.3s ease-out" }}>
-                        <td style={S.td}><div style={{ width: 7, height: 7, borderRadius: "50%", background: posColor, animation: "pBlink 1.2s infinite" }} /></td>
-                        <td style={{ ...S.td, color: posColor, fontWeight: 800 }}>{activeTrade.direction === "long" ? "▲ LONG" : "▼ SHORT"}</td>
-                        <td style={S.td}>{activeTrade.entryDate}</td>
-                        <td style={{ ...S.td, color: "rgba(255,255,255,0.25)" }}>OPEN</td>
-                        <td style={S.td}>{holdDays}d</td>
-                        <td style={S.td}>{activeTrade.entryZ}</td>
-                        <td style={{ ...S.td, color: unrealPnl >= 0 ? "#10b981" : "#ef4444", fontWeight: 700 }}>{unrealPnl >= 0 ? "+" : ""}{unrealPnl.toFixed(2)}% *</td>
-                        <td style={S.td}><span style={{ background: "rgba(59,130,246,0.2)", color: "#3b82f6", padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700 }}>LIVE</span></td>
-                      </tr>
-                    )}
-                    {[...completedTrades].reverse().slice(0, 30).map((t: any, i: number) => {
-                      const rc = t.exitReason === "stop" ? "#ef4444" : t.exitReason === "signal" ? "#3b82f6" : "#f59e0b";
-                      const rl = t.exitReason === "stop" ? "STOP" : t.exitReason === "signal" ? "SIG" : "TIME";
-                      return (
-                        <tr key={i} style={{ background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)", animation: i === 0 ? "pSlide 0.25s ease-out" : "none" }}>
-                          <td style={S.td}><div style={{ width: 6, height: 6, borderRadius: "50%", background: t.pnlPct >= 0 ? "#10b981" : "#ef4444" }} /></td>
-                          <td style={{ ...S.td, color: t.direction === "long" ? "#10b981" : "#ef4444", fontWeight: 700 }}>{t.direction === "long" ? "▲" : "▼"}</td>
-                          <td style={S.td}>{t.entryDate}</td>
-                          <td style={S.td}>{t.exitDate}</td>
-                          <td style={S.td}>{t.daysHeld}d</td>
-                          <td style={S.td}>{t.entryZ}</td>
-                          <td style={{ ...S.td, color: t.pnlPct >= 0 ? "#10b981" : "#ef4444", fontWeight: 700 }}>{t.pnlPct >= 0 ? "+" : ""}{t.pnlPct.toFixed(3)}%</td>
-                          <td style={S.td}><span style={{ background: `${rc}20`, color: rc, padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700 }}>{rl}</span></td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ── RIGHT COLUMN ── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-
-          {/* POSITION MONITOR — full width, larger */}
-          <div style={{ ...S.card, background: posBg, border: `1px solid ${posColor}`, animation: activeTrade ? "pGlow 2s ease-in-out infinite" : "none", padding: "18px 20px" }}>
+          {/* POSITION MONITOR — ROW 1 cell 2, stretches to match Z-score chart height */}
+          <div style={{ ...S.card, background: posBg, border: `1px solid ${posColor}`, animation: activeTrade ? "pGlow 2s ease-in-out infinite" : "none", padding: "18px 20px", display: "flex", flexDirection: "column" as const }}>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", letterSpacing: "0.1em", marginBottom: 8 }}>POSITION MONITOR</div>
 
             {/* Status header — stable height, no layout shift */}
@@ -3616,7 +3548,8 @@ export default function FXTerminalPage() {
               {activeTrade ? `${config.labelY} ↔ ${config.labelX} · entry z=${activeTrade.entryZ}` : config.labelY + " vs " + config.labelX}
             </div>
 
-            {/* Bell curve — always rendered, same dimensions, content updates in place */}
+            {/* Bell curve — flex: 1 so it fills available height */}
+            <div style={{ flex: 1, display: "flex", flexDirection: "column" as const, justifyContent: "center" }}>
             {(() => {
               const RANGE = 4, ENTRY = 1.5, EXIT = 0.4, STOP = 1.9;
               const VW = 100, VH = 54; // viewBox units — compact, professional
@@ -3707,6 +3640,7 @@ export default function FXTerminalPage() {
                 </svg>
               );
             })()}
+            </div>{/* end bell curve flex wrapper */}
 
             {/* Bottom — fixed height prevents layout jump between FLAT and ACTIVE states */}
             <div style={{ marginTop: 6, height: 50, display: "flex", flexDirection: "column", justifyContent: "center" }}>
@@ -3732,7 +3666,30 @@ export default function FXTerminalPage() {
             </div>
           </div>
 
-          {/* PERFORMANCE + KALMAN STATE — merged card */}
+        </div>{/* end ROW 1 */}
+
+        {/* ROW 2: Equity + Beta | Performance + Kalman State — stretch to same height */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 10, alignItems: "stretch" }}>
+
+          {/* Equity + Beta (inner 2-col) */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div style={S.card}>
+              <div style={{ ...S.cardTitle, marginBottom: 6 }}>EQUITY CURVE (closed trades)</div>
+              {equityCurve.length > 1 ? <PairsEquityChart curve={equityCurve} /> : (
+                <div style={{ height: 90, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.15)", fontSize: 10 }}>No closed trades yet</div>
+              )}
+              <div style={{ marginTop: 4, fontSize: 8, color: "rgba(255,255,255,0.25)" }}>Compounded P&L · closed trades only · indexed 100</div>
+            </div>
+            <div style={S.card}>
+              <div style={{ ...S.cardTitle, marginBottom: 6 }}>ROLLING HEDGE RATIO β</div>
+              {liveSeries.length > 1 ? <PairsBetaChart series={liveSeries} /> : (
+                <div style={{ height: 90, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.15)", fontSize: 10 }}>No data yet</div>
+              )}
+              <div style={{ marginTop: 4, fontSize: 8, color: "rgba(255,255,255,0.25)" }}>Adaptive Kalman estimate · updates each observation</div>
+            </div>
+          </div>
+
+          {/* PERFORMANCE + KALMAN STATE — ROW 2 cell 2 */}
           <div style={S.card}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
 
@@ -3804,8 +3761,57 @@ export default function FXTerminalPage() {
 
             </div>
           </div>
-        </div>{/* end right column */}
-        </div>{/* end master grid */}
+
+        </div>{/* end ROW 2 */}
+
+        {/* Trade blotter — full width below both rows */}
+        {hasStarted && (completedTrades.length > 0 || activeTrade) && (
+          <div style={S.card}>
+            <div style={{ ...S.cardTitle, marginBottom: 8 }}>
+              TRADE BLOTTER — {completedTrades.length} CLOSED
+              {activeTrade && <span style={{ color: posColor, marginLeft: 8 }}>· 1 LIVE</span>}
+            </div>
+            <div style={{ overflowY: "auto" as const, maxHeight: 260 }}>
+              <table style={S.table}>
+                <thead style={{ position: "sticky" as const, top: 0, background: "#161b22", zIndex: 1 }}>
+                  <tr>{["", "DIR", "ENTRY DATE", "EXIT DATE", "DAYS", "ENTRY Z", "P&L", "EXIT"].map(h => <th key={h} style={S.th}>{h}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {activeTrade && (
+                    <tr style={{ background: activeTrade.direction === "long" ? "rgba(16,185,129,0.06)" : "rgba(239,68,68,0.06)", animation: "pSlide 0.3s ease-out" }}>
+                      <td style={S.td}><div style={{ width: 7, height: 7, borderRadius: "50%", background: posColor, animation: "pBlink 1.2s infinite" }} /></td>
+                      <td style={{ ...S.td, color: posColor, fontWeight: 800 }}>{activeTrade.direction === "long" ? "▲ LONG" : "▼ SHORT"}</td>
+                      <td style={S.td}>{activeTrade.entryDate}</td>
+                      <td style={{ ...S.td, color: "rgba(255,255,255,0.25)" }}>OPEN</td>
+                      <td style={S.td}>{holdDays}d</td>
+                      <td style={S.td}>{activeTrade.entryZ}</td>
+                      <td style={{ ...S.td, color: unrealPnl >= 0 ? "#10b981" : "#ef4444", fontWeight: 700 }}>{unrealPnl >= 0 ? "+" : ""}{unrealPnl.toFixed(2)}% *</td>
+                      <td style={S.td}><span style={{ background: "rgba(59,130,246,0.2)", color: "#3b82f6", padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700 }}>LIVE</span></td>
+                    </tr>
+                  )}
+                  {[...completedTrades].reverse().slice(0, 30).map((t: any, i: number) => {
+                    const rc = t.exitReason === "stop" ? "#ef4444" : t.exitReason === "signal" ? "#3b82f6" : "#f59e0b";
+                    const rl = t.exitReason === "stop" ? "STOP" : t.exitReason === "signal" ? "SIG" : "TIME";
+                    return (
+                      <tr key={i} style={{ background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)", animation: i === 0 ? "pSlide 0.25s ease-out" : "none" }}>
+                        <td style={S.td}><div style={{ width: 6, height: 6, borderRadius: "50%", background: t.pnlPct >= 0 ? "#10b981" : "#ef4444" }} /></td>
+                        <td style={{ ...S.td, color: t.direction === "long" ? "#10b981" : "#ef4444", fontWeight: 700 }}>{t.direction === "long" ? "▲" : "▼"}</td>
+                        <td style={S.td}>{t.entryDate}</td>
+                        <td style={S.td}>{t.exitDate}</td>
+                        <td style={S.td}>{t.daysHeld}d</td>
+                        <td style={S.td}>{t.entryZ}</td>
+                        <td style={{ ...S.td, color: t.pnlPct >= 0 ? "#10b981" : "#ef4444", fontWeight: 700 }}>{t.pnlPct >= 0 ? "+" : ""}{t.pnlPct.toFixed(3)}%</td>
+                        <td style={S.td}><span style={{ background: `${rc}20`, color: rc, padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700 }}>{rl}</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        </div>{/* end outer wrapper */}
 
         {/* Initial load state — only shown before first dataset arrives */}
         {!pairsData && pairsDataLoading && (
