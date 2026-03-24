@@ -1295,20 +1295,65 @@ export default function FXTerminalPage() {
           </div>
         </div>
 
-        {/* What to Watch */}
-        {whatToWatch.length > 0 && (
-          <div style={{ ...S.card, border: "1px solid rgba(59,130,246,0.2)", background: "rgba(59,130,246,0.03)" }}>
-            <div style={{ ...S.cardTitle, color: "#3b82f6" }}>WHAT TO WATCH</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {whatToWatch.map((item, i) => (
-                <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                  <span style={{ color: "#3b82f6", fontWeight: 700, fontSize: 12, flexShrink: 0, marginTop: 1 }}>{i + 1}.</span>
-                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", lineHeight: 1.5 }}>{item}</span>
-                </div>
-              ))}
+        {/* Pairs Trading Teaser */}
+        <div style={{ ...S.card, border: "1px solid rgba(59,130,246,0.25)", background: "linear-gradient(135deg, rgba(59,130,246,0.04) 0%, rgba(16,185,129,0.04) 100%)", position: "relative" as const, overflow: "hidden" }}>
+          {/* Background accent */}
+          <div style={{ position: "absolute" as const, top: -30, right: -30, width: 160, height: 160, borderRadius: "50%", background: "radial-gradient(circle, rgba(59,130,246,0.07) 0%, transparent 70%)", pointerEvents: "none" as const }} />
+
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", color: "rgba(255,255,255,0.35)" }}>NEW</div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", letterSpacing: 1 }}>KALMAN PAIRS TRADING SIMULATOR</div>
+              </div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", lineHeight: 1.65, marginBottom: 14, maxWidth: 560 }}>
+                Adaptive Kalman filter detects cointegration breakdowns between NOK-denominated FX pairs.
+                Live z-score simulation with realistic friction parameters — backtest any pair combination over 5 years of Norges Bank data.
+              </div>
+
+              {/* Feature pills */}
+              <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 6, marginBottom: 16 }}>
+                {[
+                  { label: "Adaptive β hedge ratio", color: "#3b82f6" },
+                  { label: "60-bar rolling z-score", color: "#3b82f6" },
+                  { label: "Vol-targeted P&L", color: "#10b981" },
+                  { label: "Live position monitor", color: "#10b981" },
+                  { label: "Real-world friction sliders", color: "#f59e0b" },
+                  { label: "5-year backtest", color: "#f59e0b" },
+                ].map((f) => (
+                  <div key={f.label} style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.06em", color: f.color, background: `${f.color}18`, border: `1px solid ${f.color}30`, borderRadius: 4, padding: "3px 8px" }}>
+                    {f.label}
+                  </div>
+                ))}
+              </div>
+
+              {/* Mini stat row */}
+              <div style={{ display: "flex", gap: 20 }}>
+                {[
+                  { label: "PAIRS AVAILABLE", value: "10" },
+                  { label: "DATA HISTORY", value: "5Y" },
+                  { label: "ENTRY SIGNAL", value: "±1.5σ" },
+                  { label: "COST MODEL", value: "Realistic bps" },
+                ].map((s) => (
+                  <div key={s.label}>
+                    <div style={{ fontSize: 8, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", marginBottom: 2 }}>{s.label}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: "monospace" }}>{s.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* CTA button */}
+            <div style={{ flexShrink: 0, display: "flex", alignItems: "center" }}>
+              <button
+                onClick={() => setTab("pairs")}
+                style={{ background: "linear-gradient(135deg, #3b82f6, #2563eb)", color: "#fff", border: "none", borderRadius: 7, padding: "12px 22px", fontSize: 12, fontWeight: 800, letterSpacing: 1, cursor: "pointer", fontFamily: "monospace", whiteSpace: "nowrap" as const, boxShadow: "0 0 20px rgba(59,130,246,0.3)" }}
+              >
+                ▶ OPEN SIMULATOR
+              </button>
             </div>
           </div>
-        )}
+        </div>
 
         {/* Exposure heatmap */}
         <div style={S.card}>
@@ -3342,7 +3387,7 @@ export default function FXTerminalPage() {
             </button>
           ))}
           <div style={{ padding: "0 14px", fontSize: 9, color: "rgba(255,255,255,0.25)", alignSelf: "center", marginLeft: "auto" }}>
-            {config.desc} · δ=1e-5 · 60-bar rolling z · ±1.5σ ENTRY · ±0.4σ EXIT · ±2.0σ STOP
+            {config.desc} · δ=1e-5 · 60-bar rolling z · ±1.5σ ENTRY · ±0.4σ EXIT · ±1.9σ STOP
           </div>
         </div>
 
@@ -3478,7 +3523,7 @@ export default function FXTerminalPage() {
 
             {/* Bell curve — always rendered, same dimensions, content updates in place */}
             {(() => {
-              const RANGE = 4, ENTRY = 1.5, EXIT = 0.4, STOP = 2.0;
+              const RANGE = 4, ENTRY = 1.5, EXIT = 0.4, STOP = 1.9;
               const VW = 100, VH = 54; // viewBox units — compact, professional
               const PX = 4, baseline = VH - 10;
               const zToX = (zv: number) => PX + ((zv + RANGE) / (2 * RANGE)) * (VW - 2 * PX);
@@ -3666,7 +3711,7 @@ export default function FXTerminalPage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap" as const, gap: 8 }}>
             <div style={S.cardTitle}>Z-SCORE LIVE VIEW — {config.labelY} vs {config.labelX} · TRAILING 90 DAYS</div>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" as const }}>
-              {[{ c: "#3b82f6", l: "Z-score" }, { c: "#10b981", l: "±1.5σ entry" }, { c: "#ef4444", l: "±2.0σ stop" },
+              {[{ c: "#3b82f6", l: "Z-score" }, { c: "#10b981", l: "±1.5σ entry" }, { c: "#ef4444", l: "±1.9σ stop" },
                 { c: "rgba(16,185,129,0.3)", l: "Long pos" }, { c: "rgba(239,68,68,0.3)", l: "Short pos" }].map((l, i) => (
                 <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 8, color: "rgba(255,255,255,0.35)" }}>
                   <div style={{ width: 14, height: 3, background: l.c, borderRadius: 1 }} />{l.l}

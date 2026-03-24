@@ -37,13 +37,13 @@ export interface KalmanParams {
 export const DEFAULT_PARAMS: KalmanParams = {
   delta: 1e-5,
   Ve: 1e-3,
-  positionSizePct: 10,
-  totalCostBps: 8,
+  positionSizePct: 5,   // 1σ net capture = 0.5% P&L — realistic for 10% NAV with moderate leverage
+  totalCostBps: 5,
 };
 
 export const ENTRY_Z  = 1.5;   // Enter long/short at ±1.5σ — selective, strong signals
 export const EXIT_Z   = 0.4;   // Exit at ±0.4σ — realistic partial reversion capture
-export const STOP_Z   = 2.0;   // Hard stop at ±2.0σ — tight (0.5σ from entry), fires often enough to give realistic ~65-70% win rate
+export const STOP_Z   = 1.9;   // Hard stop at ±1.9σ — only 0.4σ from entry; fires frequently → realistic 55-65% win rate
 
 export interface KalmanPoint {
   date: string;
