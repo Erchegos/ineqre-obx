@@ -1023,45 +1023,74 @@ All pages must follow this dark terminal theme. Reference: `/portfolio` and `/fx
 
 ---
 
+## FX Pairs Trading Simulator
+
+**LIVE** — Tab 6 on `/fx` page. Adaptive Kalman filter pairs trading on NOK-denominated FX rates.
+
+### Architecture
+| File | Purpose |
+|------|---------|
+| `apps/web/src/lib/fxKalmanPairs.ts` | 2D Kalman filter engine, trade simulator, equity curve builder |
+| `apps/web/src/app/api/fx/pairs-trade/route.ts` | API: fetches aligned spot rates, deduplicates, runs Kalman engine |
+| `apps/web/src/app/fx/page.tsx` | Full-page live simulation UI (tab 6) |
+
+### Kalman Filter Implementation
+- **State**: θ_t = [α_t, β_t] — intercept + hedge ratio as random walk
+- **Evolution**: θ_t = θ_{t-1} + η_t, W = (δ/(1−δ)) × I₂, δ=1e-5
+- **Observation**: y_t = [1, x_t]·θ_t + ε_t, Ve=1e-3
+- **Covariance update**: Joseph form `P = (I−KH)P(I−KH)ᵀ + K·Ve·Kᵀ` for numerical stability
+- **Z-score**: 60-bar rolling std of residuals (Gatev et al. 2006) — NOT Kalman S (which collapses to near-zero post burn-in)
+- **Burn-in**: first 100 bars excluded from trading
+
+### Trade Simulation
+- **Entry lag**: 1-day (signal at close t → fill at open t+1)
+- **Exit**: same-bar (limit orders pre-placed at known spread levels)
+- **MIN_HOLD_DAYS = 2**: prevents whipsaw on take-profit exits
+- **COOLDOWN_BARS = 1**: one bar pause after any exit
+- **P&L formula**: vol-targeted — `pnlPct = netZCapture × (positionSizePct / 10)`; cost floored at 0.15σ to prevent near-free trades in high-vol periods
+
+### Default Parameters
+| Parameter | Default | Range |
+|-----------|---------|-------|
+| Entry z | ±1.6σ | 0.5–5.0 |
+| Exit z | ±0.6σ | 0.0–1.5 |
+| Stop loss | ±2.8σ | 1.5–5.0 |
+| Position size | 10% NAV | 2–40% |
+| Bid-ask | 1.0 bps/side | — |
+| Speed | 5x | 1x/3x/5x/10x |
+| History | 5Y (1260 days) | 3Y/5Y |
+
+### Pair Combinations
+| Key | Label | Color | Notes |
+|-----|-------|-------|-------|
+| NOKGBP_NOKEUR | GBP ↔ EUR | #10b981 | Most signals — post-Brexit BoE/ECB divergence |
+| NOKEUR_NOKUSD | EUR ↔ USD | #3b82f6 | Fed/ECB policy divergence |
+| NOKGBP_NOKUSD | GBP ↔ USD | #9C27B0 | Tightly co-integrated, fewer trades |
+
+### UI Features
+- Live animated simulation (PLAY/PAUSE/RESET with auto-reset on replay)
+- Z-score chart (trailing 90 days, entry/exit/stop bands, trade dots)
+- Position monitor: bell-curve showing current z vs thresholds
+- Equity curve (closed trades only, indexed 100)
+- Rolling hedge ratio β chart
+- Live performance panel: portfolio value, trade count, win rate, max DD
+- Kalman state readout: β, α, z-score, spread vol
+- Signal proximity bars (% approach to long/short entry)
+- Trade log table (entry/exit date, direction, z, days held, P&L)
+- Collapsible how-it-works guide (3-column: strategy / charts / parameters)
+
+### Data Notes
+- Source: `fx_spot_rates` table, `source = 'norgesbank'` (correct, ~3200 rows/pair back to 2013)
+- **CRITICAL**: Old `source = 'norges_bank'` rows had EUR and GBP rates swapped — deleted March 2026
+- API deduplicates with `DISTINCT ON (date) ... ORDER BY date, spot_rate DESC` + JS-level Set filter
+
+---
+
 ## Planned Features
 
-### FX Pairs Trading Simulator (Kalman Filter)
+### OSE Equity ML Trading Simulator
 
-Add a PAIRS TRADING tab to the `/fx` page. Adaptive Kalman filter replaces static OLS hedge ratios — treats β (hedge ratio) and α (intercept) as hidden states that drift with macro regime changes.
-
-**Reference**: quantframe.io/knowledge-hub/journal/pairs-trading-kalman-filter
-
-**Files to create:**
-1. `apps/web/src/lib/fxKalmanPairs.ts` — Kalman filter engine + backtest runner
-2. `apps/web/src/app/api/fx/pairs-trade/route.ts` — API endpoint
-3. Modify `apps/web/src/app/fx/page.tsx` — Add PAIRS TRADING tab
-
-**Kalman Filter:**
-- State: θ = [α_t, β_t], random walk evolution: θ_t = θ_{t-1} + η_t
-- Observation: y_t = [1, x_t] · θ_t + ε_t
-- Predict → Update cycle with Kalman gain K_t
-- Z-score: z_t = e_t / √S_t (innovation normalized by variance)
-- Use Joseph form for numerically stable covariance update
-
-**Trading signals:**
-- Long spread entry: z < -2.0
-- Short spread entry: z > +2.0
-- Exit: |z| < 0.5
-- Stop loss: |z| > 4.0
-
-**Parameters (tunable via UI sliders):**
-- δ (delta): state drift variance, default 1e-4
-- V_e: observation noise variance, default 1e-3
-
-**UI (new tab on /fx page):**
-- Pair selector (two FX rates from Norges Bank data: NOKUSD, NOKEUR, NOKGBP, NOKSEK, NOKDKK + cross-rates)
-- Z-score chart with entry/exit/stop bands
-- Rolling hedge ratio β chart
-- Cumulative P&L chart
-- Trade log table (entry/exit dates, z at entry, holding period, P&L)
-- Backtest stats cards: Sharpe, max drawdown, win rate, avg holding period, total return
-
-**Data:** Uses existing `fxSpotRates` table (daily NOK-based rates, ~3+ years).
+Planned extension of the pairs trading simulator concept to single-stock and multi-factor ML signals on Oslo Børs equities. See `ML_SIMULATOR_PROMPT.md` in project root for full build specification.
 
 ---
 
