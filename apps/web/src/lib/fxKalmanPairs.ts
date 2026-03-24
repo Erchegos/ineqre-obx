@@ -32,7 +32,7 @@ export interface KalmanParams {
   positionSizePct?: number;
   /** Round-trip transaction cost in basis points (bid-ask × 2 + slippage). Default 5 */
   totalCostBps?: number;
-  /** Entry z-score threshold. Default 1.8 */
+  /** Entry z-score threshold. Default 1.6 */
   entryZ?: number;
   /** Exit z-score threshold (mean reversion target). Default 0.6 */
   exitZ?: number;
@@ -66,7 +66,7 @@ export const DEFAULT_PARAMS: KalmanParams = {
  *   because losses are cut before mean reversion plays out. The P&L was real but
  *   the win rate looked suspicious to FX practitioners.
  */
-export const ENTRY_Z  = 1.8;   // Enter at ±1.8σ — slightly below Gatev 2σ for more signals
+export const ENTRY_Z  = 1.6;   // Enter at ±1.6σ — more signals than Gatev 2σ standard
 export const EXIT_Z   = 0.6;   // Exit at ±0.6σ — capture 70% of mean reversion
 export const STOP_Z   = 2.8;   // Stop at ±2.8σ — 1σ buffer, proper risk management
 

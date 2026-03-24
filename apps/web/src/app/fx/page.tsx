@@ -700,7 +700,7 @@ export default function FXTerminalPage() {
   const [pairsDataLoading, setPairsDataLoading] = useState(false);
   const [pairsPlayIdx, setPairsPlayIdx] = useState(-1); // -1 = not started, blank slate
   const [pairsIsPlaying, setPairsIsPlaying] = useState(false);
-  const [pairsSpeed, setPairsSpeed] = useState(3);
+  const [pairsSpeed, setPairsSpeed] = useState(5);
   const pairsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   /* Friction / cost parameters */
   const [pairsDays, setPairsDays] = useState(1260);           // history window in trading days — default 5Y
@@ -709,7 +709,7 @@ export default function FXTerminalPage() {
   const [pairsSlippageBps, setPairsSlippageBps] = useState(0.5); // bps — FX is the world's most liquid market ($7.5T/day)
   const [pairsCommBps, setPairsCommBps] = useState(0.5);     // bps — prime broker rate for major pairs
   /* Signal threshold parameters */
-  const [pairsEntryZ, setPairsEntryZ] = useState(1.8);       // entry z-score threshold
+  const [pairsEntryZ, setPairsEntryZ] = useState(1.6);       // entry z-score threshold
   const [pairsExitZ, setPairsExitZ] = useState(0.6);         // exit z-score threshold
   const [pairsStopZ, setPairsStopZ] = useState(2.8);         // stop-loss z-score threshold
   const [pairsShowDots, setPairsShowDots] = useState(true);  // show entry/exit dots on chart
@@ -3588,19 +3588,20 @@ export default function FXTerminalPage() {
         {/* Control bar */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0 16px", flexWrap: "wrap" as const }}>
           <button onClick={() => {
-              if (pairsPlayIdx < 0) {
-                // First play — skip burn-in, jump to ~30 bars before first trade
+              const atEnd = hasStarted && pairsPlayIdx >= series.length - 1;
+              if (pairsPlayIdx < 0 || atEnd) {
+                // First play or replay from end — auto-reset then start
+                setPairsIsPlaying(false);
                 const firstTrade = [...(pairsData?.trades ?? [])].sort((a, b) => a.entryDate.localeCompare(b.entryDate))[0];
                 const startIdx = firstTrade
                   ? Math.max(0, (pairsData?.series ?? []).findIndex((s: any) => s.date >= firstTrade.entryDate) - 5)
                   : 0;
-                setPairsPlayIdx(startIdx);
-                setPairsIsPlaying(true);
+                setTimeout(() => { setPairsPlayIdx(startIdx); setPairsIsPlaying(true); }, 50);
               } else {
                 setPairsIsPlaying(p => !p);
               }
             }}
-            disabled={!pairsData || (hasStarted && pairsPlayIdx >= series.length - 1)}
+            disabled={!pairsData}
             style={{ ...S.button, padding: "8px 20px", minWidth: 96, opacity: !pairsData ? 0.5 : 1, fontSize: 12, letterSpacing: 1 }}>
             {pairsIsPlaying ? "⏸ PAUSE" : "▶  PLAY"}
           </button>
