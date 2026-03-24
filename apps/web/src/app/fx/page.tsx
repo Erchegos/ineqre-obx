@@ -3599,14 +3599,9 @@ export default function FXTerminalPage() {
               if (pairsPlayIdx < 0) {
                 // First play — skip burn-in, jump to ~30 bars before first trade
                 const firstTrade = [...(pairsData?.trades ?? [])].sort((a, b) => a.entryDate.localeCompare(b.entryDate))[0];
-                // BURN_IN=100 bars in raw series.
-                // 5Y thinFactor=1 (≤1000 pts) → need ≥100 thinned points.
-                // 10Y thinFactor=2 (≤1000 pts) → need ≥50 thinned points.
-                // Using 110 is safe for both windows.
-                const PLAY_MIN_START = 110;
                 const startIdx = firstTrade
-                  ? Math.max(PLAY_MIN_START, (pairsData?.series ?? []).findIndex((s: any) => s.date >= firstTrade.entryDate) - 5)
-                  : PLAY_MIN_START;
+                  ? Math.max(0, (pairsData?.series ?? []).findIndex((s: any) => s.date >= firstTrade.entryDate) - 5)
+                  : 0;
                 setPairsPlayIdx(startIdx);
                 setPairsIsPlaying(true);
               } else {

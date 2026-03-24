@@ -76,9 +76,9 @@ export interface KalmanPoint {
   logX: number;
   alpha: number;
   beta: number;
-  spread: number;    // residual e_t
-  zscore: number;    // e_t / sqrt(max(S_t, Ve))
-  spreadVol: number; // sqrt(max(S_t, Ve)) — Kalman innovation std, floored at sqrt(Ve)
+  spread: number;   // residual e_t
+  zscore: number;   // e_t / sqrt(S_t)
+  spreadVol: number; // sqrt(S_t)
 }
 
 export interface PairsTrade {
@@ -117,26 +117,24 @@ export interface KalmanResult {
 // ── Kalman Filter Core ──────────────────────────────────────────────────────
 
 /**
- * EWMA λ for z-score spread volatility estimation.
+ * Rolling-window size for z-score normalisation.
  *
- * We normalise by the EWMA of e² rather than a rolling window or Kalman S.
- *
- * Why EWMA over alternatives:
- *   √Ve floor (≈0.032):  threshold ±1.8×0.032=0.058 requires a 5.8% log-spread
- *                         move — essentially impossible for NOKGBP/NOKEUR.
- *   252-bar rolling RMS:  large initial Kalman residuals (e≈0.13 at bar 0)
- *                         inflate the window until bar ~282, suppressing 7 months
- *                         of signals; Jan-2026 spike then inflates for another year.
- *   EWMA λ=0.94:         half-life ≈11 bars; initialised at Ve, decays to actual
- *                         residual scale (~0.002) within the 100-bar BURN_IN.
- *
- * Spike protection: each residual's contribution is capped at 3σ (9×ewmaVar)
- * so a spike is fully reflected in the current z-score but cannot persistently
- * inflate the denominator. Recovery after a spike: ~35 bars vs 12+ months.
- *
- * λ = 0.94 → half-life ≈ 11 bars. Matches RiskMetrics industry standard.
+ * The Kalman innovation variance S converges to near-zero after burn-in,
+ * making z = e/√S → ∞ for any non-zero residual.  Instead we normalise
+ * by the ROLLING STANDARD DEVIATION of residuals over the last
+ * ZSCORE_WINDOW bars — the industry-standard approach (Gatev et al. 2006).
+ * This keeps z naturally oscillating around ±1-2 regardless of whether
+ * the filter is in or out of steady state.
  */
-const EWMA_LAMBDA = 0.94;
+const ZSCORE_WINDOW = 60;  // 3-month rolling normalisation window
+
+/**
+ * Run the 2D Kalman filter on aligned log-price series.
+ * Returns per-date state estimates [α_t, β_t], residuals, and z-scores.
+ *
+ * Z-score uses a 60-bar rolling std of residuals (not Kalman S) so it
+ * oscillates naturally and generates realistic entry signals.
+ */
 export function runKalmanFilter(
   dates: string[],
   logY: number[],
@@ -155,8 +153,8 @@ export function runKalmanFilter(
   // Initial covariance: large uncertainty
   let P00 = 1, P01 = 0, P11 = 1;
 
-  // EWMA variance estimate — initialized at Ve, decays to actual spread scale within BURN_IN
-  let ewmaVar = Ve;
+  // Rolling residual buffer for z-score normalisation
+  const residualBuf: number[] = [];
 
   const result: KalmanPoint[] = [];
 
@@ -172,7 +170,7 @@ export function runKalmanFilter(
     // Innovation: e = y - H·θ  (H = [1, x])
     const e = y - (th0 + th1 * x);
 
-    // Innovation variance: S = H·P·H^T + Ve  (used for Kalman gain only)
+    // Innovation variance (used for Kalman gain only, NOT for z-score)
     const S = P00 + 2 * x * P01 + x * x * P11 + Ve;
 
     // Kalman gain: K = P·H^T / S
@@ -196,13 +194,21 @@ export function runKalmanFilter(
     P01 = AP00 * A10 + AP01 * A11 + K0 * K1 * Ve;
     P11 = AP10 * A10 + AP11 * A11 + K1 * K1 * Ve;
 
-    // ── EWMA z-score (spike-capped) ───────────────────────────────────────
-    // Cap each residual's contribution at 3σ so a spike is visible in z
-    // for this bar but cannot persistently inflate the denominator.
-    const cappedE2 = Math.min(e * e, 9 * ewmaVar);
-    ewmaVar = EWMA_LAMBDA * ewmaVar + (1 - EWMA_LAMBDA) * cappedE2;
-    const spreadVol = Math.max(Math.sqrt(ewmaVar), 1e-8);
-    const zScore = e / spreadVol;
+    // ── Rolling z-score (Gatev et al. 2006 convention) ────────────────────
+    // Normalise by rolling std of residuals, not Kalman S.
+    // This keeps z oscillating naturally around ±1-2 and is the approach
+    // used by systematic FX desks and hedge funds.
+    residualBuf.push(e);
+    if (residualBuf.length > ZSCORE_WINDOW) residualBuf.shift();
+
+    let rollingMean = 0, rollingStd = 1e-8;
+    if (residualBuf.length >= 5) {
+      rollingMean = residualBuf.reduce((s, v) => s + v, 0) / residualBuf.length;
+      const variance = residualBuf.reduce((s, v) => s + (v - rollingMean) ** 2, 0) / residualBuf.length;
+      rollingStd = Math.sqrt(Math.max(variance, 1e-12));
+    }
+
+    const zScore = (e - rollingMean) / rollingStd;
 
     result.push({
       date: dates[t],
@@ -212,7 +218,7 @@ export function runKalmanFilter(
       beta: th1,
       spread: e,
       zscore: zScore,
-      spreadVol,   // rolling RMS of residuals — used for P&L vol-targeting
+      spreadVol: rollingStd,   // rolling std — used for P&L normalisation
     });
   }
 
@@ -268,30 +274,33 @@ export function simulatePairsTrades(series: KalmanPoint[], params: KalmanParams 
 
     if (!inTrade) {
       // ── Execute pending entry (1-day lag) ───────────────────────────────────
-      let justEntered = false;
       if (pendingEntryDir !== null && (t - lastExitBar) > COOLDOWN_BARS) {
-        // Always execute — no gap-based cancellation.
-        // The stop-loss check in the trade branch fires immediately (ungated by
-        // MIN_HOLD_DAYS), so adverse gapped entries are cleaned up on the next bar
-        // with a controlled loss. Gap-cancellation was previously causing 39/40
-        // trades to be aborted on momentum pairs (GBP-EUR z-scores trend post-signal).
-        inTrade = true;
-        justEntered = true;
-        direction = pendingEntryDir;
-        entryIdx = t;
-        entryZ = pendingEntryZ;
-        entryBeta = pendingEntryBeta;
-        entrySpreadVol = pendingEntrySpreadVol;
-        entryLogY = pt.logY;   // Execute at next bar's price
-        entryLogX = pt.logX;
-        pendingEntryDir = null;
-      }
-
-      // ── Generate entry signal for next bar ────────────────────────────────
-      // Runs on every bar where we didn't just enter — including after an abort.
-      // This is the key fix: the old if/else structure blocked signal generation
-      // on abort bars, causing the simulator to miss re-signalling after cancels.
-      if (!justEntered) {
+        const execAbsZ = Math.abs(pt.zscore);
+        // Cancel entry if spread has already gapped through the stop threshold.
+        // Signal fired at ±entryThreshold but the 1-day lag allowed the spread
+        // to move beyond ±stopThreshold — entering now guarantees an immediate
+        // stop-out. Real FX desks cancel orders not filled within price limits.
+        // Also cancel if spread has already mean-reverted past the exit threshold
+        // — the opportunity has passed and we'd be entering a near-zero-P&L trade.
+        const alreadyReverted = pendingEntryDir === 'long'
+          ? pt.zscore > -exitThreshold
+          : pt.zscore < exitThreshold;
+        if (execAbsZ > stopThreshold || alreadyReverted) {
+          pendingEntryDir = null;  // abort — gap exceeded stop or opportunity gone
+        } else {
+          inTrade = true;
+          direction = pendingEntryDir;
+          entryIdx = t;
+          entryZ = pendingEntryZ;
+          entryBeta = pendingEntryBeta;
+          entrySpreadVol = pendingEntrySpreadVol;
+          entryLogY = pt.logY;   // Execute at next bar's price
+          entryLogX = pt.logX;
+          pendingEntryDir = null;
+        }
+      } else {
+        // ── Generate entry signal for next bar ──────────────────────────────
+        // Always replace stale signal with latest — don't carry forward
         pendingEntryDir = null;
         if (pt.zscore < -entryThreshold) {
           pendingEntryDir = 'long';
