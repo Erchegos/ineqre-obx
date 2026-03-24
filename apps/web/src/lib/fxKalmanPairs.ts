@@ -276,23 +276,20 @@ export function simulatePairsTrades(series: KalmanPoint[], params: KalmanParams 
       // ── Execute pending entry (1-day lag) ───────────────────────────────────
       let justEntered = false;
       if (pendingEntryDir !== null && (t - lastExitBar) > COOLDOWN_BARS) {
-        const execAbsZ = Math.abs(pt.zscore);
-        // Cancel entry if spread has already gapped through the stop threshold.
-        // Signal fired at ±entryThreshold but the 1-day lag allowed the spread
-        // to move beyond ±stopThreshold — entering now guarantees an immediate
-        // stop-out. Real FX desks cancel orders not filled within price limits.
-        if (execAbsZ <= stopThreshold) {
-          inTrade = true;
-          justEntered = true;
-          direction = pendingEntryDir;
-          entryIdx = t;
-          entryZ = pendingEntryZ;
-          entryBeta = pendingEntryBeta;
-          entrySpreadVol = pendingEntrySpreadVol;
-          entryLogY = pt.logY;   // Execute at next bar's price
-          entryLogX = pt.logX;
-        }
-        // Always clear pending entry — whether executed or aborted (gap exceeded stop)
+        // Always execute — no gap-based cancellation.
+        // The stop-loss check in the trade branch fires immediately (ungated by
+        // MIN_HOLD_DAYS), so adverse gapped entries are cleaned up on the next bar
+        // with a controlled loss. Gap-cancellation was previously causing 39/40
+        // trades to be aborted on momentum pairs (GBP-EUR z-scores trend post-signal).
+        inTrade = true;
+        justEntered = true;
+        direction = pendingEntryDir;
+        entryIdx = t;
+        entryZ = pendingEntryZ;
+        entryBeta = pendingEntryBeta;
+        entrySpreadVol = pendingEntrySpreadVol;
+        entryLogY = pt.logY;   // Execute at next bar's price
+        entryLogX = pt.logX;
         pendingEntryDir = null;
       }
 
