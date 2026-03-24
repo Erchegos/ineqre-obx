@@ -407,7 +407,7 @@ function PairsZChart({ series, activeTrade }: { series: any[]; activeTrade: any 
   const PAD = { top: 16, right: 16, bottom: 28, left: 46 };
   const cW = W - PAD.left - PAD.right, cH = H - PAD.top - PAD.bottom;
   const zvals = shown.map((s: any) => s.zscore);
-  const absMax = Math.max(4.8, Math.max(...zvals.map(Math.abs)));
+  const absMax = Math.max(4.0, Math.max(...zvals.map(Math.abs)));
   const yMin = -absMax, yMax = absMax;
   const xOf = (i: number) => PAD.left + (i / Math.max(1, shown.length - 1)) * cW;
   const yOf = (v: number) => PAD.top + (1 - (v - yMin) / (yMax - yMin)) * cH;
@@ -431,19 +431,19 @@ function PairsZChart({ series, activeTrade }: { series: any[]; activeTrade: any 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ display: "block", width: "100%", height: "auto" }}>
       {posRects}
-      {[-4,-2,-0.5,0,0.5,2,4].map(v => (
+      {[-3.5,-1.5,-0.3,0,0.3,1.5,3.5].map(v => (
         <g key={v}>
           <line x1={PAD.left} x2={W-PAD.right} y1={yOf(v)} y2={yOf(v)}
             stroke={v===0 ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.05)"} strokeWidth={v===0?1:0.8} strokeDasharray={v!==0?"3 3":undefined} />
-          <text x={PAD.left-4} y={yOf(v)+3.5} textAnchor="end" fontSize={8} fill={Math.abs(v)>=2?"rgba(255,255,255,0.4)":"rgba(255,255,255,0.22)"} fontFamily="monospace">
+          <text x={PAD.left-4} y={yOf(v)+3.5} textAnchor="end" fontSize={8} fill={Math.abs(v)>=1.5?"rgba(255,255,255,0.4)":"rgba(255,255,255,0.22)"} fontFamily="monospace">
             {v>0?`+${v}`:v}
           </text>
         </g>
       ))}
-      <line x1={PAD.left} x2={W-PAD.right} y1={yOf(2)} y2={yOf(2)} stroke="#10b981" strokeWidth={1} opacity={0.5} />
-      <line x1={PAD.left} x2={W-PAD.right} y1={yOf(-2)} y2={yOf(-2)} stroke="#10b981" strokeWidth={1} opacity={0.5} />
-      <line x1={PAD.left} x2={W-PAD.right} y1={yOf(4)} y2={yOf(4)} stroke="#ef4444" strokeWidth={0.8} strokeDasharray="4 3" opacity={0.5} />
-      <line x1={PAD.left} x2={W-PAD.right} y1={yOf(-4)} y2={yOf(-4)} stroke="#ef4444" strokeWidth={0.8} strokeDasharray="4 3" opacity={0.5} />
+      <line x1={PAD.left} x2={W-PAD.right} y1={yOf(1.5)} y2={yOf(1.5)} stroke="#10b981" strokeWidth={1} opacity={0.5} />
+      <line x1={PAD.left} x2={W-PAD.right} y1={yOf(-1.5)} y2={yOf(-1.5)} stroke="#10b981" strokeWidth={1} opacity={0.5} />
+      <line x1={PAD.left} x2={W-PAD.right} y1={yOf(3.5)} y2={yOf(3.5)} stroke="#ef4444" strokeWidth={0.8} strokeDasharray="4 3" opacity={0.5} />
+      <line x1={PAD.left} x2={W-PAD.right} y1={yOf(-3.5)} y2={yOf(-3.5)} stroke="#ef4444" strokeWidth={0.8} strokeDasharray="4 3" opacity={0.5} />
       <path d={linePts} fill="none" stroke="#3b82f6" strokeWidth={1.5} />
       <line x1={xOf(shown.length-1)} x2={xOf(shown.length-1)} y1={PAD.top} y2={PAD.top+cH} stroke="rgba(255,255,255,0.35)" strokeWidth={1} strokeDasharray="2 2" />
       {lastPt && <circle cx={xOf(shown.length-1)} cy={yOf(lastPt.zscore)} r={4} fill="#3b82f6" />}
@@ -633,7 +633,7 @@ export default function FXTerminalPage() {
   const [arbTenor, setArbTenor] = useState("3M");
 
   /* Pairs trading live simulation */
-  const [pairsSelectedPair, setPairsSelectedPair] = useState("NOKGBP_NOKUSD");
+  const [pairsSelectedPair, setPairsSelectedPair] = useState("NOKGBP_NOKEUR");
   const [pairsData, setPairsData] = useState<any>(null);
   const [pairsDataLoading, setPairsDataLoading] = useState(false);
   const [pairsPlayIdx, setPairsPlayIdx] = useState(-1); // -1 = not started, blank slate
@@ -3252,9 +3252,9 @@ export default function FXTerminalPage() {
 
   function renderPairs() {
     const PAIR_CONFIGS = [
-      { key: "NOKGBP_NOKUSD", labelY: "GBP/NOK", labelX: "USD/NOK", short: "GBP ↔ USD", color: "#9C27B0", desc: "Best Sharpe — two commodity/risk currencies" },
-      { key: "NOKEUR_NOKUSD", labelY: "EUR/NOK", labelX: "USD/NOK", short: "EUR ↔ USD", color: "#3b82f6", desc: "Global risk appetite pair — high liquidity" },
-      { key: "NOKGBP_NOKEUR", labelY: "GBP/NOK", labelX: "EUR/NOK", short: "GBP ↔ EUR", color: "#10b981", desc: "European divergence — post-Brexit dynamics" },
+      { key: "NOKGBP_NOKEUR", labelY: "GBP/NOK", labelX: "EUR/NOK", short: "GBP ↔ EUR", color: "#10b981", desc: "Most divergent — post-Brexit BoE vs ECB dynamics" },
+      { key: "NOKEUR_NOKUSD", labelY: "EUR/NOK", labelX: "USD/NOK", short: "EUR ↔ USD", color: "#3b82f6", desc: "Fed vs ECB policy divergence — global risk appetite" },
+      { key: "NOKGBP_NOKUSD", labelY: "GBP/NOK", labelX: "USD/NOK", short: "GBP ↔ USD", color: "#9C27B0", desc: "Tightly co-integrated — low divergence, few signals" },
     ];
     const config = PAIR_CONFIGS.find(p => p.key === pairsSelectedPair) ?? PAIR_CONFIGS[0];
     const series: any[] = pairsData?.series ?? [];
@@ -3306,8 +3306,8 @@ export default function FXTerminalPage() {
     const posColor = activeTrade ? (activeTrade.direction === "long" ? "#10b981" : "#ef4444") : "#30363d";
     const posBg = activeTrade ? (activeTrade.direction === "long" ? "rgba(16,185,129,0.07)" : "rgba(239,68,68,0.07)") : "transparent";
     const holdDays = activeTrade && currentPt ? liveSeries.filter((s: any) => s.date >= activeTrade.entryDate).length : 0;
-    const longProx = currentPt ? Math.max(0, Math.min(1, (-currentPt.zscore - 1) / 1)) : 0;
-    const shortProx = currentPt ? Math.max(0, Math.min(1, (currentPt.zscore - 1) / 1)) : 0;
+    const longProx = currentPt ? Math.max(0, Math.min(1, (-currentPt.zscore - 0.75) / 0.75)) : 0;
+    const shortProx = currentPt ? Math.max(0, Math.min(1, (currentPt.zscore - 0.75) / 0.75)) : 0;
 
     return (
       <>
@@ -3341,7 +3341,7 @@ export default function FXTerminalPage() {
             </button>
           ))}
           <div style={{ padding: "0 14px", fontSize: 9, color: "rgba(255,255,255,0.25)", alignSelf: "center", marginLeft: "auto" }}>
-            {config.desc} · δ=1e-4 · Ve=1e-3 · ±2σ ENTRY · ±0.5σ EXIT · ±4σ STOP
+            {config.desc} · δ=1e-4 · Ve=1e-3 · ±1.5σ ENTRY · ±0.3σ EXIT · ±3.5σ STOP
           </div>
         </div>
 
@@ -3484,7 +3484,7 @@ export default function FXTerminalPage() {
             ) : (
               <>
                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 12 }}>
-                  {pairsDataLoading ? "Recalculating..." : !hasStarted && series.length > 0 ? "Press ▶ PLAY to begin" : "Awaiting ±2σ signal"}
+                  {pairsDataLoading ? "Recalculating..." : !hasStarted && series.length > 0 ? "Press ▶ PLAY to begin" : "Awaiting ±1.5σ signal"}
                 </div>
                 {currentPt && (
                   <>
@@ -3494,7 +3494,7 @@ export default function FXTerminalPage() {
                       {(currentPt.zscore >= 0 ? "+" : "") + currentPt.zscore.toFixed(3)}
                     </div>
                     <div style={{ marginTop: 8, fontSize: 9, color: "rgba(255,255,255,0.3)" }}>
-                      {Math.abs(currentPt.zscore) > 1.5 ? "⚡ approaching entry threshold" : "signal within ±2σ band"}
+                      {Math.abs(currentPt.zscore) > 1.2 ? "⚡ approaching entry threshold" : "signal within ±1.5σ band"}
                     </div>
                   </>
                 )}
@@ -3538,7 +3538,7 @@ export default function FXTerminalPage() {
                   {[
                     { l: "HEDGE RATIO β", v: currentPt.beta?.toFixed(5), c: "#3b82f6" },
                     { l: "INTERCEPT α", v: currentPt.alpha?.toFixed(5), c: "rgba(255,255,255,0.65)" },
-                    { l: "Z-SCORE", v: (currentPt.zscore >= 0 ? "+" : "") + currentPt.zscore?.toFixed(3), c: Math.abs(currentPt.zscore) > 2 ? "#f59e0b" : "rgba(255,255,255,0.7)" },
+                    { l: "Z-SCORE", v: (currentPt.zscore >= 0 ? "+" : "") + currentPt.zscore?.toFixed(3), c: Math.abs(currentPt.zscore) > 1.5 ? "#f59e0b" : "rgba(255,255,255,0.7)" },
                     { l: "SPREAD VOL √S", v: currentPt.spreadVol?.toFixed(5), c: "rgba(255,255,255,0.65)" },
                   ].map((m, i) => (
                     <div key={i} style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #21262d", paddingBottom: 5 }}>
@@ -3549,8 +3549,8 @@ export default function FXTerminalPage() {
                 </div>
                 <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginBottom: 6, letterSpacing: "0.05em" }}>SIGNAL PROXIMITY</div>
                 {[
-                  { l: "LONG (z < −2σ)", v: longProx, c: "#10b981" },
-                  { l: "SHORT (z > +2σ)", v: shortProx, c: "#ef4444" },
+                  { l: "LONG (z < −1.5σ)", v: longProx, c: "#10b981" },
+                  { l: "SHORT (z > +1.5σ)", v: shortProx, c: "#ef4444" },
                 ].map((b, i) => (
                   <div key={i} style={{ marginBottom: 8 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "rgba(255,255,255,0.3)", marginBottom: 3 }}>
@@ -3576,7 +3576,7 @@ export default function FXTerminalPage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap" as const, gap: 8 }}>
             <div style={S.cardTitle}>Z-SCORE LIVE VIEW — {config.labelY} vs {config.labelX} · TRAILING 90 DAYS</div>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" as const }}>
-              {[{ c: "#3b82f6", l: "Z-score" }, { c: "#10b981", l: "±2σ entry" }, { c: "#ef4444", l: "±4σ stop" },
+              {[{ c: "#3b82f6", l: "Z-score" }, { c: "#10b981", l: "±1.5σ entry" }, { c: "#ef4444", l: "±3.5σ stop" },
                 { c: "rgba(16,185,129,0.3)", l: "Long pos" }, { c: "rgba(239,68,68,0.3)", l: "Short pos" }].map((l, i) => (
                 <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 8, color: "rgba(255,255,255,0.35)" }}>
                   <div style={{ width: 14, height: 3, background: l.c, borderRadius: 1 }} />{l.l}

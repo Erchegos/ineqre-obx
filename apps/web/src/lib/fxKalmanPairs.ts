@@ -39,9 +39,9 @@ export const DEFAULT_PARAMS: KalmanParams = {
   totalCostBps: 8,
 };
 
-export const ENTRY_Z  = 2.0;   // Enter long/short at ±2σ
-export const EXIT_Z   = 0.5;   // Exit at ±0.5σ (mean reversion)
-export const STOP_Z   = 4.0;   // Hard stop at ±4σ
+export const ENTRY_Z  = 1.5;   // Enter long/short at ±1.5σ (standard for daily FX pairs)
+export const EXIT_Z   = 0.3;   // Exit at ±0.3σ (mean reversion)
+export const STOP_Z   = 3.5;   // Hard stop at ±3.5σ
 
 export interface KalmanPoint {
   date: string;
