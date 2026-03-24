@@ -3590,11 +3590,8 @@ export default function FXTerminalPage() {
         {/* ── RIGHT COLUMN ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
 
-          {/* 3 compact panels stacked */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-
-          {/* POSITION MONITOR — fixed layout, no jumping */}
-          <div style={{ ...S.card, background: posBg, border: `1px solid ${posColor}`, animation: activeTrade ? "pGlow 2s ease-in-out infinite" : "none", padding: "16px 18px", minHeight: 260 }}>
+          {/* POSITION MONITOR — full width, larger */}
+          <div style={{ ...S.card, background: posBg, border: `1px solid ${posColor}`, animation: activeTrade ? "pGlow 2s ease-in-out infinite" : "none", padding: "18px 20px" }}>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", letterSpacing: "0.1em", marginBottom: 8 }}>POSITION MONITOR</div>
 
             {/* Status header — stable height, no layout shift */}
@@ -3735,73 +3732,77 @@ export default function FXTerminalPage() {
             </div>
           </div>
 
-          {/* LIVE PERFORMANCE */}
+          {/* PERFORMANCE + KALMAN STATE — merged card */}
           <div style={S.card}>
-            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", letterSpacing: "0.1em", marginBottom: 10 }}>LIVE PERFORMANCE</div>
-            <div style={{ fontSize: 30, fontWeight: 800, fontFamily: "monospace", letterSpacing: 1,
-              color: !hasStarted ? "rgba(255,255,255,0.1)" : totalReturn >= 0 ? "#10b981" : "#ef4444", marginBottom: 2 }}>
-              {!hasStarted ? "—" : (totalReturn >= 0 ? "+" : "") + totalReturn.toFixed(2) + "%"}
-            </div>
-            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.25)", marginBottom: 14, letterSpacing: "0.05em" }}>
-              TOTAL RETURN · INCL UNREALIZED
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              {[
-                { l: "Portfolio", v: totalEquity.toFixed(2), c: totalReturn >= 0 ? "#10b981" : "#ef4444" },
-                { l: "Trades", v: `${completedTrades.length} / ${allTrades.length}`, c: "#3b82f6" },
-                { l: "Win Rate", v: completedTrades.length > 0 ? `${winRate.toFixed(1)}%` : "—", c: winRate >= 50 ? "#10b981" : "#ef4444" },
-                { l: "Max DD", v: `${maxDD.toFixed(2)}%`, c: "#ef4444" },
-                { l: "Avg P&L", v: completedTrades.length > 0 ? `${(completedTrades.reduce((s: number, t: any) => s + t.pnlPct, 0) / completedTrades.length).toFixed(2)}%` : "—", c: "#fff" },
-                { l: "Stops hit", v: `${completedTrades.filter((t: any) => t.exitReason === "stop").length}`, c: "#ef4444" },
-              ].map((m, i) => (
-                <div key={i} style={{ background: "#0d1117", borderRadius: 4, padding: "8px 10px" }}>
-                  <div style={{ fontSize: 7, color: "rgba(255,255,255,0.3)", marginBottom: 2, letterSpacing: "0.05em", textTransform: "uppercase" as const }}>{m.l}</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: m.c, fontFamily: "monospace" }}>{m.v}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          </div>{/* end inner 2-col grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
 
-          {/* KALMAN STATE — full width in right column */}
-          <div style={S.card}>
-            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", letterSpacing: "0.1em", marginBottom: 10 }}>KALMAN STATE</div>
-            {currentPt ? (
-              <>
-                <div style={{ display: "flex", flexDirection: "column" as const, gap: 6, marginBottom: 12 }}>
+              {/* Left: Live Performance */}
+              <div>
+                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", letterSpacing: "0.1em", marginBottom: 8 }}>LIVE PERFORMANCE</div>
+                <div style={{ fontSize: 26, fontWeight: 800, fontFamily: "monospace", letterSpacing: 1,
+                  color: !hasStarted ? "rgba(255,255,255,0.1)" : totalReturn >= 0 ? "#10b981" : "#ef4444", marginBottom: 1, lineHeight: 1 }}>
+                  {!hasStarted ? "—" : (totalReturn >= 0 ? "+" : "") + totalReturn.toFixed(2) + "%"}
+                </div>
+                <div style={{ fontSize: 8, color: "rgba(255,255,255,0.2)", marginBottom: 10, letterSpacing: "0.05em" }}>TOTAL · INCL UNREALIZED</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5 }}>
                   {[
-                    { l: "HEDGE RATIO β", v: currentPt.beta?.toFixed(5), c: "#3b82f6" },
-                    { l: "INTERCEPT α", v: currentPt.alpha?.toFixed(5), c: "rgba(255,255,255,0.65)" },
-                    { l: "Z-SCORE", v: (currentPt.zscore >= 0 ? "+" : "") + currentPt.zscore?.toFixed(3), c: Math.abs(currentPt.zscore) > 1.5 ? "#f59e0b" : "rgba(255,255,255,0.7)" },
-                    { l: "SPREAD VOL √S", v: currentPt.spreadVol?.toFixed(5), c: "rgba(255,255,255,0.65)" },
+                    { l: "Portfolio", v: totalEquity.toFixed(2), c: totalReturn >= 0 ? "#10b981" : "#ef4444" },
+                    { l: "Trades", v: `${completedTrades.length} / ${allTrades.length}`, c: "#3b82f6" },
+                    { l: "Win Rate", v: completedTrades.length > 0 ? `${winRate.toFixed(1)}%` : "—", c: winRate >= 50 ? "#10b981" : "#ef4444" },
+                    { l: "Max DD", v: `${maxDD.toFixed(2)}%`, c: "#ef4444" },
+                    { l: "Avg P&L", v: completedTrades.length > 0 ? `${(completedTrades.reduce((s: number, t: any) => s + t.pnlPct, 0) / completedTrades.length).toFixed(2)}%` : "—", c: "#fff" },
+                    { l: "Stops hit", v: `${completedTrades.filter((t: any) => t.exitReason === "stop").length}`, c: "#ef4444" },
                   ].map((m, i) => (
-                    <div key={i} style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #21262d", paddingBottom: 5 }}>
-                      <div style={{ fontSize: 8, color: "rgba(255,255,255,0.35)", letterSpacing: "0.04em" }}>{m.l}</div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: m.c, fontFamily: "monospace" }}>{m.v}</div>
+                    <div key={i} style={{ background: "#0d1117", borderRadius: 4, padding: "6px 8px" }}>
+                      <div style={{ fontSize: 7, color: "rgba(255,255,255,0.3)", marginBottom: 2, letterSpacing: "0.05em", textTransform: "uppercase" as const }}>{m.l}</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: m.c, fontFamily: "monospace" }}>{m.v}</div>
                     </div>
                   ))}
                 </div>
-                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginBottom: 6, letterSpacing: "0.05em" }}>SIGNAL PROXIMITY</div>
-                {[
-                  { l: "LONG (z < −1.5σ)", v: longProx, c: "#10b981" },
-                  { l: "SHORT (z > +1.5σ)", v: shortProx, c: "#ef4444" },
-                ].map((b, i) => (
-                  <div key={i} style={{ marginBottom: 8 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "rgba(255,255,255,0.3)", marginBottom: 3 }}>
-                      <span>{b.l}</span><span>{(b.v * 100).toFixed(0)}%</span>
-                    </div>
-                    <div style={{ background: "#0d1117", borderRadius: 2, height: 6, overflow: "hidden" }}>
-                      <div style={{ width: `${(b.v * 100).toFixed(0)}%`, height: "100%", background: b.c, borderRadius: 2, transition: "width 0.12s ease",
-                        boxShadow: b.v > 0.7 ? `0 0 8px ${b.c}` : "none" }} />
-                    </div>
-                  </div>
-                ))}
-              </>
-            ) : (
-              <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, marginTop: 20, textAlign: "center" as const }}>
-                {pairsDataLoading ? "⟳  Loading..." : "—"}
               </div>
-            )}
+
+              {/* Right: Kalman State */}
+              <div>
+                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", letterSpacing: "0.1em", marginBottom: 8 }}>KALMAN STATE</div>
+                {currentPt ? (
+                  <>
+                    <div style={{ display: "flex", flexDirection: "column" as const, gap: 5, marginBottom: 10 }}>
+                      {[
+                        { l: "HEDGE RATIO β", v: currentPt.beta?.toFixed(5), c: "#3b82f6" },
+                        { l: "INTERCEPT α", v: currentPt.alpha?.toFixed(5), c: "rgba(255,255,255,0.65)" },
+                        { l: "Z-SCORE", v: (currentPt.zscore >= 0 ? "+" : "") + currentPt.zscore?.toFixed(3), c: Math.abs(currentPt.zscore) > 1.5 ? "#f59e0b" : "rgba(255,255,255,0.7)" },
+                        { l: "SPREAD VOL √S", v: currentPt.spreadVol?.toFixed(5), c: "rgba(255,255,255,0.65)" },
+                      ].map((m, i) => (
+                        <div key={i} style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #21262d", paddingBottom: 4 }}>
+                          <div style={{ fontSize: 8, color: "rgba(255,255,255,0.35)", letterSpacing: "0.04em" }}>{m.l}</div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: m.c, fontFamily: "monospace" }}>{m.v}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginBottom: 5, letterSpacing: "0.05em" }}>SIGNAL PROXIMITY</div>
+                    {[
+                      { l: "LONG (z < −1.5σ)", v: longProx, c: "#10b981" },
+                      { l: "SHORT (z > +1.5σ)", v: shortProx, c: "#ef4444" },
+                    ].map((b, i) => (
+                      <div key={i} style={{ marginBottom: 7 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "rgba(255,255,255,0.3)", marginBottom: 3 }}>
+                          <span>{b.l}</span><span>{(b.v * 100).toFixed(0)}%</span>
+                        </div>
+                        <div style={{ background: "#0d1117", borderRadius: 2, height: 5, overflow: "hidden" }}>
+                          <div style={{ width: `${(b.v * 100).toFixed(0)}%`, height: "100%", background: b.c, borderRadius: 2, transition: "width 0.12s ease",
+                            boxShadow: b.v > 0.7 ? `0 0 8px ${b.c}` : "none" }} />
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, marginTop: 20, textAlign: "center" as const }}>
+                    {pairsDataLoading ? "⟳  Loading..." : "—"}
+                  </div>
+                )}
+              </div>
+
+            </div>
           </div>
         </div>{/* end right column */}
         </div>{/* end master grid */}
