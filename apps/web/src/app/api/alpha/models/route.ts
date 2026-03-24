@@ -1,13 +1,13 @@
 import { NextRequest } from 'next/server';
 import { pool } from '@/lib/db';
-import { requireAuth, safeErrorResponse, secureJsonResponse } from '@/lib/security';
+import { requireAlphaAuth, safeErrorResponse, secureJsonResponse } from '@/lib/security';
 
 /**
  * GET /api/alpha/models
  * List all registered models with latest performance metrics.
  */
 export async function GET(req: NextRequest) {
-  const authError = requireAuth(req);
+  const authError = requireAlphaAuth(req);
   if (authError) return authError;
 
   try {

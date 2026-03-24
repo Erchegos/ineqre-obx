@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { pool } from '@/lib/db';
-import { requireAuth, safeErrorResponse, secureJsonResponse } from '@/lib/security';
+import { requireAlphaAuth, safeErrorResponse, secureJsonResponse } from '@/lib/security';
 
 /**
  * POST /api/alpha/backtest
@@ -8,7 +8,7 @@ import { requireAuth, safeErrorResponse, secureJsonResponse } from '@/lib/securi
  * Body: { models: string[], tickers?: string[], startDate?, endDate?, rebalanceDays?: number, costBps?: number }
  */
 export async function POST(req: NextRequest) {
-  const authError = requireAuth(req);
+  const authError = requireAlphaAuth(req);
   if (authError) return authError;
 
   try {

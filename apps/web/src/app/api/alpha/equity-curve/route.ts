@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { pool } from '@/lib/db';
-import { requireAuth, safeErrorResponse, secureJsonResponse } from '@/lib/security';
+import { requireAlphaAuth, safeErrorResponse, secureJsonResponse } from '@/lib/security';
 
 /**
  * GET /api/alpha/equity-curve?model=yggdrasil_v7
@@ -23,7 +23,7 @@ const MAX_SLOTS = 10;
 const CACHE_MAX_AGE_H = 25;
 
 export async function GET(req: NextRequest) {
-  const authError = requireAuth(req);
+  const authError = requireAlphaAuth(req);
   if (authError) return authError;
 
   try {

@@ -122,6 +122,32 @@ export function requireAuth(req: NextRequest): NextResponse | null {
 }
 
 /**
+ * Require Alpha Engine access.
+ * Only the 'oslettebak' profile may access alpha endpoints.
+ * Returns null if authorized, or an error response if not.
+ */
+export function requireAlphaAuth(req: NextRequest): NextResponse | null {
+  const payload = extractAndVerifyToken(req);
+
+  if (!payload) {
+    return NextResponse.json(
+      { error: 'Unauthorized', message: 'Valid authentication token required' },
+      { status: 401 }
+    );
+  }
+
+  if (payload.profile !== 'oslettebak') {
+    logSecurityEvent('alpha_access_denied', { profile: payload.profile || 'unknown' }, req);
+    return NextResponse.json(
+      { error: 'Forbidden', message: 'Access restricted' },
+      { status: 403 }
+    );
+  }
+
+  return null;
+}
+
+/**
  * Get authenticated user info from request.
  * Returns null if not authenticated.
  */

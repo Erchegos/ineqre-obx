@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { pool } from '@/lib/db';
-import { requireAuth, safeErrorResponse, secureJsonResponse } from '@/lib/security';
+import { requireAlphaAuth, safeErrorResponse, secureJsonResponse } from '@/lib/security';
 
 /**
  * POST /api/alpha/backtest-atr
@@ -13,7 +13,7 @@ import { requireAuth, safeErrorResponse, secureJsonResponse } from '@/lib/securi
  * This avoids the trap of trading stocks where the model has no predictive edge.
  */
 export async function POST(req: NextRequest) {
-  const authError = requireAuth(req);
+  const authError = requireAlphaAuth(req);
   if (authError) return authError;
 
   try {

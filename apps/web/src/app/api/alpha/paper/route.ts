@@ -1,13 +1,13 @@
 import { NextRequest } from 'next/server';
 import { pool } from '@/lib/db';
-import { requireAuth, getAuthUser, safeErrorResponse, secureJsonResponse } from '@/lib/security';
+import { requireAlphaAuth, getAuthUser, safeErrorResponse, secureJsonResponse } from '@/lib/security';
 
 /**
  * GET /api/alpha/paper — List paper portfolios (scoped by profile)
  * POST /api/alpha/paper — Create new paper portfolio
  */
 export async function GET(req: NextRequest) {
-  const authError = requireAuth(req);
+  const authError = requireAlphaAuth(req);
   if (authError) return authError;
   const user = getAuthUser(req);
   if (!user) return secureJsonResponse({ error: 'Unauthorized' }, { status: 401 });
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const authError = requireAuth(req);
+  const authError = requireAlphaAuth(req);
   if (authError) return authError;
   const user = getAuthUser(req);
   if (!user) return secureJsonResponse({ error: 'Unauthorized' }, { status: 401 });

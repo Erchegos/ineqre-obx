@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { pool } from '@/lib/db';
-import { requireAuth, safeErrorResponse, secureJsonResponse } from '@/lib/security';
+import { requireAlphaAuth, safeErrorResponse, secureJsonResponse } from '@/lib/security';
 
 /**
  * GET /api/alpha/top-performers
@@ -28,7 +28,7 @@ const LOOKBACK     = 5;      // Days to look back for previous signal (same as E
 const CACHE_MAX_AGE_H = 25;
 
 export async function GET(req: NextRequest) {
-  const authError = requireAuth(req);
+  const authError = requireAlphaAuth(req);
   if (authError) return authError;
 
   try {

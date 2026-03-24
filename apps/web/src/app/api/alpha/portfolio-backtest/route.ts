@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { pool } from '@/lib/db';
-import { requireAuth, safeErrorResponse, secureJsonResponse } from '@/lib/security';
+import { requireAlphaAuth, safeErrorResponse, secureJsonResponse } from '@/lib/security';
 
 // ── Cross-sectional rank → [-1, +1] ──
 function crossRank(items: { ticker: string; value: number | null }[]): Map<string, number> {
@@ -62,7 +62,7 @@ const CACHE_KEY = 'portfolio_backtest_v7';
 const CACHE_MAX_AGE_H = 25;
 
 export async function POST(req: NextRequest) {
-  const authError = requireAuth(req);
+  const authError = requireAlphaAuth(req);
   if (authError) return authError;
 
   try {

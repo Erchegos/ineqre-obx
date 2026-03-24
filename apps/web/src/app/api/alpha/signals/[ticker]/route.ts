@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { pool } from '@/lib/db';
-import { requireAuth, safeErrorResponse, secureJsonResponse } from '@/lib/security';
+import { requireAlphaAuth, safeErrorResponse, secureJsonResponse } from '@/lib/security';
 
 /**
  * GET /api/alpha/signals/[ticker]?days=1825
@@ -8,7 +8,7 @@ import { requireAuth, safeErrorResponse, secureJsonResponse } from '@/lib/securi
  * fundamental context (EP, BM, DY, EV/EBITDA), and regime context.
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ ticker: string }> }) {
-  const authError = requireAuth(req);
+  const authError = requireAlphaAuth(req);
   if (authError) return authError;
 
   try {

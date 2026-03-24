@@ -181,16 +181,22 @@ export default function AlphaPage() {
   // ============================================================================
 
   const handleLogin = async () => {
+    if (!username.trim() || !password) return;
     setAuthLoading(true);
     setAuthError("");
     try {
       const res = await fetch("/api/portfolio/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username || undefined, password }),
+        body: JSON.stringify({ username: username.trim(), password }),
       });
       if (res.ok) {
         const data = await res.json();
+        // Alpha Engine is restricted to oslettebak only
+        if (data.profile !== "oslettebak") {
+          setAuthError("Access denied");
+          return;
+        }
         authLogin(data.token, data.profile || "");
       } else { setAuthError("Invalid credentials"); }
     } catch { setAuthError("Connection error"); }
@@ -581,19 +587,20 @@ export default function AlphaPage() {
             <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", fontFamily: "monospace", marginTop: 4 }}>Cross-Sectional Portfolio Strategy</div>
           </div>
           <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", marginBottom: 4 }}>USERNAME (OPTIONAL)</div>
+            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", marginBottom: 4 }}>USERNAME</div>
             <input value={username} onChange={e => setUsername(e.target.value)}
               style={{ width: "100%", background: "#0d1117", border: "1px solid #30363d", borderRadius: 5, padding: "8px 10px", color: "#fff", fontFamily: "monospace", fontSize: 12, boxSizing: "border-box" as const }}
-              placeholder="Leave blank if none" autoComplete="username" />
+              placeholder="Enter username" autoComplete="username" required />
           </div>
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", marginBottom: 4 }}>PASSWORD</div>
             <input type="password" value={password} onChange={e => setPassword(e.target.value)}
               style={{ width: "100%", background: "#0d1117", border: "1px solid #30363d", borderRadius: 5, padding: "8px 10px", color: "#fff", fontFamily: "monospace", fontSize: 12, boxSizing: "border-box" as const }}
-              placeholder="Enter password" autoComplete="current-password" />
+              placeholder="Enter password" autoComplete="current-password" required />
           </div>
           <button type="submit"
-            style={{ ...btnPrimary, width: "100%", padding: "11px 0", fontSize: 13, opacity: (authLoading || !password) ? 0.5 : 1 }}>
+            style={{ ...btnPrimary, width: "100%", padding: "11px 0", fontSize: 13, opacity: (authLoading || !password || !username.trim()) ? 0.5 : 1 }}
+            disabled={authLoading || !password || !username.trim()}>
             {authLoading ? "Authenticating..." : "Access Alpha Engine"}
           </button>
           {authError && <div style={{ color: "#ef4444", fontSize: 11, marginTop: 12, fontFamily: "monospace", textAlign: "center" }}>{authError}</div>}

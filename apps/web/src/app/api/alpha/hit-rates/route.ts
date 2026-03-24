@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { pool } from '@/lib/db';
-import { requireAuth, safeErrorResponse, secureJsonResponse } from '@/lib/security';
+import { requireAlphaAuth, safeErrorResponse, secureJsonResponse } from '@/lib/security';
 
 /**
  * GET /api/alpha/hit-rates?model=yggdrasil_v7&minSignals=15&minAvgReturn=0
@@ -9,7 +9,7 @@ import { requireAuth, safeErrorResponse, secureJsonResponse } from '@/lib/securi
  * Only includes tickers with avg return > 0 (pure alpha generators).
  */
 export async function GET(req: NextRequest) {
-  const authError = requireAuth(req);
+  const authError = requireAlphaAuth(req);
   if (authError) return authError;
 
   try {

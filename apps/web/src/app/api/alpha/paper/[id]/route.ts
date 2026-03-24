@@ -1,13 +1,13 @@
 import { NextRequest } from 'next/server';
 import { pool } from '@/lib/db';
-import { requireAuth, getAuthUser, safeErrorResponse, secureJsonResponse } from '@/lib/security';
+import { requireAlphaAuth, getAuthUser, safeErrorResponse, secureJsonResponse } from '@/lib/security';
 
 /**
  * GET /api/alpha/paper/[id] — Portfolio detail with positions, equity curve, trades
  * DELETE /api/alpha/paper/[id] — Delete portfolio
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const authError = requireAuth(req);
+  const authError = requireAlphaAuth(req);
   if (authError) return authError;
   const user = getAuthUser(req);
   if (!user) return secureJsonResponse({ error: 'Unauthorized' }, { status: 401 });
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const authError = requireAuth(req);
+  const authError = requireAlphaAuth(req);
   if (authError) return authError;
   const user = getAuthUser(req);
   if (!user) return secureJsonResponse({ error: 'Unauthorized' }, { status: 401 });
