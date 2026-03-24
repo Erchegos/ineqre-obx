@@ -126,7 +126,13 @@ export interface KalmanResult {
  * This keeps z naturally oscillating around ±1-2 regardless of whether
  * the filter is in or out of steady state.
  */
-const ZSCORE_WINDOW = 60;  // 3-month rolling normalisation window
+const ZSCORE_WINDOW = 20;  // 1-month rolling normalisation window
+// Using 20 bars instead of 60: a tighter window lets the z-score react to
+// short-term spread moves without being swamped by the trailing 3-month mean.
+// For stable NOK-cross pairs (GBP-EUR), a 60-bar mean damps the z-score to
+// near zero most of the time, generating almost no entry signals.
+// 20 bars keeps z naturally oscillating ±1-3σ which is what the Gatev et al.
+// threshold calibration (ENTRY=1.8) expects.
 
 /**
  * Run the 2D Kalman filter on aligned log-price series.
