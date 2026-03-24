@@ -20,7 +20,7 @@
 export interface KalmanParams {
   /** State drift variance. Controls how fast β/α can change. Default 1e-5 */
   delta: number;
-  /** Observation noise variance. Controls spread noise. Default 1e-4 */
+  /** Observation noise variance. Controls Kalman gain (not z-score). Default 1e-3 */
   Ve: number;
   /**
    * Position size as % of NAV per trade. Scales per-trade P&L to realistic portfolio returns.
@@ -34,7 +34,7 @@ export interface KalmanParams {
 
 export const DEFAULT_PARAMS: KalmanParams = {
   delta: 1e-5,
-  Ve: 1e-4,
+  Ve: 1e-3,
   positionSizePct: 10,
   totalCostBps: 8,
 };
@@ -90,8 +90,23 @@ export interface KalmanResult {
 // ── Kalman Filter Core ──────────────────────────────────────────────────────
 
 /**
+ * Rolling-window size for z-score normalisation.
+ *
+ * The Kalman innovation variance S converges to near-zero after burn-in,
+ * making z = e/√S → ∞ for any non-zero residual.  Instead we normalise
+ * by the ROLLING STANDARD DEVIATION of residuals over the last
+ * ZSCORE_WINDOW bars — the industry-standard approach (Gatev et al. 2006).
+ * This keeps z naturally oscillating around ±1-2 regardless of whether
+ * the filter is in or out of steady state.
+ */
+const ZSCORE_WINDOW = 60;  // 3-month rolling normalisation window
+
+/**
  * Run the 2D Kalman filter on aligned log-price series.
  * Returns per-date state estimates [α_t, β_t], residuals, and z-scores.
+ *
+ * Z-score uses a 60-bar rolling std of residuals (not Kalman S) so it
+ * oscillates naturally and generates realistic entry signals.
  */
 export function runKalmanFilter(
   dates: string[],
@@ -111,6 +126,9 @@ export function runKalmanFilter(
   // Initial covariance: large uncertainty
   let P00 = 1, P01 = 0, P11 = 1;
 
+  // Rolling residual buffer for z-score normalisation
+  const residualBuf: number[] = [];
+
   const result: KalmanPoint[] = [];
 
   for (let t = 0; t < n; t++) {
@@ -118,54 +136,52 @@ export function runKalmanFilter(
     const x = logX[t];
 
     // ── Predict step: add state drift W ───────────────────────────────────
-    // P_{t|t-1} = P_{t-1|t-1} + W  (θ is unchanged: random walk prior)
     P00 += wScale;
     P11 += wScale;
-    // P01 unchanged (W is diagonal)
 
     // ── Update step ────────────────────────────────────────────────────────
-    // H = [1, x]
-    // Innovation: e = y - H·θ
+    // Innovation: e = y - H·θ  (H = [1, x])
     const e = y - (th0 + th1 * x);
 
-    // Innovation variance: S = H·P·H^T + Ve
-    // S = P00 + 2*x*P01 + x^2*P11 + Ve
+    // Innovation variance (used for Kalman gain only, NOT for z-score)
     const S = P00 + 2 * x * P01 + x * x * P11 + Ve;
 
-    // Kalman gain: K = P·H^T / S  (2x1 vector)
+    // Kalman gain: K = P·H^T / S
     const K0 = (P00 + x * P01) / S;
     const K1 = (P01 + x * P11) / S;
 
-    // State update: θ = θ + K * e
+    // State update
     th0 += K0 * e;
     th1 += K1 * e;
 
-    // Covariance update — Joseph form for stability:
-    // A = I - K·H:  A = [[1-K0, -K0*x], [-K1, 1-K1*x]]
-    const A00 = 1 - K0;
-    const A01 = -K0 * x;
-    const A10 = -K1;
-    const A11 = 1 - K1 * x;
+    // Covariance update — Joseph form for numerical stability
+    const A00 = 1 - K0, A01 = -K0 * x;
+    const A10 = -K1,    A11 = 1 - K1 * x;
 
-    // P_new = A·P·A^T + K·Ve·K^T
-    // A·P:
-    const AP00 = A00 * P00 + A01 * P01;   // wait — P is [[P00,P01],[P01,P11]]
+    const AP00 = A00 * P00 + A01 * P01;
     const AP01 = A00 * P01 + A01 * P11;
     const AP10 = A10 * P00 + A11 * P01;
     const AP11 = A10 * P01 + A11 * P11;
 
-    // A·P·A^T:
-    const newP00 = AP00 * A00 + AP01 * A01;
-    const newP01 = AP00 * A10 + AP01 * A11;
-    const newP11 = AP10 * A10 + AP11 * A11;
+    P00 = AP00 * A00 + AP01 * A01 + K0 * K0 * Ve;
+    P01 = AP00 * A10 + AP01 * A11 + K0 * K1 * Ve;
+    P11 = AP10 * A10 + AP11 * A11 + K1 * K1 * Ve;
 
-    // + K·Ve·K^T
-    P00 = newP00 + K0 * K0 * Ve;
-    P01 = newP01 + K0 * K1 * Ve;
-    P11 = newP11 + K1 * K1 * Ve;
+    // ── Rolling z-score (Gatev et al. 2006 convention) ────────────────────
+    // Normalise by rolling std of residuals, not Kalman S.
+    // This keeps z oscillating naturally around ±1-2 and is the approach
+    // used by systematic FX desks and hedge funds.
+    residualBuf.push(e);
+    if (residualBuf.length > ZSCORE_WINDOW) residualBuf.shift();
 
-    const zScore = e / Math.sqrt(Math.max(S, 1e-12));
-    const spreadVol = Math.sqrt(Math.max(S, 1e-12));
+    let rollingMean = 0, rollingStd = 1e-8;
+    if (residualBuf.length >= 5) {
+      rollingMean = residualBuf.reduce((s, v) => s + v, 0) / residualBuf.length;
+      const variance = residualBuf.reduce((s, v) => s + (v - rollingMean) ** 2, 0) / residualBuf.length;
+      rollingStd = Math.sqrt(Math.max(variance, 1e-12));
+    }
+
+    const zScore = (e - rollingMean) / rollingStd;
 
     result.push({
       date: dates[t],
@@ -175,7 +191,7 @@ export function runKalmanFilter(
       beta: th1,
       spread: e,
       zscore: zScore,
-      spreadVol,
+      spreadVol: rollingStd,   // rolling std — used for P&L normalisation
     });
   }
 

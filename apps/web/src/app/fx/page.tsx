@@ -804,7 +804,7 @@ export default function FXTerminalPage() {
   const pairsFetchUrl = useMemo(() => {
     const [pY, pX] = pairsSelectedPair.split("_");
     const totalCostBps = (pairsBidAskBps * 2 + pairsSlippageBps + pairsCommBps).toFixed(1);
-    return `/api/fx/pairs-trade?pairY=${pY}&pairX=${pX}&delta=0.00001&ve=0.0001&days=${pairsDays}&pos=${pairsPosSize}&cost=${totalCostBps}`;
+    return `/api/fx/pairs-trade?pairY=${pY}&pairX=${pX}&delta=0.00001&ve=0.001&days=${pairsDays}&pos=${pairsPosSize}&cost=${totalCostBps}`;
   }, [pairsSelectedPair, pairsDays, pairsPosSize, pairsBidAskBps, pairsSlippageBps, pairsCommBps]);
 
   /* Pairs trading: load dataset when tab opens, pair changes, or friction params change */
@@ -3341,7 +3341,7 @@ export default function FXTerminalPage() {
             </button>
           ))}
           <div style={{ padding: "0 14px", fontSize: 9, color: "rgba(255,255,255,0.25)", alignSelf: "center", marginLeft: "auto" }}>
-            {config.desc} · δ=1e-5 · Ve=1e-4 · ±1.5σ ENTRY · ±0.3σ EXIT · ±3.5σ STOP
+            {config.desc} · δ=1e-5 · 60-bar rolling z · ±1.5σ ENTRY · ±0.3σ EXIT · ±3.5σ STOP
           </div>
         </div>
 
