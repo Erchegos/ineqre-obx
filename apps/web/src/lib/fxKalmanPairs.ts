@@ -274,23 +274,19 @@ export function simulatePairsTrades(series: KalmanPoint[], params: KalmanParams 
 
     if (!inTrade) {
       // ── Execute pending entry (1-day lag) ───────────────────────────────────
-      let justEntered = false;
       if (pendingEntryDir !== null && (t - lastExitBar) > COOLDOWN_BARS) {
         inTrade = true;
-        justEntered = true;
         direction = pendingEntryDir;
         entryIdx = t;
         entryZ = pendingEntryZ;
         entryBeta = pendingEntryBeta;
         entrySpreadVol = pendingEntrySpreadVol;
-        entryLogY = pt.logY;
+        entryLogY = pt.logY;   // Execute at next bar's price
         entryLogX = pt.logX;
         pendingEntryDir = null;
-      }
-
-      // ── Generate entry signal for next bar ────────────────────────────────
-      // Runs every bar we didn't just enter — including after an aborted cooldown.
-      if (!justEntered) {
+      } else {
+        // ── Generate entry signal for next bar ──────────────────────────────
+        // Always replace stale signal with latest — don't carry forward
         pendingEntryDir = null;
         if (pt.zscore < -entryThreshold) {
           pendingEntryDir = 'long';
