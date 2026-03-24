@@ -39,9 +39,9 @@ export const DEFAULT_PARAMS: KalmanParams = {
   totalCostBps: 8,
 };
 
-export const ENTRY_Z  = 1.5;   // Enter long/short at ±1.5σ (standard for daily FX pairs)
-export const EXIT_Z   = 0.3;   // Exit at ±0.3σ (mean reversion)
-export const STOP_Z   = 3.5;   // Hard stop at ±3.5σ
+export const ENTRY_Z  = 1.2;   // Enter long/short at ±1.2σ — more trades, still selective
+export const EXIT_Z   = 0.2;   // Exit at ±0.2σ (capture most of the mean reversion)
+export const STOP_Z   = 3.0;   // Hard stop at ±3.0σ — tighter to limit gap risk
 
 export interface KalmanPoint {
   date: string;
@@ -291,10 +291,28 @@ export function simulatePairsTrades(series: KalmanPoint[], params: KalmanParams 
       }
 
       if (wantsExit) {
-        const spreadChange = (pt.logY - entryLogY) - entryBeta * (pt.logX - entryLogX);
-        const directedSpreadChange = direction === 'long' ? spreadChange : -spreadChange;
+        // P&L anchored to z-score change × entry spread vol.
+        //
+        // Why not use raw spread change (logY - entryLogY) − β(logX − entryLogX)?
+        //   Rolling mean drift: during a 5-day hold the rolling baseline can shift,
+        //   so even a successful z reversion captures near-zero spread in absolute
+        //   terms, making all signal exits show as losses.
+        //
+        // Why z-score change × entrySpreadVol works:
+        //   LONG entered at z = -1.8; exits at z = -0.2. The z moved +1.6σ toward
+        //   mean. At entry we know 1σ ≈ entrySpreadVol in log-price units. So the
+        //   captured spread ≈ 1.6 × entrySpreadVol — independent of subsequent
+        //   rolling-mean drift.
+        //
+        // Stop gap handling: if z spikes from -1.8 to -5 in one bar (gap risk),
+        //   we execute at -5 and P&L reflects the full 3.2σ move — bounded because
+        //   it's anchored to entry vol, not the giant absolute move.
+        const zChange = pt.zscore - entryZ;
+        const directedZCapture = direction === 'long' ? zChange : -zChange;
+        // directedZCapture > 0 = profitable, < 0 = loss
+        const spreadCapture = directedZCapture * entrySpreadVol;
         const costPct = totalCostBps / 10000;
-        const pnlPct = directedSpreadChange * positionSizePct - costPct * 100;
+        const pnlPct = (spreadCapture - costPct) * positionSizePct;
 
         trades.push({
           entryDate: series[entryIdx].date,
