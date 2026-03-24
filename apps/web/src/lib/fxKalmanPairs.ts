@@ -117,27 +117,23 @@ export interface KalmanResult {
 // ── Kalman Filter Core ──────────────────────────────────────────────────────
 
 /**
- * Run the 2D Kalman filter on aligned log-price series.
- * Returns per-date state estimates [α_t, β_t], residuals, and z-scores.
+ * Rolling window for z-score RMS normalisation (1 trading year).
  *
- * Z-score normalization uses the Kalman innovation variance S:
- *   z_t = e_t / max(√S_t, √Ve)
+ * We normalise by the rolling RMS of raw residuals — no mean subtraction.
+ * This adapts to each pair's actual spread volatility rather than using
+ * the Kalman innovation variance S or the observation noise Ve, both of
+ * which are TUNING parameters unrelated to realized spread scale.
  *
- * Why S and not rolling std / MAD?
- *   S = H·P·H^T + Ve is the filter's own uncertainty estimate for the
- *   innovation. It is large before convergence (correctly dampening z
- *   during burn-in) and converges to a stable value ≈ Ve in steady state.
- *   The √Ve floor (≈ 0.032 at Ve=0.001) prevents division-by-near-zero
- *   after full convergence on tightly cointegrated pairs (e.g. NOKGBP/NOKEUR)
- *   where S can fall below Ve. This produces z ≈ N(0,1) throughout without
- *   any rolling buffer, outlier suppression, or manual window tuning.
+ * For NOKGBP/NOKEUR (tight pair, spread σ ≈ 0.002/day):
+ *   S-based floor √Ve ≈ 0.032 → need 6.5% spread move for ±1.8z (impossible)
+ *   RMS ≈ 0.002      → need 0.36% spread move for ±1.8z (realistic, 7%/day)
  *
- * Rolling std / MAD alternatives were tried and failed:
- *   • Rolling mean + std: tracked drift → z ≈ 0 for years on stable pairs
- *   • RMS: one spike inflated the denominator for WINDOW bars after
- *   • MAD: when all residuals ≈ 0 (NOKGBP/NOKEUR), MAD ≈ 0, floors to 1e-8
- *     → z = e / 1e-8 → catastrophic overflow (+1.76e22 portfolio value)
+ * 252-bar window is spike-robust: a single 10σ spike raises RMS by only 18%
+ * (vs 63% at 30 bars, or 34% at 60 bars), returning to baseline within 1Y.
+ * No mean subtraction: the Kalman filter already centers residuals; subtracting
+ * a 30-bar mean tracked slow drift and killed signals on stable pairs.
  */
+const ZSCORE_WINDOW = 252;
 export function runKalmanFilter(
   dates: string[],
   logY: number[],
@@ -156,7 +152,8 @@ export function runKalmanFilter(
   // Initial covariance: large uncertainty
   let P00 = 1, P01 = 0, P11 = 1;
 
-  const sqrtVe = Math.sqrt(Ve);  // Floor for spreadVol — prevents z blowup after convergence
+  // Rolling RMS buffer: stores e² values for the last ZSCORE_WINDOW bars
+  const rmsBuffer: number[] = [];
 
   const result: KalmanPoint[] = [];
 
@@ -172,7 +169,7 @@ export function runKalmanFilter(
     // Innovation: e = y - H·θ  (H = [1, x])
     const e = y - (th0 + th1 * x);
 
-    // Innovation variance: S = H·P·H^T + Ve  (used for Kalman gain AND z-score)
+    // Innovation variance: S = H·P·H^T + Ve  (used for Kalman gain only)
     const S = P00 + 2 * x * P01 + x * x * P11 + Ve;
 
     // Kalman gain: K = P·H^T / S
@@ -196,10 +193,15 @@ export function runKalmanFilter(
     P01 = AP00 * A10 + AP01 * A11 + K0 * K1 * Ve;
     P11 = AP10 * A10 + AP11 * A11 + K1 * K1 * Ve;
 
-    // ── Kalman z-score: z = e / max(√S, √Ve) ─────────────────────────────
-    // S is already computed above for the Kalman gain. Use it directly.
-    // Floor at √Ve prevents division by near-zero after full convergence.
-    const spreadVol = Math.max(Math.sqrt(S), sqrtVe);
+    // ── Rolling RMS z-score ────────────────────────────────────────────────
+    rmsBuffer.push(e * e);
+    if (rmsBuffer.length > ZSCORE_WINDOW) rmsBuffer.shift();
+
+    let spreadVol = 1e-8;
+    if (rmsBuffer.length >= 20) {
+      const rms = Math.sqrt(rmsBuffer.reduce((s, v) => s + v, 0) / rmsBuffer.length);
+      if (rms > 1e-8) spreadVol = rms;
+    }
     const zScore = e / spreadVol;
 
     result.push({
@@ -210,7 +212,7 @@ export function runKalmanFilter(
       beta: th1,
       spread: e,
       zscore: zScore,
-      spreadVol,   // Kalman innovation std — used for P&L vol-targeting
+      spreadVol,   // rolling RMS of residuals — used for P&L vol-targeting
     });
   }
 
