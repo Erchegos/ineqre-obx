@@ -703,7 +703,7 @@ export default function FXTerminalPage() {
   const [pairsSpeed, setPairsSpeed] = useState(3);
   const pairsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   /* Friction / cost parameters */
-  const [pairsDays, setPairsDays] = useState(2520);           // history window in trading days — default 10Y
+  const [pairsDays, setPairsDays] = useState(1260);           // history window in trading days — default 5Y
   const [pairsPosSize, setPairsPosSize] = useState(10);       // % of NAV per trade
   const [pairsBidAskBps, setPairsBidAskBps] = useState(1.0); // bps per side — institutional major FX (EUR/USD ~0.5, GBP pairs ~1.0)
   const [pairsSlippageBps, setPairsSlippageBps] = useState(0.5); // bps — FX is the world's most liquid market ($7.5T/day)
@@ -3444,7 +3444,7 @@ export default function FXTerminalPage() {
           {/* Separator */}
           <div style={{ width: 1, background: "#30363d", margin: "8px 8px" }} />
           {/* Timeframe buttons */}
-          {([{ label: "5Y", days: 1260 }, { label: "10Y", days: 2520 }] as { label: string; days: number }[]).map(tf => (
+          {([{ label: "3Y", days: 756 }, { label: "5Y", days: 1260 }] as { label: string; days: number }[]).map(tf => (
             <button key={tf.days} onClick={() => { setPairsDays(tf.days); setPairsIsPlaying(false); }}
               style={{ padding: "10px 14px", background: pairsDays === tf.days ? "rgba(59,130,246,0.1)" : "transparent",
                 border: "none", borderBottom: pairsDays === tf.days ? "2px solid #3b82f6" : "2px solid transparent",
