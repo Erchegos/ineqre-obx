@@ -3292,7 +3292,8 @@ export default function FXTerminalPage() {
       const zChange = currentPt.zscore - activeTrade.entryZ;
       const directedZCapture = activeTrade.direction === "long" ? zChange : -zChange;
       const sv = activeTrade.entrySpreadVol || 0.01;
-      const costInZ = sv > 1e-8 ? (5 / 10000) / sv : 0;
+      const fixedCostInZ = sv > 1e-8 ? (5 / 10000) / sv : 0.15;
+      const costInZ = Math.max(fixedCostInZ, 0.15);
       unrealPnl = (directedZCapture - costInZ) * (pairsPosSize / 10);
     }
 
@@ -3341,7 +3342,7 @@ export default function FXTerminalPage() {
             </button>
           ))}
           <div style={{ padding: "0 14px", fontSize: 9, color: "rgba(255,255,255,0.25)", alignSelf: "center", marginLeft: "auto" }}>
-            {config.desc} · δ=1e-5 · 60-bar rolling z · ±1.5σ ENTRY · ±0.4σ EXIT · ±2.5σ STOP
+            {config.desc} · δ=1e-5 · 60-bar rolling z · ±1.5σ ENTRY · ±0.4σ EXIT · ±2.0σ STOP
           </div>
         </div>
 
@@ -3477,7 +3478,7 @@ export default function FXTerminalPage() {
 
             {/* Bell curve — always rendered, same dimensions, content updates in place */}
             {(() => {
-              const RANGE = 4, ENTRY = 1.5, EXIT = 0.4, STOP = 2.5;
+              const RANGE = 4, ENTRY = 1.5, EXIT = 0.4, STOP = 2.0;
               const VW = 100, VH = 54; // viewBox units — compact, professional
               const PX = 4, baseline = VH - 10;
               const zToX = (zv: number) => PX + ((zv + RANGE) / (2 * RANGE)) * (VW - 2 * PX);
@@ -3665,7 +3666,7 @@ export default function FXTerminalPage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap" as const, gap: 8 }}>
             <div style={S.cardTitle}>Z-SCORE LIVE VIEW — {config.labelY} vs {config.labelX} · TRAILING 90 DAYS</div>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" as const }}>
-              {[{ c: "#3b82f6", l: "Z-score" }, { c: "#10b981", l: "±1.5σ entry" }, { c: "#ef4444", l: "±3.5σ stop" },
+              {[{ c: "#3b82f6", l: "Z-score" }, { c: "#10b981", l: "±1.5σ entry" }, { c: "#ef4444", l: "±2.0σ stop" },
                 { c: "rgba(16,185,129,0.3)", l: "Long pos" }, { c: "rgba(239,68,68,0.3)", l: "Short pos" }].map((l, i) => (
                 <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 8, color: "rgba(255,255,255,0.35)" }}>
                   <div style={{ width: 14, height: 3, background: l.c, borderRadius: 1 }} />{l.l}
