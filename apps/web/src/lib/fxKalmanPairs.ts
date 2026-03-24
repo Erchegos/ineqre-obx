@@ -32,6 +32,12 @@ export interface KalmanParams {
   positionSizePct?: number;
   /** Round-trip transaction cost in basis points (bid-ask × 2 + slippage). Default 5 */
   totalCostBps?: number;
+  /** Entry z-score threshold. Default 1.8 */
+  entryZ?: number;
+  /** Exit z-score threshold (mean reversion target). Default 0.6 */
+  exitZ?: number;
+  /** Stop-loss z-score threshold. Default 2.8 */
+  stopZ?: number;
 }
 
 export const DEFAULT_PARAMS: KalmanParams = {
@@ -60,9 +66,9 @@ export const DEFAULT_PARAMS: KalmanParams = {
  *   because losses are cut before mean reversion plays out. The P&L was real but
  *   the win rate looked suspicious to FX practitioners.
  */
-export const ENTRY_Z  = 2.0;   // Enter at ±2σ — industry standard (Gatev 2006)
+export const ENTRY_Z  = 1.8;   // Enter at ±1.8σ — slightly below Gatev 2σ for more signals
 export const EXIT_Z   = 0.6;   // Exit at ±0.6σ — capture 70% of mean reversion
-export const STOP_Z   = 3.0;   // Stop at ±3σ — 1σ buffer, proper risk management
+export const STOP_Z   = 2.8;   // Stop at ±2.8σ — 1σ buffer, proper risk management
 
 export interface KalmanPoint {
   date: string;
@@ -233,6 +239,9 @@ export function simulatePairsTrades(series: KalmanPoint[], params: KalmanParams 
 
   const positionSizePct = params.positionSizePct ?? 15;
   const totalCostBps = params.totalCostBps ?? 5;
+  const entryThreshold = params.entryZ ?? ENTRY_Z;
+  const exitThreshold  = params.exitZ  ?? EXIT_Z;
+  const stopThreshold  = params.stopZ  ?? STOP_Z;
 
   // ── Realism constants ────────────────────────────────────────────────────
   // BURN_IN: filter needs ~100 bars to converge (was 30 — too few)
@@ -279,12 +288,12 @@ export function simulatePairsTrades(series: KalmanPoint[], params: KalmanParams 
         // ── Generate entry signal for next bar ──────────────────────────────
         // Always replace stale signal with latest — don't carry forward
         pendingEntryDir = null;
-        if (pt.zscore < -ENTRY_Z) {
+        if (pt.zscore < -entryThreshold) {
           pendingEntryDir = 'long';
           pendingEntryZ = pt.zscore;
           pendingEntryBeta = pt.beta;
           pendingEntrySpreadVol = pt.spreadVol;
-        } else if (pt.zscore > ENTRY_Z) {
+        } else if (pt.zscore > entryThreshold) {
           pendingEntryDir = 'short';
           pendingEntryZ = pt.zscore;
           pendingEntryBeta = pt.beta;
@@ -302,12 +311,12 @@ export function simulatePairsTrades(series: KalmanPoint[], params: KalmanParams 
       let wantsExit = false;
       let exitReason: PairsTrade['exitReason'] = 'signal';
 
-      if (absZ > STOP_Z) {
+      if (absZ > stopThreshold) {
         wantsExit = true;
         exitReason = 'stop';
-      } else if (direction === 'long' && pt.zscore > -EXIT_Z) {
+      } else if (direction === 'long' && pt.zscore > -exitThreshold) {
         wantsExit = true;
-      } else if (direction === 'short' && pt.zscore < EXIT_Z) {
+      } else if (direction === 'short' && pt.zscore < exitThreshold) {
         wantsExit = true;
       }
 

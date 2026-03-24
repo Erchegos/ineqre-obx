@@ -646,6 +646,10 @@ export default function FXTerminalPage() {
   const [pairsBidAskBps, setPairsBidAskBps] = useState(1.0); // bps per side — institutional major FX (EUR/USD ~0.5, GBP pairs ~1.0)
   const [pairsSlippageBps, setPairsSlippageBps] = useState(0.5); // bps — FX is the world's most liquid market ($7.5T/day)
   const [pairsCommBps, setPairsCommBps] = useState(0.5);     // bps — prime broker rate for major pairs
+  /* Signal threshold parameters */
+  const [pairsEntryZ, setPairsEntryZ] = useState(1.8);       // entry z-score threshold
+  const [pairsExitZ, setPairsExitZ] = useState(0.6);         // exit z-score threshold
+  const [pairsStopZ, setPairsStopZ] = useState(2.8);         // stop-loss z-score threshold
   const pairsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [expSort, setExpSort] = useState<{ col: string; asc: boolean }>({ col: "ticker", asc: true });
@@ -804,8 +808,8 @@ export default function FXTerminalPage() {
   const pairsFetchUrl = useMemo(() => {
     const [pY, pX] = pairsSelectedPair.split("_");
     const totalCostBps = (pairsBidAskBps * 2 + pairsSlippageBps + pairsCommBps).toFixed(1);
-    return `/api/fx/pairs-trade?pairY=${pY}&pairX=${pX}&delta=0.00001&ve=0.001&days=${pairsDays}&pos=${pairsPosSize}&cost=${totalCostBps}`;
-  }, [pairsSelectedPair, pairsDays, pairsPosSize, pairsBidAskBps, pairsSlippageBps, pairsCommBps]);
+    return `/api/fx/pairs-trade?pairY=${pY}&pairX=${pX}&delta=0.00001&ve=0.001&days=${pairsDays}&pos=${pairsPosSize}&cost=${totalCostBps}&entryz=${pairsEntryZ}&exitz=${pairsExitZ}&stopz=${pairsStopZ}`;
+  }, [pairsSelectedPair, pairsDays, pairsPosSize, pairsBidAskBps, pairsSlippageBps, pairsCommBps, pairsEntryZ, pairsExitZ, pairsStopZ]);
 
   /* Pairs trading: load dataset when tab opens, pair changes, or friction params change */
   useEffect(() => {
@@ -1332,7 +1336,7 @@ export default function FXTerminalPage() {
                 {[
                   { label: "PAIRS AVAILABLE", value: "10" },
                   { label: "DATA HISTORY", value: "5Y" },
-                  { label: "ENTRY SIGNAL", value: "±2.0σ" },
+                  { label: "ENTRY SIGNAL", value: `±${pairsEntryZ}σ` },
                   { label: "COST MODEL", value: "Realistic bps" },
                 ].map((s) => (
                   <div key={s.label}>
@@ -3352,8 +3356,9 @@ export default function FXTerminalPage() {
     const posColor = activeTrade ? (activeTrade.direction === "long" ? "#10b981" : "#ef4444") : "#30363d";
     const posBg = activeTrade ? (activeTrade.direction === "long" ? "rgba(16,185,129,0.07)" : "rgba(239,68,68,0.07)") : "transparent";
     const holdDays = activeTrade && currentPt ? liveSeries.filter((s: any) => s.date >= activeTrade.entryDate).length : 0;
-    const longProx = currentPt ? Math.max(0, Math.min(1, (-currentPt.zscore - 1.2) / 0.8)) : 0;
-    const shortProx = currentPt ? Math.max(0, Math.min(1, (currentPt.zscore - 1.2) / 0.8)) : 0;
+    const proxStart = pairsEntryZ * 0.67;  // starts filling at ~2/3 of entry threshold
+    const longProx = currentPt ? Math.max(0, Math.min(1, (-currentPt.zscore - proxStart) / (pairsEntryZ - proxStart))) : 0;
+    const shortProx = currentPt ? Math.max(0, Math.min(1, (currentPt.zscore - proxStart) / (pairsEntryZ - proxStart))) : 0;
 
     return (
       <>
@@ -3387,7 +3392,7 @@ export default function FXTerminalPage() {
             </button>
           ))}
           <div style={{ padding: "0 14px", fontSize: 9, color: "rgba(255,255,255,0.25)", alignSelf: "center", marginLeft: "auto" }}>
-            {config.desc} · δ=1e-5 · 60-bar rolling z · ±2.0σ ENTRY · ±0.6σ EXIT · ±3.0σ STOP
+            {config.desc} · δ=1e-5 · 60-bar rolling z · ±{pairsEntryZ}σ ENTRY · ±{pairsExitZ}σ EXIT · ±{pairsStopZ}σ STOP
           </div>
         </div>
 
@@ -3443,6 +3448,50 @@ export default function FXTerminalPage() {
                 onChange={e => setPairsCommBps(+e.target.value)}
                 style={{ ...S.slider, display: "block", width: "100%" }} />
               <div style={{ fontSize: 8, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>Prime broker / clearing fees</div>
+            </div>
+          </div>
+          {/* Signal threshold row */}
+          <div style={{ borderTop: "1px solid #21262d", marginTop: 10, paddingTop: 10 }}>
+            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", letterSpacing: "0.08em", marginBottom: 8, textTransform: "uppercase" as const }}>
+              Signal Thresholds
+              <span style={{ marginLeft: 12, color: "rgba(255,255,255,0.25)", fontSize: 9, fontWeight: 400, letterSpacing: 0, textTransform: "none" as const }}>
+                Change sliders then press RESET + PLAY to re-run simulation
+              </span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+              {/* Entry Z */}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>
+                  <span>ENTRY Z-SCORE</span>
+                  <span style={{ color: "#10b981", fontWeight: 700 }}>±{pairsEntryZ.toFixed(1)}σ</span>
+                </div>
+                <input type="range" min={1.0} max={3.0} step={0.1} value={pairsEntryZ}
+                  onChange={e => { setPairsEntryZ(+e.target.value); setPairsIsPlaying(false); setPairsPlayIdx(-1); }}
+                  style={{ ...S.slider, display: "block", width: "100%" }} />
+                <div style={{ fontSize: 8, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>Enter when |z| exceeds threshold · lower = more signals</div>
+              </div>
+              {/* Exit Z */}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>
+                  <span>EXIT Z-SCORE</span>
+                  <span style={{ color: "#3b82f6", fontWeight: 700 }}>±{pairsExitZ.toFixed(1)}σ</span>
+                </div>
+                <input type="range" min={0.0} max={1.5} step={0.1} value={pairsExitZ}
+                  onChange={e => { setPairsExitZ(+e.target.value); setPairsIsPlaying(false); setPairsPlayIdx(-1); }}
+                  style={{ ...S.slider, display: "block", width: "100%" }} />
+                <div style={{ fontSize: 8, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>Exit when |z| reverts below · 0 = full mean reversion</div>
+              </div>
+              {/* Stop Z */}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>
+                  <span>STOP-LOSS Z-SCORE</span>
+                  <span style={{ color: "#ef4444", fontWeight: 700 }}>±{pairsStopZ.toFixed(1)}σ</span>
+                </div>
+                <input type="range" min={1.5} max={5.0} step={0.1} value={pairsStopZ}
+                  onChange={e => { setPairsStopZ(+e.target.value); setPairsIsPlaying(false); setPairsPlayIdx(-1); }}
+                  style={{ ...S.slider, display: "block", width: "100%" }} />
+                <div style={{ fontSize: 8, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>Stop out when |z| exceeds · buffer = {(pairsStopZ - pairsEntryZ).toFixed(1)}σ from entry</div>
+              </div>
             </div>
           </div>
         </div>
@@ -3503,7 +3552,7 @@ export default function FXTerminalPage() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap" as const, gap: 8 }}>
               <div style={S.cardTitle}>Z-SCORE LIVE VIEW — {config.labelY} vs {config.labelX} · TRAILING 90 DAYS</div>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
-                {[{ c: "#3b82f6", l: "Z-score" }, { c: "#10b981", l: "±2.0σ entry" }, { c: "#ef4444", l: "±3.0σ stop" },
+                {[{ c: "#3b82f6", l: "Z-score" }, { c: "#10b981", l: `±${pairsEntryZ}σ entry` }, { c: "#ef4444", l: `±${pairsStopZ}σ stop` },
                   { c: "rgba(16,185,129,0.3)", l: "Long pos" }, { c: "rgba(239,68,68,0.3)", l: "Short pos" }].map((l, i) => (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 8, color: "rgba(255,255,255,0.35)" }}>
                     <div style={{ width: 14, height: 3, background: l.c, borderRadius: 1 }} />{l.l}
@@ -3539,7 +3588,7 @@ export default function FXTerminalPage() {
               <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", fontFamily: "monospace", textAlign: "right" as const }}>
                 {activeTrade
                   ? <>{holdDays}d · β={activeTrade.entryBeta}</>
-                  : <>{pairsDataLoading ? "loading…" : !hasStarted ? "press PLAY" : "±2.0σ entry"}</>}
+                  : <>{pairsDataLoading ? "loading…" : !hasStarted ? "press PLAY" : `±${pairsEntryZ}σ entry`}</>}
               </div>
             </div>
 
@@ -3551,7 +3600,7 @@ export default function FXTerminalPage() {
             {/* Bell curve — flex: 1 so it fills available height */}
             <div style={{ flex: 1, display: "flex", flexDirection: "column" as const, justifyContent: "center" }}>
             {(() => {
-              const RANGE = 4, ENTRY = 2.0, EXIT = 0.6, STOP = 3.0;
+              const RANGE = 4, ENTRY = pairsEntryZ, EXIT = pairsExitZ, STOP = pairsStopZ;
               const VW = 100, VH = 54; // viewBox units — compact, professional
               const PX = 4, baseline = VH - 10;
               const zToX = (zv: number) => PX + ((zv + RANGE) / (2 * RANGE)) * (VW - 2 * PX);
@@ -3583,7 +3632,7 @@ export default function FXTerminalPage() {
               const dotColor = activeTrade
                 ? (progressing ? "#10b981" : "#ef4444")
                 : currentPt
-                  ? (Math.abs(currentPt.zscore) >= ENTRY ? "#f59e0b" : Math.abs(currentPt.zscore) > 1.5 ? "#3b82f6" : "rgba(255,255,255,0.45)")
+                  ? (Math.abs(currentPt.zscore) >= ENTRY ? "#f59e0b" : Math.abs(currentPt.zscore) > ENTRY * 0.75 ? "#3b82f6" : "rgba(255,255,255,0.45)")
                   : "rgba(255,255,255,0.2)";
 
               return (
@@ -3656,10 +3705,10 @@ export default function FXTerminalPage() {
                   </div>
                 </>
               ) : (
-                <div style={{ fontSize: 9, color: currentPt && Math.abs(currentPt.zscore) >= 2.0 ? "#f59e0b" : Math.abs(currentPt?.zscore ?? 0) > 1.5 ? "#3b82f6" : "rgba(255,255,255,0.3)" }}>
+                <div style={{ fontSize: 9, color: currentPt && Math.abs(currentPt.zscore) >= pairsEntryZ ? "#f59e0b" : Math.abs(currentPt?.zscore ?? 0) > pairsEntryZ * 0.75 ? "#3b82f6" : "rgba(255,255,255,0.3)" }}>
                   {!currentPt ? "—"
-                    : Math.abs(currentPt.zscore) >= 2.0 ? `⚡ ${currentPt.zscore < 0 ? "LONG" : "SHORT"} signal`
-                    : Math.abs(currentPt.zscore) > 1.5 ? "↗ approaching ±2.0σ"
+                    : Math.abs(currentPt.zscore) >= pairsEntryZ ? `⚡ ${currentPt.zscore < 0 ? "LONG" : "SHORT"} signal`
+                    : Math.abs(currentPt.zscore) > pairsEntryZ * 0.75 ? `↗ approaching ±${pairsEntryZ}σ`
                     : "signal within band"}
                 </div>
               )}
@@ -3727,7 +3776,7 @@ export default function FXTerminalPage() {
                       {[
                         { l: "HEDGE RATIO β", v: currentPt.beta?.toFixed(5), c: "#3b82f6" },
                         { l: "INTERCEPT α", v: currentPt.alpha?.toFixed(5), c: "rgba(255,255,255,0.65)" },
-                        { l: "Z-SCORE", v: (currentPt.zscore >= 0 ? "+" : "") + currentPt.zscore?.toFixed(3), c: Math.abs(currentPt.zscore) > 2.0 ? "#f59e0b" : "rgba(255,255,255,0.7)" },
+                        { l: "Z-SCORE", v: (currentPt.zscore >= 0 ? "+" : "") + currentPt.zscore?.toFixed(3), c: Math.abs(currentPt.zscore) > pairsEntryZ ? "#f59e0b" : "rgba(255,255,255,0.7)" },
                         { l: "SPREAD VOL √S", v: currentPt.spreadVol?.toFixed(5), c: "rgba(255,255,255,0.65)" },
                       ].map((m, i) => (
                         <div key={i} style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #21262d", paddingBottom: 4 }}>
@@ -3738,8 +3787,8 @@ export default function FXTerminalPage() {
                     </div>
                     <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginBottom: 5, letterSpacing: "0.05em" }}>SIGNAL PROXIMITY</div>
                     {[
-                      { l: "LONG (z < −2.0σ)", v: longProx, c: "#10b981" },
-                      { l: "SHORT (z > +2.0σ)", v: shortProx, c: "#ef4444" },
+                      { l: `LONG (z < −${pairsEntryZ}σ)`, v: longProx, c: "#10b981" },
+                      { l: `SHORT (z > +${pairsEntryZ}σ)`, v: shortProx, c: "#ef4444" },
                     ].map((b, i) => (
                       <div key={i} style={{ marginBottom: 7 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "rgba(255,255,255,0.3)", marginBottom: 3 }}>

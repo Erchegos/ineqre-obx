@@ -31,6 +31,9 @@ export async function GET(req: NextRequest) {
     const days  = Math.min(1260, Math.max(60, parseInt(sp.get("days") || "252")));
     const positionSizePct = Math.max(1, Math.min(50, parseFloat(sp.get("pos") || "15")));
     const totalCostBps    = Math.max(0, Math.min(50, parseFloat(sp.get("cost") || "5")));
+    const entryZ = Math.max(0.5, Math.min(5.0, parseFloat(sp.get("entryz") || "1.8")));
+    const exitZ  = Math.max(0.0, Math.min(2.0, parseFloat(sp.get("exitz")  || "0.6")));
+    const stopZ  = Math.max(1.0, Math.min(6.0, parseFloat(sp.get("stopz")  || "2.8")));
 
     if (!VALID_PAIRS.includes(pairY) || !VALID_PAIRS.includes(pairX)) {
       return NextResponse.json({ error: "Invalid pair" }, { status: 400 });
@@ -86,7 +89,7 @@ export async function GET(req: NextRequest) {
     const logY   = deduped.map((r: { rate_y: number }) => Math.log(r.rate_y));
     const logX   = deduped.map((r: { rate_x: number }) => Math.log(r.rate_x));
 
-    const params: KalmanParams = { delta, Ve, positionSizePct, totalCostBps };
+    const params: KalmanParams = { delta, Ve, positionSizePct, totalCostBps, entryZ, exitZ, stopZ };
     const result = runKalmanPairs(dates, logY, logX, pairY, pairX, params);
 
     // Thin the series for the response (keep every point for charts, cap at 1000)
@@ -96,7 +99,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       pairY,
       pairX,
-      params: { delta, Ve, days, positionSizePct, totalCostBps },
+      params: { delta, Ve, days, positionSizePct, totalCostBps, entryZ, exitZ, stopZ },
       observations: deduped.length,
       series: thinned.map(pt => ({
         date: pt.date,
