@@ -698,6 +698,7 @@ export default function FXTerminalPage() {
   const [pairsSelectedPair, setPairsSelectedPair] = useState("NOKGBP_NOKEUR");
   const [pairsData, setPairsData] = useState<any>(null);
   const [pairsDataLoading, setPairsDataLoading] = useState(false);
+  const [pairsShowGuide, setPairsShowGuide] = useState(false);
   const [pairsPlayIdx, setPairsPlayIdx] = useState(-1); // -1 = not started, blank slate
   const [pairsIsPlaying, setPairsIsPlaying] = useState(false);
   const [pairsSpeed, setPairsSpeed] = useState(5);
@@ -3456,6 +3457,91 @@ export default function FXTerminalPage() {
           <div style={{ padding: "0 14px", fontSize: 9, color: "rgba(255,255,255,0.25)", alignSelf: "center", marginLeft: "auto" }}>
             {config.desc} · δ=1e-5 · 60-bar rolling z · ±{pairsEntryZ}σ ENTRY · ±{pairsExitZ}σ EXIT · ±{pairsStopZ}σ STOP
           </div>
+        </div>
+
+        {/* How it works — collapsible guide */}
+        <div style={{ margin: "8px 0 0", borderRadius: 6, overflow: "hidden", border: "1px solid #21262d" }}>
+          <button onClick={() => setPairsShowGuide(v => !v)}
+            style={{ width: "100%", background: "#0d1117", border: "none", padding: "9px 14px", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "space-between", fontFamily: "monospace" }}>
+            <span style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.45)", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>
+              ℹ HOW IT WORKS — Kalman Filter Pairs Trading Guide
+            </span>
+            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", letterSpacing: "0.05em" }}>
+              {pairsShowGuide ? "▲ COLLAPSE" : "▼ EXPAND"}
+            </span>
+          </button>
+          {pairsShowGuide && (
+            <div style={{ background: "#0a0f16", padding: "16px 20px", borderTop: "1px solid #21262d", fontSize: 11, color: "rgba(255,255,255,0.65)", lineHeight: 1.65 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20 }}>
+
+                {/* Col 1: Strategy */}
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#3b82f6", letterSpacing: "0.1em", textTransform: "uppercase" as const, marginBottom: 10 }}>
+                    THE STRATEGY
+                  </div>
+                  <p style={{ margin: "0 0 8px", color: "rgba(255,255,255,0.7)" }}>
+                    <strong style={{ color: "#fff" }}>Pairs trading</strong> exploits the historical co-movement between two FX rates that share the same base currency (NOK). When one rate temporarily diverges from the other, we bet on reversion to their long-run equilibrium.
+                  </p>
+                  <p style={{ margin: "0 0 8px" }}>
+                    Instead of a fixed hedge ratio, this simulator uses a <strong style={{ color: "#10b981" }}>Kalman filter</strong> — a Bayesian algorithm that continuously updates the estimated relationship between the two pairs as macro conditions evolve. This adapts to regime changes (e.g. post-Brexit BoE policy vs ECB).
+                  </p>
+                  <p style={{ margin: 0 }}>
+                    The pairs are NOK-denominated: <strong style={{ color: "#10b981" }}>GBP/NOK vs EUR/NOK</strong> (most signals), <strong style={{ color: "#3b82f6" }}>EUR/NOK vs USD/NOK</strong> (Fed/ECB divergence), and <strong style={{ color: "#9C27B0" }}>GBP/NOK vs USD/NOK</strong> (tightly co-integrated, fewer trades).
+                  </p>
+                </div>
+
+                {/* Col 2: Signals & Charts */}
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#10b981", letterSpacing: "0.1em", textTransform: "uppercase" as const, marginBottom: 10 }}>
+                    READING THE CHARTS
+                  </div>
+                  <div style={{ marginBottom: 10 }}>
+                    <span style={{ color: "#fff", fontWeight: 700 }}>Z-Score chart (top left)</span>
+                    <span style={{ color: "rgba(255,255,255,0.55)" }}> — Shows the normalised spread between the two pairs over the last 90 days. The z-score measures how many standard deviations the spread is from its rolling mean. Dashed green lines = entry thresholds; dashed red lines = stop-loss. <strong style={{ color: "#10b981" }}>Green dot</strong> = long entry, <strong style={{ color: "#ef4444" }}>red dot</strong> = short entry, <strong style={{ color: "#9E9E9E" }}>white dot</strong> = take-profit exit.</span>
+                  </div>
+                  <div style={{ marginBottom: 10 }}>
+                    <span style={{ color: "#fff", fontWeight: 700 }}>Equity curve (bottom left)</span>
+                    <span style={{ color: "rgba(255,255,255,0.55)" }}> — Compounded P&L of all closed trades indexed to 100. Does not include open unrealised P&L.</span>
+                  </div>
+                  <div style={{ marginBottom: 10 }}>
+                    <span style={{ color: "#fff", fontWeight: 700 }}>Rolling hedge ratio β (bottom centre)</span>
+                    <span style={{ color: "rgba(255,255,255,0.55)" }}> — The Kalman filter's current estimate of how many units of X to short per unit of Y. β drifting away from 1.0 signals a regime change — the two pairs are no longer moving in lockstep.</span>
+                  </div>
+                  <div>
+                    <span style={{ color: "#fff", fontWeight: 700 }}>Position monitor (top right)</span>
+                    <span style={{ color: "rgba(255,255,255,0.55)" }}> — Bell-curve shows current z-score position vs entry/stop thresholds. <strong style={{ color: "#10b981" }}>LONG</strong> = bought the spread (z too negative, expect reversion up). <strong style={{ color: "#ef4444" }}>SHORT</strong> = sold the spread (z too positive, expect reversion down).</span>
+                  </div>
+                </div>
+
+                {/* Col 3: Parameters */}
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#f59e0b", letterSpacing: "0.1em", textTransform: "uppercase" as const, marginBottom: 10 }}>
+                    PARAMETERS & CONTROLS
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column" as const, gap: 7 }}>
+                    {[
+                      { label: "Entry z (±σ)", color: "#10b981", desc: "How far the spread must deviate before entering a trade. Lower = more trades, higher noise. Higher = fewer trades, cleaner signals. Default ±1.6σ." },
+                      { label: "Exit z (±σ)", color: "#3b82f6", desc: "How close the spread must revert before closing at profit. 0 = full mean reversion. Higher = exit earlier, smaller gains per trade. Default ±0.6σ." },
+                      { label: "Stop loss (±σ)", color: "#ef4444", desc: "Maximum adverse spread move before cutting the loss. Should be >entry to give the trade room. Default ±2.8σ." },
+                      { label: "Position size", color: "#f59e0b", desc: "% of NAV allocated per trade. Scales all P&L figures linearly. 10% NAV at 1σ capture ≈ 1% portfolio P&L." },
+                      { label: "Friction costs", color: "rgba(255,255,255,0.5)", desc: "Bid-ask spread + slippage + commission. Deducted from every trade. Institutional FX: bid-ask ~1 bps/side, total ~3 bps round-trip." },
+                      { label: "Speed (1x–10x)", color: "rgba(255,255,255,0.5)", desc: "Simulation playback speed. 1x = 1 bar per tick, 10x = 10 bars. Use 5x for a quick overview, 1x to watch individual trades form." },
+                    ].map(({ label, color, desc }) => (
+                      <div key={label} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                        <span style={{ color, fontWeight: 700, minWidth: 100, fontSize: 10, flexShrink: 0, paddingTop: 1 }}>{label}</span>
+                        <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 10 }}>{desc}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: 12, padding: "8px 10px", background: "rgba(59,130,246,0.07)", borderRadius: 4, border: "1px solid rgba(59,130,246,0.2)", fontSize: 10, color: "rgba(255,255,255,0.5)" }}>
+                    <strong style={{ color: "#3b82f6" }}>Workflow:</strong> Adjust parameters → press <strong style={{ color: "#fff" }}>RESET</strong> to apply → press <strong style={{ color: "#10b981" }}>PLAY</strong> to run. Pressing PLAY at end auto-resets and replays.
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Friction & cost parameters */}
