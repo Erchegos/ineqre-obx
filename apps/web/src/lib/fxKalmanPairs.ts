@@ -292,10 +292,9 @@ export function simulatePairsTrades(series: KalmanPoint[], params: KalmanParams 
 
       if (wantsExit) {
         const spreadChange = (pt.logY - entryLogY) - entryBeta * (pt.logX - entryLogX);
-        const capture = entrySpreadVol > 0 ? spreadChange / entrySpreadVol : spreadChange;
-        const directedCapture = direction === 'long' ? capture : -capture;
+        const directedSpreadChange = direction === 'long' ? spreadChange : -spreadChange;
         const costPct = totalCostBps / 10000;
-        const pnlPct = directedCapture * (positionSizePct * 0.01) - costPct * 100;
+        const pnlPct = directedSpreadChange * positionSizePct - costPct * 100;
 
         trades.push({
           entryDate: series[entryIdx].date,
