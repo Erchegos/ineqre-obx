@@ -399,21 +399,30 @@ function HelpToggle({ id, label, children, showHelp, setShowHelp }: {
 /* main component to avoid identity issues during playback)           */
 /* ------------------------------------------------------------------ */
 
-function PairsZChart({ series, activeTrade }: { series: any[]; activeTrade: any }) {
+function PairsZChart({ series, activeTrade, entryZ = 1.8, stopZ = 2.8, trades = [], showDots = false }:
+  { series: any[]; activeTrade: any; entryZ?: number; stopZ?: number; trades?: any[]; showDots?: boolean }) {
   if (series.length < 2) return null;
   const WIN = 90;
   const shown = series.length > WIN ? series.slice(-WIN) : series;
+  const shownStart = shown[0].date, shownEnd = shown[shown.length - 1].date;
   const W = 700, H = 190;
   const PAD = { top: 16, right: 16, bottom: 28, left: 46 };
   const cW = W - PAD.left - PAD.right, cH = H - PAD.top - PAD.bottom;
   const zvals = shown.map((s: any) => s.zscore);
-  const absMax = Math.max(4.0, Math.max(...zvals.map(Math.abs)));
+  const absMax = Math.max(Math.ceil(stopZ) + 0.3, Math.max(...zvals.map(Math.abs)));
   const yMin = -absMax, yMax = absMax;
   const xOf = (i: number) => PAD.left + (i / Math.max(1, shown.length - 1)) * cW;
   const yOf = (v: number) => PAD.top + (1 - (v - yMin) / (yMax - yMin)) * cH;
+  // Map a date string → x coordinate
+  const dateToX = (d: string): number | null => {
+    const idx = shown.findIndex((s: any) => s.date >= d);
+    return idx >= 0 ? xOf(idx) : null;
+  };
   const linePts = shown.map((s: any, i: number) => `${i === 0 ? "M" : "L"}${xOf(i).toFixed(1)},${yOf(s.zscore).toFixed(1)}`).join(" ");
   const fmtD = (s: string) => { const d = new Date(s); return `${d.getDate()} ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()]}`; };
   const xTicks = [0, Math.floor(shown.length*0.25), Math.floor(shown.length*0.5), Math.floor(shown.length*0.75), shown.length-1];
+  // Reference grid lines — subtle
+  const gridLines = [0, entryZ * 0.5, -entryZ * 0.5];
   // Position shading
   const posRects: React.ReactElement[] = [];
   if (activeTrade) {
@@ -424,31 +433,91 @@ function PairsZChart({ series, activeTrade }: { series: any[]; activeTrade: any 
     if (start >= 0) {
       const x1 = xOf(start), x2 = xOf(shown.length - 1);
       posRects.push(<rect key="pos" x={x1} y={PAD.top} width={Math.max(0, x2 - x1)} height={cH}
-        fill={activeTrade.direction === "long" ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)"} />);
+        fill={activeTrade.direction === "long" ? "rgba(16,185,129,0.10)" : "rgba(239,68,68,0.10)"} />);
+    }
+  }
+  // Trade entry/exit dots
+  const tradeDots: React.ReactElement[] = [];
+  if (showDots) {
+    for (const t of trades) {
+      if (t.exitDate > shownEnd) continue;
+      // Entry dot
+      if (t.entryDate >= shownStart && t.entryDate <= shownEnd) {
+        const ex = dateToX(t.entryDate);
+        const entryPt = shown.find((s: any) => s.date >= t.entryDate);
+        if (ex !== null && entryPt) {
+          const ey = yOf(entryPt.zscore);
+          const col = t.direction === "long" ? "#10b981" : "#ef4444";
+          tradeDots.push(
+            <g key={`entry-${t.entryDate}`}>
+              <circle cx={ex} cy={ey} r={5} fill={col} opacity={0.9} />
+              <circle cx={ex} cy={ey} r={5} fill="none" stroke="#fff" strokeWidth={0.8} opacity={0.5} />
+              <text x={ex} y={ey - 8} textAnchor="middle" fontSize={7} fill={col} fontFamily="monospace" fontWeight={700}>
+                {t.direction === "long" ? "▲" : "▼"}
+              </text>
+            </g>
+          );
+        }
+      }
+      // Exit dot
+      if (t.exitDate >= shownStart && t.exitDate <= shownEnd) {
+        const xx = dateToX(t.exitDate);
+        const exitPt = shown.find((s: any) => s.date >= t.exitDate);
+        if (xx !== null && exitPt) {
+          const xy = yOf(exitPt.zscore);
+          const isStop = t.exitReason === "stop";
+          tradeDots.push(
+            <g key={`exit-${t.exitDate}-${t.entryDate}`}>
+              <circle cx={xx} cy={xy} r={4} fill={isStop ? "#f59e0b" : "rgba(255,255,255,0.85)"} opacity={0.9} />
+              <circle cx={xx} cy={xy} r={4} fill="none" stroke={isStop ? "#f59e0b" : "#fff"} strokeWidth={0.8} opacity={0.4} />
+              {isStop && <text x={xx} y={xy - 8} textAnchor="middle" fontSize={7} fill="#f59e0b" fontFamily="monospace">✕</text>}
+            </g>
+          );
+        }
+      }
     }
   }
   const lastPt = shown[shown.length - 1];
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ display: "block", width: "100%", height: "auto" }}>
+      <defs>
+        <linearGradient id="zcGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.15" />
+          <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+        </linearGradient>
+      </defs>
       {posRects}
-      {[-3.5,-1.5,-0.3,0,0.3,1.5,3.5].map(v => (
-        <g key={v}>
-          <line x1={PAD.left} x2={W-PAD.right} y1={yOf(v)} y2={yOf(v)}
-            stroke={v===0 ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.05)"} strokeWidth={v===0?1:0.8} strokeDasharray={v!==0?"3 3":undefined} />
-          <text x={PAD.left-4} y={yOf(v)+3.5} textAnchor="end" fontSize={8} fill={Math.abs(v)>=1.5?"rgba(255,255,255,0.4)":"rgba(255,255,255,0.22)"} fontFamily="monospace">
-            {v>0?`+${v}`:v}
-          </text>
-        </g>
+      {/* Subtle entry zone bands */}
+      <rect x={PAD.left} y={yOf(entryZ)} width={cW} height={yOf(-entryZ) - yOf(entryZ)} fill="rgba(16,185,129,0.04)" />
+      {/* Grid lines */}
+      {gridLines.map(v => (
+        <line key={v} x1={PAD.left} x2={W-PAD.right} y1={yOf(v)} y2={yOf(v)}
+          stroke={v===0 ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.04)"} strokeWidth={v===0?1:0.8} strokeDasharray={v!==0?"3 4":undefined} />
       ))}
-      <line x1={PAD.left} x2={W-PAD.right} y1={yOf(1.5)} y2={yOf(1.5)} stroke="#10b981" strokeWidth={1} opacity={0.5} />
-      <line x1={PAD.left} x2={W-PAD.right} y1={yOf(-1.5)} y2={yOf(-1.5)} stroke="#10b981" strokeWidth={1} opacity={0.5} />
-      <line x1={PAD.left} x2={W-PAD.right} y1={yOf(3.5)} y2={yOf(3.5)} stroke="#ef4444" strokeWidth={0.8} strokeDasharray="4 3" opacity={0.5} />
-      <line x1={PAD.left} x2={W-PAD.right} y1={yOf(-3.5)} y2={yOf(-3.5)} stroke="#ef4444" strokeWidth={0.8} strokeDasharray="4 3" opacity={0.5} />
+      {/* Zero line label */}
+      <text x={PAD.left-4} y={yOf(0)+3.5} textAnchor="end" fontSize={8} fill="rgba(255,255,255,0.25)" fontFamily="monospace">0</text>
+      {/* Dynamic entry lines */}
+      <line x1={PAD.left} x2={W-PAD.right} y1={yOf(entryZ)} y2={yOf(entryZ)} stroke="#10b981" strokeWidth={1.2} opacity={0.65} strokeDasharray="5 3" />
+      <line x1={PAD.left} x2={W-PAD.right} y1={yOf(-entryZ)} y2={yOf(-entryZ)} stroke="#10b981" strokeWidth={1.2} opacity={0.65} strokeDasharray="5 3" />
+      <text x={PAD.left-4} y={yOf(entryZ)+3.5} textAnchor="end" fontSize={7.5} fill="#10b981" fontFamily="monospace" opacity={0.8}>+{entryZ}</text>
+      <text x={PAD.left-4} y={yOf(-entryZ)+3.5} textAnchor="end" fontSize={7.5} fill="#10b981" fontFamily="monospace" opacity={0.8}>-{entryZ}</text>
+      {/* Dynamic stop lines */}
+      <line x1={PAD.left} x2={W-PAD.right} y1={yOf(stopZ)} y2={yOf(stopZ)} stroke="#ef4444" strokeWidth={1} opacity={0.55} strokeDasharray="3 3" />
+      <line x1={PAD.left} x2={W-PAD.right} y1={yOf(-stopZ)} y2={yOf(-stopZ)} stroke="#ef4444" strokeWidth={1} opacity={0.55} strokeDasharray="3 3" />
+      <text x={PAD.left-4} y={yOf(stopZ)+3.5} textAnchor="end" fontSize={7.5} fill="#ef4444" fontFamily="monospace" opacity={0.7}>+{stopZ}</text>
+      <text x={PAD.left-4} y={yOf(-stopZ)+3.5} textAnchor="end" fontSize={7.5} fill="#ef4444" fontFamily="monospace" opacity={0.7}>-{stopZ}</text>
+      {/* Area fill under z-line */}
+      <path d={linePts + ` L${xOf(shown.length-1)},${yOf(0)} L${xOf(0)},${yOf(0)} Z`} fill="url(#zcGrad)" />
+      {/* Z-score line */}
       <path d={linePts} fill="none" stroke="#3b82f6" strokeWidth={1.5} />
-      <line x1={xOf(shown.length-1)} x2={xOf(shown.length-1)} y1={PAD.top} y2={PAD.top+cH} stroke="rgba(255,255,255,0.35)" strokeWidth={1} strokeDasharray="2 2" />
-      {lastPt && <circle cx={xOf(shown.length-1)} cy={yOf(lastPt.zscore)} r={4} fill="#3b82f6" />}
+      {/* Trade dots */}
+      {tradeDots}
+      {/* Current bar cursor */}
+      <line x1={xOf(shown.length-1)} x2={xOf(shown.length-1)} y1={PAD.top} y2={PAD.top+cH} stroke="rgba(255,255,255,0.3)" strokeWidth={1} strokeDasharray="2 2" />
+      {lastPt && <circle cx={xOf(shown.length-1)} cy={yOf(lastPt.zscore)} r={3.5} fill="#3b82f6" stroke="rgba(255,255,255,0.5)" strokeWidth={1} />}
+      {/* Date ticks */}
       {xTicks.map(i => shown[i] && (
-        <text key={i} x={xOf(i)} y={H-4} textAnchor="middle" fontSize={8} fill="rgba(255,255,255,0.28)" fontFamily="monospace">{fmtD(shown[i].date)}</text>
+        <text key={i} x={xOf(i)} y={H-4} textAnchor="middle" fontSize={8} fill="rgba(255,255,255,0.25)" fontFamily="monospace">{fmtD(shown[i].date)}</text>
       ))}
     </svg>
   );
@@ -650,6 +719,7 @@ export default function FXTerminalPage() {
   const [pairsEntryZ, setPairsEntryZ] = useState(1.8);       // entry z-score threshold
   const [pairsExitZ, setPairsExitZ] = useState(0.6);         // exit z-score threshold
   const [pairsStopZ, setPairsStopZ] = useState(2.8);         // stop-loss z-score threshold
+  const [pairsShowDots, setPairsShowDots] = useState(true);  // show entry/exit dots on chart
   const pairsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [expSort, setExpSort] = useState<{ col: string; asc: boolean }>({ col: "ticker", asc: true });
@@ -3450,49 +3520,76 @@ export default function FXTerminalPage() {
               <div style={{ fontSize: 8, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>Prime broker / clearing fees</div>
             </div>
           </div>
-          {/* Signal threshold row */}
-          <div style={{ borderTop: "1px solid #21262d", marginTop: 10, paddingTop: 10 }}>
-            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", letterSpacing: "0.08em", marginBottom: 8, textTransform: "uppercase" as const }}>
-              Signal Thresholds
-              <span style={{ marginLeft: 12, color: "rgba(255,255,255,0.25)", fontSize: 9, fontWeight: 400, letterSpacing: 0, textTransform: "none" as const }}>
-                Change sliders then press RESET + PLAY to re-run simulation
-              </span>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-              {/* Entry Z */}
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>
-                  <span>ENTRY Z-SCORE</span>
-                  <span style={{ color: "#10b981", fontWeight: 700 }}>±{pairsEntryZ.toFixed(1)}σ</span>
+        </div>
+
+        {/* Signal Threshold card — separate from friction */}
+        <div style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 6, padding: "12px 16px", margin: "6px 0 0" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>Signal Thresholds</span>
+            <span style={{ fontSize: 8, color: "rgba(255,255,255,0.2)" }}>Adjust then RESET + PLAY to re-run</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
+            {/* Entry Z */}
+            {(() => {
+              const pct = ((pairsEntryZ - 1.0) / (3.0 - 1.0)) * 100;
+              return (
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+                    <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", letterSpacing: "0.06em" }}>ENTRY</span>
+                    <span style={{ fontSize: 16, fontWeight: 800, color: "#10b981", fontFamily: "monospace" }}>±{pairsEntryZ.toFixed(1)}<span style={{ fontSize: 9, fontWeight: 400, color: "rgba(16,185,129,0.7)" }}>σ</span></span>
+                  </div>
+                  <div style={{ position: "relative", height: 20, display: "flex", alignItems: "center" }}>
+                    <div style={{ position: "absolute", left: 0, right: 0, height: 4, borderRadius: 2, background: `linear-gradient(to right, #10b981 ${pct}%, rgba(255,255,255,0.08) ${pct}%)` }} />
+                    <input type="range" min={1.0} max={3.0} step={0.1} value={pairsEntryZ}
+                      onChange={e => { setPairsEntryZ(+e.target.value); setPairsIsPlaying(false); setPairsPlayIdx(-1); }}
+                      className="pairs-range pairs-range-green"
+                      style={{ position: "absolute", left: 0, right: 0, width: "100%", opacity: 0, cursor: "pointer", height: 20, margin: 0 }} />
+                  </div>
+                  <div style={{ fontSize: 7.5, color: "rgba(255,255,255,0.18)", marginTop: 4 }}>Lower = more signals · min 1.0σ</div>
                 </div>
-                <input type="range" min={1.0} max={3.0} step={0.1} value={pairsEntryZ}
-                  onChange={e => { setPairsEntryZ(+e.target.value); setPairsIsPlaying(false); setPairsPlayIdx(-1); }}
-                  style={{ ...S.slider, display: "block", width: "100%" }} />
-                <div style={{ fontSize: 8, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>Enter when |z| exceeds threshold · lower = more signals</div>
-              </div>
-              {/* Exit Z */}
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>
-                  <span>EXIT Z-SCORE</span>
-                  <span style={{ color: "#3b82f6", fontWeight: 700 }}>±{pairsExitZ.toFixed(1)}σ</span>
+              );
+            })()}
+            {/* Exit Z */}
+            {(() => {
+              const pct = ((pairsExitZ - 0.0) / (1.5 - 0.0)) * 100;
+              return (
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+                    <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", letterSpacing: "0.06em" }}>EXIT (TAKE PROFIT)</span>
+                    <span style={{ fontSize: 16, fontWeight: 800, color: "#3b82f6", fontFamily: "monospace" }}>±{pairsExitZ.toFixed(1)}<span style={{ fontSize: 9, fontWeight: 400, color: "rgba(59,130,246,0.7)" }}>σ</span></span>
+                  </div>
+                  <div style={{ position: "relative", height: 20, display: "flex", alignItems: "center" }}>
+                    <div style={{ position: "absolute", left: 0, right: 0, height: 4, borderRadius: 2, background: `linear-gradient(to right, #3b82f6 ${pct}%, rgba(255,255,255,0.08) ${pct}%)` }} />
+                    <input type="range" min={0.0} max={1.5} step={0.1} value={pairsExitZ}
+                      onChange={e => { setPairsExitZ(+e.target.value); setPairsIsPlaying(false); setPairsPlayIdx(-1); }}
+                      style={{ position: "absolute", left: 0, right: 0, width: "100%", opacity: 0, cursor: "pointer", height: 20, margin: 0 }} />
+                  </div>
+                  <div style={{ fontSize: 7.5, color: "rgba(255,255,255,0.18)", marginTop: 4 }}>0 = full reversion · higher = quicker exit</div>
                 </div>
-                <input type="range" min={0.0} max={1.5} step={0.1} value={pairsExitZ}
-                  onChange={e => { setPairsExitZ(+e.target.value); setPairsIsPlaying(false); setPairsPlayIdx(-1); }}
-                  style={{ ...S.slider, display: "block", width: "100%" }} />
-                <div style={{ fontSize: 8, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>Exit when |z| reverts below · 0 = full mean reversion</div>
-              </div>
-              {/* Stop Z */}
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>
-                  <span>STOP-LOSS Z-SCORE</span>
-                  <span style={{ color: "#ef4444", fontWeight: 700 }}>±{pairsStopZ.toFixed(1)}σ</span>
+              );
+            })()}
+            {/* Stop Z */}
+            {(() => {
+              const pct = ((pairsStopZ - 1.5) / (5.0 - 1.5)) * 100;
+              return (
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+                    <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", letterSpacing: "0.06em" }}>STOP LOSS</span>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.25)", fontFamily: "monospace" }}>+{(pairsStopZ - pairsEntryZ).toFixed(1)}σ buffer</span>
+                      <span style={{ fontSize: 16, fontWeight: 800, color: "#ef4444", fontFamily: "monospace" }}>±{pairsStopZ.toFixed(1)}<span style={{ fontSize: 9, fontWeight: 400, color: "rgba(239,68,68,0.7)" }}>σ</span></span>
+                    </div>
+                  </div>
+                  <div style={{ position: "relative", height: 20, display: "flex", alignItems: "center" }}>
+                    <div style={{ position: "absolute", left: 0, right: 0, height: 4, borderRadius: 2, background: `linear-gradient(to right, #ef4444 ${pct}%, rgba(255,255,255,0.08) ${pct}%)` }} />
+                    <input type="range" min={1.5} max={5.0} step={0.1} value={pairsStopZ}
+                      onChange={e => { setPairsStopZ(+e.target.value); setPairsIsPlaying(false); setPairsPlayIdx(-1); }}
+                      style={{ position: "absolute", left: 0, right: 0, width: "100%", opacity: 0, cursor: "pointer", height: 20, margin: 0 }} />
+                  </div>
+                  <div style={{ fontSize: 7.5, color: "rgba(255,255,255,0.18)", marginTop: 4 }}>Wider = fewer stops · risk per trade ↑</div>
                 </div>
-                <input type="range" min={1.5} max={5.0} step={0.1} value={pairsStopZ}
-                  onChange={e => { setPairsStopZ(+e.target.value); setPairsIsPlaying(false); setPairsPlayIdx(-1); }}
-                  style={{ ...S.slider, display: "block", width: "100%" }} />
-                <div style={{ fontSize: 8, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>Stop out when |z| exceeds · buffer = {(pairsStopZ - pairsEntryZ).toFixed(1)}σ from entry</div>
-              </div>
-            </div>
+              );
+            })()}
           </div>
         </div>
 
@@ -3518,6 +3615,14 @@ export default function FXTerminalPage() {
           <button onClick={() => { setPairsIsPlaying(false); setTimeout(() => setPairsPlayIdx(-1), 50); }}
             style={{ background: "#21262d", border: "1px solid #30363d", color: "rgba(255,255,255,0.6)", borderRadius: 6, padding: "8px 14px", fontSize: 11, cursor: "pointer", fontFamily: "monospace" }}>
             ⏹ RESET
+          </button>
+          <button onClick={() => setPairsShowDots(v => !v)}
+            title="Toggle entry/exit dots on z-score chart"
+            style={{ background: pairsShowDots ? "rgba(59,130,246,0.15)" : "#21262d",
+              border: `1px solid ${pairsShowDots ? "#3b82f6" : "#30363d"}`,
+              color: pairsShowDots ? "#3b82f6" : "rgba(255,255,255,0.4)", borderRadius: 6,
+              padding: "8px 14px", fontSize: 11, cursor: "pointer", fontFamily: "monospace", letterSpacing: "0.03em" }}>
+            ◉ DOTS {pairsShowDots ? "ON" : "OFF"}
           </button>
           <div style={{ display: "flex", gap: 3 }}>
             {[1, 3, 5, 10].map(s => (
@@ -3553,7 +3658,9 @@ export default function FXTerminalPage() {
               <div style={S.cardTitle}>Z-SCORE LIVE VIEW — {config.labelY} vs {config.labelX} · TRAILING 90 DAYS</div>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
                 {[{ c: "#3b82f6", l: "Z-score" }, { c: "#10b981", l: `±${pairsEntryZ}σ entry` }, { c: "#ef4444", l: `±${pairsStopZ}σ stop` },
-                  { c: "rgba(16,185,129,0.3)", l: "Long pos" }, { c: "rgba(239,68,68,0.3)", l: "Short pos" }].map((l, i) => (
+                  { c: "rgba(16,185,129,0.3)", l: "Long pos" }, { c: "rgba(239,68,68,0.3)", l: "Short pos" },
+                  ...(pairsShowDots ? [{ c: "#10b981", l: "▲ entry" }, { c: "rgba(255,255,255,0.7)", l: "● exit" }, { c: "#f59e0b", l: "✕ stop" }] : [])
+                ].map((l, i) => (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 8, color: "rgba(255,255,255,0.35)" }}>
                     <div style={{ width: 14, height: 3, background: l.c, borderRadius: 1 }} />{l.l}
                   </div>
@@ -3562,7 +3669,9 @@ export default function FXTerminalPage() {
             </div>
             <div style={{ flex: 1, minHeight: 200 }}>
               {liveSeries.length > 1 ? (
-                <PairsZChart series={liveSeries} activeTrade={activeTrade} />
+                <PairsZChart series={liveSeries} activeTrade={activeTrade}
+                  entryZ={pairsEntryZ} stopZ={pairsStopZ}
+                  trades={allTrades} showDots={pairsShowDots} />
               ) : (
                 <div style={{ height: "100%", minHeight: 200, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.15)", fontSize: 12 }}>
                   {pairsDataLoading ? "Loading dataset..." : "Press ▶ PLAY to begin the simulation"}
