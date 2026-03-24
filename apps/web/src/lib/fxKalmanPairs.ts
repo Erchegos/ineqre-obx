@@ -18,7 +18,7 @@
  */
 
 export interface KalmanParams {
-  /** State drift variance. Controls how fast β/α can change. Default 1e-4 */
+  /** State drift variance. Controls how fast β/α can change. Default 1e-5 */
   delta: number;
   /** Observation noise variance. Controls spread noise. Default 1e-3 */
   Ve: number;
@@ -33,7 +33,7 @@ export interface KalmanParams {
 }
 
 export const DEFAULT_PARAMS: KalmanParams = {
-  delta: 1e-4,
+  delta: 1e-5,
   Ve: 1e-3,
   positionSizePct: 10,
   totalCostBps: 8,
