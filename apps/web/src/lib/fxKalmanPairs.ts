@@ -23,12 +23,14 @@ export interface KalmanParams {
   /** Observation noise variance. Controls Kalman gain (not z-score). Default 1e-3 */
   Ve: number;
   /**
-   * Position size as % of NAV per trade. Scales per-trade P&L to realistic portfolio returns.
-   * Rule-of-thumb: each σ of spread capture ≈ positionSizePct × 0.01% of portfolio.
-   * Default 15 → ~20-25% annual return for ~100 trades/year.
+   * Vol-targeted position size. Scales P&L so that:
+   *   1σ of z-score capture (net of cost) = positionSizePct × 0.1% of portfolio.
+   * Example: positionSizePct=10 → 1σ capture ≈ 1% portfolio P&L.
+   * Using a vol-targeted formula ensures P&L is meaningful regardless of whether
+   * the current spread vol is tight (NOK pairs, ≈0.001) or wide (crisis, ≈0.02).
    */
   positionSizePct?: number;
-  /** Round-trip transaction cost in basis points (bid-ask × 2 + slippage + commission). Default 5 */
+  /** Round-trip transaction cost in basis points (bid-ask × 2 + slippage). Default 5 */
   totalCostBps?: number;
 }
 
@@ -39,9 +41,9 @@ export const DEFAULT_PARAMS: KalmanParams = {
   totalCostBps: 8,
 };
 
-export const ENTRY_Z  = 1.2;   // Enter long/short at ±1.2σ — more trades, still selective
-export const EXIT_Z   = 0.2;   // Exit at ±0.2σ (capture most of the mean reversion)
-export const STOP_Z   = 3.0;   // Hard stop at ±3.0σ — tighter to limit gap risk
+export const ENTRY_Z  = 1.5;   // Enter long/short at ±1.5σ — more selective, stronger signals
+export const EXIT_Z   = 0.4;   // Exit at ±0.4σ — exits before full reversion, realistic
+export const STOP_Z   = 2.5;   // Hard stop at ±2.5σ — tighter, creates realistic stop losses
 
 export interface KalmanPoint {
   date: string;
@@ -291,28 +293,30 @@ export function simulatePairsTrades(series: KalmanPoint[], params: KalmanParams 
       }
 
       if (wantsExit) {
-        // P&L anchored to z-score change × entry spread vol.
+        // Vol-targeted P&L: express everything in z-score units.
         //
-        // Why not use raw spread change (logY - entryLogY) − β(logX − entryLogX)?
-        //   Rolling mean drift: during a 5-day hold the rolling baseline can shift,
-        //   so even a successful z reversion captures near-zero spread in absolute
-        //   terms, making all signal exits show as losses.
+        // Why not (zChange × entrySpreadVol × positionSizePct)?
+        //   For highly correlated NOK pairs (GBP/NOK vs EUR/NOK), entrySpreadVol
+        //   is ~0.001 in normal times. 8bps of cost = 0.0008, which is 0.8σ
+        //   equivalent — eating 80%+ of every trade. P&Ls come out as 0.002%,
+        //   which is arithmetically correct but looks like rounding noise.
         //
-        // Why z-score change × entrySpreadVol works:
-        //   LONG entered at z = -1.8; exits at z = -0.2. The z moved +1.6σ toward
-        //   mean. At entry we know 1σ ≈ entrySpreadVol in log-price units. So the
-        //   captured spread ≈ 1.6 × entrySpreadVol — independent of subsequent
-        //   rolling-mean drift.
+        // Vol-targeted approach (vol-managed position sizing):
+        //   We size the position to achieve X% P&L per σ regardless of current
+        //   spread vol. Cost is converted to z-score units (bps / entrySpreadVol)
+        //   so it scales correctly — tight spreads mean higher per-σ cost burden.
+        //   Rule: 1σ net capture with positionSizePct=10 → 1% portfolio P&L.
         //
-        // Stop gap handling: if z spikes from -1.8 to -5 in one bar (gap risk),
-        //   we execute at -5 and P&L reflects the full 3.2σ move — bounded because
-        //   it's anchored to entry vol, not the giant absolute move.
+        //   pnlPct = (netZCapture) × (positionSizePct / 10)
+        //   netZCapture = directedZCapture − costInZ
+        //   costInZ = totalCostBps / 10000 / entrySpreadVol
         const zChange = pt.zscore - entryZ;
         const directedZCapture = direction === 'long' ? zChange : -zChange;
-        // directedZCapture > 0 = profitable, < 0 = loss
-        const spreadCapture = directedZCapture * entrySpreadVol;
-        const costPct = totalCostBps / 10000;
-        const pnlPct = (spreadCapture - costPct) * positionSizePct;
+        const costInZ = entrySpreadVol > 1e-8
+          ? (totalCostBps / 10000) / entrySpreadVol
+          : 0;
+        const netZCapture = directedZCapture - costInZ;
+        const pnlPct = netZCapture * (positionSizePct / 10);
 
         trades.push({
           entryDate: series[entryIdx].date,

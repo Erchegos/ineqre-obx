@@ -3291,8 +3291,9 @@ export default function FXTerminalPage() {
     if (activeTrade && currentPt) {
       const zChange = currentPt.zscore - activeTrade.entryZ;
       const directedZCapture = activeTrade.direction === "long" ? zChange : -zChange;
-      const sv = activeTrade.entrySpreadVol || 0.015;
-      unrealPnl = directedZCapture * sv * pairsPosSize;
+      const sv = activeTrade.entrySpreadVol || 0.01;
+      const costInZ = sv > 1e-8 ? (5 / 10000) / sv : 0;
+      unrealPnl = (directedZCapture - costInZ) * (pairsPosSize / 10);
     }
 
     const totalEquity = equityVal * (1 + unrealPnl / 100);
@@ -3305,8 +3306,8 @@ export default function FXTerminalPage() {
     const posColor = activeTrade ? (activeTrade.direction === "long" ? "#10b981" : "#ef4444") : "#30363d";
     const posBg = activeTrade ? (activeTrade.direction === "long" ? "rgba(16,185,129,0.07)" : "rgba(239,68,68,0.07)") : "transparent";
     const holdDays = activeTrade && currentPt ? liveSeries.filter((s: any) => s.date >= activeTrade.entryDate).length : 0;
-    const longProx = currentPt ? Math.max(0, Math.min(1, (-currentPt.zscore - 0.6) / 0.6)) : 0;
-    const shortProx = currentPt ? Math.max(0, Math.min(1, (currentPt.zscore - 0.6) / 0.6)) : 0;
+    const longProx = currentPt ? Math.max(0, Math.min(1, (-currentPt.zscore - 0.8) / 0.7)) : 0;
+    const shortProx = currentPt ? Math.max(0, Math.min(1, (currentPt.zscore - 0.8) / 0.7)) : 0;
 
     return (
       <>
@@ -3340,7 +3341,7 @@ export default function FXTerminalPage() {
             </button>
           ))}
           <div style={{ padding: "0 14px", fontSize: 9, color: "rgba(255,255,255,0.25)", alignSelf: "center", marginLeft: "auto" }}>
-            {config.desc} · δ=1e-5 · 60-bar rolling z · ±1.2σ ENTRY · ±0.2σ EXIT · ±3.0σ STOP
+            {config.desc} · δ=1e-5 · 60-bar rolling z · ±1.5σ ENTRY · ±0.4σ EXIT · ±2.5σ STOP
           </div>
         </div>
 
@@ -3465,7 +3466,7 @@ export default function FXTerminalPage() {
               <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", fontFamily: "monospace", textAlign: "right" as const }}>
                 {activeTrade
                   ? <>{holdDays}d · β={activeTrade.entryBeta}</>
-                  : <>{pairsDataLoading ? "loading…" : !hasStarted ? "press PLAY" : "±1.2σ entry"}</>}
+                  : <>{pairsDataLoading ? "loading…" : !hasStarted ? "press PLAY" : "±1.5σ entry"}</>}
               </div>
             </div>
 
@@ -3476,7 +3477,7 @@ export default function FXTerminalPage() {
 
             {/* Bell curve — always rendered, same dimensions, content updates in place */}
             {(() => {
-              const RANGE = 4, ENTRY = 1.2, EXIT = 0.2, STOP = 3.0;
+              const RANGE = 4, ENTRY = 1.5, EXIT = 0.4, STOP = 2.5;
               const VW = 100, VH = 54; // viewBox units — compact, professional
               const PX = 4, baseline = VH - 10;
               const zToX = (zv: number) => PX + ((zv + RANGE) / (2 * RANGE)) * (VW - 2 * PX);
@@ -3508,7 +3509,7 @@ export default function FXTerminalPage() {
               const dotColor = activeTrade
                 ? (progressing ? "#10b981" : "#ef4444")
                 : currentPt
-                  ? (Math.abs(currentPt.zscore) >= ENTRY ? "#f59e0b" : Math.abs(currentPt.zscore) > 0.9 ? "#3b82f6" : "rgba(255,255,255,0.45)")
+                  ? (Math.abs(currentPt.zscore) >= ENTRY ? "#f59e0b" : Math.abs(currentPt.zscore) > 1.1 ? "#3b82f6" : "rgba(255,255,255,0.45)")
                   : "rgba(255,255,255,0.2)";
 
               return (
@@ -3580,10 +3581,10 @@ export default function FXTerminalPage() {
                   </div>
                 </>
               ) : (
-                <div style={{ fontSize: 9, color: currentPt && Math.abs(currentPt.zscore) >= 1.2 ? "#f59e0b" : Math.abs(currentPt?.zscore ?? 0) > 0.9 ? "#3b82f6" : "rgba(255,255,255,0.3)" }}>
+                <div style={{ fontSize: 9, color: currentPt && Math.abs(currentPt.zscore) >= 1.5 ? "#f59e0b" : Math.abs(currentPt?.zscore ?? 0) > 1.1 ? "#3b82f6" : "rgba(255,255,255,0.3)" }}>
                   {!currentPt ? "—"
-                    : Math.abs(currentPt.zscore) >= 1.2 ? `⚡ ${currentPt.zscore < 0 ? "LONG" : "SHORT"} signal`
-                    : Math.abs(currentPt.zscore) > 0.9 ? "↗ approaching ±1.2σ"
+                    : Math.abs(currentPt.zscore) >= 1.5 ? `⚡ ${currentPt.zscore < 0 ? "LONG" : "SHORT"} signal`
+                    : Math.abs(currentPt.zscore) > 1.1 ? "↗ approaching ±1.5σ"
                     : "signal within band"}
                 </div>
               )}
@@ -3637,8 +3638,8 @@ export default function FXTerminalPage() {
                 </div>
                 <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginBottom: 6, letterSpacing: "0.05em" }}>SIGNAL PROXIMITY</div>
                 {[
-                  { l: "LONG (z < −1.2σ)", v: longProx, c: "#10b981" },
-                  { l: "SHORT (z > +1.2σ)", v: shortProx, c: "#ef4444" },
+                  { l: "LONG (z < −1.5σ)", v: longProx, c: "#10b981" },
+                  { l: "SHORT (z > +1.5σ)", v: shortProx, c: "#ef4444" },
                 ].map((b, i) => (
                   <div key={i} style={{ marginBottom: 8 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "rgba(255,255,255,0.3)", marginBottom: 3 }}>
