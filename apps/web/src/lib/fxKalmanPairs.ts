@@ -303,21 +303,27 @@ export function simulatePairsTrades(series: KalmanPoint[], params: KalmanParams 
     } else {
       // ── In trade: check exit conditions (same-bar execution) ─────────────────
       const daysHeld = t - entryIdx;
-
-      // Enforce minimum holding period — no same/next-day flips
-      if (daysHeld < MIN_HOLD_DAYS) continue;
-
       const absZ = Math.abs(pt.zscore);
+
+      // Stop-loss fires immediately — never gated by MIN_HOLD_DAYS.
+      // Risk management must always be honored; the min-hold rule only
+      // prevents whipsaw on take-profit exits, not on emergency stops.
       let wantsExit = false;
       let exitReason: PairsTrade['exitReason'] = 'signal';
 
       if (absZ > stopThreshold) {
         wantsExit = true;
         exitReason = 'stop';
-      } else if (direction === 'long' && pt.zscore > -exitThreshold) {
-        wantsExit = true;
-      } else if (direction === 'short' && pt.zscore < exitThreshold) {
-        wantsExit = true;
+      }
+
+      // Take-profit exits require minimum holding period — no same/next-day flips.
+      if (!wantsExit) {
+        if (daysHeld < MIN_HOLD_DAYS) continue;
+        if (direction === 'long' && pt.zscore > -exitThreshold) {
+          wantsExit = true;
+        } else if (direction === 'short' && pt.zscore < exitThreshold) {
+          wantsExit = true;
+        }
       }
 
       if (wantsExit) {
