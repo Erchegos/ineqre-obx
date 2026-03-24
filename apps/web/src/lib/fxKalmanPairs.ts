@@ -20,7 +20,7 @@
 export interface KalmanParams {
   /** State drift variance. Controls how fast β/α can change. Default 1e-5 */
   delta: number;
-  /** Observation noise variance. Controls spread noise. Default 1e-3 */
+  /** Observation noise variance. Controls spread noise. Default 1e-4 */
   Ve: number;
   /**
    * Position size as % of NAV per trade. Scales per-trade P&L to realistic portfolio returns.
@@ -34,7 +34,7 @@ export interface KalmanParams {
 
 export const DEFAULT_PARAMS: KalmanParams = {
   delta: 1e-5,
-  Ve: 1e-3,
+  Ve: 1e-4,
   positionSizePct: 10,
   totalCostBps: 8,
 };
