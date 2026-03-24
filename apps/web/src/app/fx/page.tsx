@@ -3492,8 +3492,106 @@ export default function FXTerminalPage() {
           </div>
         </div>
 
-        {/* 3-column live status */}
-        <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr 0.9fr", gap: 12, marginBottom: 12 }}>
+        {/* ── 2-column master layout ──────────────────────────────────────────── */}
+        {/* LEFT: z-score chart + trade blotter   RIGHT: panels + mini charts  */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 10, alignItems: "start" }}>
+
+        {/* ── LEFT COLUMN ── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+
+          {/* Z-score live chart */}
+          <div style={S.card}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap" as const, gap: 8 }}>
+              <div style={S.cardTitle}>Z-SCORE LIVE VIEW — {config.labelY} vs {config.labelX} · TRAILING 90 DAYS</div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
+                {[{ c: "#3b82f6", l: "Z-score" }, { c: "#10b981", l: "±1.5σ entry" }, { c: "#ef4444", l: "±1.9σ stop" },
+                  { c: "rgba(16,185,129,0.3)", l: "Long pos" }, { c: "rgba(239,68,68,0.3)", l: "Short pos" }].map((l, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 8, color: "rgba(255,255,255,0.35)" }}>
+                    <div style={{ width: 14, height: 3, background: l.c, borderRadius: 1 }} />{l.l}
+                  </div>
+                ))}
+              </div>
+            </div>
+            {liveSeries.length > 1 ? (
+              <PairsZChart series={liveSeries} activeTrade={activeTrade} />
+            ) : (
+              <div style={{ height: 200, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.15)", fontSize: 12 }}>
+                {pairsDataLoading ? "Loading dataset..." : "Press ▶ PLAY to begin the simulation"}
+              </div>
+            )}
+          </div>
+
+          {/* Equity + β row */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div style={S.card}>
+              <div style={{ ...S.cardTitle, marginBottom: 6 }}>EQUITY CURVE (closed trades)</div>
+              {equityCurve.length > 1 ? <PairsEquityChart curve={equityCurve} /> : (
+                <div style={{ height: 90, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.15)", fontSize: 10 }}>No closed trades yet</div>
+              )}
+              <div style={{ marginTop: 4, fontSize: 8, color: "rgba(255,255,255,0.25)" }}>Compounded P&L · closed trades only · indexed 100</div>
+            </div>
+            <div style={S.card}>
+              <div style={{ ...S.cardTitle, marginBottom: 6 }}>ROLLING HEDGE RATIO β</div>
+              {liveSeries.length > 1 ? <PairsBetaChart series={liveSeries} /> : (
+                <div style={{ height: 90, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.15)", fontSize: 10 }}>No data yet</div>
+              )}
+              <div style={{ marginTop: 4, fontSize: 8, color: "rgba(255,255,255,0.25)" }}>Adaptive Kalman estimate · updates each observation</div>
+            </div>
+          </div>
+
+          {/* Trade blotter */}
+          {hasStarted && (completedTrades.length > 0 || activeTrade) && (
+            <div style={S.card}>
+              <div style={{ ...S.cardTitle, marginBottom: 8 }}>
+                TRADE BLOTTER — {completedTrades.length} CLOSED
+                {activeTrade && <span style={{ color: posColor, marginLeft: 8 }}>· 1 LIVE</span>}
+              </div>
+              <div style={{ overflowY: "auto" as const, maxHeight: 260 }}>
+                <table style={S.table}>
+                  <thead style={{ position: "sticky" as const, top: 0, background: "#161b22", zIndex: 1 }}>
+                    <tr>{["", "DIR", "ENTRY DATE", "EXIT DATE", "DAYS", "ENTRY Z", "P&L", "EXIT"].map(h => <th key={h} style={S.th}>{h}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {activeTrade && (
+                      <tr style={{ background: activeTrade.direction === "long" ? "rgba(16,185,129,0.06)" : "rgba(239,68,68,0.06)", animation: "pSlide 0.3s ease-out" }}>
+                        <td style={S.td}><div style={{ width: 7, height: 7, borderRadius: "50%", background: posColor, animation: "pBlink 1.2s infinite" }} /></td>
+                        <td style={{ ...S.td, color: posColor, fontWeight: 800 }}>{activeTrade.direction === "long" ? "▲ LONG" : "▼ SHORT"}</td>
+                        <td style={S.td}>{activeTrade.entryDate}</td>
+                        <td style={{ ...S.td, color: "rgba(255,255,255,0.25)" }}>OPEN</td>
+                        <td style={S.td}>{holdDays}d</td>
+                        <td style={S.td}>{activeTrade.entryZ}</td>
+                        <td style={{ ...S.td, color: unrealPnl >= 0 ? "#10b981" : "#ef4444", fontWeight: 700 }}>{unrealPnl >= 0 ? "+" : ""}{unrealPnl.toFixed(2)}% *</td>
+                        <td style={S.td}><span style={{ background: "rgba(59,130,246,0.2)", color: "#3b82f6", padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700 }}>LIVE</span></td>
+                      </tr>
+                    )}
+                    {[...completedTrades].reverse().slice(0, 30).map((t: any, i: number) => {
+                      const rc = t.exitReason === "stop" ? "#ef4444" : t.exitReason === "signal" ? "#3b82f6" : "#f59e0b";
+                      const rl = t.exitReason === "stop" ? "STOP" : t.exitReason === "signal" ? "SIG" : "TIME";
+                      return (
+                        <tr key={i} style={{ background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)", animation: i === 0 ? "pSlide 0.25s ease-out" : "none" }}>
+                          <td style={S.td}><div style={{ width: 6, height: 6, borderRadius: "50%", background: t.pnlPct >= 0 ? "#10b981" : "#ef4444" }} /></td>
+                          <td style={{ ...S.td, color: t.direction === "long" ? "#10b981" : "#ef4444", fontWeight: 700 }}>{t.direction === "long" ? "▲" : "▼"}</td>
+                          <td style={S.td}>{t.entryDate}</td>
+                          <td style={S.td}>{t.exitDate}</td>
+                          <td style={S.td}>{t.daysHeld}d</td>
+                          <td style={S.td}>{t.entryZ}</td>
+                          <td style={{ ...S.td, color: t.pnlPct >= 0 ? "#10b981" : "#ef4444", fontWeight: 700 }}>{t.pnlPct >= 0 ? "+" : ""}{t.pnlPct.toFixed(3)}%</td>
+                          <td style={S.td}><span style={{ background: `${rc}20`, color: rc, padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700 }}>{rl}</span></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── RIGHT COLUMN ── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+
+          {/* 3 compact panels stacked */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
 
           {/* POSITION MONITOR — fixed layout, no jumping */}
           <div style={{ ...S.card, background: posBg, border: `1px solid ${posColor}`, animation: activeTrade ? "pGlow 2s ease-in-out infinite" : "none", padding: "16px 18px", minHeight: 260 }}>
@@ -3663,8 +3761,9 @@ export default function FXTerminalPage() {
               ))}
             </div>
           </div>
+          </div>{/* end inner 2-col grid */}
 
-          {/* KALMAN STATE */}
+          {/* KALMAN STATE — full width in right column */}
           <div style={S.card}>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", letterSpacing: "0.1em", marginBottom: 10 }}>KALMAN STATE</div>
             {currentPt ? (
@@ -3704,110 +3803,14 @@ export default function FXTerminalPage() {
               </div>
             )}
           </div>
-        </div>
-
-        {/* Z-score live chart */}
-        <div style={S.card}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap" as const, gap: 8 }}>
-            <div style={S.cardTitle}>Z-SCORE LIVE VIEW — {config.labelY} vs {config.labelX} · TRAILING 90 DAYS</div>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" as const }}>
-              {[{ c: "#3b82f6", l: "Z-score" }, { c: "#10b981", l: "±1.5σ entry" }, { c: "#ef4444", l: "±1.9σ stop" },
-                { c: "rgba(16,185,129,0.3)", l: "Long pos" }, { c: "rgba(239,68,68,0.3)", l: "Short pos" }].map((l, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 8, color: "rgba(255,255,255,0.35)" }}>
-                  <div style={{ width: 14, height: 3, background: l.c, borderRadius: 1 }} />{l.l}
-                </div>
-              ))}
-            </div>
-          </div>
-          {liveSeries.length > 1 ? (
-            <PairsZChart series={liveSeries} activeTrade={activeTrade} />
-          ) : (
-            <div style={{ height: 160, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.15)", fontSize: 12 }}>
-              {pairsDataLoading ? "Loading 1-year dataset..." : "Press ▶ PLAY to begin the simulation"}
-            </div>
-          )}
-        </div>
-
-        {/* Equity + β row */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-          <div style={S.card}>
-            <div style={{ ...S.cardTitle, marginBottom: 6 }}>EQUITY CURVE (closed trades)</div>
-            {equityCurve.length > 1 ? (
-              <PairsEquityChart curve={equityCurve} />
-            ) : (
-              <div style={{ height: 100, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.15)", fontSize: 10 }}>No closed trades yet</div>
-            )}
-            <div style={{ marginTop: 5, fontSize: 8, color: "rgba(255,255,255,0.25)" }}>Compounded P&L · closed trades only · indexed 100</div>
-          </div>
-          <div style={S.card}>
-            <div style={{ ...S.cardTitle, marginBottom: 6 }}>ROLLING HEDGE RATIO β</div>
-            {liveSeries.length > 1 ? (
-              <PairsBetaChart series={liveSeries} />
-            ) : (
-              <div style={{ height: 100, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.15)", fontSize: 10 }}>No data yet</div>
-            )}
-            <div style={{ marginTop: 5, fontSize: 8, color: "rgba(255,255,255,0.25)" }}>Adaptive Kalman estimate · updates each observation</div>
-          </div>
-        </div>
-
-        {/* Trade blotter — only visible after simulation started */}
-        {hasStarted && (completedTrades.length > 0 || activeTrade) && (
-          <div style={S.card}>
-            <div style={{ ...S.cardTitle, marginBottom: 8 }}>
-              TRADE BLOTTER — {completedTrades.length} CLOSED
-              {activeTrade && <span style={{ color: posColor, marginLeft: 8 }}>· 1 LIVE</span>}
-            </div>
-            <div style={{ overflowY: "auto" as const, maxHeight: 320 }}>
-              <table style={S.table}>
-                <thead style={{ position: "sticky" as const, top: 0, background: "#161b22", zIndex: 1 }}>
-                  <tr>
-                    {["", "DIR", "ENTRY DATE", "EXIT DATE", "DAYS", "ENTRY Z", "P&L", "EXIT"].map(h => (
-                      <th key={h} style={S.th}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeTrade && (
-                    <tr style={{ background: activeTrade.direction === "long" ? "rgba(16,185,129,0.06)" : "rgba(239,68,68,0.06)", animation: "pSlide 0.3s ease-out" }}>
-                      <td style={S.td}><div style={{ width: 7, height: 7, borderRadius: "50%", background: posColor, animation: "pBlink 1.2s infinite" }} /></td>
-                      <td style={{ ...S.td, color: posColor, fontWeight: 800 }}>{activeTrade.direction === "long" ? "▲ LONG" : "▼ SHORT"}</td>
-                      <td style={S.td}>{activeTrade.entryDate}</td>
-                      <td style={{ ...S.td, color: "rgba(255,255,255,0.25)" }}>OPEN</td>
-                      <td style={S.td}>{holdDays}d</td>
-                      <td style={S.td}>{activeTrade.entryZ}</td>
-                      <td style={{ ...S.td, color: unrealPnl >= 0 ? "#10b981" : "#ef4444", fontWeight: 700 }}>
-                        {unrealPnl >= 0 ? "+" : ""}{unrealPnl.toFixed(2)}% *
-                      </td>
-                      <td style={S.td}><span style={{ background: "rgba(59,130,246,0.2)", color: "#3b82f6", padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700 }}>LIVE</span></td>
-                    </tr>
-                  )}
-                  {[...completedTrades].reverse().slice(0, 20).map((t: any, i: number) => {
-                    const rc = t.exitReason === "stop" ? "#ef4444" : t.exitReason === "signal" ? "#3b82f6" : "#f59e0b";
-                    const rl = t.exitReason === "stop" ? "STOP" : t.exitReason === "signal" ? "SIG" : "TIME";
-                    return (
-                      <tr key={i} style={{ background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)", animation: i === 0 ? "pSlide 0.25s ease-out" : "none" }}>
-                        <td style={S.td}><div style={{ width: 6, height: 6, borderRadius: "50%", background: t.pnlPct >= 0 ? "#10b981" : "#ef4444" }} /></td>
-                        <td style={{ ...S.td, color: t.direction === "long" ? "#10b981" : "#ef4444", fontWeight: 700 }}>{t.direction === "long" ? "▲" : "▼"}</td>
-                        <td style={S.td}>{t.entryDate}</td>
-                        <td style={S.td}>{t.exitDate}</td>
-                        <td style={S.td}>{t.daysHeld}d</td>
-                        <td style={S.td}>{t.entryZ}</td>
-                        <td style={{ ...S.td, color: t.pnlPct >= 0 ? "#10b981" : "#ef4444", fontWeight: 700 }}>{t.pnlPct >= 0 ? "+" : ""}{t.pnlPct}%</td>
-                        <td style={S.td}><span style={{ background: rc + "22", color: rc, padding: "2px 6px", borderRadius: 3, fontSize: 8, fontWeight: 700 }}>{rl}</span></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+        </div>{/* end right column */}
+        </div>{/* end master grid */}
 
         {/* Initial load state — only shown before first dataset arrives */}
         {!pairsData && pairsDataLoading && (
-          <div style={{ ...S.card, textAlign: "center" as const, padding: "60px 20px" }}>
+          <div style={{ ...S.card, textAlign: "center" as const, padding: "60px 20px", marginTop: 10 }}>
             <div style={{ fontSize: 28, marginBottom: 12, color: "rgba(255,255,255,0.15)" }}>⟳</div>
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.2)" }}>Loading 1-year Kalman filter dataset…</div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.2)" }}>Loading Kalman filter dataset…</div>
           </div>
         )}
       </>
