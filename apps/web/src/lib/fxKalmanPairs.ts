@@ -117,23 +117,26 @@ export interface KalmanResult {
 // ── Kalman Filter Core ──────────────────────────────────────────────────────
 
 /**
- * Rolling window for z-score RMS normalisation (1 trading year).
+ * EWMA λ for z-score spread volatility estimation.
  *
- * We normalise by the rolling RMS of raw residuals — no mean subtraction.
- * This adapts to each pair's actual spread volatility rather than using
- * the Kalman innovation variance S or the observation noise Ve, both of
- * which are TUNING parameters unrelated to realized spread scale.
+ * We normalise by the EWMA of e² rather than a rolling window or Kalman S.
  *
- * For NOKGBP/NOKEUR (tight pair, spread σ ≈ 0.002/day):
- *   S-based floor √Ve ≈ 0.032 → need 6.5% spread move for ±1.8z (impossible)
- *   RMS ≈ 0.002      → need 0.36% spread move for ±1.8z (realistic, 7%/day)
+ * Why EWMA over alternatives:
+ *   √Ve floor (≈0.032):  threshold ±1.8×0.032=0.058 requires a 5.8% log-spread
+ *                         move — essentially impossible for NOKGBP/NOKEUR.
+ *   252-bar rolling RMS:  large initial Kalman residuals (e≈0.13 at bar 0)
+ *                         inflate the window until bar ~282, suppressing 7 months
+ *                         of signals; Jan-2026 spike then inflates for another year.
+ *   EWMA λ=0.94:         half-life ≈11 bars; initialised at Ve, decays to actual
+ *                         residual scale (~0.002) within the 100-bar BURN_IN.
  *
- * 252-bar window is spike-robust: a single 10σ spike raises RMS by only 18%
- * (vs 63% at 30 bars, or 34% at 60 bars), returning to baseline within 1Y.
- * No mean subtraction: the Kalman filter already centers residuals; subtracting
- * a 30-bar mean tracked slow drift and killed signals on stable pairs.
+ * Spike protection: each residual's contribution is capped at 3σ (9×ewmaVar)
+ * so a spike is fully reflected in the current z-score but cannot persistently
+ * inflate the denominator. Recovery after a spike: ~35 bars vs 12+ months.
+ *
+ * λ = 0.94 → half-life ≈ 11 bars. Matches RiskMetrics industry standard.
  */
-const ZSCORE_WINDOW = 252;
+const EWMA_LAMBDA = 0.94;
 export function runKalmanFilter(
   dates: string[],
   logY: number[],
@@ -152,8 +155,8 @@ export function runKalmanFilter(
   // Initial covariance: large uncertainty
   let P00 = 1, P01 = 0, P11 = 1;
 
-  // Rolling RMS buffer: stores e² values for the last ZSCORE_WINDOW bars
-  const rmsBuffer: number[] = [];
+  // EWMA variance estimate — initialized at Ve, decays to actual spread scale within BURN_IN
+  let ewmaVar = Ve;
 
   const result: KalmanPoint[] = [];
 
@@ -193,15 +196,12 @@ export function runKalmanFilter(
     P01 = AP00 * A10 + AP01 * A11 + K0 * K1 * Ve;
     P11 = AP10 * A10 + AP11 * A11 + K1 * K1 * Ve;
 
-    // ── Rolling RMS z-score ────────────────────────────────────────────────
-    rmsBuffer.push(e * e);
-    if (rmsBuffer.length > ZSCORE_WINDOW) rmsBuffer.shift();
-
-    let spreadVol = 1e-8;
-    if (rmsBuffer.length >= 20) {
-      const rms = Math.sqrt(rmsBuffer.reduce((s, v) => s + v, 0) / rmsBuffer.length);
-      if (rms > 1e-8) spreadVol = rms;
-    }
+    // ── EWMA z-score (spike-capped) ───────────────────────────────────────
+    // Cap each residual's contribution at 3σ so a spike is visible in z
+    // for this bar but cannot persistently inflate the denominator.
+    const cappedE2 = Math.min(e * e, 9 * ewmaVar);
+    ewmaVar = EWMA_LAMBDA * ewmaVar + (1 - EWMA_LAMBDA) * cappedE2;
+    const spreadVol = Math.max(Math.sqrt(ewmaVar), 1e-8);
     const zScore = e / spreadVol;
 
     result.push({
