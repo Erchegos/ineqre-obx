@@ -194,27 +194,29 @@ export function runKalmanFilter(
     P01 = AP00 * A10 + AP01 * A11 + K0 * K1 * Ve;
     P11 = AP10 * A10 + AP11 * A11 + K1 * K1 * Ve;
 
-    // ── Rolling z-score ────────────────────────────────────────────────────
-    // z = e / RMS(residuals_30)  — NO mean subtraction.
+    // ── Rolling z-score — MAD normalisation ───────────────────────────────
+    // z = e / (MAD × 1.4826)
     //
-    // Why no mean subtraction?
-    //   The Kalman filter already minimises e in expectation so e ≈ 0 on
-    //   average over the full history.  Subtracting a short rolling mean
-    //   causes the normaliser to track any recent drift, keeping z ≈ 0 even
-    //   when the spread is genuinely displaced — this killed all signals on
-    //   stable NOK pairs (GBP-EUR stayed near-zero z for 3+ years).
+    // Why MAD instead of rolling mean/RMS?
+    //   • Rolling mean subtraction: tracks slow drift, keeps z ≈ 0 for stable
+    //     pairs — killed all signals on NOKGBP/NOKEUR for 3 years.
+    //   • RMS: a single spike inflates the denominator for the next
+    //     ZSCORE_WINDOW bars, suppressing all subsequent signals.
+    //   • MAD (median absolute deviation): robust to outliers. The spike is
+    //     always at the tail of the sorted buffer, not the median. After a
+    //     spike, z returns to normal immediately — and before the spike,
+    //     typical quiet residuals give z ≈ N(0,1) → regular threshold crossings.
     //
-    //   Using RMS instead: z reflects how large the current residual is
-    //   relative to typical noise.  When the spread exceeds ±1.8× its
-    //   typical magnitude we enter — exactly the Gatev et al. (2006)
-    //   "distance" criterion.
+    // For normal data: MAD × 1.4826 ≈ σ, so z ≈ N(0,1) throughout.
+    // For spike data: z_spike = e_spike / σ_quiet → large z (correct signal).
     residualBuf.push(e);
     if (residualBuf.length > ZSCORE_WINDOW) residualBuf.shift();
 
     let rollingStd = 1e-8;
     if (residualBuf.length >= 5) {
-      const rms = Math.sqrt(residualBuf.reduce((s, v) => s + v * v, 0) / residualBuf.length);
-      rollingStd = Math.max(rms, 1e-8);
+      const sorted = residualBuf.map(Math.abs).sort((a, b) => a - b);
+      const mad = sorted[Math.floor(sorted.length / 2)];
+      rollingStd = Math.max(mad * 1.4826, 1e-8);
     }
 
     const zScore = e / rollingStd;
