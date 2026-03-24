@@ -643,9 +643,9 @@ export default function FXTerminalPage() {
   /* Friction / cost parameters */
   const [pairsDays, setPairsDays] = useState(252);            // history window in trading days
   const [pairsPosSize, setPairsPosSize] = useState(10);       // % of NAV per trade
-  const [pairsBidAskBps, setPairsBidAskBps] = useState(2.5); // bps per side
-  const [pairsSlippageBps, setPairsSlippageBps] = useState(2.0); // bps
-  const [pairsCommBps, setPairsCommBps] = useState(1.0);     // bps
+  const [pairsBidAskBps, setPairsBidAskBps] = useState(1.0); // bps per side — institutional major FX (EUR/USD ~0.5, GBP pairs ~1.0)
+  const [pairsSlippageBps, setPairsSlippageBps] = useState(0.5); // bps — FX is the world's most liquid market ($7.5T/day)
+  const [pairsCommBps, setPairsCommBps] = useState(0.5);     // bps — prime broker rate for major pairs
   const pairsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [expSort, setExpSort] = useState<{ col: string; asc: boolean }>({ col: "ticker", asc: true });
@@ -3374,7 +3374,7 @@ export default function FXTerminalPage() {
               <input type="range" min={0.5} max={10} step={0.5} value={pairsBidAskBps}
                 onChange={e => setPairsBidAskBps(+e.target.value)}
                 style={{ ...S.slider, display: "block", width: "100%" }} />
-              <div style={{ fontSize: 8, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>×2 round-trip = {(pairsBidAskBps * 2).toFixed(1)} bps</div>
+              <div style={{ fontSize: 8, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>×2 round-trip = {(pairsBidAskBps * 2).toFixed(1)} bps · EUR/USD ~0.5, GBP ~1.0</div>
             </div>
             {/* Slippage */}
             <div>
@@ -3385,7 +3385,7 @@ export default function FXTerminalPage() {
               <input type="range" min={0} max={10} step={0.5} value={pairsSlippageBps}
                 onChange={e => setPairsSlippageBps(+e.target.value)}
                 style={{ ...S.slider, display: "block", width: "100%" }} />
-              <div style={{ fontSize: 8, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>Order book impact / slippage</div>
+              <div style={{ fontSize: 8, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>Minimal in FX — $7.5T daily volume</div>
             </div>
             {/* Commission */}
             <div>
