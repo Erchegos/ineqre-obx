@@ -126,13 +126,7 @@ export interface KalmanResult {
  * This keeps z naturally oscillating around ±1-2 regardless of whether
  * the filter is in or out of steady state.
  */
-const ZSCORE_WINDOW = 20;  // 1-month rolling normalisation window
-// Using 20 bars instead of 60: a tighter window lets the z-score react to
-// short-term spread moves without being swamped by the trailing 3-month mean.
-// For stable NOK-cross pairs (GBP-EUR), a 60-bar mean damps the z-score to
-// near zero most of the time, generating almost no entry signals.
-// 20 bars keeps z naturally oscillating ±1-3σ which is what the Gatev et al.
-// threshold calibration (ENTRY=1.8) expects.
+const ZSCORE_WINDOW = 30;  // Rolling window for spread volatility normalisation
 
 /**
  * Run the 2D Kalman filter on aligned log-price series.
@@ -200,21 +194,30 @@ export function runKalmanFilter(
     P01 = AP00 * A10 + AP01 * A11 + K0 * K1 * Ve;
     P11 = AP10 * A10 + AP11 * A11 + K1 * K1 * Ve;
 
-    // ── Rolling z-score (Gatev et al. 2006 convention) ────────────────────
-    // Normalise by rolling std of residuals, not Kalman S.
-    // This keeps z oscillating naturally around ±1-2 and is the approach
-    // used by systematic FX desks and hedge funds.
+    // ── Rolling z-score ────────────────────────────────────────────────────
+    // z = e / RMS(residuals_30)  — NO mean subtraction.
+    //
+    // Why no mean subtraction?
+    //   The Kalman filter already minimises e in expectation so e ≈ 0 on
+    //   average over the full history.  Subtracting a short rolling mean
+    //   causes the normaliser to track any recent drift, keeping z ≈ 0 even
+    //   when the spread is genuinely displaced — this killed all signals on
+    //   stable NOK pairs (GBP-EUR stayed near-zero z for 3+ years).
+    //
+    //   Using RMS instead: z reflects how large the current residual is
+    //   relative to typical noise.  When the spread exceeds ±1.8× its
+    //   typical magnitude we enter — exactly the Gatev et al. (2006)
+    //   "distance" criterion.
     residualBuf.push(e);
     if (residualBuf.length > ZSCORE_WINDOW) residualBuf.shift();
 
-    let rollingMean = 0, rollingStd = 1e-8;
+    let rollingStd = 1e-8;
     if (residualBuf.length >= 5) {
-      rollingMean = residualBuf.reduce((s, v) => s + v, 0) / residualBuf.length;
-      const variance = residualBuf.reduce((s, v) => s + (v - rollingMean) ** 2, 0) / residualBuf.length;
-      rollingStd = Math.sqrt(Math.max(variance, 1e-12));
+      const rms = Math.sqrt(residualBuf.reduce((s, v) => s + v * v, 0) / residualBuf.length);
+      rollingStd = Math.max(rms, 1e-8);
     }
 
-    const zScore = (e - rollingMean) / rollingStd;
+    const zScore = e / rollingStd;
 
     result.push({
       date: dates[t],
