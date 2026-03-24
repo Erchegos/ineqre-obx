@@ -274,33 +274,23 @@ export function simulatePairsTrades(series: KalmanPoint[], params: KalmanParams 
 
     if (!inTrade) {
       // ── Execute pending entry (1-day lag) ───────────────────────────────────
+      let justEntered = false;
       if (pendingEntryDir !== null && (t - lastExitBar) > COOLDOWN_BARS) {
-        const execAbsZ = Math.abs(pt.zscore);
-        // Cancel entry if spread has already gapped through the stop threshold.
-        // Signal fired at ±entryThreshold but the 1-day lag allowed the spread
-        // to move beyond ±stopThreshold — entering now guarantees an immediate
-        // stop-out. Real FX desks cancel orders not filled within price limits.
-        // Also cancel if spread has already mean-reverted past the exit threshold
-        // — the opportunity has passed and we'd be entering a near-zero-P&L trade.
-        const alreadyReverted = pendingEntryDir === 'long'
-          ? pt.zscore > -exitThreshold
-          : pt.zscore < exitThreshold;
-        if (execAbsZ > stopThreshold || alreadyReverted) {
-          pendingEntryDir = null;  // abort — gap exceeded stop or opportunity gone
-        } else {
-          inTrade = true;
-          direction = pendingEntryDir;
-          entryIdx = t;
-          entryZ = pendingEntryZ;
-          entryBeta = pendingEntryBeta;
-          entrySpreadVol = pendingEntrySpreadVol;
-          entryLogY = pt.logY;   // Execute at next bar's price
-          entryLogX = pt.logX;
-          pendingEntryDir = null;
-        }
-      } else {
-        // ── Generate entry signal for next bar ──────────────────────────────
-        // Always replace stale signal with latest — don't carry forward
+        inTrade = true;
+        justEntered = true;
+        direction = pendingEntryDir;
+        entryIdx = t;
+        entryZ = pendingEntryZ;
+        entryBeta = pendingEntryBeta;
+        entrySpreadVol = pendingEntrySpreadVol;
+        entryLogY = pt.logY;
+        entryLogX = pt.logX;
+        pendingEntryDir = null;
+      }
+
+      // ── Generate entry signal for next bar ────────────────────────────────
+      // Runs every bar we didn't just enter — including after an aborted cooldown.
+      if (!justEntered) {
         pendingEntryDir = null;
         if (pt.zscore < -entryThreshold) {
           pendingEntryDir = 'long';

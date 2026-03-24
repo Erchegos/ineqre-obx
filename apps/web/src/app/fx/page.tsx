@@ -198,7 +198,7 @@ function Sparkline({ data, width = 120, height = 32, color = "#3b82f6" }: { data
 }
 
 /* Area sparkline with fill — uses viewBox for responsive width */
-function AreaSparkline({ data, width = 500, height = 140, color = "#3b82f6", currentValue }: { data: number[]; width?: number; height?: number; color?: string; currentValue?: number }) {
+function AreaSparkline({ data, width = 500, height = 140, color = "#3b82f6" }: { data: number[]; width?: number; height?: number; color?: string }) {
   if (data.length < 2) return null;
   const min = Math.min(...data);
   const max = Math.max(...data);
@@ -222,14 +222,7 @@ function AreaSparkline({ data, width = 500, height = 140, color = "#3b82f6", cur
       <polygon points={areaPoints} fill="url(#areaGrad)" />
       <polyline points={linePoints} fill="none" stroke={color} strokeWidth={2} vectorEffect="non-scaling-stroke" />
       {lastPt && (
-        <>
-          <circle cx={lastPt.x} cy={lastPt.y} r={4} fill={color} />
-          {currentValue != null && (
-            <text x={lastPt.x - 8} y={lastPt.y - 10} fill={color} fontSize={11} fontWeight={700} fontFamily="monospace" textAnchor="end">
-              {currentValue.toFixed(2)}
-            </text>
-          )}
-        </>
+        <circle cx={lastPt.x} cy={lastPt.y} r={4} fill={color} />
       )}
     </svg>
   );
@@ -1310,7 +1303,6 @@ export default function FXTerminalPage() {
                 width={500}
                 height={140}
                 color="#3b82f6"
-                currentValue={nokIndexCurrent?.index}
               />
             ) : (
               <div style={S.dim}>No TWI data available</div>
