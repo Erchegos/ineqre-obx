@@ -3407,7 +3407,7 @@ export default function FXTerminalPage() {
                 // First play — skip burn-in, jump to ~30 bars before first trade
                 const firstTrade = [...(pairsData?.trades ?? [])].sort((a, b) => a.entryDate.localeCompare(b.entryDate))[0];
                 const startIdx = firstTrade
-                  ? Math.max(0, (pairsData?.series ?? []).findIndex((s: any) => s.date >= firstTrade.entryDate) - 30)
+                  ? Math.max(0, (pairsData?.series ?? []).findIndex((s: any) => s.date >= firstTrade.entryDate) - 5)
                   : 0;
                 setPairsPlayIdx(startIdx);
                 setPairsIsPlaying(true);
@@ -3477,11 +3477,11 @@ export default function FXTerminalPage() {
             {/* Bell curve — always rendered, same dimensions, content updates in place */}
             {(() => {
               const RANGE = 4, ENTRY = 1.2, EXIT = 0.2, STOP = 3.0;
-              const VW = 100, VH = 72; // viewBox units
+              const VW = 100, VH = 54; // viewBox units — compact, professional
               const PX = 4, baseline = VH - 10;
               const zToX = (zv: number) => PX + ((zv + RANGE) / (2 * RANGE)) * (VW - 2 * PX);
               const pdf = (zv: number) => Math.exp(-0.5 * zv * zv);
-              const curveH = baseline - 6; // max curve height from baseline
+              const curveH = 28; // fixed curve height — peak at y=(baseline-28), ~16px from top
 
               const curvePts: string[] = [];
               for (let i = 0; i <= 140; i++) {
@@ -3512,7 +3512,7 @@ export default function FXTerminalPage() {
                   : "rgba(255,255,255,0.2)";
 
               return (
-                <svg viewBox={`0 0 ${VW} ${VH}`} width="100%" style={{ display: "block", overflow: "visible" }}>
+                <svg viewBox={`0 0 ${VW} ${VH}`} width="100%" height="auto" style={{ display: "block", overflow: "visible" }}>
                   {/* Zone fills — same in both states */}
                   <polygon points={fillArea(-STOP, -ENTRY)} fill="rgba(16,185,129,0.17)" />
                   <polygon points={fillArea(ENTRY, STOP)} fill="rgba(239,68,68,0.17)" />
@@ -3537,7 +3537,7 @@ export default function FXTerminalPage() {
                         stroke="#ef4444" strokeWidth={0.6} opacity={0.3} />
                       {/* Entry label */}
                       <text x={zToX(Math.max(-RANGE+0.5, Math.min(RANGE-0.5, activeTrade.entryZ)))} y={VH - 1}
-                        fontSize={4.5} fill={isLong ? "#10b981" : "#ef4444"} textAnchor="middle" fontFamily="monospace">entry</text>
+                        fontSize={3.5} fill={isLong ? "#10b981" : "#ef4444"} textAnchor="middle" fontFamily="monospace">entry</text>
                     </>
                   ) : (
                     <>
@@ -3547,17 +3547,17 @@ export default function FXTerminalPage() {
                       <line x1={zToX(-STOP)} y1={3} x2={zToX(-STOP)} y2={baseline} stroke="#ef4444" strokeWidth={0.5} opacity={0.28} />
                       <line x1={zToX(STOP)} y1={3} x2={zToX(STOP)} y2={baseline} stroke="#ef4444" strokeWidth={0.5} opacity={0.28} />
                       {/* Entry labels */}
-                      <text x={zToX(-ENTRY)} y={VH - 1} fontSize={4.5} fill="#10b981" textAnchor="middle" fontFamily="monospace">−{ENTRY}σ</text>
-                      <text x={zToX(ENTRY)} y={VH - 1} fontSize={4.5} fill="#ef4444" textAnchor="middle" fontFamily="monospace">+{ENTRY}σ</text>
+                      <text x={zToX(-ENTRY)} y={VH - 1} fontSize={3.5} fill="#10b981" textAnchor="middle" fontFamily="monospace">−{ENTRY}σ</text>
+                      <text x={zToX(ENTRY)} y={VH - 1} fontSize={3.5} fill="#ef4444" textAnchor="middle" fontFamily="monospace">+{ENTRY}σ</text>
                     </>
                   )}
                   {/* Current z dot — always present when data exists */}
                   {currentPt && (
                     <>
-                      <line x1={zToX(cz)} y1={dotY + 3.5} x2={zToX(cz)} y2={baseline} stroke={dotColor} strokeWidth={0.9} opacity={0.65} />
-                      <circle cx={zToX(cz)} cy={dotY} r={3} fill={dotColor} />
+                      <line x1={zToX(cz)} y1={dotY + 2.5} x2={zToX(cz)} y2={baseline} stroke={dotColor} strokeWidth={0.9} opacity={0.65} />
+                      <circle cx={zToX(cz)} cy={dotY} r={2.5} fill={dotColor} />
                       {/* Z label above dot */}
-                      <text x={zToX(cz)} y={dotY - 4} fontSize={5} fill={dotColor} textAnchor="middle" fontFamily="monospace" fontWeight="bold">
+                      <text x={zToX(cz)} y={dotY - 3} fontSize={3.5} fill={dotColor} textAnchor="middle" fontFamily="monospace" fontWeight="bold">
                         {currentPt.zscore >= 0 ? "+" : ""}{currentPt.zscore.toFixed(2)}σ
                       </text>
                     </>
@@ -3566,15 +3566,15 @@ export default function FXTerminalPage() {
               );
             })()}
 
-            {/* Bottom — unrealized P&L when active, status text when flat */}
-            <div style={{ marginTop: 4 }}>
+            {/* Bottom — fixed height prevents layout jump between FLAT and ACTIVE states */}
+            <div style={{ marginTop: 6, height: 50, display: "flex", flexDirection: "column", justifyContent: "center" }}>
               {activeTrade ? (
                 <>
                   <div style={{ fontSize: 8, color: "rgba(255,255,255,0.3)", letterSpacing: "0.05em", marginBottom: 2 }}>UNREALIZED P&L</div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: unrealPnl >= 0 ? "#10b981" : "#ef4444", fontFamily: "monospace" }}>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: unrealPnl >= 0 ? "#10b981" : "#ef4444", fontFamily: "monospace", lineHeight: 1 }}>
                     {unrealPnl >= 0 ? "+" : ""}{unrealPnl.toFixed(2)}%
                   </div>
-                  <div style={{ marginTop: 5, background: "rgba(0,0,0,0.4)", borderRadius: 3, height: 4, overflow: "hidden" }}>
+                  <div style={{ marginTop: 6, background: "rgba(0,0,0,0.4)", borderRadius: 3, height: 4, overflow: "hidden" }}>
                     <div style={{ width: `${Math.min(100, Math.abs(unrealPnl) / 20 * 100)}%`, height: "100%",
                       background: unrealPnl >= 0 ? "#10b981" : "#ef4444", borderRadius: 3 }} />
                   </div>
