@@ -194,84 +194,134 @@ export function simulatePairsTrades(series: KalmanPoint[], params: KalmanParams 
   let entrySpreadVol = 0;
   let entryLogY = 0, entryLogX = 0;
 
-  // Position sizing & cost params
   const positionSizePct = params.positionSizePct ?? 15;
   const totalCostBps = params.totalCostBps ?? 5;
 
-  // Burn-in: skip first 30 points to let filter converge
-  const BURN_IN = 30;
+  // ── Realism constants ────────────────────────────────────────────────────
+  // BURN_IN: filter needs ~100 bars to converge (was 30 — too few)
+  const BURN_IN = 100;
+  // MIN_HOLD_DAYS: no same/next-day flips — real execution has 2d minimum
+  const MIN_HOLD_DAYS = 2;
+  // COOLDOWN_BARS: after closing, wait 1 bar before re-entering
+  const COOLDOWN_BARS = 1;
+
+  // ── 1-day execution lag state ─────────────────────────────────────────────
+  // Signal fires at bar t → execute at bar t+1.
+  // This eliminates look-ahead bias: you observe the close z-score, then
+  // trade the NEXT open/close. Without this lag the strategy enters at the
+  // exact price that triggered the signal, guaranteeing an unrealistically
+  // favourable fill.
+  let pendingEntryDir: 'long' | 'short' | null = null;
+  let pendingEntryZ = 0;
+  let pendingEntryBeta = 1;
+  let pendingEntrySpreadVol = 0;
+  let pendingExitBar = -1;
+  let pendingExitReason: PairsTrade['exitReason'] = 'signal';
+  let lastExitBar = -(COOLDOWN_BARS + 1);
 
   for (let t = BURN_IN; t < series.length; t++) {
     const pt = series[t];
 
+    // ── Execute pending exit (1-day lag) ─────────────────────────────────────
+    if (inTrade && pendingExitBar === t) {
+      const spreadChange = (pt.logY - entryLogY) - entryBeta * (pt.logX - entryLogX);
+      const capture = entrySpreadVol > 0 ? spreadChange / entrySpreadVol : spreadChange;
+      const directedCapture = direction === 'long' ? capture : -capture;
+      const costPct = totalCostBps / 10000;
+      const pnlPct = directedCapture * (positionSizePct * 0.01) - costPct * 100;
+
+      trades.push({
+        entryDate: series[entryIdx].date,
+        exitDate: pt.date,
+        direction,
+        entryZ: Math.round(entryZ * 1000) / 1000,
+        exitZ: Math.round(pt.zscore * 1000) / 1000,
+        entryBeta: Math.round(entryBeta * 1000) / 1000,
+        entrySpreadVol: Math.round(entrySpreadVol * 100000) / 100000,
+        daysHeld: t - entryIdx,
+        pnlPct: Math.round(pnlPct * 1000) / 1000,
+        exitReason: pendingExitReason,
+      });
+
+      inTrade = false;
+      lastExitBar = t;
+      pendingExitBar = -1;
+      continue; // Skip entry signal on exit bar
+    }
+
     if (!inTrade) {
-      // Entry signals
-      if (pt.zscore < -ENTRY_Z) {
+      // ── Execute pending entry (1-day lag) ───────────────────────────────────
+      if (pendingEntryDir !== null && (t - lastExitBar) > COOLDOWN_BARS) {
         inTrade = true;
-        direction = 'long';
+        direction = pendingEntryDir;
         entryIdx = t;
-        entryZ = pt.zscore;
-        entryBeta = pt.beta;
-        entrySpreadVol = pt.spreadVol;
-        entryLogY = pt.logY;
+        entryZ = pendingEntryZ;
+        entryBeta = pendingEntryBeta;
+        entrySpreadVol = pendingEntrySpreadVol;
+        entryLogY = pt.logY;   // Execute at next bar's price
         entryLogX = pt.logX;
-      } else if (pt.zscore > ENTRY_Z) {
-        inTrade = true;
-        direction = 'short';
-        entryIdx = t;
-        entryZ = pt.zscore;
-        entryBeta = pt.beta;
-        entrySpreadVol = pt.spreadVol;
-        entryLogY = pt.logY;
-        entryLogX = pt.logX;
+        pendingEntryDir = null;
+      } else {
+        // ── Generate entry signal for next bar ──────────────────────────────
+        // Always replace with latest signal — don't carry stale signals forward
+        pendingEntryDir = null;
+        if (pt.zscore < -ENTRY_Z) {
+          pendingEntryDir = 'long';
+          pendingEntryZ = pt.zscore;
+          pendingEntryBeta = pt.beta;
+          pendingEntrySpreadVol = pt.spreadVol;
+        } else if (pt.zscore > ENTRY_Z) {
+          pendingEntryDir = 'short';
+          pendingEntryZ = pt.zscore;
+          pendingEntryBeta = pt.beta;
+          pendingEntrySpreadVol = pt.spreadVol;
+        }
       }
     } else {
+      // ── In trade: check exit conditions ──────────────────────────────────────
       const daysHeld = t - entryIdx;
-      const absZ = Math.abs(pt.zscore);
 
-      let exit = false;
+      // Enforce minimum holding period — no same/next-day flips
+      if (daysHeld < MIN_HOLD_DAYS) continue;
+
+      // Don't schedule a second pending exit
+      if (pendingExitBar >= 0) continue;
+
+      const absZ = Math.abs(pt.zscore);
+      let wantsExit = false;
       let exitReason: PairsTrade['exitReason'] = 'signal';
 
-      // Stop loss
       if (absZ > STOP_Z) {
-        exit = true;
+        wantsExit = true;
         exitReason = 'stop';
-      }
-      // Mean reversion exit
-      else if (direction === 'long' && pt.zscore > -EXIT_Z) {
-        exit = true;
+      } else if (direction === 'long' && pt.zscore > -EXIT_Z) {
+        wantsExit = true;
       } else if (direction === 'short' && pt.zscore < EXIT_Z) {
-        exit = true;
+        wantsExit = true;
       }
 
-      if (exit) {
-        // Raw spread change in log-level space
-        const spreadChange = (pt.logY - entryLogY) - entryBeta * (pt.logX - entryLogX);
-
-        // Normalize to sigma-units, then scale by position size:
-        //   capture ≈ z_entry - z_exit (σ units of mean-reversion captured)
-        //   pnlPct = capture × positionSizePct × 0.01 − roundTripCost
-        // This gives ~0.1-0.3% per trade at default positionSizePct=15, matching
-        // realistic FX pairs fund returns of 15-25% annually over ~100 trades.
-        const capture = entrySpreadVol > 0 ? spreadChange / entrySpreadVol : spreadChange;
-        const directedCapture = direction === 'long' ? capture : -capture;
-        const costPct = totalCostBps / 10000;
-        const pnlPct = directedCapture * (positionSizePct * 0.01) - costPct * 100;
-
-        trades.push({
-          entryDate: series[entryIdx].date,
-          exitDate: pt.date,
-          direction,
-          entryZ: Math.round(entryZ * 1000) / 1000,
-          exitZ: Math.round(pt.zscore * 1000) / 1000,
-          entryBeta: Math.round(entryBeta * 1000) / 1000,
-          entrySpreadVol: Math.round(entrySpreadVol * 100000) / 100000,
-          daysHeld,
-          pnlPct: Math.round(pnlPct * 1000) / 1000,
-          exitReason,
-        });
-
-        inTrade = false;
+      if (wantsExit) {
+        if (t + 1 < series.length) {
+          // Schedule exit for next bar (1-day lag)
+          pendingExitBar = t + 1;
+          pendingExitReason = exitReason;
+        } else {
+          // Last bar — exit at current price (no next bar)
+          const spreadChange = (pt.logY - entryLogY) - entryBeta * (pt.logX - entryLogX);
+          const capture = entrySpreadVol > 0 ? spreadChange / entrySpreadVol : spreadChange;
+          const directedCapture = direction === 'long' ? capture : -capture;
+          const costPct = totalCostBps / 10000;
+          const pnlPct = directedCapture * (positionSizePct * 0.01) - costPct * 100;
+          trades.push({
+            entryDate: series[entryIdx].date, exitDate: pt.date, direction,
+            entryZ: Math.round(entryZ * 1000) / 1000, exitZ: Math.round(pt.zscore * 1000) / 1000,
+            entryBeta: Math.round(entryBeta * 1000) / 1000,
+            entrySpreadVol: Math.round(entrySpreadVol * 100000) / 100000,
+            daysHeld, pnlPct: Math.round(pnlPct * 1000) / 1000, exitReason,
+          });
+          inTrade = false;
+          lastExitBar = t;
+        }
       }
     }
   }
