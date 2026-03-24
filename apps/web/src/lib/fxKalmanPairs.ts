@@ -76,9 +76,9 @@ export interface KalmanPoint {
   logX: number;
   alpha: number;
   beta: number;
-  spread: number;   // residual e_t
-  zscore: number;   // e_t / sqrt(S_t)
-  spreadVol: number; // sqrt(S_t)
+  spread: number;    // residual e_t
+  zscore: number;    // e_t / sqrt(max(S_t, Ve))
+  spreadVol: number; // sqrt(max(S_t, Ve)) — Kalman innovation std, floored at sqrt(Ve)
 }
 
 export interface PairsTrade {
@@ -117,23 +117,26 @@ export interface KalmanResult {
 // ── Kalman Filter Core ──────────────────────────────────────────────────────
 
 /**
- * Rolling-window size for z-score normalisation.
- *
- * The Kalman innovation variance S converges to near-zero after burn-in,
- * making z = e/√S → ∞ for any non-zero residual.  Instead we normalise
- * by the ROLLING STANDARD DEVIATION of residuals over the last
- * ZSCORE_WINDOW bars — the industry-standard approach (Gatev et al. 2006).
- * This keeps z naturally oscillating around ±1-2 regardless of whether
- * the filter is in or out of steady state.
- */
-const ZSCORE_WINDOW = 30;  // Rolling window for spread volatility normalisation
-
-/**
  * Run the 2D Kalman filter on aligned log-price series.
  * Returns per-date state estimates [α_t, β_t], residuals, and z-scores.
  *
- * Z-score uses a 60-bar rolling std of residuals (not Kalman S) so it
- * oscillates naturally and generates realistic entry signals.
+ * Z-score normalization uses the Kalman innovation variance S:
+ *   z_t = e_t / max(√S_t, √Ve)
+ *
+ * Why S and not rolling std / MAD?
+ *   S = H·P·H^T + Ve is the filter's own uncertainty estimate for the
+ *   innovation. It is large before convergence (correctly dampening z
+ *   during burn-in) and converges to a stable value ≈ Ve in steady state.
+ *   The √Ve floor (≈ 0.032 at Ve=0.001) prevents division-by-near-zero
+ *   after full convergence on tightly cointegrated pairs (e.g. NOKGBP/NOKEUR)
+ *   where S can fall below Ve. This produces z ≈ N(0,1) throughout without
+ *   any rolling buffer, outlier suppression, or manual window tuning.
+ *
+ * Rolling std / MAD alternatives were tried and failed:
+ *   • Rolling mean + std: tracked drift → z ≈ 0 for years on stable pairs
+ *   • RMS: one spike inflated the denominator for WINDOW bars after
+ *   • MAD: when all residuals ≈ 0 (NOKGBP/NOKEUR), MAD ≈ 0, floors to 1e-8
+ *     → z = e / 1e-8 → catastrophic overflow (+1.76e22 portfolio value)
  */
 export function runKalmanFilter(
   dates: string[],
@@ -153,8 +156,7 @@ export function runKalmanFilter(
   // Initial covariance: large uncertainty
   let P00 = 1, P01 = 0, P11 = 1;
 
-  // Rolling residual buffer for z-score normalisation
-  const residualBuf: number[] = [];
+  const sqrtVe = Math.sqrt(Ve);  // Floor for spreadVol — prevents z blowup after convergence
 
   const result: KalmanPoint[] = [];
 
@@ -170,7 +172,7 @@ export function runKalmanFilter(
     // Innovation: e = y - H·θ  (H = [1, x])
     const e = y - (th0 + th1 * x);
 
-    // Innovation variance (used for Kalman gain only, NOT for z-score)
+    // Innovation variance: S = H·P·H^T + Ve  (used for Kalman gain AND z-score)
     const S = P00 + 2 * x * P01 + x * x * P11 + Ve;
 
     // Kalman gain: K = P·H^T / S
@@ -194,32 +196,11 @@ export function runKalmanFilter(
     P01 = AP00 * A10 + AP01 * A11 + K0 * K1 * Ve;
     P11 = AP10 * A10 + AP11 * A11 + K1 * K1 * Ve;
 
-    // ── Rolling z-score — MAD normalisation ───────────────────────────────
-    // z = e / (MAD × 1.4826)
-    //
-    // Why MAD instead of rolling mean/RMS?
-    //   • Rolling mean subtraction: tracks slow drift, keeps z ≈ 0 for stable
-    //     pairs — killed all signals on NOKGBP/NOKEUR for 3 years.
-    //   • RMS: a single spike inflates the denominator for the next
-    //     ZSCORE_WINDOW bars, suppressing all subsequent signals.
-    //   • MAD (median absolute deviation): robust to outliers. The spike is
-    //     always at the tail of the sorted buffer, not the median. After a
-    //     spike, z returns to normal immediately — and before the spike,
-    //     typical quiet residuals give z ≈ N(0,1) → regular threshold crossings.
-    //
-    // For normal data: MAD × 1.4826 ≈ σ, so z ≈ N(0,1) throughout.
-    // For spike data: z_spike = e_spike / σ_quiet → large z (correct signal).
-    residualBuf.push(e);
-    if (residualBuf.length > ZSCORE_WINDOW) residualBuf.shift();
-
-    let rollingStd = 1e-8;
-    if (residualBuf.length >= 5) {
-      const sorted = residualBuf.map(Math.abs).sort((a, b) => a - b);
-      const mad = sorted[Math.floor(sorted.length / 2)];
-      rollingStd = Math.max(mad * 1.4826, 1e-8);
-    }
-
-    const zScore = e / rollingStd;
+    // ── Kalman z-score: z = e / max(√S, √Ve) ─────────────────────────────
+    // S is already computed above for the Kalman gain. Use it directly.
+    // Floor at √Ve prevents division by near-zero after full convergence.
+    const spreadVol = Math.max(Math.sqrt(S), sqrtVe);
+    const zScore = e / spreadVol;
 
     result.push({
       date: dates[t],
@@ -229,7 +210,7 @@ export function runKalmanFilter(
       beta: th1,
       spread: e,
       zscore: zScore,
-      spreadVol: rollingStd,   // rolling std — used for P&L normalisation
+      spreadVol,   // Kalman innovation std — used for P&L vol-targeting
     });
   }
 
