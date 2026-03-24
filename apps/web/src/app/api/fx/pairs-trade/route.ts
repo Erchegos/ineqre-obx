@@ -39,21 +39,27 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Pairs must be different" }, { status: 400 });
     }
 
-    // Fetch aligned daily spot rates for both pairs
+    // Fetch aligned daily spot rates for both pairs.
+    // DISTINCT ON (date) prevents duplicate rows (e.g. multiple intraday or
+    // re-imported records) from cartesian-multiplying in the JOIN — without it
+    // a 5Y window with even a handful of duplicates produces 2-3× too many
+    // bars, bypassing MIN_HOLD/COOLDOWN and inflating trade counts.
     const res = await pool.query(`
       WITH y_rates AS (
-        SELECT date, spot_rate::float AS rate
+        SELECT DISTINCT ON (date) date, spot_rate::float AS rate
         FROM fx_spot_rates
         WHERE currency_pair = $1
           AND date >= CURRENT_DATE - INTERVAL '${days} days'
           AND spot_rate IS NOT NULL AND spot_rate::float > 0
+        ORDER BY date, spot_rate DESC
       ),
       x_rates AS (
-        SELECT date, spot_rate::float AS rate
+        SELECT DISTINCT ON (date) date, spot_rate::float AS rate
         FROM fx_spot_rates
         WHERE currency_pair = $2
           AND date >= CURRENT_DATE - INTERVAL '${days} days'
           AND spot_rate IS NOT NULL AND spot_rate::float > 0
+        ORDER BY date, spot_rate DESC
       )
       SELECT y.date::text, y.rate AS rate_y, x.rate AS rate_x
       FROM y_rates y
@@ -61,16 +67,24 @@ export async function GET(req: NextRequest) {
       ORDER BY y.date ASC
     `, [pairY, pairX]);
 
-    if (res.rows.length < 60) {
+    // JS-level dedup: safety net in case any duplicate dates slip through
+    const seen = new Set<string>();
+    const deduped = res.rows.filter((r: { date: string }) => {
+      if (seen.has(r.date)) return false;
+      seen.add(r.date);
+      return true;
+    });
+
+    if (deduped.length < 60) {
       return NextResponse.json(
-        { error: `Insufficient data: only ${res.rows.length} aligned observations` },
+        { error: `Insufficient data: only ${deduped.length} aligned observations` },
         { status: 422 }
       );
     }
 
-    const dates  = res.rows.map((r: { date: string }) => r.date);
-    const logY   = res.rows.map((r: { rate_y: number }) => Math.log(r.rate_y));
-    const logX   = res.rows.map((r: { rate_x: number }) => Math.log(r.rate_x));
+    const dates  = deduped.map((r: { date: string }) => r.date);
+    const logY   = deduped.map((r: { rate_y: number }) => Math.log(r.rate_y));
+    const logX   = deduped.map((r: { rate_x: number }) => Math.log(r.rate_x));
 
     const params: KalmanParams = { delta, Ve, positionSizePct, totalCostBps };
     const result = runKalmanPairs(dates, logY, logX, pairY, pairX, params);
@@ -83,7 +97,7 @@ export async function GET(req: NextRequest) {
       pairY,
       pairX,
       params: { delta, Ve, days, positionSizePct, totalCostBps },
-      observations: res.rows.length,
+      observations: deduped.length,
       series: thinned.map(pt => ({
         date: pt.date,
         logY: Math.round(pt.logY * 10000) / 10000,
