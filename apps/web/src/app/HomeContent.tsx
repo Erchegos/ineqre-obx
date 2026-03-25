@@ -204,8 +204,8 @@ export default function HomeContent({ stats }: { stats: SystemStats }) {
                 tags={[{ label: "NOK/FX", color: "#f59e0b" }, { label: "IRP", color: "#3b82f6" }, { label: "Hedging", color: "#10b981" }]}
                 visible={modulesReveal.visible} delay={7} />
               <FeatureCard href="/alpha" title="Alpha Engine Yggdrasil"
-                description="Cross-sectional ML signal explorer with interactive trade simulation. Signal crossing entry/exit with dotted P&L connectors, sector-browser ticker search, 365-day cumulative performance chart (10 equal-weight slots, vol-targeted), and a 15-position concentrated portfolio strategy with 5-year monthly backtest."
-                tags={[{ label: "ML Alpha", color: "#10b981" }, { label: "Trade Sim", color: "#f59e0b" }, { label: "228 Stocks", color: "#3b82f6" }]}
+                description="Cross-sectional ML signal explorer with animated trading simulator. Backtest ML predictions with 15 tunable parameters (entry/exit thresholds, stops, momentum filters, SMA gates, valuation screens). Live equity curve vs OBX, trade log, and factor dashboard. Plus: signal explorer with P&L connectors and a 15-position portfolio strategy with 5-year monthly backtest."
+                tags={[{ label: "ML Simulator", color: "#10b981" }, { label: "15 Params", color: "#f59e0b" }, { label: "228 Stocks", color: "#3b82f6" }]}
                 visible={modulesReveal.visible} delay={8} isPrivate />
             </div>
           </section>

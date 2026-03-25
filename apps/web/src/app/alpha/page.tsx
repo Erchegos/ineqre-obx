@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
 import {
@@ -8,6 +8,7 @@ import {
   LineChart, Line, BarChart, Bar, Cell, ComposedChart, Area,
   ReferenceLine, ReferenceArea, Scatter,
 } from "recharts";
+import { runMLSimulation, computeProgressiveStats, SIM_DEFAULTS, type SimInputBar, type SimResult } from "@/lib/mlTradingEngine";
 
 // ============================================================================
 // Types
@@ -132,7 +133,7 @@ export default function AlphaPage() {
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
 
-  const [tab, setTab] = useState<"strategy" | "signals" | "explorer">("strategy");
+  const [tab, setTab] = useState<"strategy" | "signals" | "explorer" | "simulator">("strategy");
   const [selectedModel, setSelectedModel] = useState<ModelId>("yggdrasil_v7");
 
   // Signals
@@ -157,6 +158,40 @@ export default function AlphaPage() {
   const [explorerSectorFilter, setExplorerSectorFilter] = useState("");
   const [explorerSectorSort, setExplorerSectorSort] = useState<"name" | "alpha">("name");
   const [expandedExplorerSectors, setExpandedExplorerSectors] = useState<Set<string>>(new Set());
+
+  // Simulator
+  const [simTicker, setSimTicker] = useState("");
+  const [simDays, setSimDays] = useState(730);
+  const [simData, setSimData] = useState<{ ticker: string; sector: string; input: SimInputBar[]; model: string } | null>(null);
+  const [simLoading, setSimLoading] = useState(false);
+  const [simPlayIdx, setSimPlayIdx] = useState(-1);
+  const [simIsPlaying, setSimIsPlaying] = useState(false);
+  const [simSpeed, setSimSpeed] = useState(5);
+  const simIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [simSearch, setSimSearch] = useState("");
+  const [simSearchIdx, setSimSearchIdx] = useState(-1);
+  const [simShowSectors, setSimShowSectors] = useState(false);
+  const [simSectorFilter, setSimSectorFilter] = useState("");
+  const [simSectorSort, setSimSectorSort] = useState<"name" | "alpha">("name");
+  const [simExpandedSectors, setSimExpandedSectors] = useState<Set<string>>(new Set());
+  const [simSelectedTrade, setSimSelectedTrade] = useState<string | null>(null);
+  const [simShowFilterHelp, setSimShowFilterHelp] = useState(false);
+  // Strategy params
+  const [simEntry, setSimEntry] = useState(SIM_DEFAULTS.entryThreshold);
+  const [simExit, setSimExit] = useState(SIM_DEFAULTS.exitThreshold);
+  const [simStop, setSimStop] = useState(SIM_DEFAULTS.stopLossPct);
+  const [simTP, setSimTP] = useState(SIM_DEFAULTS.takeProfitPct);
+  const [simPosSize, setSimPosSize] = useState(SIM_DEFAULTS.positionSizePct);
+  const [simMinHold, setSimMinHold] = useState(SIM_DEFAULTS.minHoldDays);
+  const [simMaxHold, setSimMaxHold] = useState(SIM_DEFAULTS.maxHoldDays);
+  const [simCooldown, setSimCooldown] = useState(SIM_DEFAULTS.cooldownBars);
+  const [simCost, setSimCost] = useState(SIM_DEFAULTS.costBps);
+  const [simMom, setSimMom] = useState<0 | 1 | 2 | 3>(SIM_DEFAULTS.momentumFilter);
+  const [simVolGate, setSimVolGate] = useState<'off' | 'soft' | 'hard'>(SIM_DEFAULTS.volGate);
+  const [simSma200, setSimSma200] = useState(SIM_DEFAULTS.sma200Require);
+  const [simSma50, setSimSma50] = useState(SIM_DEFAULTS.sma50Require);
+  const [simSmaExit, setSimSmaExit] = useState(SIM_DEFAULTS.smaExitOnCross);
+  const [simValFilter, setSimValFilter] = useState(SIM_DEFAULTS.valuationFilter);
 
   // Portfolio Strategy
   const [portfolioBacktest, setPortfolioBacktest] = useState<PortfolioBacktestResult | null>(null);
@@ -574,6 +609,106 @@ export default function AlphaPage() {
   [explorerSectorGroups]);
 
   // ============================================================================
+  // Simulator: data fetch, engine, animation
+  // ============================================================================
+
+  // Fetch data on ticker/days change (NOT on param change)
+  useEffect(() => {
+    if (tab !== "simulator" || !simTicker || !token) return;
+    setSimIsPlaying(false);
+    setSimPlayIdx(-1);
+    setSimLoading(true);
+    const ctrl = new AbortController();
+    fetch(`/api/alpha/simulator/${simTicker}?days=${simDays}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: ctrl.signal,
+    })
+      .then(r => { if (r.status === 401) { authLogout(); return null; } return r.ok ? r.json() : null; })
+      .then(data => { if (data) setSimData(data); })
+      .catch(() => {})
+      .finally(() => setSimLoading(false));
+    return () => ctrl.abort();
+  }, [tab, simTicker, simDays, token, authLogout]);
+
+  // Run engine client-side (instant on param change)
+  const simResult: SimResult | null = useMemo(() => {
+    if (!simData?.input?.length) return null;
+    return runMLSimulation(simData.input, {
+      entryThreshold: simEntry, exitThreshold: simExit, stopLossPct: simStop,
+      takeProfitPct: simTP, positionSizePct: simPosSize, minHoldDays: simMinHold,
+      maxHoldDays: simMaxHold, cooldownBars: simCooldown, costBps: simCost,
+      momentumFilter: simMom, volGate: simVolGate, sma200Require: simSma200,
+      sma50Require: simSma50, smaExitOnCross: simSmaExit, valuationFilter: simValFilter,
+    });
+  }, [simData, simEntry, simExit, simStop, simTP, simPosSize, simMinHold, simMaxHold,
+      simCooldown, simCost, simMom, simVolGate, simSma200, simSma50, simSmaExit, simValFilter]);
+
+  // Reset playback when engine re-runs (param change)
+  useEffect(() => {
+    setSimIsPlaying(false);
+    setSimPlayIdx(-1);
+  }, [simResult]);
+
+  // Animation loop (copy from FX sim)
+  useEffect(() => {
+    if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+    if (!simIsPlaying || !simResult) return;
+    simIntervalRef.current = setInterval(() => {
+      setSimPlayIdx(prev => {
+        const next = prev + simSpeed;
+        if (next >= simResult.series.length - 1) {
+          setSimIsPlaying(false);
+          return simResult.series.length - 1;
+        }
+        return next;
+      });
+    }, 80);
+    return () => { if (simIntervalRef.current) clearInterval(simIntervalRef.current); };
+  }, [simIsPlaying, simSpeed, simResult]);
+
+  // Derived animation state
+  const simLive = useMemo(() =>
+    simResult?.series.slice(0, Math.max(0, simPlayIdx + 1)) ?? [],
+  [simResult, simPlayIdx]);
+  const simCurrent = simLive.length > 0 ? simLive[simLive.length - 1] : null;
+  const simDoneTrades = useMemo(() =>
+    simResult?.trades.filter(t => simCurrent && t.exitDate <= simCurrent.date) ?? [],
+  [simResult, simCurrent]);
+  const simLiveStats = useMemo(() =>
+    computeProgressiveStats(simDoneTrades, simLive),
+  [simDoneTrades, simLive]);
+  const simProgress = simResult ? Math.max(0, (simPlayIdx / Math.max(1, simResult.series.length - 1)) * 100) : 0;
+
+  // Sim ticker search
+  const simSearchResults = useMemo(() => {
+    if (!simSearch) return [];
+    const q = simSearch.toUpperCase();
+    return allStocks.filter(s => s.ticker.includes(q) || s.name.toUpperCase().includes(q)).slice(0, 10);
+  }, [simSearch, allStocks]);
+
+  // Sim sector browser
+  const simSectorGroups = useMemo(() => {
+    const groups: Record<string, { ticker: string; name: string; sector: string }[]> = {};
+    let stocks = allStocks;
+    if (simSectorFilter) {
+      const q = simSectorFilter.toUpperCase();
+      stocks = stocks.filter(s => s.ticker.includes(q) || s.name.toUpperCase().includes(q));
+    }
+    for (const s of stocks) {
+      if (!groups[s.sector]) groups[s.sector] = [];
+      groups[s.sector].push(s);
+    }
+    if (simSectorSort === "alpha") {
+      for (const sec of Object.keys(groups)) groups[sec].sort((a, b) => a.ticker.localeCompare(b.ticker));
+    }
+    return groups;
+  }, [allStocks, simSectorFilter, simSectorSort]);
+
+  const simSectorNames = useMemo(() =>
+    Object.keys(simSectorGroups).sort(),
+  [simSectorGroups]);
+
+  // ============================================================================
   // LOGIN SCREEN
   // ============================================================================
 
@@ -657,6 +792,7 @@ export default function AlphaPage() {
           { id: "strategy" as const, label: "PORTFOLIO STRATEGY" },
           { id: "signals" as const, label: "SIGNALS" },
           { id: "explorer" as const, label: "EXPLORER" },
+          { id: "simulator" as const, label: "SIMULATOR" },
         ].map(t => <button key={t.id} onClick={() => setTab(t.id)} style={tabStyle(tab === t.id)}>{t.label}</button>)}
       </div>
 
@@ -1713,6 +1849,726 @@ export default function AlphaPage() {
           )}
         </div>
       )}
+      {/* ================================================================ */}
+      {/* SIMULATOR TAB                                                   */}
+      {/* ================================================================ */}
+      {tab === "simulator" && (
+        <div>
+          {/* ── Controls Bar ── */}
+          <div style={{ ...cardStyle, marginBottom: 12, padding: "12px 16px" }}>
+            {/* Row 1: Ticker + Timeframe + Playback */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              {/* Ticker search (Explorer-style) */}
+              <div style={{ flex: 1, minWidth: 220, position: "relative" }}>
+                <div style={{ position: "relative" }}>
+                  <input
+                    value={simSearch}
+                    onChange={e => { setSimSearch(e.target.value); setSimSearchIdx(-1); setSimShowSectors(false); }}
+                    onKeyDown={e => {
+                      if (e.key === "ArrowDown") { e.preventDefault(); setSimSearchIdx(i => Math.min(i + 1, simSearchResults.length - 1)); }
+                      else if (e.key === "ArrowUp") { e.preventDefault(); setSimSearchIdx(i => Math.max(i - 1, -1)); }
+                      else if (e.key === "Enter") {
+                        e.preventDefault();
+                        const pick = simSearchIdx >= 0 ? simSearchResults[simSearchIdx] : simSearchResults[0];
+                        if (pick) { setSimTicker(pick.ticker); setSimSearch(""); setSimSearchIdx(-1); }
+                      }
+                      else if (e.key === "Escape") { setSimSearch(""); setSimSearchIdx(-1); }
+                    }}
+                    placeholder="Search by ticker or company name..."
+                    style={{
+                      width: "100%", padding: "9px 14px", paddingLeft: 34,
+                      background: "#0d1117", border: "1px solid #30363d", borderRadius: 6,
+                      color: "#fff", fontSize: 12, fontFamily: "monospace",
+                      boxSizing: "border-box" as const, outline: "none",
+                    }}
+                    onFocus={e => (e.currentTarget.style.borderColor = "#3b82f6")}
+                    onBlur={e => (e.currentTarget.style.borderColor = "#30363d")}
+                  />
+                  <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "rgba(255,255,255,0.3)", fontSize: 13 }}>⌕</span>
+                </div>
+                {simSearchResults.length > 0 && (
+                  <div style={{
+                    position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
+                    background: "#161b22", border: "1px solid #3b82f6", borderRadius: 6,
+                    zIndex: 30, maxHeight: 300, overflowY: "auto",
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+                  }}>
+                    {simSearchResults.map((s, sIdx) => (
+                      <div key={s.ticker}
+                        onMouseDown={() => { setSimTicker(s.ticker); setSimSearch(""); setSimSearchIdx(-1); }}
+                        style={{ padding: "8px 14px", fontSize: 12, fontFamily: "monospace", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, borderBottom: "1px solid #21262d",
+                          background: sIdx === simSearchIdx ? "rgba(59,130,246,0.15)" : "transparent" }}
+                        onMouseEnter={e => { if (sIdx !== simSearchIdx) e.currentTarget.style.background = "rgba(59,130,246,0.1)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = sIdx === simSearchIdx ? "rgba(59,130,246,0.15)" : "transparent"; }}>
+                        <span style={{ fontWeight: 700, color: "#fff", minWidth: 56 }}>{s.ticker}</span>
+                        <span style={{ color: "rgba(255,255,255,0.5)", flex: 1, fontSize: 11 }}>{s.name}</span>
+                        <span style={{ fontSize: 8, padding: "2px 6px", borderRadius: 3, background: `${sectorColor(s.sector)}20`, color: sectorColor(s.sector), fontWeight: 700 }}>{s.sector}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Selected ticker badge */}
+              {simTicker ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.3)", borderRadius: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, fontFamily: "monospace", color: "#3b82f6" }}>{simTicker}</span>
+                  <span style={{ fontSize: 9, color: sectorColor(simData?.sector ?? ""), fontFamily: "monospace", fontWeight: 700 }}>{simData?.sector ?? ""}</span>
+                  <button onClick={() => { setSimTicker(""); setSimData(null); setSimIsPlaying(false); setSimPlayIdx(-1); }}
+                    style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 14, lineHeight: 1, padding: 0 }}>×</button>
+                </div>
+              ) : (
+                <div style={{ padding: "8px 12px", background: "#0d1117", border: "1px solid #21262d", borderRadius: 6, fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.25)" }}>
+                  No stock selected
+                </div>
+              )}
+
+              {/* Timeframe */}
+              <div style={{ display: "flex", gap: 3 }}>
+                {[{ d: 180, l: "180D" }, { d: 365, l: "1Y" }, { d: 730, l: "2Y" }, { d: 1825, l: "5Y" }].map(t => (
+                  <button key={t.d} onClick={() => setSimDays(t.d)}
+                    style={{ padding: "5px 10px", background: simDays === t.d ? "rgba(59,130,246,0.25)" : "#0d1117",
+                      border: `1px solid ${simDays === t.d ? "#3b82f6" : "#30363d"}`,
+                      color: simDays === t.d ? "#3b82f6" : "rgba(255,255,255,0.35)", borderRadius: 4,
+                      fontSize: 10, fontWeight: 700, cursor: "pointer", fontFamily: "monospace" }}>{t.l}</button>
+                ))}
+              </div>
+
+              <div style={{ width: 1, height: 20, background: "#30363d" }} />
+
+              {/* Play/Pause/Reset */}
+              <button onClick={() => {
+                if (!simResult) return;
+                const atEnd = simPlayIdx >= simResult.series.length - 1;
+                if (simPlayIdx < 0 || atEnd) {
+                  setSimIsPlaying(false);
+                  setTimeout(() => { setSimPlayIdx(0); setSimIsPlaying(true); }, 50);
+                } else {
+                  setSimIsPlaying(p => !p);
+                }
+              }}
+                disabled={!simResult}
+                style={{ ...btnPrimary, padding: "6px 18px", minWidth: 90, opacity: !simResult ? 0.5 : 1, fontSize: 11, letterSpacing: 1 }}>
+                {simIsPlaying ? "⏸ PAUSE" : "▶  PLAY"}
+              </button>
+              <button onClick={() => { setSimIsPlaying(false); setTimeout(() => setSimPlayIdx(-1), 50); }}
+                style={{ ...btnSecondary, padding: "6px 12px", fontSize: 10 }}>⏹ RESET</button>
+
+              {/* Speed */}
+              <div style={{ display: "flex", gap: 3 }}>
+                {[1, 3, 5, 10].map(s => (
+                  <button key={s} onClick={() => setSimSpeed(s)}
+                    style={{ padding: "4px 9px", background: simSpeed === s ? "rgba(59,130,246,0.25)" : "#0d1117",
+                      border: `1px solid ${simSpeed === s ? "#3b82f6" : "#30363d"}`,
+                      color: simSpeed === s ? "#3b82f6" : "rgba(255,255,255,0.35)", borderRadius: 4,
+                      fontSize: 10, fontWeight: 700, cursor: "pointer", fontFamily: "monospace" }}>{s}×</button>
+                ))}
+              </div>
+
+              {/* Progress bar */}
+              <div style={{ flex: 1, minWidth: 80 }}>
+                <div style={{ background: "#21262d", borderRadius: 3, height: 5, overflow: "hidden" }}>
+                  <div style={{ width: `${simProgress.toFixed(1)}%`, height: "100%", background: "linear-gradient(90deg, #3b82f6, #10b981)", transition: "width 0.08s linear", borderRadius: 3 }} />
+                </div>
+              </div>
+
+              {/* Date */}
+              <div style={{ fontSize: 12, fontWeight: 800, color: simLoading ? "#f59e0b" : "#fff", fontFamily: "monospace", letterSpacing: 1.5, minWidth: 100, textAlign: "right" as const }}>
+                {simLoading ? "⟳ LOADING" : (simCurrent?.date ?? "—")}
+              </div>
+            </div>
+
+            {/* Sector browser toggle */}
+            <button
+              onClick={() => setSimShowSectors(v => !v)}
+              style={{
+                display: "flex", alignItems: "center", gap: 6, padding: "6px 0", marginTop: 10,
+                background: "none", border: "none",
+                color: simShowSectors ? "#3b82f6" : "rgba(255,255,255,0.4)",
+                fontSize: 10, fontFamily: "monospace", cursor: "pointer", letterSpacing: "0.05em",
+              }}
+              onMouseEnter={e => { if (!simShowSectors) e.currentTarget.style.color = "#3b82f6"; }}
+              onMouseLeave={e => { if (!simShowSectors) e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}>
+              {simShowSectors ? "▲ HIDE SECTOR BROWSER" : "▼ BROWSE BY SECTOR"}
+              <span style={{ fontSize: 9, opacity: 0.6 }}>({allStocks.length} stocks)</span>
+            </button>
+
+            {/* Sector browser panel */}
+            {simShowSectors && (
+              <div style={{ marginTop: 4, padding: 12, background: "#0d1117", border: "1px solid #30363d", borderRadius: 6, maxHeight: 400, overflowY: "auto" }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+                  <input
+                    value={simSectorFilter}
+                    onChange={e => setSimSectorFilter(e.target.value)}
+                    placeholder="Filter stocks..."
+                    style={{ flex: 1, padding: "5px 10px", background: "#161b22", border: "1px solid #21262d", borderRadius: 4, color: "#fff", fontSize: 11, fontFamily: "monospace", outline: "none" }}
+                  />
+                  <div style={{ display: "flex", gap: 2 }}>
+                    {(["name", "alpha"] as const).map(key => (
+                      <button key={key} onClick={() => setSimSectorSort(key)}
+                        style={{ padding: "4px 8px", borderRadius: 3, fontSize: 9, fontWeight: 600, fontFamily: "monospace", cursor: "pointer",
+                          border: `1px solid ${simSectorSort === key ? "#3b82f6" : "#21262d"}`,
+                          background: simSectorSort === key ? "#3b82f6" : "transparent",
+                          color: simSectorSort === key ? "#fff" : "rgba(255,255,255,0.4)" }}>
+                        {key === "name" ? "SECTOR" : "A-Z"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {simSectorNames.map(sector => {
+                  const stocks = simSectorGroups[sector];
+                  if (!stocks || stocks.length === 0) return null;
+                  const isExpanded = simExpandedSectors.has(sector);
+                  const color = sectorColor(sector);
+                  return (
+                    <div key={sector} style={{ marginBottom: 2 }}>
+                      <button
+                        onClick={() => setSimExpandedSectors(prev => {
+                          const next = new Set(prev);
+                          if (next.has(sector)) next.delete(sector); else next.add(sector);
+                          return next;
+                        })}
+                        style={{
+                          width: "100%", display: "flex", alignItems: "center", gap: 8,
+                          padding: "7px 10px", background: isExpanded ? `${color}12` : "transparent",
+                          border: "none", borderBottom: `1px solid ${isExpanded ? color + "30" : "#21262d"}`,
+                          cursor: "pointer", borderRadius: isExpanded ? "4px 4px 0 0" : 4,
+                        }}
+                        onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = "#161b2280"; }}
+                        onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = "transparent"; }}>
+                        <span style={{ width: 3, height: 14, background: color, borderRadius: 2, flexShrink: 0 }} />
+                        <span style={{ fontSize: 10, fontWeight: 700, fontFamily: "monospace", color }}>{sector}</span>
+                        <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", fontFamily: "monospace" }}>{stocks.length} stocks</span>
+                        <span style={{ marginLeft: "auto", fontSize: 9, color: "rgba(255,255,255,0.3)" }}>{isExpanded ? "▲" : "▼"}</span>
+                      </button>
+                      {isExpanded && (
+                        <div style={{ background: `${color}06`, border: `1px solid ${color}20`, borderTop: "none", borderRadius: "0 0 4px 4px", padding: "4px 0" }}>
+                          {stocks.map(s => (
+                            <div key={s.ticker}
+                              onClick={() => { setSimTicker(s.ticker); setSimShowSectors(false); setSimSearch(""); }}
+                              style={{
+                                display: "flex", alignItems: "center", gap: 10, padding: "6px 14px",
+                                cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.03)",
+                                background: simTicker === s.ticker ? "rgba(59,130,246,0.12)" : "transparent",
+                              }}
+                              onMouseEnter={e => { if (simTicker !== s.ticker) e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
+                              onMouseLeave={e => { e.currentTarget.style.background = simTicker === s.ticker ? "rgba(59,130,246,0.12)" : "transparent"; }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, fontFamily: "monospace", color: simTicker === s.ticker ? "#3b82f6" : "#fff", minWidth: 60 }}>{s.ticker}</span>
+                              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", fontFamily: "monospace", flex: 1 }}>{s.name}</span>
+                              {simTicker === s.ticker && <span style={{ fontSize: 9, color: "#3b82f6" }}>●</span>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* ── Strategy Parameters (boxed controls) ── */}
+          <div style={{ ...cardStyle, marginBottom: 12, padding: "10px 14px" }}>
+            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ ...sectionTitle, margin: 0, marginRight: 4, display: "inline" }}>STRATEGY</span>
+              {([
+                { label: "ENTRY >", value: simEntry, set: setSimEntry, min: 0.25, max: 5, step: 0.25, dec: 2, unit: "%" },
+                { label: "EXIT <", value: simExit, set: setSimExit, min: -3, max: 3, step: 0.25, dec: 2, unit: "%" },
+                { label: "STOP", value: simStop, set: setSimStop, min: 2, max: 15, step: 0.5, dec: 1, unit: "%", prefix: "-" },
+                { label: "TP", value: simTP, set: setSimTP, min: 1, max: 100, step: 1, dec: 0, unit: "%" },
+              ] as const).map(p => (
+                <div key={p.label} style={{ display: "flex", alignItems: "center", background: "#0d1117", border: "1px solid #21262d", borderRadius: 4, padding: "6px 10px", minWidth: 72 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", lineHeight: 1 }}>{p.label}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", fontFamily: "monospace", lineHeight: 1.3 }}>{"prefix" in p ? p.prefix : ""}{p.value.toFixed(p.dec)}{p.unit}</div>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column" as const, gap: 1, marginLeft: 6 }}>
+                    <button onClick={() => p.set(Math.min(p.max, parseFloat((p.value + p.step).toFixed(p.dec))))}
+                      style={{ width: 14, height: 14, background: "transparent", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 8, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                      onMouseEnter={e => (e.currentTarget.style.color = "#fff")}
+                      onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.4)")}>▲</button>
+                    <button onClick={() => p.set(Math.max(p.min, parseFloat((p.value - p.step).toFixed(p.dec))))}
+                      style={{ width: 14, height: 14, background: "transparent", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 8, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                      onMouseEnter={e => (e.currentTarget.style.color = "#fff")}
+                      onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.4)")}>▼</button>
+                  </div>
+                </div>
+              ))}
+
+              <div style={{ width: 1, height: 28, background: "#30363d" }} />
+              <span style={{ ...sectionTitle, margin: 0, marginRight: 4, display: "inline" }}>POSITION</span>
+              {([
+                { label: "SIZE", value: simPosSize, set: setSimPosSize, min: 2, max: 30, step: 1, dec: 0, unit: "%" },
+                { label: "MIN", value: simMinHold, set: setSimMinHold, min: 1, max: 21, step: 1, dec: 0, unit: "d" },
+                { label: "MAX", value: simMaxHold, set: setSimMaxHold, min: 5, max: 63, step: 1, dec: 0, unit: "d" },
+                { label: "COOL", value: simCooldown, set: setSimCooldown, min: 0, max: 10, step: 1, dec: 0, unit: "" },
+                { label: "COST", value: simCost, set: setSimCost, min: 0, max: 50, step: 1, dec: 0, unit: "bp" },
+              ] as const).map(p => (
+                <div key={p.label} style={{ display: "flex", alignItems: "center", background: "#0d1117", border: "1px solid #21262d", borderRadius: 4, padding: "6px 10px", minWidth: 72 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", lineHeight: 1 }}>{p.label}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", fontFamily: "monospace", lineHeight: 1.3 }}>{p.value}{p.unit}</div>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column" as const, gap: 1, marginLeft: 6 }}>
+                    <button onClick={() => p.set(Math.min(p.max, p.value + p.step))}
+                      style={{ width: 14, height: 14, background: "transparent", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 8, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                      onMouseEnter={e => (e.currentTarget.style.color = "#fff")}
+                      onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.4)")}>▲</button>
+                    <button onClick={() => p.set(Math.max(p.min, p.value - p.step))}
+                      style={{ width: 14, height: 14, background: "transparent", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 8, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                      onMouseEnter={e => (e.currentTarget.style.color = "#fff")}
+                      onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.4)")}>▼</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Filter toggles */}
+            <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.4)", letterSpacing: "0.06em", textTransform: "uppercase" as const, marginRight: 4 }}>Filters</span>
+
+              {/* Momentum filter */}
+              <div style={{ display: "flex", gap: 2 }}>
+                <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.45)", marginRight: 3 }}>Mom</span>
+                {([0, 1, 2, 3] as const).map(v => (
+                  <button key={v} onClick={() => setSimMom(v)}
+                    style={{ padding: "3px 7px", background: simMom === v ? "rgba(59,130,246,0.25)" : "#0d1117",
+                      border: `1px solid ${simMom === v ? "#3b82f6" : "#30363d"}`,
+                      color: simMom === v ? "#3b82f6" : "rgba(255,255,255,0.35)", borderRadius: 3,
+                      fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "monospace" }}>
+                    {v === 0 ? "OFF" : `${v}/3`}
+                  </button>
+                ))}
+              </div>
+
+              {/* Vol Gate */}
+              <div style={{ display: "flex", gap: 2 }}>
+                <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.45)", marginRight: 3 }}>Vol</span>
+                {(["off", "soft", "hard"] as const).map(v => (
+                  <button key={v} onClick={() => setSimVolGate(v)}
+                    style={{ padding: "3px 7px", background: simVolGate === v ? "rgba(59,130,246,0.25)" : "#0d1117",
+                      border: `1px solid ${simVolGate === v ? "#3b82f6" : "#30363d"}`,
+                      color: simVolGate === v ? "#3b82f6" : "rgba(255,255,255,0.35)", borderRadius: 3,
+                      fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "monospace", textTransform: "uppercase" as const }}>
+                    {v}
+                  </button>
+                ))}
+              </div>
+
+              {/* Boolean toggles */}
+              {([
+                { label: "SMA200", value: simSma200, set: setSimSma200 },
+                { label: "SMA50", value: simSma50, set: setSimSma50 },
+                { label: "SMA Exit", value: simSmaExit, set: setSimSmaExit },
+                { label: "Valuation", value: simValFilter, set: setSimValFilter },
+              ] as const).map(f => (
+                <button key={f.label} onClick={() => f.set(!f.value)}
+                  style={{ padding: "3px 8px", background: f.value ? "rgba(59,130,246,0.25)" : "#0d1117",
+                    border: `1px solid ${f.value ? "#3b82f6" : "#30363d"}`,
+                    color: f.value ? "#3b82f6" : "rgba(255,255,255,0.35)", borderRadius: 3,
+                    fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "monospace" }}>
+                  {f.label}: {f.value ? "ON" : "OFF"}
+                </button>
+              ))}
+
+              <button onClick={() => {
+                setSimEntry(SIM_DEFAULTS.entryThreshold); setSimExit(SIM_DEFAULTS.exitThreshold);
+                setSimStop(SIM_DEFAULTS.stopLossPct); setSimTP(SIM_DEFAULTS.takeProfitPct);
+                setSimPosSize(SIM_DEFAULTS.positionSizePct); setSimMinHold(SIM_DEFAULTS.minHoldDays);
+                setSimMaxHold(SIM_DEFAULTS.maxHoldDays); setSimCooldown(SIM_DEFAULTS.cooldownBars);
+                setSimCost(SIM_DEFAULTS.costBps); setSimMom(SIM_DEFAULTS.momentumFilter);
+                setSimVolGate(SIM_DEFAULTS.volGate); setSimSma200(SIM_DEFAULTS.sma200Require);
+                setSimSma50(SIM_DEFAULTS.sma50Require); setSimSmaExit(SIM_DEFAULTS.smaExitOnCross);
+                setSimValFilter(SIM_DEFAULTS.valuationFilter);
+              }}
+                style={{ marginLeft: "auto", fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.35)", background: "none", border: "1px solid #30363d", borderRadius: 3, padding: "3px 10px", cursor: "pointer" }}>RESET</button>
+
+              <button onClick={() => setSimShowFilterHelp(v => !v)}
+                style={{ fontSize: 9, fontFamily: "monospace", color: simShowFilterHelp ? "#3b82f6" : "rgba(255,255,255,0.35)", background: simShowFilterHelp ? "rgba(59,130,246,0.1)" : "none", border: `1px solid ${simShowFilterHelp ? "#3b82f6" : "#30363d"}`, borderRadius: 3, padding: "3px 10px", cursor: "pointer" }}>
+                {simShowFilterHelp ? "▲ HIDE GUIDE" : "? GUIDE"}
+              </button>
+            </div>
+
+            {/* Filter & Parameter Explanation Panel */}
+            {simShowFilterHelp && (
+              <div style={{ marginTop: 8, padding: 14, background: "#0d1117", border: "1px solid #30363d", borderRadius: 6, fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.6)", lineHeight: 1.7 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+                  <div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#3b82f6", letterSpacing: "0.06em", marginBottom: 6 }}>STRATEGY PARAMETERS</div>
+                    <div><span style={{ color: "#fff" }}>Entry &gt;</span> — ML predicted return must cross above this threshold to open a LONG position. Higher = fewer but higher-conviction trades.</div>
+                    <div style={{ marginTop: 4 }}><span style={{ color: "#fff" }}>Exit &lt;</span> — When ML prediction drops below this level, the position is closed (signal flip exit). Lower = hold longer through dips.</div>
+                    <div style={{ marginTop: 4 }}><span style={{ color: "#fff" }}>Stop</span> — Maximum allowed loss from entry price. Triggers immediate exit regardless of min hold days.</div>
+                    <div style={{ marginTop: 4 }}><span style={{ color: "#fff" }}>TP</span> — Take profit target. Position closed when unrealized gain hits this level (after min hold). Set to 100% to effectively disable.</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#3b82f6", letterSpacing: "0.06em", marginBottom: 6 }}>POSITION PARAMETERS</div>
+                    <div><span style={{ color: "#fff" }}>Size</span> — Percentage of NAV allocated per trade. Affects P&L scaling but not entry/exit logic.</div>
+                    <div style={{ marginTop: 4 }}><span style={{ color: "#fff" }}>Min Hold</span> — Minimum days before a signal-flip or take-profit exit is allowed. Stop loss always overrides. Prevents whipsaw.</div>
+                    <div style={{ marginTop: 4 }}><span style={{ color: "#fff" }}>Max Hold</span> — Time stop. Position auto-closed after this many days regardless of signal. Forces capital rotation.</div>
+                    <div style={{ marginTop: 4 }}><span style={{ color: "#fff" }}>Cooldown</span> — Bars to wait after closing before the next entry. Prevents re-entering immediately on volatile signals.</div>
+                    <div style={{ marginTop: 4 }}><span style={{ color: "#fff" }}>Cost</span> — Round-trip transaction cost in basis points (1bp = 0.01%). Deducted from each trade P&L.</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#3b82f6", letterSpacing: "0.06em", marginBottom: 6 }}>SIGNAL FILTERS</div>
+                    <div><span style={{ color: "#fff" }}>Momentum</span> — Requires N of 3 momentum factors (1m, 6m, 11m) to be positive before entry. 0=off, 3/3=all must be bullish.</div>
+                    <div style={{ marginTop: 4 }}><span style={{ color: "#fff" }}>Vol Gate</span> — Volatility regime filter. SOFT: halves position size in high-vol. HARD: blocks entry entirely in high-vol regimes.</div>
+                    <div style={{ marginTop: 4 }}><span style={{ color: "#fff" }}>SMA200</span> — Only enter when price is above the 200-day moving average (long-term uptrend confirmation).</div>
+                    <div style={{ marginTop: 4 }}><span style={{ color: "#fff" }}>SMA50</span> — Only enter when price is above the 50-day moving average (medium-term trend filter).</div>
+                    <div style={{ marginTop: 4 }}><span style={{ color: "#fff" }}>SMA Exit</span> — Auto-exit if price crosses below SMA200 during a trade (trend breakdown protection).</div>
+                    <div style={{ marginTop: 4 }}><span style={{ color: "#fff" }}>Valuation</span> — Only enter when stock is cheap vs sector peers (E/P z-score &gt; 0). Avoids chasing expensive momentum names.</div>
+                  </div>
+                </div>
+                <div style={{ marginTop: 12, padding: "8px 0", borderTop: "1px solid #21262d", color: "rgba(255,255,255,0.4)", fontSize: 9 }}>
+                  <span style={{ color: "#fff", fontWeight: 700 }}>How it works:</span> The simulator replays historical ML predictions as daily trading signals. Entry at next-day OPEN after signal crosses threshold. Exits follow priority: stop loss (ignores min hold) → take profit → signal flip → time stop → SMA cross → regime exit. Equity curve compounds closed-trade P&L indexed to 100. OBX benchmark indexed to same start date.
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Loading / No Data States */}
+          {simLoading && (
+            <div style={{ ...cardStyle, textAlign: "center", padding: 60, color: "rgba(255,255,255,0.3)", fontSize: 12, fontFamily: "monospace" }}>
+              Loading simulation data for {simTicker}...
+            </div>
+          )}
+
+          {!simTicker && !simLoading && (
+            <div style={{ ...cardStyle, textAlign: "center", padding: 60, color: "rgba(255,255,255,0.25)", fontSize: 12, fontFamily: "monospace" }}>
+              Search for a ticker above to start the ML Trading Simulator
+            </div>
+          )}
+
+          {simTicker && !simLoading && simResult && (
+            <>
+              {/* ── Row 1: Price Chart + Signal State Panel ── */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 12, marginBottom: 12, alignItems: "stretch" }}>
+                {/* Price & SMA Chart */}
+                <div style={{ ...cardStyle, display: "flex", flexDirection: "column" as const }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <div style={sectionTitle}>{simTicker} — Price & Moving Averages</div>
+                    <div style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.3)" }}>
+                      <span style={{ color: "#f59e0b" }}>— 200MA</span>
+                      &nbsp;&nbsp;<span style={{ color: "rgba(139,157,195,0.6)" }}>— 50MA</span>
+                      &nbsp;&nbsp;<span style={{ color: "#10b981" }}>▲ entry</span>
+                      &nbsp;&nbsp;<span style={{ color: "#ef4444" }}>▼ exit</span>
+                    </div>
+                  </div>
+                  {simLive.length > 1 ? (
+                    <div style={{ flex: 1, minHeight: 300 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={simLive} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="simPriceGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.2} />
+                            <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.02} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                        <XAxis dataKey="date" tick={{ fontSize: 9, fill: "rgba(255,255,255,0.4)", fontFamily: "monospace" }} tickFormatter={d => d.slice(5)} interval="preserveStartEnd" />
+                        <YAxis tick={{ fontSize: 9, fill: "rgba(255,255,255,0.4)", fontFamily: "monospace" }} domain={["auto", "auto"]} />
+                        <Tooltip contentStyle={{ background: "#0d1117", border: "1px solid #30363d", borderRadius: 6, fontFamily: "monospace", fontSize: 11, color: "#fff" }}
+                          labelStyle={{ color: "rgba(255,255,255,0.6)", marginBottom: 4 }}
+                          formatter={(v: number | undefined, name: string | undefined) => {
+                            if (v == null) return [null, ""];
+                            if (name === "price") return [`NOK ${fmtPrice(v)}`, "Price"];
+                            if (name === "sma200") return [fmtPrice(v), "200MA"];
+                            if (name === "sma50") return [fmtPrice(v), "50MA"];
+                            return [null, ""];
+                          }} />
+                        <Area type="monotone" dataKey="price" stroke="#3b82f6" fill="url(#simPriceGrad)" strokeWidth={1.5} dot={false} isAnimationActive={false} name="price" />
+                        <Line type="monotone" dataKey="sma200" stroke="#f59e0b" strokeWidth={1.5} dot={false} strokeDasharray="6 3" connectNulls isAnimationActive={false} name="sma200" />
+                        <Line type="monotone" dataKey="sma50" stroke="rgba(139,157,195,0.5)" strokeWidth={1} dot={false} strokeDasharray="3 3" connectNulls isAnimationActive={false} name="sma50" />
+                        {/* Entry markers (green ▲) */}
+                        <Line type="monotone" dataKey="price" stroke="none" legendType="none" isAnimationActive={false} connectNulls={false} name="priceEntry" tooltipType="none"
+                          dot={(props: { cx?: number; cy?: number; payload?: any; index?: number }) => {
+                            const { cx, cy, payload } = props;
+                            if (!payload?.entryMarker || cx == null || cy == null) return <g key={`se-${cx}-${cy}`} />;
+                            const pts = `${cx},${cy - 10} ${cx - 6},${cy + 3} ${cx + 6},${cy + 3}`;
+                            return <polygon key={`se-${cx}`} points={pts} fill="#10b981" stroke="#0a0a0a" strokeWidth={1.5} />;
+                          }} />
+                        {/* Exit markers (red ▼) */}
+                        <Line type="monotone" dataKey="price" stroke="none" legendType="none" isAnimationActive={false} connectNulls={false} name="priceExit" tooltipType="none"
+                          dot={(props: { cx?: number; cy?: number; payload?: any }) => {
+                            const { cx, cy, payload } = props;
+                            if (!payload?.exitMarker || cx == null || cy == null) return <g key={`sx-${cx}-${cy}`} />;
+                            const pts = `${cx},${cy + 10} ${cx - 6},${cy - 3} ${cx + 6},${cy - 3}`;
+                            return <polygon key={`sx-${cx}`} points={pts} fill="#ef4444" stroke="#0a0a0a" strokeWidth={1.5} />;
+                          }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div style={{ flex: 1, minHeight: 300, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.15)", fontSize: 12, fontFamily: "monospace" }}>
+                      Press ▶ PLAY to begin the simulation
+                    </div>
+                  )}
+                </div>
+
+                {/* Signal State Panel (merged Position Monitor + Factor Dashboard) */}
+                <div style={{ ...cardStyle, padding: "14px 16px", display: "flex", flexDirection: "column" as const }}>
+                  {(() => {
+                    const inPos = simCurrent?.inPosition;
+                    const posColor = inPos ? "#10b981" : "rgba(255,255,255,0.25)";
+                    return (
+                      <>
+                        <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", letterSpacing: "0.1em", marginBottom: 8, fontFamily: "monospace", textTransform: "uppercase" as const }}>Signal State</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                          <div style={{ width: 9, height: 9, borderRadius: "50%", background: posColor, animation: inPos ? "pBlink 1.2s ease-in-out infinite" : "none" }} />
+                          <div style={{ fontSize: 16, fontWeight: 800, color: posColor, letterSpacing: 2, fontFamily: "monospace" }}>
+                            {inPos ? "▲  LONG" : "◌  FLAT"}
+                          </div>
+                        </div>
+
+                        {/* All 7 metric boxes — always visible to prevent layout jumps */}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 10 }}>
+                          {/* ML Prediction — spans full width */}
+                          <div style={{ ...metricCard, gridColumn: "1 / -1" }}>
+                            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", marginBottom: 4, fontFamily: "monospace" }}>ML PREDICTION</div>
+                            <div style={{ fontSize: 18, fontWeight: 800, color: simCurrent?.mlPrediction != null ? (simCurrent.mlPrediction > simEntry ? "#10b981" : simCurrent.mlPrediction < 0 ? "#ef4444" : "#fff") : "rgba(255,255,255,0.2)", fontFamily: "monospace" }}>
+                              {simCurrent?.mlPrediction != null ? `${simCurrent.mlPrediction >= 0 ? "+" : ""}${simCurrent.mlPrediction.toFixed(2)}%` : "—"}
+                            </div>
+                            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.3)", marginTop: 2, fontFamily: "monospace" }}>
+                              entry &gt; {simEntry}% · exit &lt; {simExit}%
+                            </div>
+                          </div>
+                          {/* Unrealized P&L — always shown */}
+                          <div style={metricCard}>
+                            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>UNREALZD</div>
+                            <div style={{ fontSize: 14, fontWeight: 800, color: inPos && simCurrent?.unrealizedPnl != null ? ((simCurrent.unrealizedPnl ?? 0) >= 0 ? "#10b981" : "#ef4444") : "rgba(255,255,255,0.2)", fontFamily: "monospace" }}>
+                              {inPos && simCurrent?.unrealizedPnl != null ? `${simCurrent.unrealizedPnl >= 0 ? "+" : ""}${(simCurrent.unrealizedPnl * 100).toFixed(2)}%` : "—"}
+                            </div>
+                          </div>
+                          {/* Days held — always shown */}
+                          <div style={metricCard}>
+                            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>DAYS</div>
+                            <div style={{ fontSize: 14, fontWeight: 800, color: inPos ? "#fff" : "rgba(255,255,255,0.2)", fontFamily: "monospace" }}>
+                              {inPos && simCurrent ? `${simCurrent.positionDaysHeld ?? 0} / ${simMaxHold}` : "—"}
+                            </div>
+                          </div>
+                          {/* Momentum */}
+                          <div style={metricCard}>
+                            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>MOMENTUM</div>
+                            <div style={{ fontSize: 12, fontWeight: 700, fontFamily: "monospace" }}>
+                              {simCurrent ? (() => {
+                                const moms = [simData?.input[simPlayIdx]?.mom1m, simData?.input[simPlayIdx]?.mom6m, simData?.input[simPlayIdx]?.mom11m];
+                                return <span>{moms.map((m, j) => <span key={j} style={{ color: m != null && m > 0 ? "#10b981" : m != null ? "#ef4444" : "rgba(255,255,255,0.15)", marginRight: 3 }}>{m != null && m > 0 ? "▲" : "▼"}</span>)}</span>;
+                              })() : "—"}
+                            </div>
+                            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.3)", fontFamily: "monospace" }}>{simCurrent?.momScore ?? 0}/3</div>
+                          </div>
+                          {/* Vol */}
+                          <div style={metricCard}>
+                            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>VOL</div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: simCurrent?.volRegime === "high" ? "#ef4444" : simCurrent?.volRegime === "low" ? "#10b981" : "rgba(255,255,255,0.3)", fontFamily: "monospace" }}>
+                              {simCurrent?.volRegime?.toUpperCase() ?? "N/A"}
+                            </div>
+                          </div>
+                          {/* Valuation */}
+                          <div style={metricCard}>
+                            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>VALUATN</div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", fontFamily: "monospace" }}>
+                              {simCurrent?.epSectorZ != null ? (simCurrent.epSectorZ > 1 ? "CHEAP" : simCurrent.epSectorZ < -1 ? "EXPENSIVE" : "FAIR") : "—"}
+                            </div>
+                            <div style={{ fontSize: 7, color: "rgba(255,255,255,0.3)", fontFamily: "monospace" }}>
+                              z={simCurrent?.epSectorZ?.toFixed(1) ?? "—"}
+                            </div>
+                          </div>
+                          {/* Cooldown */}
+                          <div style={metricCard}>
+                            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>COOLDOWN</div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: simCurrent?.blockReason === "cooldown" ? "#f59e0b" : "rgba(255,255,255,0.3)", fontFamily: "monospace" }}>
+                              {simCurrent?.blockReason === "cooldown" ? "ACTIVE" : "CLEAR"}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Recent Trades */}
+                        {simDoneTrades.length > 0 && (
+                          <div style={{ borderTop: "1px solid #21262d", paddingTop: 8, marginTop: "auto" }}>
+                            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.3)", letterSpacing: "0.06em", textTransform: "uppercase" as const, marginBottom: 4, fontFamily: "monospace" }}>Recent Trades</div>
+                            {[...simDoneTrades].reverse().slice(0, 4).map((t, i) => (
+                              <div key={i} style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.5)", padding: "2px 0", display: "flex", gap: 8 }}>
+                                <span style={{ color: "rgba(255,255,255,0.3)" }}>{t.exitDate}</span>
+                                <span style={{ color: t.actualReturn >= 0 ? "#10b981" : "#ef4444", fontWeight: 700 }}>{t.actualReturn >= 0 ? "+" : ""}{(t.actualReturn * 100).toFixed(1)}%</span>
+                                <span style={{ color: "rgba(255,255,255,0.25)" }}>{t.exitReason.replace("_", " ")}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* ── Row 2: ML Signal Chart (full width, compact) ── */}
+              <div style={{ ...cardStyle, marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <div style={sectionTitle}>ML Predicted Return — Trade Signal</div>
+                  <div style={{ display: "flex", gap: 16, fontSize: 9, fontFamily: "monospace" }}>
+                    <span style={{ color: "#10b981" }}>▲ ENTER (&gt;{simEntry}%)</span>
+                    <span style={{ color: "#ef4444" }}>▼ EXIT (&lt;{simExit}%)</span>
+                    <span style={{ color: "rgba(255,255,255,0.4)" }}>{simDoneTrades.length} trades completed</span>
+                  </div>
+                </div>
+                {simLive.length > 1 ? (
+                  <ResponsiveContainer width="100%" height={120}>
+                    <ComposedChart data={simLive} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="simPredGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.2} />
+                          <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                      <XAxis dataKey="date" tick={{ fontSize: 9, fill: "rgba(255,255,255,0.4)", fontFamily: "monospace" }} tickFormatter={d => d.slice(5)} interval="preserveStartEnd" />
+                      <YAxis tick={{ fontSize: 9, fill: "rgba(255,255,255,0.4)", fontFamily: "monospace" }} />
+                      <Tooltip contentStyle={{ background: "#0d1117", border: "1px solid #30363d", borderRadius: 6, fontFamily: "monospace", fontSize: 11, color: "#fff" }}
+                        formatter={(v: number | undefined, name: string | undefined, _props: unknown, idx: number | undefined) => {
+                          if (idx !== 0) return [null, ""];
+                          return [`${v?.toFixed(2) ?? "—"}%`, "ML Prediction"];
+                        }} />
+                      <ReferenceLine y={simEntry} stroke="#10b981" strokeDasharray="5 3" strokeWidth={1} />
+                      <ReferenceLine y={simExit} stroke="#ef4444" strokeDasharray="5 3" strokeWidth={1} />
+                      <ReferenceLine y={0} stroke="rgba(255,255,255,0.15)" strokeWidth={1} />
+                      <Area type="stepAfter" dataKey="mlPrediction" stroke="#3b82f6" fill="url(#simPredGrad)" strokeWidth={1.5} dot={false} isAnimationActive={false} connectNulls name="mlPred" />
+                      {/* Entry dots */}
+                      <Line type="stepAfter" dataKey="mlPrediction" stroke="none" legendType="none" isAnimationActive={false} connectNulls={false} name="mlPredEntry" tooltipType="none"
+                        dot={(props: { cx?: number; cy?: number; payload?: any }) => {
+                          const { cx, cy, payload } = props;
+                          if (!payload?.entryMarker || cx == null || cy == null) return <g key={`spe-${cx}-${cy}`} />;
+                          const pts = `${cx},${cy - 8} ${cx - 5},${cy + 2} ${cx + 5},${cy + 2}`;
+                          return <polygon key={`spe-${cx}`} points={pts} fill="#10b981" stroke="#0a0a0a" strokeWidth={1} />;
+                        }} />
+                      {/* Exit markers (red ▼) */}
+                      <Line type="stepAfter" dataKey="mlPrediction" stroke="none" legendType="none" isAnimationActive={false} connectNulls={false} name="mlPredExit" tooltipType="none"
+                        dot={(props: { cx?: number; cy?: number; payload?: any }) => {
+                          const { cx, cy, payload } = props;
+                          if (!payload?.exitMarker || cx == null || cy == null) return <g key={`spx-${cx}-${cy}`} />;
+                          const pts = `${cx},${cy + 8} ${cx - 5},${cy - 2} ${cx + 5},${cy - 2}`;
+                          return <polygon key={`spx-${cx}`} points={pts} fill="#ef4444" stroke="#0a0a0a" strokeWidth={1} />;
+                        }} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div style={{ height: 120, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.15)", fontSize: 12, fontFamily: "monospace" }}>
+                    Press ▶ PLAY to see ML prediction signal
+                  </div>
+                )}
+              </div>
+
+              {/* ── Row 3: Stats Strip (full width) ── */}
+              <div style={{ ...cardStyle, marginBottom: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 8 }}>
+                  {[
+                    { label: "Trades", value: String(simLiveStats.trades), color: "#fff" },
+                    { label: "Win Rate", value: `${Math.round(simLiveStats.winRate * 100)}%`, color: simLiveStats.winRate >= 0.5 ? "#10b981" : "#ef4444" },
+                    { label: "Total Return", value: `${simLiveStats.totalReturn >= 0 ? "+" : ""}${(simLiveStats.totalReturn * 100).toFixed(1)}%`, color: simLiveStats.totalReturn >= 0 ? "#10b981" : "#ef4444" },
+                    { label: "Ann. Return", value: `${simLiveStats.annualizedReturn >= 0 ? "+" : ""}${(simLiveStats.annualizedReturn * 100).toFixed(1)}%`, color: simLiveStats.annualizedReturn >= 0 ? "#10b981" : "#ef4444" },
+                    { label: "Sharpe", value: simLiveStats.sharpe.toFixed(2), color: simLiveStats.sharpe >= 1 ? "#10b981" : simLiveStats.sharpe >= 0.5 ? "#f59e0b" : "#ef4444" },
+                    { label: "Max DD", value: `${(simLiveStats.maxDrawdown * 100).toFixed(1)}%`, color: "#ef4444" },
+                    { label: "Avg Hold", value: `${Math.round(simLiveStats.avgHoldDays)}d`, color: "#fff" },
+                    { label: "vs OBX", value: `${simLiveStats.excessReturn >= 0 ? "+" : ""}${(simLiveStats.excessReturn * 100).toFixed(1)}%`, color: simLiveStats.excessReturn >= 0 ? "#10b981" : "#ef4444" },
+                  ].map(m => (
+                    <div key={m.label} style={metricCard}>
+                      <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>{m.label}</div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: m.color, fontFamily: "monospace" }}>{m.value}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── Row 4: Trade Log (full width) ── */}
+              <div style={{ ...cardStyle, marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
+                  <div style={sectionTitle}>Simulated Trade Log — Entry &gt;{simEntry}% · Stop -{simStop}% · Min {simMinHold}d · Max {simMaxHold}d</div>
+                  {simDoneTrades.length > 0 && (() => {
+                    const closed = simDoneTrades.filter(t => t.exitReason !== 'time_stop' || true);
+                    const wins = closed.filter(t => t.actualReturn > 0).length;
+                    const avgPnl = closed.reduce((s, t) => s + t.actualReturn, 0) / closed.length;
+                    const avgDD = closed.reduce((s, t) => s + t.maxDrawdown, 0) / closed.length;
+                    const totalPnl = closed.reduce((s, t) => s + t.actualReturn, 0);
+                    return (
+                      <div style={{ display: "flex", gap: 16, fontSize: 10, fontFamily: "monospace" }}>
+                        <span style={{ color: "rgba(255,255,255,0.4)" }}>Trades: <span style={{ color: "#fff", fontWeight: 700 }}>{closed.length}</span></span>
+                        <span style={{ color: "rgba(255,255,255,0.4)" }}>Win Rate: <span style={{ color: closed.length > 0 && wins / closed.length >= 0.5 ? "#10b981" : "#ef4444", fontWeight: 700 }}>{closed.length > 0 ? Math.round(wins / closed.length * 100) : 0}%</span></span>
+                        <span style={{ color: "rgba(255,255,255,0.4)" }}>Avg P&L: <span style={{ color: avgPnl >= 0 ? "#10b981" : "#ef4444", fontWeight: 700 }}>{avgPnl >= 0 ? "+" : ""}{(avgPnl * 100).toFixed(1)}%</span></span>
+                        <span style={{ color: "rgba(255,255,255,0.4)" }}>Avg DD: <span style={{ color: "#ef4444", fontWeight: 700 }}>{(Math.min(avgDD, 0) * 100).toFixed(1)}%</span></span>
+                        <span style={{ color: "rgba(255,255,255,0.4)" }}>Total: <span style={{ color: totalPnl >= 0 ? "#10b981" : "#ef4444", fontWeight: 700 }}>{totalPnl >= 0 ? "+" : ""}{(totalPnl * 100).toFixed(1)}%</span></span>
+                      </div>
+                    );
+                  })()}
+                </div>
+                {simDoneTrades.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: 24, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
+                    {simPlayIdx < 0 ? "Press ▶ PLAY to start simulation" : "No trades completed yet — waiting for entry signal..."}
+                  </div>
+                ) : (
+                  <div style={{ maxHeight: 300, overflowY: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "monospace" }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid #30363d", position: "sticky" as const, top: 0, background: "#161b22" }}>
+                          {["Entry Date", "Exit Date", "Entry Price", "Exit Price", "ML Pred", "Days", "Max DD", "P&L", "Exit Reason"].map(h => (
+                            <th key={h} style={{ fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.5)", padding: "5px 6px", textAlign: h === "Entry Date" ? "left" as const : "right" as const }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...simDoneTrades].reverse().map((t, i) => (
+                          <tr key={i} style={{ borderBottom: "1px solid rgba(48,54,61,0.3)" }}
+                            onMouseEnter={e => e.currentTarget.style.background = "rgba(59,130,246,0.07)"}
+                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                            <td style={{ padding: "4px 6px", fontSize: 10, color: "rgba(255,255,255,0.7)" }}>{t.entryDate}</td>
+                            <td style={{ padding: "4px 6px", fontSize: 10, textAlign: "right", color: "rgba(255,255,255,0.7)" }}>{t.exitDate}</td>
+                            <td style={{ padding: "4px 6px", fontSize: 10, textAlign: "right", color: "rgba(255,255,255,0.5)" }}>NOK {fmtPrice(t.entryPrice)}</td>
+                            <td style={{ padding: "4px 6px", fontSize: 10, textAlign: "right", color: "rgba(255,255,255,0.5)" }}>NOK {fmtPrice(t.exitPrice)}</td>
+                            <td style={{ padding: "4px 6px", fontSize: 10, textAlign: "right", color: "#3b82f6" }}>{(t.predAtEntry).toFixed(1)}%</td>
+                            <td style={{ padding: "4px 6px", fontSize: 10, textAlign: "right", color: "rgba(255,255,255,0.5)" }}>{t.daysHeld}d</td>
+                            <td style={{ padding: "4px 6px", fontSize: 10, fontWeight: 600, textAlign: "right", color: t.maxDrawdown < 0 ? "#ef4444" : "rgba(255,255,255,0.3)" }}>
+                              {t.maxDrawdown < 0 ? (t.maxDrawdown * 100).toFixed(1) + "%" : "0%"}
+                            </td>
+                            <td style={{ padding: "4px 6px", fontSize: 11, fontWeight: 700, textAlign: "right", color: t.actualReturn >= 0 ? "#10b981" : "#ef4444" }}>
+                              {t.actualReturn >= 0 ? "+" : ""}{(t.actualReturn * 100).toFixed(1)}%
+                            </td>
+                            <td style={{ padding: "4px 6px", fontSize: 9, textAlign: "right", color: "rgba(255,255,255,0.4)", textTransform: "uppercase" as const }}>
+                              {t.exitReason.replace("_", " ")}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Row 5: Equity Curve vs OBX (full width, bottom) ── */}
+              <div style={cardStyle}>
+                <div style={sectionTitle}>Equity Curve — Strategy vs OBX</div>
+                {simLive.length > 1 ? (
+                  <ResponsiveContainer width="100%" height={180}>
+                    <LineChart data={simLive} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                      <XAxis dataKey="date" tick={{ fontSize: 9, fill: "rgba(255,255,255,0.4)", fontFamily: "monospace" }} tickFormatter={d => d.slice(5)} interval="preserveStartEnd" />
+                      <YAxis tick={{ fontSize: 9, fill: "rgba(255,255,255,0.4)", fontFamily: "monospace" }} />
+                      <Tooltip contentStyle={{ background: "#0d1117", border: "1px solid #30363d", borderRadius: 6, fontFamily: "monospace", fontSize: 11, color: "#fff" }}
+                        formatter={(v: number | undefined, name: string | undefined) => [v?.toFixed(1) ?? "—", name === "equityValue" ? "Strategy" : "OBX"]} />
+                      <Line type="monotone" dataKey="equityValue" stroke="#3b82f6" strokeWidth={2} dot={false} isAnimationActive={false} name="equityValue" />
+                      <Line type="monotone" dataKey="benchmarkValue" stroke="rgba(255,255,255,0.25)" strokeWidth={1} dot={false} isAnimationActive={false} strokeDasharray="4 3" name="benchmarkValue" />
+                      <ReferenceLine y={100} stroke="rgba(255,255,255,0.1)" strokeWidth={1} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div style={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.15)", fontSize: 12, fontFamily: "monospace" }}>
+                    Press ▶ PLAY to see equity curve
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
     </main>
   );
 }
