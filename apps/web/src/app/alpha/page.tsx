@@ -179,6 +179,7 @@ export default function AlphaPage() {
   const [simShowFilterHelp, setSimShowFilterHelp] = useState(false);
   const [simShowMLGuide, setSimShowMLGuide] = useState(false);
   const [explorerShowMLGuide, setExplorerShowMLGuide] = useState(false);
+  const [signalsShowMLGuide, setSignalsShowMLGuide] = useState(false);
   // Strategy params
   const [simEntry, setSimEntry] = useState(SIM_DEFAULTS.entryThreshold);
   const [simExit, setSimExit] = useState(SIM_DEFAULTS.exitThreshold);
@@ -762,49 +763,52 @@ export default function AlphaPage() {
 
   const loading = signalsLoading || explorerLoading || portfolioBacktestLoading;
 
+  // Professional ML guide button style
+  const guideButtonStyle = (active: boolean): React.CSSProperties => ({
+    display: "inline-flex", alignItems: "center", gap: 5,
+    fontSize: 9, fontFamily: "monospace", fontWeight: 600, letterSpacing: "0.04em",
+    color: active ? "#fff" : "rgba(255,255,255,0.5)",
+    background: active ? "linear-gradient(135deg, rgba(59,130,246,0.2), rgba(16,185,129,0.15))" : "rgba(255,255,255,0.03)",
+    border: `1px solid ${active ? "rgba(59,130,246,0.5)" : "#30363d"}`,
+    borderRadius: 4, padding: "5px 12px", cursor: "pointer",
+    transition: "all 0.15s ease",
+  });
+
   // Shared ML Signal explanation panel
-  const renderMLGuide = (show: boolean, setShow: (v: boolean) => void) => (
-    <>
-      <button onClick={() => setShow(!show)}
-        style={{ fontSize: 9, fontFamily: "monospace", color: show ? "#3b82f6" : "rgba(255,255,255,0.35)", background: show ? "rgba(59,130,246,0.1)" : "none", border: `1px solid ${show ? "#3b82f6" : "#30363d"}`, borderRadius: 3, padding: "3px 10px", cursor: "pointer" }}>
-        {show ? "▲ HIDE ML GUIDE" : "? HOW ML SIGNALS WORK"}
-      </button>
-      {show && (
-        <div style={{ marginTop: 10, padding: 16, background: "#0d1117", border: "1px solid #30363d", borderRadius: 6, fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.6)", lineHeight: 1.7 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20 }}>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#3b82f6", letterSpacing: "0.06em", marginBottom: 8 }}>WHAT IS THE ML SIGNAL?</div>
-              <div>The ML prediction is a <span style={{ color: "#fff" }}>1-month forward return forecast</span> for each stock, generated daily by an ensemble of two gradient-boosted tree models:</div>
-              <div style={{ marginTop: 6 }}><span style={{ color: "#10b981" }}>XGBoost (50%)</span> + <span style={{ color: "#10b981" }}>LightGBM (50%)</span></div>
-              <div style={{ marginTop: 6 }}>The models are trained on <span style={{ color: "#fff" }}>19 factors</span> across 200+ OSE stocks:</div>
-              <div style={{ marginTop: 4, color: "rgba(255,255,255,0.45)" }}>
-                <div><span style={{ color: "#f59e0b" }}>Technical (11):</span> Momentum (1m/6m/11m/36m), change in momentum, volatility (1m/3m/12m), max return, beta, idiosyncratic vol, January dummy</div>
-                <div style={{ marginTop: 2 }}><span style={{ color: "#f59e0b" }}>Fundamental (8):</span> Book/Market, Earnings/Price, dividend yield, sales/price, sales growth, market cap, NOK volume</div>
-              </div>
-              <div style={{ marginTop: 6 }}>Output: a <span style={{ color: "#fff" }}>predicted % return</span> (e.g. +2.5% means the model expects ~2.5% gain over the next month) plus confidence percentiles (p05–p95).</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#10b981", letterSpacing: "0.06em", marginBottom: 8 }}>WHY IS IT TRUSTED?</div>
-              <div><span style={{ color: "#fff" }}>Cross-sectional ranking</span> — The model doesn't predict absolute prices. It ranks stocks against each other based on factor exposure, which is more stable and less prone to overfitting.</div>
-              <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>Walk-forward validation</span> — Trained on rolling historical windows, tested on out-of-sample future data. No look-ahead bias.</div>
-              <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>Factor-based, not pattern-based</span> — Uses well-documented academic factors (Fama-French momentum, value, size) that have worked for decades across global markets, not chart patterns or technical indicators alone.</div>
-              <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>Ensemble averaging</span> — Two different model architectures (XGBoost + LightGBM) reduce model-specific bias. Predictions are averaged for robustness.</div>
-              <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>Daily recalibration</span> — Signals update daily with fresh price and factor data, adapting to changing market conditions.</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#ef4444", letterSpacing: "0.06em", marginBottom: 8 }}>RISKS & LIMITATIONS</div>
-              <div><span style={{ color: "#fff" }}>Not a crystal ball</span> — Even good signals are right only ~55-65% of the time. Edge comes from many trades, not any single prediction.</div>
-              <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>Regime changes</span> — In market crises (COVID, rate shocks), historical factor relationships can break down. Momentum crashes and value traps are real risks.</div>
-              <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>OSE-specific</span> — Trained on Oslo Stock Exchange data only (~200 stocks). Small universe means less diversification and potential liquidity issues in smaller names.</div>
-              <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>Survivorship bias</span> — Only includes stocks currently listed. Delisted companies (often failures) are excluded, which can inflate historical performance.</div>
-              <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>Transaction costs</span> — Real-world slippage, bid-ask spreads, and market impact (especially in illiquid stocks) may exceed the 10bp default cost assumption.</div>
-              <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>Past ≠ Future</span> — Backtested results always look better than live trading. Use these signals as one input among many, not as sole decision basis.</div>
-            </div>
+  const renderMLGuidePanel = (show: boolean) => show ? (
+    <div style={{ marginTop: 10, padding: 16, background: "#0d1117", border: "1px solid #30363d", borderRadius: 6, fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.6)", lineHeight: 1.7 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20 }}>
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#3b82f6", letterSpacing: "0.06em", marginBottom: 8 }}>WHAT IS THE ML SIGNAL?</div>
+          <div>The ML prediction is a <span style={{ color: "#fff" }}>1-month forward return forecast</span> for each stock, generated daily by an ensemble of two gradient-boosted tree models:</div>
+          <div style={{ marginTop: 6 }}><span style={{ color: "#10b981" }}>XGBoost (50%)</span> + <span style={{ color: "#10b981" }}>LightGBM (50%)</span></div>
+          <div style={{ marginTop: 6 }}>The models are trained on <span style={{ color: "#fff" }}>19 factors</span> across 200+ OSE stocks:</div>
+          <div style={{ marginTop: 4, color: "rgba(255,255,255,0.45)" }}>
+            <div><span style={{ color: "#f59e0b" }}>Technical (11):</span> Momentum (1m/6m/11m/36m), change in momentum, volatility (1m/3m/12m), max return, beta, idiosyncratic vol, January dummy</div>
+            <div style={{ marginTop: 2 }}><span style={{ color: "#f59e0b" }}>Fundamental (8):</span> Book/Market, Earnings/Price, dividend yield, sales/price, sales growth, market cap, NOK volume</div>
           </div>
+          <div style={{ marginTop: 6 }}>Output: a <span style={{ color: "#fff" }}>predicted % return</span> (e.g. +2.5% means the model expects ~2.5% gain over the next month) plus confidence percentiles (p05–p95).</div>
         </div>
-      )}
-    </>
-  );
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#10b981", letterSpacing: "0.06em", marginBottom: 8 }}>WHY IS IT TRUSTED?</div>
+          <div><span style={{ color: "#fff" }}>Cross-sectional ranking</span> — The model ranks stocks against each other based on factor exposure, which is more stable and less prone to overfitting than predicting absolute prices.</div>
+          <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>Walk-forward validation</span> — Trained on rolling historical windows, tested on out-of-sample future data. No look-ahead bias.</div>
+          <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>Factor-based, not pattern-based</span> — Uses well-documented academic factors (Fama-French momentum, value, size) that have worked for decades across global markets.</div>
+          <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>Ensemble averaging</span> — Two different model architectures (XGBoost + LightGBM) reduce model-specific bias.</div>
+          <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>Daily recalibration</span> — Signals update daily with fresh price and factor data.</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#ef4444", letterSpacing: "0.06em", marginBottom: 8 }}>RISKS & LIMITATIONS</div>
+          <div><span style={{ color: "#fff" }}>Not a crystal ball</span> — Even good signals are right only ~55-65% of the time. Edge comes from many trades, not any single prediction.</div>
+          <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>Regime changes</span> — In market crises, historical factor relationships can break down. Momentum crashes and value traps are real risks.</div>
+          <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>OSE-specific</span> — Trained on Oslo Stock Exchange only (~200 stocks). Small universe means less diversification.</div>
+          <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>Survivorship bias</span> — Only includes currently listed stocks. Delisted companies are excluded.</div>
+          <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>Transaction costs</span> — Real-world slippage and market impact may exceed the 10bp default cost assumption.</div>
+          <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>Past ≠ Future</span> — Backtested results always look better than live trading. Use signals as one input among many.</div>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <main style={{ padding: "20px 16px", maxWidth: 1400, margin: "0 auto" }}>
@@ -1438,8 +1442,13 @@ export default function AlphaPage() {
                   {s.toUpperCase()} {signalSort === s ? (signalSortAsc ? "↑" : "↓") : ""}
                 </button>
               ))}
+              <div style={{ width: 1, height: 16, background: "#30363d" }} />
+              <button onClick={() => setSignalsShowMLGuide(v => !v)} style={guideButtonStyle(signalsShowMLGuide)}>
+                <span style={{ fontSize: 11 }}>◈</span> {signalsShowMLGuide ? "HIDE ML GUIDE" : "HOW ML SIGNALS WORK"}
+              </button>
             </div>
           </div>
+          {renderMLGuidePanel(signalsShowMLGuide)}
 
           {/* Signal Table */}
           <div style={cardStyle}>
@@ -1449,7 +1458,7 @@ export default function AlphaPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "monospace" }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid #30363d" }}>
-                    {["Ticker", "Name", "Sector", "Rank", "Signal", "Price", "1D Chg"].map(h => (
+                    {["Ticker", "Name", "Sector", "Rank", "Predicted", "Signal", "Price", "1D Chg"].map(h => (
                       <th key={h} style={{ fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.5)", padding: "6px 8px", textAlign: h === "Name" ? "left" as const : "right" as const }}>{h}</th>
                     ))}
                   </tr>
@@ -1476,6 +1485,9 @@ export default function AlphaPage() {
                           <span style={{ color: sectorColor(row.sector), fontWeight: 700 }}>{row.sector}</span>
                         </td>
                         <td style={{ padding: "5px 8px", fontSize: 10, textAlign: "right", color: "rgba(255,255,255,0.5)", fontFamily: "monospace" }}>{conf.toFixed(3)}</td>
+                        <td style={{ padding: "5px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", fontFamily: "monospace", color: pred > 0.02 ? "#10b981" : pred > 0 ? "#4caf50" : pred > -0.02 ? "#f59e0b" : "#ef4444" }}>
+                          {pred !== 0 ? `${pred >= 0 ? "+" : ""}${(pred * 100).toFixed(1)}%` : "—"}
+                        </td>
                         <td style={{ padding: "5px 8px", textAlign: "right" }}>
                           <span style={{ fontSize: 10, fontWeight: 700, color: label.color }}>{label.text}</span>
                         </td>
@@ -1567,11 +1579,16 @@ export default function AlphaPage() {
                 ))}
               </div>
 
-              {explorerTicker && (
-                <span style={{ marginLeft: "auto", fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", alignSelf: "center" }}>
-                  {tickerHistory?.signals.filter(s => s.model_id === selectedModel).length || 0} signals · {tickerHistory?.actualReturns.length || 0} days
-                </span>
-              )}
+              <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+                {explorerTicker && (
+                  <span style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.3)" }}>
+                    {tickerHistory?.signals.filter(s => s.model_id === selectedModel).length || 0} signals · {tickerHistory?.actualReturns.length || 0} days
+                  </span>
+                )}
+                <button onClick={() => setExplorerShowMLGuide(v => !v)} style={guideButtonStyle(explorerShowMLGuide)}>
+                  <span style={{ fontSize: 11 }}>◈</span> {explorerShowMLGuide ? "HIDE ML GUIDE" : "HOW ML SIGNALS WORK"}
+                </button>
+              </div>
             </div>
 
             {/* Sector browser toggle */}
@@ -1665,10 +1682,7 @@ export default function AlphaPage() {
               </div>
             )}
 
-            {/* ML Signal Guide */}
-            <div style={{ marginTop: 8 }}>
-              {renderMLGuide(explorerShowMLGuide, setExplorerShowMLGuide)}
-            </div>
+            {renderMLGuidePanel(explorerShowMLGuide)}
           </div>
 
           {/* Fundamentals */}
@@ -2271,13 +2285,12 @@ export default function AlphaPage() {
               }}
                 style={{ marginLeft: "auto", fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.35)", background: "none", border: "1px solid #30363d", borderRadius: 3, padding: "3px 10px", cursor: "pointer" }}>RESET</button>
 
-              <button onClick={() => setSimShowFilterHelp(v => !v)}
-                style={{ fontSize: 9, fontFamily: "monospace", color: simShowFilterHelp ? "#3b82f6" : "rgba(255,255,255,0.35)", background: simShowFilterHelp ? "rgba(59,130,246,0.1)" : "none", border: `1px solid ${simShowFilterHelp ? "#3b82f6" : "#30363d"}`, borderRadius: 3, padding: "3px 10px", cursor: "pointer" }}>
-                {simShowFilterHelp ? "▲ HIDE GUIDE" : "? GUIDE"}
+              <div style={{ width: 1, height: 18, background: "#30363d" }} />
+              <button onClick={() => setSimShowFilterHelp(v => !v)} style={guideButtonStyle(simShowFilterHelp)}>
+                <span style={{ fontSize: 11 }}>⚙</span> {simShowFilterHelp ? "HIDE PARAMETER GUIDE" : "PARAMETER GUIDE"}
               </button>
-              <button onClick={() => setSimShowMLGuide(v => !v)}
-                style={{ fontSize: 9, fontFamily: "monospace", color: simShowMLGuide ? "#10b981" : "rgba(255,255,255,0.35)", background: simShowMLGuide ? "rgba(16,185,129,0.1)" : "none", border: `1px solid ${simShowMLGuide ? "#10b981" : "#30363d"}`, borderRadius: 3, padding: "3px 10px", cursor: "pointer" }}>
-                {simShowMLGuide ? "▲ HIDE ML GUIDE" : "? HOW ML SIGNALS WORK"}
+              <button onClick={() => setSimShowMLGuide(v => !v)} style={guideButtonStyle(simShowMLGuide)}>
+                <span style={{ fontSize: 11 }}>◈</span> {simShowMLGuide ? "HIDE ML GUIDE" : "HOW ML SIGNALS WORK"}
               </button>
             </div>
 
@@ -2316,41 +2329,7 @@ export default function AlphaPage() {
               </div>
             )}
 
-            {/* ML Signal Guide Panel */}
-            {simShowMLGuide && (
-              <div style={{ marginTop: 8, padding: 16, background: "#0d1117", border: "1px solid #30363d", borderRadius: 6, fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.6)", lineHeight: 1.7 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20 }}>
-                  <div>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "#3b82f6", letterSpacing: "0.06em", marginBottom: 8 }}>WHAT IS THE ML SIGNAL?</div>
-                    <div>The ML prediction is a <span style={{ color: "#fff" }}>1-month forward return forecast</span> for each stock, generated daily by an ensemble of two gradient-boosted tree models:</div>
-                    <div style={{ marginTop: 6 }}><span style={{ color: "#10b981" }}>XGBoost (50%)</span> + <span style={{ color: "#10b981" }}>LightGBM (50%)</span></div>
-                    <div style={{ marginTop: 6 }}>The models are trained on <span style={{ color: "#fff" }}>19 factors</span> across 200+ OSE stocks:</div>
-                    <div style={{ marginTop: 4, color: "rgba(255,255,255,0.45)" }}>
-                      <div><span style={{ color: "#f59e0b" }}>Technical (11):</span> Momentum (1m/6m/11m/36m), change in momentum, volatility (1m/3m/12m), max return, beta, idiosyncratic vol, January dummy</div>
-                      <div style={{ marginTop: 2 }}><span style={{ color: "#f59e0b" }}>Fundamental (8):</span> Book/Market, Earnings/Price, dividend yield, sales/price, sales growth, market cap, NOK volume</div>
-                    </div>
-                    <div style={{ marginTop: 6 }}>Output: a <span style={{ color: "#fff" }}>predicted % return</span> (e.g. +2.5% means the model expects ~2.5% gain over the next month) plus confidence percentiles (p05–p95).</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "#10b981", letterSpacing: "0.06em", marginBottom: 8 }}>WHY IS IT TRUSTED?</div>
-                    <div><span style={{ color: "#fff" }}>Cross-sectional ranking</span> — The model ranks stocks against each other based on factor exposure, which is more stable and less prone to overfitting than predicting absolute prices.</div>
-                    <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>Walk-forward validation</span> — Trained on rolling historical windows, tested on out-of-sample future data. No look-ahead bias.</div>
-                    <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>Factor-based</span> — Uses well-documented academic factors (Fama-French momentum, value, size) that have worked for decades across global markets.</div>
-                    <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>Ensemble averaging</span> — Two different architectures (XGBoost + LightGBM) reduce model-specific bias.</div>
-                    <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>Daily recalibration</span> — Signals update daily with fresh price and factor data, adapting to changing market conditions.</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "#ef4444", letterSpacing: "0.06em", marginBottom: 8 }}>RISKS & LIMITATIONS</div>
-                    <div><span style={{ color: "#fff" }}>Not a crystal ball</span> — Even good signals are right ~55-65% of the time. Edge comes from many trades, not any single prediction.</div>
-                    <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>Regime changes</span> — In crises (COVID, rate shocks), historical factor relationships can break down. Momentum crashes and value traps are real.</div>
-                    <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>OSE-specific</span> — Trained on ~200 OSE stocks only. Small universe with potential liquidity issues in smaller names.</div>
-                    <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>Survivorship bias</span> — Only current listings. Delisted companies excluded, which can inflate historical performance.</div>
-                    <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>Transaction costs</span> — Real slippage and market impact may exceed the 10bp default assumption, especially in illiquid stocks.</div>
-                    <div style={{ marginTop: 6 }}><span style={{ color: "#fff" }}>Past ≠ Future</span> — Backtested results always look better than live trading. Use as one input among many.</div>
-                  </div>
-                </div>
-              </div>
-            )}
+            {renderMLGuidePanel(simShowMLGuide)}
           </div>
 
           {/* Loading / No Data States */}
