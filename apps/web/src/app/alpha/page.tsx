@@ -802,6 +802,33 @@ export default function AlphaPage() {
       {tab === "strategy" && (
         <div>
 
+          {/* ── Simulator Teaser ── */}
+          <div
+            onClick={() => setTab("simulator")}
+            style={{
+              marginBottom: 16, padding: "16px 20px", cursor: "pointer",
+              background: "linear-gradient(135deg, rgba(59,130,246,0.06) 0%, rgba(16,185,129,0.04) 100%)",
+              border: "1px solid rgba(59,130,246,0.2)", borderRadius: 8,
+              display: "flex", alignItems: "center", gap: 16,
+              transition: "border-color 0.2s, box-shadow 0.2s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = "#3b82f6"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(59,130,246,0.12)"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(59,130,246,0.2)"; e.currentTarget.style.boxShadow = "none"; }}
+          >
+            <div style={{ fontSize: 28, lineHeight: 1 }}>▶</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#3b82f6", fontFamily: "monospace", letterSpacing: "0.04em", marginBottom: 3 }}>
+                ML TRADING SIMULATOR
+              </div>
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.55)", fontFamily: "monospace", lineHeight: 1.5 }}>
+                Animated backtest of ML prediction signals with 15 tunable parameters. Configure entry/exit thresholds, stops, momentum filters, SMA gates, and valuation screens — watch trades execute in real-time with equity curve vs OBX.
+              </div>
+            </div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#3b82f6", fontFamily: "monospace", whiteSpace: "nowrap" as const, padding: "6px 14px", background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.3)", borderRadius: 5 }}>
+              OPEN SIMULATOR →
+            </div>
+          </div>
+
           {/* ══════════════════════════════════════════════════════════════════
               SECTION 1 — ML SIGNAL PAPER TRADING  (research / exploration)
           ══════════════════════════════════════════════════════════════════ */}
@@ -1314,32 +1341,6 @@ export default function AlphaPage() {
             })()}
           </div>
 
-          {/* ── Simulator Teaser ── */}
-          <div
-            onClick={() => setTab("simulator")}
-            style={{
-              marginTop: 20, padding: "16px 20px", cursor: "pointer",
-              background: "linear-gradient(135deg, rgba(59,130,246,0.06) 0%, rgba(16,185,129,0.04) 100%)",
-              border: "1px solid rgba(59,130,246,0.2)", borderRadius: 8,
-              display: "flex", alignItems: "center", gap: 16,
-              transition: "border-color 0.2s, box-shadow 0.2s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = "#3b82f6"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(59,130,246,0.12)"; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(59,130,246,0.2)"; e.currentTarget.style.boxShadow = "none"; }}
-          >
-            <div style={{ fontSize: 28, lineHeight: 1 }}>▶</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: "#3b82f6", fontFamily: "monospace", letterSpacing: "0.04em", marginBottom: 3 }}>
-                ML TRADING SIMULATOR
-              </div>
-              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.55)", fontFamily: "monospace", lineHeight: 1.5 }}>
-                Animated backtest of ML prediction signals with 15 tunable parameters. Configure entry/exit thresholds, stops, momentum filters, SMA gates, and valuation screens — watch trades execute in real-time with equity curve vs OBX.
-              </div>
-            </div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "#3b82f6", fontFamily: "monospace", whiteSpace: "nowrap" as const, padding: "6px 14px", background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.3)", borderRadius: 5 }}>
-              OPEN SIMULATOR →
-            </div>
-          </div>
 
         </div>
       )}
