@@ -154,6 +154,7 @@ export default function AlphaPage() {
   // Explorer ticker selector
   const [allStocks, setAllStocks] = useState<{ ticker: string; name: string; sector: string }[]>([]);
   const [explorerSearch, setExplorerSearch] = useState("");
+  const [explorerSearchIdx, setExplorerSearchIdx] = useState(-1);
   const [showExplorerSectors, setShowExplorerSectors] = useState(false);
   const [explorerSectorFilter, setExplorerSectorFilter] = useState("");
   const [explorerSectorSort, setExplorerSectorSort] = useState<"name" | "alpha">("name");
@@ -1520,7 +1521,17 @@ export default function AlphaPage() {
                 <div style={{ position: "relative" }}>
                   <input
                     value={explorerSearch}
-                    onChange={e => { setExplorerSearch(e.target.value); setShowExplorerSectors(false); }}
+                    onChange={e => { setExplorerSearch(e.target.value); setExplorerSearchIdx(-1); setShowExplorerSectors(false); }}
+                    onKeyDown={e => {
+                      if (e.key === "ArrowDown") { e.preventDefault(); setExplorerSearchIdx(i => Math.min(i + 1, explorerSearchResults.length - 1)); }
+                      else if (e.key === "ArrowUp") { e.preventDefault(); setExplorerSearchIdx(i => Math.max(i - 1, -1)); }
+                      else if (e.key === "Enter") {
+                        e.preventDefault();
+                        const pick = explorerSearchIdx >= 0 ? explorerSearchResults[explorerSearchIdx] : explorerSearchResults[0];
+                        if (pick) { setExplorerTicker(pick.ticker); setExplorerSearch(""); setExplorerSearchIdx(-1); }
+                      }
+                      else if (e.key === "Escape") { setExplorerSearch(""); setExplorerSearchIdx(-1); }
+                    }}
                     placeholder="Search by ticker or company name..."
                     style={{
                       width: "100%", padding: "9px 14px", paddingLeft: 34,
@@ -1541,12 +1552,13 @@ export default function AlphaPage() {
                     zIndex: 30, maxHeight: 300, overflowY: "auto",
                     boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
                   }}>
-                    {explorerSearchResults.map(s => (
+                    {explorerSearchResults.map((s, sIdx) => (
                       <div key={s.ticker}
-                        onMouseDown={() => { setExplorerTicker(s.ticker); setExplorerSearch(""); }}
-                        style={{ padding: "8px 14px", fontSize: 12, fontFamily: "monospace", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, borderBottom: "1px solid #21262d" }}
-                        onMouseEnter={e => (e.currentTarget.style.background = "rgba(59,130,246,0.1)")}
-                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                        onMouseDown={() => { setExplorerTicker(s.ticker); setExplorerSearch(""); setExplorerSearchIdx(-1); }}
+                        style={{ padding: "8px 14px", fontSize: 12, fontFamily: "monospace", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, borderBottom: "1px solid #21262d",
+                          background: sIdx === explorerSearchIdx ? "rgba(59,130,246,0.15)" : "transparent" }}
+                        onMouseEnter={e => { if (sIdx !== explorerSearchIdx) e.currentTarget.style.background = "rgba(59,130,246,0.1)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = sIdx === explorerSearchIdx ? "rgba(59,130,246,0.15)" : "transparent"; }}>
                         <span style={{ fontWeight: 700, color: "#fff", minWidth: 56 }}>{s.ticker}</span>
                         <span style={{ color: "rgba(255,255,255,0.5)", flex: 1, fontSize: 11 }}>{s.name}</span>
                         <span style={{ fontSize: 8, padding: "2px 6px", borderRadius: 3, background: `${sectorColor(s.sector)}20`, color: sectorColor(s.sector), fontWeight: 700 }}>{s.sector}</span>
