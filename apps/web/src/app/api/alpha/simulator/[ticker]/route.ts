@@ -3,10 +3,9 @@ import { pool } from '@/lib/db';
 import { requireAlphaAuth, safeErrorResponse, secureJsonResponse } from '@/lib/security';
 
 /**
- * GET /api/alpha/simulator/[ticker]?days=1260
+ * GET /api/alpha/simulator/[ticker]?days=1260&model=yggdrasil_v7
  * Returns SimInputBar[] for client-side ML trading simulation.
- * Reads directly from ml_predictions (ensemble_prediction) — independent of alpha_signals.
- * Fetches: prices + SMAs + ML predictions + momentum + fundamentals + OBX benchmark.
+ * Fetches: prices + SMAs + alpha signals + momentum + fundamentals + OBX benchmark.
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ ticker: string }> }) {
   const authError = requireAlphaAuth(req);
@@ -17,8 +16,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tick
     const t = ticker.toUpperCase();
     const url = new URL(req.url);
     const days = parseInt(url.searchParams.get('days') || '1260');
+    const model = url.searchParams.get('model') || 'yggdrasil_v7';
 
-    // 1. Prices with SMA200/SMA50
+    // 1. Prices with SMA200/SMA50 (window functions in SQL)
     const priceRes = await pool.query(`
       WITH raw AS (
         SELECT date, open::float, high::float, low::float, close::float, volume::float
@@ -42,19 +42,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tick
     `, [t, days]);
 
     if (priceRes.rows.length === 0) {
-      return secureJsonResponse({ ticker: t, sector: '', input: [], model: 'ml_predictions', error: 'No price data' });
+      return secureJsonResponse({ ticker: t, sector: '', input: [], model, error: 'No price data' });
     }
 
-    // 2. ML predictions — use ensemble_prediction directly (actual 1-month forward return)
-    const mlRes = await pool.query(`
-      SELECT prediction_date AS date,
-             ensemble_prediction::float AS prediction,
-             confidence_score::float AS confidence
-      FROM ml_predictions
-      WHERE ticker = $1
-        AND prediction_date >= CURRENT_DATE - ($2 + 60) * INTERVAL '1 day'
-      ORDER BY prediction_date ASC
-    `, [t, days]);
+    // 2. Alpha signals — use yggdrasil_v7 (full history back to 2014)
+    const sigRes = await pool.query(`
+      SELECT signal_date AS date, predicted_return::float, confidence::float
+      FROM alpha_signals
+      WHERE ticker = $1 AND model_id = $2
+        AND signal_date >= CURRENT_DATE - $3 * INTERVAL '1 day'
+      ORDER BY signal_date ASC
+    `, [t, model, days]);
 
     // 3. Momentum factors
     const momRes = await pool.query(`
@@ -65,7 +63,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tick
       ORDER BY date ASC
     `, [t, days]);
 
-    // 4. Fundamental factors
+    // 4. Fundamental factors (time series for the period)
     const fundRes = await pool.query(`
       SELECT date, ep::float, bm::float
       FROM factor_fundamentals
@@ -74,7 +72,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tick
       ORDER BY date ASC
     `, [t, days]);
 
-    // 5. Sector info + averages for valuation z-scores
+    // 5. Sector info + averages for z-scores
     const stockInfo = await pool.query(`SELECT sector FROM stocks WHERE ticker = $1 LIMIT 1`, [t]);
     const sector = stockInfo.rows[0]?.sector || '';
 
@@ -107,9 +105,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tick
       ORDER BY date ASC
     `, [days]);
 
-    // Build lookup maps
-    const mlMap = new Map<string, { prediction: number; confidence: number }>();
-    for (const r of mlRes.rows) mlMap.set(r.date.toISOString().slice(0, 10), r);
+    // Build lookup maps (date string → data)
+    const sigMap = new Map<string, { predicted_return: number; confidence: number }>();
+    for (const r of sigRes.rows) sigMap.set(r.date.toISOString().slice(0, 10), r);
 
     const momMap = new Map<string, { mom1m: number; mom6m: number; mom11m: number; vol1m: number }>();
     for (const r of momRes.rows) momMap.set(r.date.toISOString().slice(0, 10), r);
@@ -120,32 +118,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tick
     const obxMap = new Map<string, number>();
     for (const r of obxRes.rows) obxMap.set(r.date.toISOString().slice(0, 10), r.obx_close);
 
-    // ── ML Prediction pass-through ───────────────────────────────────────────
-    // Use ensemble_prediction directly from ml_predictions table.
-    // This is the actual 1-month forward return prediction from the Ridge/GB/RF
-    // ensemble. Values range [-15%, +10%] with stddev ~3%.
-    //
-    // The engine multiplies by 100 → predPct in percent (e.g. 0.03 → 3%).
-    // Default entry threshold 1% works well with this range.
-    //
-    // Momentum is NOT mixed into the signal — it stays as a separate UI filter.
-    // This keeps the ML signal pure and interpretable.
-
-    let heldPrediction: number | null = null;
-    let heldConfidence = 0.5;
-
+    // Assemble SimInputBar[]
     const input = priceRes.rows.map((px: any) => {
       const d = px.date.toISOString().slice(0, 10);
-      const ml = mlMap.get(d);
+      const sig = sigMap.get(d);
       const mom = momMap.get(d);
       const fund = fundMap.get(d);
       const obx = obxMap.get(d) ?? null;
-
-      // Step-hold: carry forward last known ML prediction
-      if (ml) {
-        heldPrediction = ml.prediction;
-        heldConfidence = ml.confidence ?? 0.5;
-      }
 
       const ep = fund?.ep ?? null;
       const bm = fund?.bm ?? null;
@@ -159,8 +138,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tick
         volume: px.volume,
         sma200: px.sma200,
         sma50: px.sma50,
-        mlPrediction: heldPrediction,  // Raw ensemble prediction (decimal, e.g. 0.03 = 3%)
-        mlConfidence: heldConfidence,
+        mlPrediction: sig?.predicted_return ?? null,
+        mlConfidence: sig?.confidence ?? null,
         mom1m: mom?.mom1m ?? null,
         mom6m: mom?.mom6m ?? null,
         mom11m: mom?.mom11m ?? null,
@@ -174,7 +153,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tick
       };
     });
 
-    return secureJsonResponse({ ticker: t, sector, input, model: 'ml_predictions' });
+    return secureJsonResponse({ ticker: t, sector, input, model });
   } catch (error) {
     return safeErrorResponse(error, 'Failed to fetch simulator data');
   }
