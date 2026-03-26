@@ -158,6 +158,8 @@ export function runMLSimulation(input: SimInputBar[], params: SimParams): SimRes
   // Step-hold ML predictions (monthly → daily)
   let heldPrediction: number | null = null;
   let heldConfidence: number | null = null;
+  // Previous bar prediction % (for cross-above entry logic, matching Explorer)
+  let prevPredPct: number | null = null;
   // OBX benchmark start
   const obxStart = input.find(b => b.benchmarkClose != null)?.benchmarkClose ?? null;
 
@@ -223,7 +225,7 @@ export function runMLSimulation(input: SimInputBar[], params: SimParams): SimRes
       if (exitReason) {
         const rawReturn = (bar.close - entryPrice) / entryPrice;
         const costAdj = params.costBps / 10000;
-        const pnlPct = rawReturn - costAdj;  // raw return minus round-trip cost
+        const pnlPct = rawReturn - costAdj;
 
         trades.push({
           entryDate: input[entryBar].date,
@@ -259,9 +261,8 @@ export function runMLSimulation(input: SimInputBar[], params: SimParams): SimRes
     let blockReason: string | null = null;
 
     if (!inPosition && predPct != null && i > cooldownUntil) {
-      // Level-based entry: enter whenever prediction is above threshold
-      // (monthly predictions step-held daily — re-enter after cooldown if signal still bullish)
-      if (predPct >= params.entryThreshold) {
+      // Cross-above entry: signal must transition from below to above threshold (matches Explorer)
+      if (predPct >= params.entryThreshold && (prevPredPct === null || prevPredPct < params.entryThreshold)) {
         signalActive = true;
 
         // Check filters
@@ -354,6 +355,8 @@ export function runMLSimulation(input: SimInputBar[], params: SimParams): SimRes
       benchmarkValue,
     });
 
+    // Update prevPredPct for next iteration's cross-above check
+    prevPredPct = predPct;
   }
 
   // Close out any open position at last bar (for stats)
