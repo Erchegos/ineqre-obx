@@ -158,8 +158,6 @@ export function runMLSimulation(input: SimInputBar[], params: SimParams): SimRes
   // Step-hold ML predictions (monthly → daily)
   let heldPrediction: number | null = null;
   let heldConfidence: number | null = null;
-  let prevPredPct: number | null = null;  // for cross-below exit logic
-
   // OBX benchmark start
   const obxStart = input.find(b => b.benchmarkClose != null)?.benchmarkClose ?? null;
 
@@ -204,8 +202,8 @@ export function runMLSimulation(input: SimInputBar[], params: SimParams): SimRes
         if (currentReturn >= params.takeProfitPct / 100) {
           exitReason = 'take_profit';
         }
-        // Signal flip — cross-below: prediction must drop FROM above threshold TO at/below it (matches Explorer: prev > exit && curr <= exit)
-        else if (predPct != null && prevPredPct != null && prevPredPct > params.exitThreshold && predPct <= params.exitThreshold) {
+        // Signal flip — level-based: exit whenever prediction drops to/below exit threshold
+        else if (predPct != null && predPct <= params.exitThreshold) {
           exitReason = 'signal_flip';
         }
         // Time stop
@@ -261,8 +259,9 @@ export function runMLSimulation(input: SimInputBar[], params: SimParams): SimRes
     let blockReason: string | null = null;
 
     if (!inPosition && predPct != null && i > cooldownUntil) {
-      // Cross-above entry: prediction must cross UP through threshold (matches Explorer)
-      if (predPct >= params.entryThreshold && (prevPredPct == null || prevPredPct < params.entryThreshold)) {
+      // Level-based entry: enter whenever prediction is above threshold
+      // (monthly predictions step-held daily — re-enter after cooldown if signal still bullish)
+      if (predPct >= params.entryThreshold) {
         signalActive = true;
 
         // Check filters
@@ -355,8 +354,6 @@ export function runMLSimulation(input: SimInputBar[], params: SimParams): SimRes
       benchmarkValue,
     });
 
-    // Track previous prediction for cross-below exit logic
-    prevPredPct = predPct;
   }
 
   // Close out any open position at last bar (for stats)
