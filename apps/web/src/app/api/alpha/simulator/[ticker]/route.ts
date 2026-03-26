@@ -45,12 +45,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tick
       return secureJsonResponse({ ticker: t, sector: '', input: [], model, error: 'No price data' });
     }
 
-    // 2. Alpha signals
+    // 2. Alpha signals (fetch signal_value z-score for daily composite)
     const sigRes = await pool.query(`
-      SELECT signal_date AS date, predicted_return::float, confidence::float
+      SELECT signal_date AS date, predicted_return::float, confidence::float,
+             signal_value::float
       FROM alpha_signals
       WHERE ticker = $1 AND model_id = $2
-        AND signal_date >= CURRENT_DATE - $3 * INTERVAL '1 day'
+        AND signal_date >= CURRENT_DATE - ($3 + 60) * INTERVAL '1 day'
       ORDER BY signal_date ASC
     `, [t, model, days]);
 
@@ -106,7 +107,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tick
     `, [days]);
 
     // Build lookup maps (date string → data)
-    const sigMap = new Map<string, { predicted_return: number; confidence: number }>();
+    const sigMap = new Map<string, { predicted_return: number; confidence: number; signal_value: number }>();
     for (const r of sigRes.rows) sigMap.set(r.date.toISOString().slice(0, 10), r);
 
     const momMap = new Map<string, { mom1m: number; mom6m: number; mom11m: number; vol1m: number }>();
@@ -118,13 +119,64 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tick
     const obxMap = new Map<string, number>();
     for (const r of obxRes.rows) obxMap.set(r.date.toISOString().slice(0, 10), r.obx_close);
 
-    // Assemble SimInputBar[]
+    // ── Daily composite signal ──────────────────────────────────────────────
+    // Monthly ML prediction alone is flat and tiny. The original signals were
+    // daily composites of ML z-score + momentum + price trend. Recompute that
+    // here so the simulator gets daily-varying, properly-scaled signals.
+    //
+    // Components (weights sum to 1.0):
+    //   ML z-score (step-held monthly)  : 35% — directional ML view
+    //   Momentum alignment (daily)      : 30% — trend confirmation
+    //   Price vs SMA200 (daily)         : 20% — long-term trend
+    //   Price vs SMA50 (daily)          : 15% — short-term trend
+    //
+    // Composite range: ±1.0 → scaled by 0.15 → predicted_return ±0.15
+    // Engine does ×100 → predPct ±15% (matches original signal magnitude)
+
+    let heldMlZ = 0;
+    let heldConfidence = 0.5;
+
+    // Assemble SimInputBar[] with daily composite signals
     const input = priceRes.rows.map((px: any) => {
       const d = px.date.toISOString().slice(0, 10);
       const sig = sigMap.get(d);
       const mom = momMap.get(d);
       const fund = fundMap.get(d);
       const obx = obxMap.get(d) ?? null;
+
+      // Step-hold ML z-score from monthly alpha_signals
+      if (sig) {
+        heldMlZ = sig.signal_value ?? 0;
+        heldConfidence = sig.confidence ?? 0.5;
+      }
+
+      // Momentum component: daily alignment of 1m/6m/11m [-1, +1]
+      const momScore = mom ? (
+        ((mom.mom1m ?? 0) > 0 ? 1 : -1) * 0.3 +
+        ((mom.mom6m ?? 0) > 0 ? 1 : -1) * 0.4 +
+        ((mom.mom11m ?? 0) > 0 ? 1 : -1) * 0.3
+      ) : 0;
+
+      // Price vs SMA200: daily trend position [-1, +1]
+      const priceSma200 = (px.sma200 && px.sma200 > 0)
+        ? Math.max(-1, Math.min(1, (px.close - px.sma200) / px.sma200 / 0.15))
+        : 0;
+
+      // Price vs SMA50: daily short-term trend [-1, +1]
+      const priceSma50 = (px.sma50 && px.sma50 > 0)
+        ? Math.max(-1, Math.min(1, (px.close - px.sma50) / px.sma50 / 0.10))
+        : 0;
+
+      // Daily composite signal [-1, +1]
+      const composite =
+        0.35 * heldMlZ +       // ML prediction (monthly, step-held z-score)
+        0.30 * momScore +       // Momentum alignment (daily)
+        0.20 * priceSma200 +    // Long-term price trend (daily)
+        0.15 * priceSma50;      // Short-term price trend (daily)
+
+      // Scale to predicted_return magnitude: composite ±1 → ±0.15
+      // Engine does ×100 → predPct ±15% (matches old signal range)
+      const dailyPrediction = composite * 0.15;
 
       const ep = fund?.ep ?? null;
       const bm = fund?.bm ?? null;
@@ -138,13 +190,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tick
         volume: px.volume,
         sma200: px.sma200,
         sma50: px.sma50,
-        mlPrediction: sig?.predicted_return ?? null,
-        mlConfidence: sig?.confidence ?? null,
+        mlPrediction: dailyPrediction,
+        mlConfidence: heldConfidence,
         mom1m: mom?.mom1m ?? null,
         mom6m: mom?.mom6m ?? null,
         mom11m: mom?.mom11m ?? null,
         vol1m: mom?.vol1m ?? null,
-        volRegime: null as 'low' | 'high' | null,  // ML service optional, skip for now
+        volRegime: null as 'low' | 'high' | null,
         ep,
         bm,
         epSectorZ: ep != null && sectorEpStd > 0 ? (ep - sectorEpAvg) / sectorEpStd : null,
