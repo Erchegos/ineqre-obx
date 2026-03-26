@@ -117,16 +117,16 @@ export interface SimResult {
 }
 
 export const SIM_DEFAULTS: SimParams = {
-  entryThreshold: 1.0,       // Match Explorer default
-  exitThreshold: 0.25,       // Match Explorer default
-  stopLossPct: 5.0,
-  takeProfitPct: 100,         // Effectively off (Explorer has no TP)
+  entryThreshold: 0.5,        // Low threshold — catch all bullish signals
+  exitThreshold: 0.0,         // Exit only when signal turns negative
+  stopLossPct: 3.0,           // Tight stop — cut losers fast
+  takeProfitPct: 15.0,        // Take profit at 15%
   positionSizePct: 10,
-  minHoldDays: 5,
-  maxHoldDays: 21,
-  cooldownBars: 0,            // Match Explorer (no cooldown)
+  minHoldDays: 3,             // Short min hold — nimble exits
+  maxHoldDays: 21,            // Matches 21-day prediction horizon
+  cooldownBars: 2,            // Brief pause after exit — avoid whipsaws
   costBps: 10,
-  momentumFilter: 0,          // Off by default (Explorer has no momentum filter)
+  momentumFilter: 0,
   volGate: 'off',
   sma200Require: false,
   sma50Require: false,
@@ -158,8 +158,6 @@ export function runMLSimulation(input: SimInputBar[], params: SimParams): SimRes
   // Step-hold ML predictions (monthly → daily)
   let heldPrediction: number | null = null;
   let heldConfidence: number | null = null;
-  // Previous bar prediction % (for cross-above entry logic, matching Explorer)
-  let prevPredPct: number | null = null;
   // OBX benchmark start
   const obxStart = input.find(b => b.benchmarkClose != null)?.benchmarkClose ?? null;
 
@@ -261,8 +259,8 @@ export function runMLSimulation(input: SimInputBar[], params: SimParams): SimRes
     let blockReason: string | null = null;
 
     if (!inPosition && predPct != null && i > cooldownUntil) {
-      // Cross-above entry: signal must transition from below to above threshold (matches Explorer)
-      if (predPct >= params.entryThreshold && (prevPredPct === null || prevPredPct < params.entryThreshold)) {
+      // Level-based entry: enter any bar where signal is above threshold and flat (maximizes compounding)
+      if (predPct >= params.entryThreshold) {
         signalActive = true;
 
         // Check filters
@@ -355,8 +353,6 @@ export function runMLSimulation(input: SimInputBar[], params: SimParams): SimRes
       benchmarkValue,
     });
 
-    // Update prevPredPct for next iteration's cross-above check
-    prevPredPct = predPct;
   }
 
   // Close out any open position at last bar (for stats)
