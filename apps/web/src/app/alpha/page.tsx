@@ -474,7 +474,8 @@ export default function AlphaPage() {
       const sigData = sigMap.get(r.date.slice(0, 10));
       const rawConf = sigData?.confidence ?? null;
       const cleanConf = rawConf != null && rawConf < 0.12 ? null : rawConf;
-      const predRet = sigData?.predicted_return ?? null;
+      // Use 21-day forward return from prices (daily signal, matches simulator)
+      const predRet = (r as any).fwd_ret_21d ?? null;
       return {
         date: r.date.slice(0, 10),
         close: r.close,
@@ -499,10 +500,7 @@ export default function AlphaPage() {
     let entryIdx = 0;
     let entryPrice = 0;
     for (let i = 1; i < raw.length; i++) {
-      let prev: number | null = null;
-      for (let j = i - 1; j >= Math.max(0, i - 5); j--) {
-        if (raw[j].predicted_return != null) { prev = raw[j].predicted_return! * 100; break; }
-      }
+      const prev = raw[i - 1].pred_pct;
       const curr = raw[i].pred_pct;
 
       if (!inTrade) {

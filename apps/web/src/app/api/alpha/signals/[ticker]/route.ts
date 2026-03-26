@@ -45,6 +45,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tick
           close / LAG(close, 1) OVER (ORDER BY date) - 1 AS daily_return,
           close / LAG(close, 5) OVER (ORDER BY date) - 1 AS weekly_return,
           close / LAG(close, 21) OVER (ORDER BY date) - 1 AS monthly_return,
+          -- 21-day forward return (same signal as simulator)
+          (LEAD(close, 21) OVER (ORDER BY date) - close) / NULLIF(close, 0) AS fwd_ret_21d,
           -- True Range for ATR
           GREATEST(
             high - low,
@@ -65,6 +67,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tick
       SELECT date, open::float, high::float, low::float, close, volume,
              sma200::float, sma50::float, sma20::float,
              daily_return::float, weekly_return::float, monthly_return::float,
+             fwd_ret_21d::float,
              atr14::float,
              CASE WHEN sma200 > 0 THEN (close / sma200 - 1)::float ELSE NULL END AS dist_sma200,
              CASE WHEN avg_vol_20 > 0 THEN (volume / avg_vol_20)::float ELSE NULL END AS rel_volume,
