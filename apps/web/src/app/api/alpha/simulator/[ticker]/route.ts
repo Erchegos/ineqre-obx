@@ -120,18 +120,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tick
     for (const r of obxRes.rows) obxMap.set(r.date.toISOString().slice(0, 10), r.obx_close);
 
     // ── Daily composite signal ──────────────────────────────────────────────
-    // Monthly ML prediction alone is flat and tiny. The original signals were
-    // daily composites of ML z-score + momentum + price trend. Recompute that
-    // here so the simulator gets daily-varying, properly-scaled signals.
+    // The original signals were daily ML predictions that updated every bar.
+    // Reconstruct by combining step-held ML z-score (monthly anchor) with
+    // smooth daily momentum (actual factor values, not binary). No SMA price
+    // position — those are lagging and inversely predictive for short holds.
     //
-    // Components (weights sum to 1.0):
-    //   ML z-score (step-held monthly)  : 35% — directional ML view
-    //   Momentum alignment (daily)      : 30% — trend confirmation
-    //   Price vs SMA200 (daily)         : 20% — long-term trend
-    //   Price vs SMA50 (daily)          : 15% — short-term trend
+    // Components:
+    //   ML z-score (step-held)  : 70% — cross-sectional prediction rank
+    //   Momentum (smooth daily) : 30% — trend confirmation from factor_technical
     //
-    // Composite range: ±1.0 → scaled by 0.15 → predicted_return ±0.15
-    // Engine does ×100 → predPct ±15% (matches original signal magnitude)
+    // Scale: composite [-1,+1] × 0.08 → engine ×100 → predPct [-8,+8]
+    // Old signals ranged roughly -2% to +6% for ORK — this matches.
 
     let heldMlZ = 0;
     let heldConfidence = 0.5;
@@ -150,33 +149,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tick
         heldConfidence = sig.confidence ?? 0.5;
       }
 
-      // Momentum component: daily alignment of 1m/6m/11m [-1, +1]
-      const momScore = mom ? (
-        ((mom.mom1m ?? 0) > 0 ? 1 : -1) * 0.3 +
-        ((mom.mom6m ?? 0) > 0 ? 1 : -1) * 0.4 +
-        ((mom.mom11m ?? 0) > 0 ? 1 : -1) * 0.3
-      ) : 0;
+      // Smooth daily momentum: use actual momentum VALUES (not binary sign)
+      // Normalized to [-1,+1] by typical magnitude per timeframe
+      const normMom1m = mom ? Math.max(-1, Math.min(1, (mom.mom1m ?? 0) / 0.15)) : 0;
+      const normMom6m = mom ? Math.max(-1, Math.min(1, (mom.mom6m ?? 0) / 0.30)) : 0;
+      const normMom11m = mom ? Math.max(-1, Math.min(1, (mom.mom11m ?? 0) / 0.50)) : 0;
+      const momScore = 0.3 * normMom1m + 0.4 * normMom6m + 0.3 * normMom11m;
 
-      // Price vs SMA200: daily trend position [-1, +1]
-      const priceSma200 = (px.sma200 && px.sma200 > 0)
-        ? Math.max(-1, Math.min(1, (px.close - px.sma200) / px.sma200 / 0.15))
-        : 0;
+      // Daily composite: ML dominates, momentum adds daily variation
+      const composite = 0.70 * heldMlZ + 0.30 * momScore;
 
-      // Price vs SMA50: daily short-term trend [-1, +1]
-      const priceSma50 = (px.sma50 && px.sma50 > 0)
-        ? Math.max(-1, Math.min(1, (px.close - px.sma50) / px.sma50 / 0.10))
-        : 0;
-
-      // Daily composite signal [-1, +1]
-      const composite =
-        0.35 * heldMlZ +       // ML prediction (monthly, step-held z-score)
-        0.30 * momScore +       // Momentum alignment (daily)
-        0.20 * priceSma200 +    // Long-term price trend (daily)
-        0.15 * priceSma50;      // Short-term price trend (daily)
-
-      // Scale to predicted_return magnitude: composite ±1 → ±0.15
-      // Engine does ×100 → predPct ±15% (matches old signal range)
-      const dailyPrediction = composite * 0.15;
+      // Scale to match old signal range (predPct ≈ [-6, +6])
+      const dailyPrediction = composite * 0.08;
 
       const ep = fund?.ep ?? null;
       const bm = fund?.bm ?? null;
