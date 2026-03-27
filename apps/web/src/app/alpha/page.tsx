@@ -8,7 +8,7 @@ import {
   LineChart, Line, BarChart, Bar, Cell, ComposedChart, Area,
   ReferenceLine, ReferenceArea, Scatter,
 } from "recharts";
-import { runMLSimulation, computeProgressiveStats, SIM_DEFAULTS, type SimInputBar, type SimResult } from "@/lib/mlTradingEngine";
+import { runMLSimulation, computeProgressiveStats, SIM_DEFAULTS, type SimInputBar, type SimResult, type SimParams, type SimStats } from "@/lib/mlTradingEngine";
 
 // ============================================================================
 // Types
@@ -181,6 +181,13 @@ export default function AlphaPage() {
   const [simShowFilterHelp, setSimShowFilterHelp] = useState(false);
   const [simShowMLGuide, setSimShowMLGuide] = useState(false);
   const [explorerShowMLGuide, setExplorerShowMLGuide] = useState(false);
+  // Parameter sweep
+  const [simSweepOpen, setSimSweepOpen] = useState(false);
+  const [simSweepRunning, setSimSweepRunning] = useState(false);
+  const [simSweepProgress, setSimSweepProgress] = useState(0);
+  const [simSweepResults, setSimSweepResults] = useState<{ params: SimParams; stats: SimStats }[]>([]);
+  const [simSweepSortKey, setSimSweepSortKey] = useState<string>("sharpe");
+  const [simSweepSortDir, setSimSweepSortDir] = useState<1 | -1>(-1);
   const [signalsShowMLGuide, setSignalsShowMLGuide] = useState(false);
   // Strategy params
   const [simEntry, setSimEntry] = useState(SIM_DEFAULTS.entryThreshold);
@@ -668,6 +675,53 @@ export default function AlphaPage() {
     setExplorerTicker(simData.ticker);
     setTickerHistory({ ticker: simData.ticker, sector: simData.sector, signals, actualReturns } as TickerSignalHistory);
   }, [simData]);
+
+  // Parameter sweep — runs all combinations client-side
+  const runSweep = useCallback(async () => {
+    if (!simData?.input?.length) return;
+    setSimSweepRunning(true);
+    setSimSweepProgress(0);
+    setSimSweepResults([]);
+
+    const entryVals = [0, 0.5, 1.0, 2.0];
+    const stopVals  = [3, 5, 8];
+    const holdVals  = [10, 21, 30];
+    const volVals   = ['off', 'hard'] as const;
+    const smaVals   = [false, true];
+    const momVals   = [0, 2] as const;
+
+    const combos: SimParams[] = [];
+    for (const entry of entryVals)
+      for (const stop of stopVals)
+        for (const hold of holdVals)
+          for (const vol of volVals)
+            for (const sma of smaVals)
+              for (const mom of momVals)
+                combos.push({
+                  entryThreshold: entry, exitThreshold: simExit,
+                  stopLossPct: stop, takeProfitPct: simTP,
+                  positionSizePct: simPosSize, minHoldDays: simMinHold,
+                  maxHoldDays: hold, cooldownBars: simCooldown, costBps: simCost,
+                  momentumFilter: mom, volGate: vol,
+                  sma200Require: sma, sma50Require: false, smaExitOnCross: false, valuationFilter: false,
+                });
+
+    const results: { params: SimParams; stats: SimStats }[] = [];
+    const BATCH = 40;
+    for (let i = 0; i < combos.length; i += BATCH) {
+      const slice = combos.slice(i, i + BATCH);
+      for (const p of slice) {
+        const r = runMLSimulation(simData.input, p);
+        if (r.stats.trades >= 5) results.push({ params: p, stats: r.stats });
+      }
+      setSimSweepProgress(Math.round(Math.min(i + BATCH, combos.length) / combos.length * 100));
+      await new Promise(res => setTimeout(res, 0));
+    }
+
+    results.sort((a, b) => b.stats.sharpe - a.stats.sharpe);
+    setSimSweepResults(results.slice(0, 50));
+    setSimSweepRunning(false);
+  }, [simData, simExit, simTP, simPosSize, simMinHold, simCooldown, simCost]);
 
   // Run engine client-side (instant on param change)
   const simResult: SimResult | null = useMemo(() => {
@@ -2693,6 +2747,173 @@ export default function AlphaPage() {
                   </div>
                 )}
               </div>
+
+              {/* ── Parameter Sweep ── */}
+              {(() => {
+                const SWEEP_COLS: { key: string; label: string; fmt: (r: { params: SimParams; stats: SimStats }) => string; num?: boolean }[] = [
+                  { key: "entry",       label: "Entry",     fmt: r => `${r.params.entryThreshold}%`,  num: true },
+                  { key: "stop",        label: "Stop",      fmt: r => `-${r.params.stopLossPct}%`,     num: true },
+                  { key: "maxHold",     label: "MaxHold",   fmt: r => `${r.params.maxHoldDays}d`,      num: true },
+                  { key: "vol",         label: "Vol",       fmt: r => r.params.volGate.toUpperCase() },
+                  { key: "sma200",      label: "SMA200",    fmt: r => r.params.sma200Require ? "ON" : "—" },
+                  { key: "mom",         label: "Mom",       fmt: r => r.params.momentumFilter > 0 ? `${r.params.momentumFilter}/3` : "—" },
+                  { key: "trades",      label: "Trades",    fmt: r => `${r.stats.trades}`,             num: true },
+                  { key: "winRate",     label: "Win%",      fmt: r => `${(r.stats.winRate * 100).toFixed(0)}%`, num: true },
+                  { key: "totalReturn", label: "Total Ret", fmt: r => `${r.stats.totalReturn >= 0 ? "+" : ""}${(r.stats.totalReturn * 100).toFixed(0)}%`, num: true },
+                  { key: "annReturn",   label: "Ann Ret",   fmt: r => `${r.stats.annualizedReturn >= 0 ? "+" : ""}${(r.stats.annualizedReturn * 100).toFixed(1)}%`, num: true },
+                  { key: "sharpe",      label: "Sharpe",    fmt: r => r.stats.sharpe.toFixed(2),       num: true },
+                  { key: "maxDD",       label: "MaxDD",     fmt: r => `${(r.stats.maxDrawdown * 100).toFixed(1)}%`, num: true },
+                  { key: "vsObx",       label: "vs OBX",   fmt: r => `${r.stats.excessReturn >= 0 ? "+" : ""}${(r.stats.excessReturn * 100).toFixed(1)}%`, num: true },
+                ];
+
+                const sortedSweep = [...simSweepResults].sort((a, b) => {
+                  const getVal = (r: { params: SimParams; stats: SimStats }) => {
+                    if (simSweepSortKey === "entry")       return r.params.entryThreshold;
+                    if (simSweepSortKey === "stop")        return r.params.stopLossPct;
+                    if (simSweepSortKey === "maxHold")     return r.params.maxHoldDays;
+                    if (simSweepSortKey === "vol")         return r.params.volGate === 'hard' ? 1 : 0;
+                    if (simSweepSortKey === "sma200")      return r.params.sma200Require ? 1 : 0;
+                    if (simSweepSortKey === "mom")         return r.params.momentumFilter;
+                    if (simSweepSortKey === "trades")      return r.stats.trades;
+                    if (simSweepSortKey === "winRate")     return r.stats.winRate;
+                    if (simSweepSortKey === "totalReturn") return r.stats.totalReturn;
+                    if (simSweepSortKey === "annReturn")   return r.stats.annualizedReturn;
+                    if (simSweepSortKey === "sharpe")      return r.stats.sharpe;
+                    if (simSweepSortKey === "maxDD")       return r.stats.maxDrawdown; // lower is better but sort as number
+                    if (simSweepSortKey === "vsObx")       return r.stats.excessReturn;
+                    return 0;
+                  };
+                  return (getVal(a) - getVal(b)) * simSweepSortDir;
+                });
+
+                const thStyle = (key: string): React.CSSProperties => ({
+                  padding: "5px 8px", fontSize: 9, fontFamily: "monospace", fontWeight: 700,
+                  color: simSweepSortKey === key ? "#3b82f6" : "rgba(255,255,255,0.4)",
+                  textAlign: "right" as const, textTransform: "uppercase" as const, letterSpacing: "0.05em",
+                  cursor: "pointer", whiteSpace: "nowrap" as const, borderBottom: "1px solid #30363d",
+                  background: simSweepSortKey === key ? "rgba(59,130,246,0.06)" : "transparent",
+                  userSelect: "none" as const,
+                });
+
+                return (
+                  <div style={{ ...cardStyle, marginBottom: 12 }}>
+                    {/* Header / toggle */}
+                    <div onClick={() => setSimSweepOpen(v => !v)}
+                      style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                      <div style={{ ...sectionTitle, marginBottom: 0 }}>⚡ PARAMETER SWEEP</div>
+                      <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.3)" }}>
+                        {simSweepResults.length > 0
+                          ? `${simSweepResults.length} combos · sorted by ${simSweepSortKey}`
+                          : "288 strategy combos — entry × stop × hold × vol × sma × mom"}
+                      </span>
+                      <span style={{ marginLeft: "auto", fontSize: 10, color: "rgba(255,255,255,0.3)" }}>
+                        {simSweepOpen ? "▲" : "▼"}
+                      </span>
+                    </div>
+
+                    {simSweepOpen && (
+                      <div style={{ marginTop: 12 }}>
+                        {/* Run controls */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                          <button onClick={runSweep} disabled={simSweepRunning || !simData}
+                            style={{ padding: "6px 16px", fontSize: 10, fontWeight: 700, fontFamily: "monospace",
+                              background: simSweepRunning ? "#21262d" : "linear-gradient(135deg,#3b82f6,#2563eb)",
+                              color: simSweepRunning ? "rgba(255,255,255,0.4)" : "#fff",
+                              border: "none", borderRadius: 5, cursor: simSweepRunning ? "default" : "pointer" }}>
+                            {simSweepRunning ? `Running… ${simSweepProgress}%` : "▶ RUN SWEEP"}
+                          </button>
+                          {simSweepRunning && (
+                            <div style={{ flex: 1, height: 4, background: "#21262d", borderRadius: 2, overflow: "hidden" }}>
+                              <div style={{ width: `${simSweepProgress}%`, height: "100%", background: "#3b82f6", borderRadius: 2, transition: "width 0.2s" }} />
+                            </div>
+                          )}
+                          {simSweepResults.length > 0 && !simSweepRunning && (
+                            <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.35)" }}>
+                              Top 50 · click row to apply params · click column header to sort
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Results table */}
+                        {sortedSweep.length > 0 && (
+                          <div style={{ overflowX: "auto", maxHeight: 420, overflowY: "auto", border: "1px solid #21262d", borderRadius: 6 }}>
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10, fontFamily: "monospace" }}>
+                              <thead style={{ position: "sticky", top: 0, background: "#0d1117", zIndex: 1 }}>
+                                <tr>
+                                  <th style={{ ...thStyle("rank"), textAlign: "center" as const }}>#</th>
+                                  {SWEEP_COLS.map(c => (
+                                    <th key={c.key} style={thStyle(c.key)}
+                                      onClick={e => { e.stopPropagation(); setSimSweepSortKey(c.key); setSimSweepSortDir(d => simSweepSortKey === c.key ? (d === -1 ? 1 : -1) : -1); }}>
+                                      {c.label} {simSweepSortKey === c.key ? (simSweepSortDir === -1 ? "↓" : "↑") : ""}
+                                    </th>
+                                  ))}
+                                  <th style={{ ...thStyle("apply"), textAlign: "center" as const }}></th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {sortedSweep.map((r, i) => {
+                                  const isTop = i < 5;
+                                  const sharpeColor = r.stats.sharpe >= 2 ? "#10b981" : r.stats.sharpe >= 1 ? "#3b82f6" : r.stats.sharpe >= 0 ? "rgba(255,255,255,0.6)" : "#ef4444";
+                                  const retColor = r.stats.totalReturn >= 0.5 ? "#10b981" : r.stats.totalReturn >= 0 ? "rgba(255,255,255,0.6)" : "#ef4444";
+                                  const ddColor = Math.abs(r.stats.maxDrawdown) < 0.1 ? "#10b981" : Math.abs(r.stats.maxDrawdown) < 0.2 ? "#f59e0b" : "#ef4444";
+                                  return (
+                                    <tr key={i}
+                                      onMouseEnter={e => e.currentTarget.style.background = "rgba(59,130,246,0.07)"}
+                                      onMouseLeave={e => e.currentTarget.style.background = isTop ? "rgba(16,185,129,0.04)" : "transparent"}
+                                      style={{ background: isTop ? "rgba(16,185,129,0.04)" : "transparent", borderBottom: "1px solid rgba(48,54,61,0.4)", cursor: "pointer" }}>
+                                      <td style={{ padding: "4px 8px", textAlign: "center", fontSize: 9, color: isTop ? "#10b981" : "rgba(255,255,255,0.3)", fontWeight: isTop ? 700 : 400 }}>{i + 1}</td>
+                                      {SWEEP_COLS.map(c => {
+                                        const val = c.fmt(r);
+                                        const color = c.key === "sharpe" ? sharpeColor
+                                          : c.key === "totalReturn" || c.key === "annReturn" || c.key === "vsObx" ? retColor
+                                          : c.key === "maxDD" ? ddColor
+                                          : c.key === "vol" && r.params.volGate === 'hard' ? "#f59e0b"
+                                          : c.key === "sma200" && r.params.sma200Require ? "#3b82f6"
+                                          : c.key === "mom" && r.params.momentumFilter > 0 ? "#3b82f6"
+                                          : "rgba(255,255,255,0.7)";
+                                        return (
+                                          <td key={c.key} style={{ padding: "4px 8px", textAlign: "right", color, fontWeight: (c.key === "sharpe" && isTop) ? 700 : 400 }}>
+                                            {val}
+                                          </td>
+                                        );
+                                      })}
+                                      <td style={{ padding: "4px 8px", textAlign: "center" }}>
+                                        <button onClick={e => {
+                                          e.stopPropagation();
+                                          setSimEntry(r.params.entryThreshold);
+                                          setSimExit(r.params.exitThreshold);
+                                          setSimStop(r.params.stopLossPct);
+                                          setSimTP(r.params.takeProfitPct);
+                                          setSimMaxHold(r.params.maxHoldDays);
+                                          setSimMom(r.params.momentumFilter);
+                                          setSimVolGate(r.params.volGate);
+                                          setSimSma200(r.params.sma200Require);
+                                          setSimPlayIdx(-1);
+                                          setSimIsPlaying(false);
+                                        }}
+                                          style={{ fontSize: 8, padding: "2px 7px", background: "#21262d", border: "1px solid #30363d",
+                                            borderRadius: 3, color: "#3b82f6", cursor: "pointer", fontFamily: "monospace", fontWeight: 700 }}>
+                                          APPLY
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+
+                        {!simSweepRunning && simSweepResults.length === 0 && (
+                          <div style={{ textAlign: "center", padding: "20px 0", fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.25)" }}>
+                            Click RUN SWEEP to test all parameter combinations on {simTicker}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* ── Row 5: Equity Curve vs OBX (full width, bottom) ── */}
               <div style={cardStyle}>
