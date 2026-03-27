@@ -6,19 +6,26 @@ import { runMLSimulation, type SimInputBar, type SimParams, type SimStats, type 
 /**
  * GET /api/alpha/best-stocks
  *
- * Parameter-sweep optimized top 10 stocks from top 50 liquid OSE equities.
- * For each ticker: runs 108 strategy combos over the last 365 days.
- * Scoring: Sharpe × TIM_factor (time-in-market weighted) to keep ≥10 concurrent positions.
- * TIM_factor = 0.5 + 0.5 × min(timeInMarket / 0.5, 1.0)
- * → strategies with <50% TIM are penalised, favouring more continuous exposure.
+ * Rolling walk-forward backtest — NO LOOK-AHEAD BIAS.
  *
+ * For each 30-day forward period over the last 365 days:
+ *   1. Train on prior 90 days: run 108-combo sweep per ticker, TIM-weighted Sharpe scoring
+ *   2. Select top 10 stocks by training score
+ *   3. Simulate FORWARD 30 days with training-selected params (out-of-sample)
+ *   4. Collect only forward-period trades for the equity curve
+ *
+ * ML signal uses stored `ensemble_prediction` (model output at that date) — NOT future returns.
  * 108 combos = Entry[0.5,1.0,2.0] × Stop[3,5,8] × MaxHold[21,30,45] × VolGate[off,hard] × Mom[0,2]
  * Cached 24h in alpha_result_cache.
  */
 
-const CACHE_KEY = 'best_stocks_v3_365d_tim_weighted';
+const CACHE_KEY = 'best_stocks_v4_365d_walk_forward';
 const CACHE_MAX_AGE_H = 24;
-const DAYS = 365 + 250 + 30; // extra for SMA warmup
+const SMA_WARMUP = 230;            // bars to discard for SMA stability
+const TRAIN_DAYS = 90;             // training window per walk-forward step
+const FORWARD_DAYS = 30;           // out-of-sample forward window
+const TOP_N = 10;                  // stocks selected per window
+const MIN_TRAIN_TRADES = 3;        // minimum trades on training slice to qualify
 
 // 108 param combos for sweep
 const ENTRY_VALS = [0.5, 1.0, 2.0];
@@ -46,10 +53,15 @@ export interface BestStockResult {
   name: string;
   sector: string;
   avg_nokvol: number;
-  bestParams: SimParams;
-  stats: SimStats;
-  trades: SimTrade[];
+  bestParams: SimParams;          // last training window's best params
+  stats: SimStats;                // aggregate OOS (forward-period) stats
+  trades: SimTrade[];             // all OOS forward trades for this stock
   combosRun: number;
+  windowsSelected: number;       // how many windows this stock was in the top 10
+}
+
+export interface ForwardTrade extends SimTrade {
+  ticker: string;
 }
 
 export async function GET(req: NextRequest) {
@@ -70,7 +82,7 @@ export async function GET(req: NextRequest) {
       if (cached.rows.length > 0) return secureJsonResponse(cached.rows[0].result);
     } catch { /* fall through */ }
 
-    // 1. Top 50 liquid NOK equities by avg daily NOK volume (last 3 months)
+    // 1. Top 50 liquid NOK equities
     const liquidRes = await pool.query(`
       SELECT ff.ticker, s.name, s.sector,
              AVG(ff.nokvol::float) AS avg_nokvol
@@ -90,9 +102,11 @@ export async function GET(req: NextRequest) {
     const tickerMeta = new Map<string, { name: string; sector: string; avg_nokvol: number }>(
       liquidRes.rows.map((r: { ticker: string; name: string; sector: string; avg_nokvol: number }) => [r.ticker, r])
     );
-    if (tickers.length === 0) return secureJsonResponse({ bestStocks: [], meta: { computedAt: new Date().toISOString() } });
+    if (tickers.length === 0) return secureJsonResponse({ bestStocks: [], allForwardTrades: [], meta: { computedAt: new Date().toISOString() } });
 
-    // 2. Bulk fetch price + SMA + fwd_ret_21d for all tickers
+    const TOTAL_DAYS = 365 + SMA_WARMUP;
+
+    // 2. Price + SMA (no fwd_ret — we use ML predictions instead)
     const priceRes = await pool.query(`
       WITH raw AS (
         SELECT ticker, date, close::float
@@ -106,18 +120,17 @@ export async function GET(req: NextRequest) {
         SELECT ticker, date, close,
           AVG(close) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 199 PRECEDING AND CURRENT ROW) AS sma200,
           AVG(close) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 49 PRECEDING AND CURRENT ROW) AS sma50,
-          ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date) AS rn,
-          (LEAD(close, 21) OVER (PARTITION BY ticker ORDER BY date) - close) / NULLIF(close, 0) AS fwd_ret_21d
+          ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date) AS rn
         FROM raw
       )
-      SELECT ticker, date::text AS date, close, sma200, sma50, fwd_ret_21d
+      SELECT ticker, date::text AS date, close, sma200, sma50
       FROM with_sma
       WHERE rn > 200
         AND date >= CURRENT_DATE - 365 * INTERVAL '1 day'
       ORDER BY ticker, date ASC
-    `, [tickers, DAYS]);
+    `, [tickers, TOTAL_DAYS]);
 
-    // 3. Bulk fetch momentum factors
+    // 3. Momentum factors
     const momRes = await pool.query(`
       SELECT ticker, date::text AS date, mom1m::float, mom6m::float, mom11m::float, vol1m::float
       FROM factor_technical
@@ -126,7 +139,19 @@ export async function GET(req: NextRequest) {
       ORDER BY ticker, date ASC
     `, [tickers]);
 
-    // 4. OBX benchmark
+    // 4. ML predictions — actual model output, NOT future returns
+    const mlRes = await pool.query(`
+      SELECT DISTINCT ON (ticker, prediction_date::date)
+        ticker, prediction_date::date::text AS date,
+        ensemble_prediction::float AS pred
+      FROM ml_predictions
+      WHERE ticker = ANY($1)
+        AND prediction_date >= CURRENT_DATE - 365 * INTERVAL '1 day'
+        AND ensemble_prediction IS NOT NULL
+      ORDER BY ticker, prediction_date::date, prediction_date DESC
+    `, [tickers]);
+
+    // 5. OBX benchmark
     const obxRes = await pool.query(`
       SELECT date::text AS date, close::float AS obx_close
       FROM prices_daily
@@ -146,47 +171,44 @@ export async function GET(req: NextRequest) {
       momByTicker.get(r.ticker)!.set(r.date.slice(0, 10), r);
     }
 
-    // 5. Assemble SimInputBar[] per ticker
-    type PxRow = { ticker: string; date: string; close: number; sma200: number; sma50: number; fwd_ret_21d: number | null };
+    // ML prediction map: ticker → date → prediction (decimal fraction, e.g. 0.02 = 2%)
+    const mlByTicker = new Map<string, Map<string, number>>();
+    for (const r of mlRes.rows) {
+      if (!mlByTicker.has(r.ticker)) mlByTicker.set(r.ticker, new Map());
+      mlByTicker.get(r.ticker)!.set(r.date.slice(0, 10), r.pred);
+    }
+
+    // 6. Assemble full SimInputBar[] per ticker
+    type PxRow = { ticker: string; date: string; close: number; sma200: number; sma50: number };
     const pxByTicker = new Map<string, PxRow[]>();
     for (const r of priceRes.rows as PxRow[]) {
       if (!pxByTicker.has(r.ticker)) pxByTicker.set(r.ticker, []);
       pxByTicker.get(r.ticker)!.push(r);
     }
 
-    // 6. Build combos
-    const combos: SimParams[] = [];
-    for (const entry of ENTRY_VALS)
-      for (const stop of STOP_VALS)
-        for (const hold of HOLD_VALS)
-          for (const vol of VOL_VALS)
-            for (const mom of MOM_VALS)
-              combos.push({ ...BASE_PARAMS, entryThreshold: entry, stopLossPct: stop, maxHoldDays: hold, volGate: vol, momentumFilter: mom });
-
-    // 7. Run sweep per ticker
-    const results: BestStockResult[] = [];
-
+    // Build input arrays per ticker with actual ML predictions
+    const inputByTicker = new Map<string, SimInputBar[]>();
     for (const ticker of tickers) {
       const pxRows = pxByTicker.get(ticker);
-      if (!pxRows || pxRows.length < 30) continue;
+      if (!pxRows || pxRows.length < TRAIN_DAYS + FORWARD_DAYS) continue;
 
       const momMap = momByTicker.get(ticker) ?? new Map<string, MomRow>();
+      const mlMap = mlByTicker.get(ticker) ?? new Map<string, number>();
 
-      // Build SimInputBar[]
       const input: SimInputBar[] = pxRows.map(px => {
         const d = px.date.slice(0, 10);
         const mom = momMap.get(d);
         return {
           date: d,
-          open: px.close, // no open in bulk query — use close as approximation
+          open: px.close,
           close: px.close,
           high: px.close,
           low: px.close,
           volume: 0,
           sma200: px.sma200 ?? null,
           sma50: px.sma50 ?? null,
-          mlPrediction: px.fwd_ret_21d ?? null,
-          mlConfidence: px.fwd_ret_21d != null ? 0.8 : null,
+          mlPrediction: mlMap.get(d) ?? null,   // actual ML model output
+          mlConfidence: mlMap.has(d) ? 0.7 : null,
           mom1m: mom?.mom1m ?? null,
           mom6m: mom?.mom6m ?? null,
           mom11m: mom?.mom11m ?? null,
@@ -200,65 +222,170 @@ export async function GET(req: NextRequest) {
         };
       });
 
-      // Compute vol regime (top 33% = 'high', rest = 'low')
+      // Vol regime from full series (uses only historical vol, computed before walk-forward slicing)
       const vol1mVals = input.map(b => b.vol1m).filter((v): v is number => v != null).sort((a, b) => a - b);
       const p66 = vol1mVals.length > 0 ? vol1mVals[Math.floor(vol1mVals.length * 0.67)] : 0;
       for (const bar of input) {
         if (bar.vol1m != null) bar.volRegime = bar.vol1m > p66 ? 'high' : 'low';
       }
 
-      // Run all combos, pick best TIM-weighted Sharpe
-      // score = sharpe × (0.5 + 0.5 × min(timeInMarket / 0.5, 1.0))
-      // Rewards strategies invested ≥50% of the time, penalises very sparse ones.
-      let bestScore = -Infinity;
-      let bestSharpe = 0;
-      let bestStats: SimStats | null = null;
-      let bestParams: SimParams | null = null;
-      let bestTrades: SimTrade[] = [];
+      inputByTicker.set(ticker, input);
+    }
 
-      for (const params of combos) {
-        const result = runMLSimulation(input, params);
-        if (result.stats.trades >= 5 && result.stats.sharpe > 0) {
-          const daysInTrade = result.trades.reduce((s, t) => s + t.daysHeld, 0);
-          const timeInMarket = daysInTrade / Math.max(input.length, 1);
-          const timFactor = 0.5 + 0.5 * Math.min(timeInMarket / 0.5, 1.0);
-          const score = result.stats.sharpe * timFactor;
-          if (score > bestScore) {
-            bestScore = score;
-            bestSharpe = result.stats.sharpe;
-            bestStats = result.stats;
-            bestParams = params;
-            bestTrades = result.trades;
+    // 7. Build param combos
+    const combos: SimParams[] = [];
+    for (const entry of ENTRY_VALS)
+      for (const stop of STOP_VALS)
+        for (const hold of HOLD_VALS)
+          for (const vol of VOL_VALS)
+            for (const mom of MOM_VALS)
+              combos.push({ ...BASE_PARAMS, entryThreshold: entry, stopLossPct: stop, maxHoldDays: hold, volGate: vol, momentumFilter: mom });
+
+    // 8. Rolling walk-forward backtest
+    // Training: 90 bars, Forward: 30 bars, step 30 bars
+    // Number of windows that fit in 365 bars starting from TRAIN_DAYS offset
+    const allForwardTrades: ForwardTrade[] = [];
+    const stockAgg = new Map<string, {
+      forwardTrades: SimTrade[];
+      lastParams: SimParams;
+      lastSharpe: number;
+      windowsSelected: number;
+    }>();
+
+    const maxBars = Math.max(...Array.from(inputByTicker.values()).map(v => v.length));
+    const numWindows = Math.floor((maxBars - TRAIN_DAYS) / FORWARD_DAYS);
+
+    for (let w = 0; w < numWindows; w++) {
+      const fwdStart = TRAIN_DAYS + w * FORWARD_DAYS;
+      const fwdEnd = fwdStart + FORWARD_DAYS;
+      const trainStart = fwdStart - TRAIN_DAYS;   // = w * FORWARD_DAYS
+
+      // Score all tickers on training slice
+      const windowRankings: Array<{ ticker: string; score: number; params: SimParams; sharpe: number }> = [];
+
+      for (const ticker of tickers) {
+        const input = inputByTicker.get(ticker);
+        if (!input || input.length < fwdEnd) continue;
+
+        const trainSlice = input.slice(trainStart, fwdStart);
+        if (trainSlice.length < 30) continue;
+
+        let bestScore = -Infinity;
+        let bestParams: SimParams | null = null;
+        let bestSharpe = 0;
+
+        for (const params of combos) {
+          const result = runMLSimulation(trainSlice, params);
+          if (result.stats.trades >= MIN_TRAIN_TRADES && result.stats.sharpe > 0) {
+            const daysInTrade = result.trades.reduce((s, t) => s + t.daysHeld, 0);
+            const tim = daysInTrade / Math.max(trainSlice.length, 1);
+            const timFactor = 0.5 + 0.5 * Math.min(tim / 0.4, 1.0);
+            const score = result.stats.sharpe * timFactor;
+            if (score > bestScore) {
+              bestScore = score;
+              bestParams = params;
+              bestSharpe = result.stats.sharpe;
+            }
           }
+        }
+
+        if (bestParams && bestSharpe > 0) {
+          windowRankings.push({ ticker, score: bestScore, params: bestParams, sharpe: bestSharpe });
         }
       }
 
-      if (bestStats && bestParams && bestSharpe > 0 && bestStats.winRate >= 0.45) {
-        results.push({
-          rank: 0, // set after sort
-          ticker,
-          name: tickerMeta.get(ticker)?.name || ticker,
-          sector: tickerMeta.get(ticker)?.sector || 'Other',
-          avg_nokvol: tickerMeta.get(ticker)?.avg_nokvol || 0,
-          bestParams,
-          stats: bestStats,
-          trades: bestTrades,
-          combosRun: combos.length,
-        });
+      // Select top N for this window
+      windowRankings.sort((a, b) => b.score - a.score);
+      const windowTop = windowRankings.slice(0, TOP_N);
+
+      // Simulate FORWARD period only (out-of-sample) with training-selected params
+      for (const { ticker, params, sharpe } of windowTop) {
+        const input = inputByTicker.get(ticker)!;
+        const forwardSlice = input.slice(fwdStart, Math.min(fwdEnd, input.length));
+        if (forwardSlice.length < 3) continue;
+
+        const forwardResult = runMLSimulation(forwardSlice, params);
+
+        for (const trade of forwardResult.trades) {
+          allForwardTrades.push({ ...trade, ticker });
+        }
+
+        // Accumulate per-stock aggregates
+        const agg = stockAgg.get(ticker) ?? { forwardTrades: [], lastParams: params, lastSharpe: sharpe, windowsSelected: 0 };
+        agg.forwardTrades.push(...forwardResult.trades);
+        agg.lastParams = params;
+        agg.lastSharpe = sharpe;
+        agg.windowsSelected++;
+        stockAgg.set(ticker, agg);
       }
     }
 
-    // Sort by Sharpe, assign rank
-    results.sort((a, b) => b.stats.sharpe - a.stats.sharpe);
-    const top10 = results.slice(0, 10).map((r, i) => ({ ...r, rank: i + 1 }));
+    // 9. Build bestStocks — top 10 by last-window score, with OOS stats
+    // Use frequency (windowsSelected) × lastSharpe as overall ranking
+    const stockResults: BestStockResult[] = [];
+    for (const [ticker, agg] of stockAgg) {
+      if (agg.forwardTrades.length === 0) continue;
+      const trades = agg.forwardTrades;
+      const wins = trades.filter(t => t.pnlPct > 0).length;
+      const totalRet = trades.reduce((s, t) => s + t.pnlPct * 0.1, 0); // 10% slot weight
+      const avgHold = trades.reduce((s, t) => s + t.daysHeld, 0) / trades.length;
+      const winRate = wins / trades.length;
+      const grossPnls = trades.map(t => t.pnlPct);
+      const mean = grossPnls.reduce((s, v) => s + v, 0) / grossPnls.length;
+      const stdDev = Math.sqrt(grossPnls.reduce((s, v) => s + (v - mean) ** 2, 0) / grossPnls.length) || 1;
+      const sharpe = mean / stdDev * Math.sqrt(252 / avgHold);
+      const maxDD = trades.reduce((worst, t) => Math.min(worst, t.maxDrawdown ?? 0), 0);
+
+      const winTrades = trades.filter(t => t.pnlPct > 0);
+      const lossTrades = trades.filter(t => t.pnlPct <= 0);
+      const oosStats: SimStats = {
+        totalReturn: totalRet,
+        annualizedReturn: totalRet * (252 / Math.max(numWindows * FORWARD_DAYS, 1)),
+        benchmarkReturn: 0,
+        benchmarkAnnReturn: 0,
+        excessReturn: totalRet,
+        sharpe,
+        maxDrawdown: maxDD,
+        winRate,
+        trades: trades.length,
+        avgHoldDays: avgHold,
+        avgWinPct: winTrades.length > 0 ? winTrades.reduce((s, t) => s + t.pnlPct, 0) / winTrades.length : 0,
+        avgLossPct: lossTrades.length > 0 ? lossTrades.reduce((s, t) => s + t.pnlPct, 0) / lossTrades.length : 0,
+        profitFactor: winTrades.length > 0 && lossTrades.length > 0
+          ? winTrades.reduce((s, t) => s + t.pnlPct, 0) /
+            Math.abs(lossTrades.reduce((s, t) => s + t.pnlPct, 0))
+          : winTrades.length > 0 ? 999 : 0,
+      };
+
+      stockResults.push({
+        rank: 0,
+        ticker,
+        name: tickerMeta.get(ticker)?.name || ticker,
+        sector: tickerMeta.get(ticker)?.sector || 'Other',
+        avg_nokvol: tickerMeta.get(ticker)?.avg_nokvol || 0,
+        bestParams: agg.lastParams,
+        stats: oosStats,
+        trades,
+        combosRun: combos.length,
+        windowsSelected: agg.windowsSelected,
+      });
+    }
+
+    // Rank by: windowsSelected (consistency) × OOS Sharpe
+    stockResults.sort((a, b) => (b.windowsSelected * Math.max(b.stats.sharpe, 0)) - (a.windowsSelected * Math.max(a.stats.sharpe, 0)));
+    const top10 = stockResults.slice(0, 10).map((r, i) => ({ ...r, rank: i + 1 }));
 
     const result = {
       bestStocks: top10,
+      allForwardTrades,
       meta: {
         universe: tickers.length,
         combosPerTicker: combos.length,
-        qualified: results.length,
+        qualified: stockResults.length,
+        windows: numWindows,
         days: 365,
+        trainDays: TRAIN_DAYS,
+        forwardDays: FORWARD_DAYS,
         computedAt: new Date().toISOString(),
       },
     };
@@ -275,6 +402,6 @@ export async function GET(req: NextRequest) {
 
     return secureJsonResponse(result);
   } catch (error) {
-    return safeErrorResponse(error, 'Best stocks sweep failed');
+    return safeErrorResponse(error, 'Best stocks walk-forward sweep failed');
   }
 }

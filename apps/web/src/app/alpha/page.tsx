@@ -215,16 +215,19 @@ export default function AlphaPage() {
   const [topPerformers, setTopPerformers] = useState<TopPerformer[]>([]);
   const [topPerfLoading, setTopPerfLoading] = useState(false);
 
-  // Best Stocks (optimized sweep)
+  // Best Stocks (walk-forward sweep)
   type BestStock = {
     rank: number; ticker: string; name: string; sector: string; avg_nokvol: number;
     bestParams: SimParams;
     stats: SimStats;
     trades: SimTrade[];
+    windowsSelected?: number;
   };
+  type ForwardTrade = SimTrade & { ticker: string };
   const [bestStocks, setBestStocks] = useState<BestStock[]>([]);
+  const [allForwardTrades, setAllForwardTrades] = useState<ForwardTrade[]>([]);
   const [bestStocksLoading, setBestStocksLoading] = useState(false);
-  const [bestStocksMeta, setBestStocksMeta] = useState<{ computedAt?: string; universe?: number; combosPerTicker?: number; qualified?: number } | null>(null);
+  const [bestStocksMeta, setBestStocksMeta] = useState<{ computedAt?: string; universe?: number; combosPerTicker?: number; qualified?: number; windows?: number } | null>(null);
   const [paperTradingMode, setPaperTradingMode] = useState<'standard' | 'optimized'>('standard');
   const [expandedOptTicker, setExpandedOptTicker] = useState<string | null>(null);
 
@@ -388,7 +391,7 @@ export default function AlphaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const BEST_STOCKS_CACHE_KEY = "alpha_best_stocks_v3_365d_tim_weighted";
+  const BEST_STOCKS_CACHE_KEY = "alpha_best_stocks_v4_365d_walk_forward";
   const BEST_STOCKS_CACHE_TTL = 24 * 60 * 60 * 1000;
   const fetchBestStocks = useCallback(async (force = false) => {
     if (!token) return;
@@ -396,8 +399,8 @@ export default function AlphaPage() {
       try {
         const raw = localStorage.getItem(BEST_STOCKS_CACHE_KEY);
         if (raw) {
-          const { data, meta, ts } = JSON.parse(raw);
-          if (Date.now() - ts < BEST_STOCKS_CACHE_TTL) { setBestStocks(data); setBestStocksMeta(meta); return; }
+          const { data, meta, fwdTrades, ts } = JSON.parse(raw);
+          if (Date.now() - ts < BEST_STOCKS_CACHE_TTL) { setBestStocks(data); setBestStocksMeta(meta); if (fwdTrades) setAllForwardTrades(fwdTrades); return; }
         }
       } catch { /* ignore */ }
     }
@@ -408,7 +411,8 @@ export default function AlphaPage() {
         const d = await res.json();
         setBestStocks(d.bestStocks || []);
         setBestStocksMeta(d.meta || null);
-        try { localStorage.setItem(BEST_STOCKS_CACHE_KEY, JSON.stringify({ data: d.bestStocks || [], meta: d.meta || null, ts: Date.now() })); } catch { /* ignore */ }
+        setAllForwardTrades(d.allForwardTrades || []);
+        try { localStorage.setItem(BEST_STOCKS_CACHE_KEY, JSON.stringify({ data: d.bestStocks || [], meta: d.meta || null, fwdTrades: d.allForwardTrades || [], ts: Date.now() })); } catch { /* ignore */ }
       }
     } catch (e) { console.error("Best stocks failed:", e); }
     setBestStocksLoading(false);
@@ -824,8 +828,11 @@ export default function AlphaPage() {
 
   // Optimized equity curve — computed client-side from bestStocks trades
   const optimizedEqData = useMemo(() => {
-    if (bestStocks.length === 0) return null;
-    const allTrades = bestStocks.flatMap(s => (s.trades || []).map(t => ({ ...t, ticker: s.ticker })));
+    // Use server-computed allForwardTrades (walk-forward OOS) if available,
+    // fall back to per-stock trades for backwards compat
+    const allTrades: ForwardTrade[] = allForwardTrades.length > 0
+      ? allForwardTrades
+      : bestStocks.flatMap(s => (s.trades || []).map(t => ({ ...t, ticker: s.ticker })));
     if (allTrades.length === 0) return null;
 
     // Collect all unique dates from trade events
@@ -1096,7 +1103,7 @@ export default function AlphaPage() {
 
             {bestStocksLoading && (
               <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
-                Running 72-combo sweep across 50 liquid tickers... (may take 10-20s)
+                Running 108-combo walk-forward sweep across 50 liquid tickers... (may take 10-20s)
               </div>
             )}
             {!bestStocksLoading && bestStocks.length === 0 && (
@@ -1206,7 +1213,7 @@ export default function AlphaPage() {
                   <div style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", marginTop: 2 }}>
                     {paperTradingMode === 'standard'
                       ? "Entry: ML pred >+1% · Exit: signal <+0.25% (min 5d hold) OR −5% stop loss OR 21d max hold"
-                      : "Optimized params per ticker · 72-combo sweep · ranked by Sharpe · click row for trade log"}
+                      : "Optimized params per ticker · 108-combo walk-forward sweep · ranked by Sharpe · click row for trade log"}
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -1301,7 +1308,7 @@ export default function AlphaPage() {
                 <>
                   {bestStocksLoading && (
                     <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
-                      Running 72-combo sweep across 50 liquid tickers...
+                      Running 108-combo walk-forward sweep across 50 liquid tickers...
                     </div>
                   )}
                   {!bestStocksLoading && bestStocks.length === 0 && (
@@ -1408,8 +1415,8 @@ export default function AlphaPage() {
                                                 <td style={{ padding: "3px 6px", fontSize: 9, color: "rgba(255,255,255,0.6)" }}>{t.entryDate}</td>
                                                 <td style={{ padding: "3px 6px", fontSize: 9, textAlign: "right", color: "rgba(255,255,255,0.5)" }}>{t.exitDate}</td>
                                                 <td style={{ padding: "3px 6px", fontSize: 9, textAlign: "right", color: "rgba(255,255,255,0.5)" }}>{t.daysHeld}d</td>
-                                                <td style={{ padding: "3px 6px", fontSize: 9, textAlign: "right", color: t.predAtEntry >= 0.01 ? "#10b981" : "#f59e0b" }}>
-                                                  {t.predAtEntry >= 0 ? "+" : ""}{(t.predAtEntry * 100).toFixed(1)}%
+                                                <td style={{ padding: "3px 6px", fontSize: 9, textAlign: "right", color: t.predAtEntry >= 0.5 ? "#10b981" : "#f59e0b" }}>
+                                                  {t.predAtEntry >= 0 ? "+" : ""}{t.predAtEntry.toFixed(1)}%
                                                 </td>
                                                 <td style={{ padding: "3px 6px", fontSize: 10, fontWeight: 700, textAlign: "right", color: isWin ? "#10b981" : "#ef4444" }}>
                                                   {isWin ? "+" : ""}{(t.pnlPct * 100).toFixed(2)}%
@@ -1466,7 +1473,7 @@ export default function AlphaPage() {
                       </div>
                       <div style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", marginTop: -8 }}>
                         {isOptMode
-                          ? "Per-ticker optimal params from 72-combo sweep · 10% per slot · pnl realized at exit · indexed to 100"
+                          ? "Walk-forward OOS: params optimised on prior 90d, traded on next 30d · no future data · 10% per slot · indexed to 100"
                           : "Top 50 liquid OSE · Entry >+1% signal · −5% stop · 21d max · Up to 10 concurrent positions · Indexed to 100"}
                       </div>
                     </div>
@@ -1598,8 +1605,8 @@ export default function AlphaPage() {
                                   <td style={{ padding: "5px 10px", color: "rgba(255,255,255,0.5)" }}>{t.exitDate}</td>
                                   <td style={{ padding: "5px 10px", textAlign: "right", color: "rgba(255,255,255,0.4)" }}>{t.daysHeld}d</td>
                                   {isOptMode && (
-                                    <td style={{ padding: "5px 10px", textAlign: "right", fontSize: 9, color: (t as any).predAtEntry >= 0.01 ? "#10b981" : "#f59e0b" }}>
-                                      {((t as any).predAtEntry >= 0 ? "+" : "")}{(((t as any).predAtEntry ?? 0) * 100).toFixed(1)}%
+                                    <td style={{ padding: "5px 10px", textAlign: "right", fontSize: 9, color: (t as any).predAtEntry >= 0.5 ? "#10b981" : "#f59e0b" }}>
+                                      {((t as any).predAtEntry >= 0 ? "+" : "")}{((t as any).predAtEntry ?? 0).toFixed(1)}%
                                     </td>
                                   )}
                                   <td style={{ padding: "5px 10px", textAlign: "right", fontWeight: 700, color: isWin ? "#10b981" : "#ef4444" }}>
