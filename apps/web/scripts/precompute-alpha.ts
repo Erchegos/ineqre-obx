@@ -31,14 +31,14 @@ const pool = new Pool({
   max: 5,
 });
 
-const BEST_STOCKS_KEY = 'best_stocks_v8_full_year';
+const BEST_STOCKS_KEY = 'best_stocks_v9_tight_risk';
 
 // Fixed params — entry/exit driven by ML signal level
 const FIXED_PARAMS: SimParams = {
   entryThreshold:  1.0,
   exitThreshold:   0.25,
-  stopLossPct:     5.0,
-  takeProfitPct:   15.0,
+  stopLossPct:     3.0,
+  takeProfitPct:   12.0,
   maxHoldDays:     21,
   minHoldDays:     2,
   positionSizePct: 10,
@@ -209,7 +209,8 @@ async function computeBestStocks() {
 
     const result = runMLSimulation(input, FIXED_PARAMS);
     if (result.stats.trades < 3) continue;
-    if (result.stats.sharpe < 0.8) continue;  // only consistent performers
+    if (result.stats.sharpe < 1.0) continue;
+    if (result.stats.maxDrawdown < -0.12) continue;
 
     const currentPred = currentPredMap.get(ticker) ?? 0;
     const currentPredPct = currentPred * 100;

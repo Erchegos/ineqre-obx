@@ -392,7 +392,7 @@ export default function AlphaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const BEST_STOCKS_CACHE_KEY = "alpha_best_stocks_v8_full_year";
+  const BEST_STOCKS_CACHE_KEY = "alpha_best_stocks_v9_tight_risk";
   const BEST_STOCKS_CACHE_TTL = 24 * 60 * 60 * 1000;
   const fetchBestStocks = useCallback(async (force = false) => {
     if (!token) return;

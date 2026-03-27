@@ -21,7 +21,7 @@ export const maxDuration = 60;
  * Cache miss: computes inline (fast — single pass, no param sweep).
  */
 
-const CACHE_KEY      = 'best_stocks_v8_full_year';
+const CACHE_KEY      = 'best_stocks_v9_tight_risk';
 const CACHE_MAX_AGE_H = 25;
 
 export interface BestStockResult {
@@ -40,8 +40,8 @@ export interface BestStockResult {
 const FIXED_PARAMS: SimParams = {
   entryThreshold:  1.0,    // enter when pred > 1%
   exitThreshold:   0.25,   // exit when pred drops below 0.25%
-  stopLossPct:     5.0,
-  takeProfitPct:   15.0,
+  stopLossPct:     3.0,    // tighter stop — max -3% per trade
+  takeProfitPct:   12.0,
   maxHoldDays:     21,
   minHoldDays:     2,
   positionSizePct: 10,
@@ -228,7 +228,8 @@ async function computeAndCache(): Promise<object> {
 
     const result = runMLSimulation(input, FIXED_PARAMS);
     if (result.stats.trades < 3) continue;
-    if (result.stats.sharpe < 0.8) continue;  // only consistent performers in top 10
+    if (result.stats.sharpe < 1.0) continue;       // only Sharpe ≥ 1 in top 10
+    if (result.stats.maxDrawdown < -0.12) continue; // exclude MaxDD worse than -12%
 
     const currentPred = currentPredMap.get(ticker) ?? 0;
     const currentPredPct = currentPred * 100;
