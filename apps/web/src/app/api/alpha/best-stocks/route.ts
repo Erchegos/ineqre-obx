@@ -21,7 +21,7 @@ export const maxDuration = 60;
  * Cache miss: computes inline (fast — single pass, no param sweep).
  */
 
-const CACHE_KEY      = 'best_stocks_v7_full_year';
+const CACHE_KEY      = 'best_stocks_v8_full_year';
 const CACHE_MAX_AGE_H = 25;
 
 export interface BestStockResult {
@@ -56,7 +56,10 @@ const FIXED_PARAMS: SimParams = {
 };
 
 async function computeAndCache(): Promise<object> {
-  const TOTAL_DAYS = 365 + 230; // 230-day SMA warmup
+  // Need row 201 (SMA warmup) to fall before 365 days ago.
+  // Row 201 date ≈ CURRENT_DATE - TOTAL_DAYS + 291 (calendar days).
+  // To reach March 2025: TOTAL_DAYS ≥ 656. Use 700 for safety.
+  const TOTAL_DAYS = 700;
 
   // 1. Top 50 liquid tickers
   const liquidRes = await pool.query(`
@@ -224,7 +227,8 @@ async function computeAndCache(): Promise<object> {
     }
 
     const result = runMLSimulation(input, FIXED_PARAMS);
-    if (result.stats.trades < 2) continue;   // need at least 2 trades to rank meaningfully
+    if (result.stats.trades < 3) continue;
+    if (result.stats.sharpe < 0.8) continue;  // only consistent performers in top 10
 
     const currentPred = currentPredMap.get(ticker) ?? 0;
     const currentPredPct = currentPred * 100;

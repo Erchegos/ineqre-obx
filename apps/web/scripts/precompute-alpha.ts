@@ -31,7 +31,7 @@ const pool = new Pool({
   max: 5,
 });
 
-const BEST_STOCKS_KEY = 'best_stocks_v7_full_year';
+const BEST_STOCKS_KEY = 'best_stocks_v8_full_year';
 
 // Fixed params — entry/exit driven by ML signal level
 const FIXED_PARAMS: SimParams = {
@@ -57,7 +57,7 @@ function log(msg: string) { console.log(`[${new Date().toISOString()}] ${msg}`);
 async function computeBestStocks() {
   log('Starting best-stocks ML signal computation...');
 
-  const TOTAL_DAYS = 365 + 230;
+  const TOTAL_DAYS = 700; // 335d SMA warmup buffer so row 201 falls before Mar 2025
 
   const liquidRes = await pool.query(`
     SELECT ff.ticker, s.name, s.sector, AVG(ff.nokvol::float) AS avg_nokvol
@@ -208,7 +208,8 @@ async function computeBestStocks() {
     }
 
     const result = runMLSimulation(input, FIXED_PARAMS);
-    if (result.stats.trades < 2) continue;
+    if (result.stats.trades < 3) continue;
+    if (result.stats.sharpe < 0.8) continue;  // only consistent performers
 
     const currentPred = currentPredMap.get(ticker) ?? 0;
     const currentPredPct = currentPred * 100;
