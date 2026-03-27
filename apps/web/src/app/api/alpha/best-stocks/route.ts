@@ -21,7 +21,7 @@ export const maxDuration = 60;
  * Cache miss: computes inline (fast — single pass, no param sweep).
  */
 
-const CACHE_KEY      = 'best_stocks_v9_tight_risk';
+const CACHE_KEY      = 'best_stocks_v10_quality';
 const CACHE_MAX_AGE_H = 25;
 
 export interface BestStockResult {
@@ -226,13 +226,15 @@ async function computeAndCache(): Promise<object> {
       if (bar.vol1m != null) bar.volRegime = bar.vol1m > p66 ? 'high' : 'low';
     }
 
-    const result = runMLSimulation(input, FIXED_PARAMS);
-    if (result.stats.trades < 3) continue;
-    if (result.stats.sharpe < 1.0) continue;       // only Sharpe ≥ 1 in top 10
-    if (result.stats.maxDrawdown < -0.12) continue; // exclude MaxDD worse than -12%
-
     const currentPred = currentPredMap.get(ticker) ?? 0;
     const currentPredPct = currentPred * 100;
+
+    const result = runMLSimulation(input, FIXED_PARAMS);
+    if (result.stats.trades < 3) continue;
+    if (currentPredPct <= 0.5) continue;            // must have bullish current ML signal
+    if (result.stats.sharpe < 1.2) continue;        // Sharpe ≥ 1.2
+    if (result.stats.winRate < 0.55) continue;      // WinRate ≥ 55%
+    if (result.stats.maxDrawdown < -0.12) continue; // MaxDD no worse than -12%
 
     // Score: current ML strength × historical Sharpe (floor Sharpe at 0.1 so positive-pred stocks rank ahead of negatives)
     const sharpe = result.stats.sharpe;
