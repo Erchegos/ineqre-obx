@@ -70,6 +70,7 @@ InEqRe_OBX/
 | **OBX Volatility Dashboard** | `/volatility/obx` | `apps/web/src/app/volatility/obx/page.tsx` |
 | **Std Channel Strategy** | `/std-channel-strategy` | `apps/web/src/app/std-channel-strategy/page.tsx` |
 | **Backtest Results** | `/backtest` | `apps/web/src/app/backtest/page.tsx` |
+| **Alpha Engine** | `/alpha` | `apps/web/src/app/alpha/page.tsx` — 4 tabs: Strategy (optimized top 10 + paper trading + equity curve), Signals, Explorer, Simulator |
 | **FX Terminal** | `/fx` | `apps/web/src/app/fx/page.tsx` |
 | **Options List** | `/options` | `apps/web/src/app/options/page.tsx` |
 | **Options Analysis** | `/options/[ticker]` | `apps/web/src/app/options/[ticker]/page.tsx` |
@@ -120,6 +121,9 @@ All endpoints in `apps/web/src/app/api/`
 | `GET /api/std-channel-optimize/[ticker]` | Optimized channel params |
 | `GET /api/std-channel-optimize` | Bulk optimization results |
 | `GET /api/std-channel-strategy` | Strategy backtest with trades & signals |
+| `GET /api/alpha/top-performers` | Walk-forward trade sim on top 50 liquid OSE (fixed params, 12M) |
+| `GET /api/alpha/best-stocks` | 72-combo param sweep on top 50 liquid OSE (365d), top 10 by best Sharpe (24h cache) |
+| `GET /api/alpha/simulator/[ticker]` | Per-ticker SimInputBar[] for client-side ML trading simulation |
 | `GET /api/correlation` | Correlation matrices |
 
 ### Options APIs

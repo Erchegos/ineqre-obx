@@ -215,6 +215,16 @@ export default function AlphaPage() {
   const [topPerformers, setTopPerformers] = useState<TopPerformer[]>([]);
   const [topPerfLoading, setTopPerfLoading] = useState(false);
 
+  // Best Stocks (optimized sweep)
+  type BestStock = {
+    rank: number; ticker: string; name: string; sector: string; avg_nokvol: number;
+    bestParams: SimParams;
+    stats: SimStats;
+  };
+  const [bestStocks, setBestStocks] = useState<BestStock[]>([]);
+  const [bestStocksLoading, setBestStocksLoading] = useState(false);
+  const [bestStocksMeta, setBestStocksMeta] = useState<{ computedAt?: string; universe?: number; combosPerTicker?: number; qualified?: number } | null>(null);
+
   // Equity curve
   type EqCurvePoint = { date: string; value: number; positions: number };
   type EqCurveStats = { totalReturn: number; maxDrawdown: number; winRate: number; trades: number };
@@ -372,6 +382,37 @@ export default function AlphaPage() {
 
   useEffect(() => {
     if (token && topPerformers.length === 0 && !topPerfLoading) fetchTopPerformers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  const BEST_STOCKS_CACHE_KEY = "alpha_best_stocks_v1_365d";
+  const BEST_STOCKS_CACHE_TTL = 24 * 60 * 60 * 1000;
+  const fetchBestStocks = useCallback(async (force = false) => {
+    if (!token) return;
+    if (!force) {
+      try {
+        const raw = localStorage.getItem(BEST_STOCKS_CACHE_KEY);
+        if (raw) {
+          const { data, meta, ts } = JSON.parse(raw);
+          if (Date.now() - ts < BEST_STOCKS_CACHE_TTL) { setBestStocks(data); setBestStocksMeta(meta); return; }
+        }
+      } catch { /* ignore */ }
+    }
+    setBestStocksLoading(true);
+    try {
+      const res = await fetch('/api/alpha/best-stocks', { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const d = await res.json();
+        setBestStocks(d.bestStocks || []);
+        setBestStocksMeta(d.meta || null);
+        try { localStorage.setItem(BEST_STOCKS_CACHE_KEY, JSON.stringify({ data: d.bestStocks || [], meta: d.meta || null, ts: Date.now() })); } catch { /* ignore */ }
+      }
+    } catch (e) { console.error("Best stocks failed:", e); }
+    setBestStocksLoading(false);
+  }, [token]);
+
+  useEffect(() => {
+    if (token && bestStocks.length === 0 && !bestStocksLoading) fetchBestStocks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
@@ -973,6 +1014,108 @@ export default function AlphaPage() {
             <div style={{ fontSize: 10, fontWeight: 700, color: "#3b82f6", fontFamily: "monospace", whiteSpace: "nowrap" as const, padding: "6px 14px", background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.3)", borderRadius: 5 }}>
               OPEN SIMULATOR →
             </div>
+          </div>
+
+          {/* ══════════════════════════════════════════════════════════════════
+              OPTIMIZED TOP 10 — parameter-sweep optimized best stocks 365d
+          ══════════════════════════════════════════════════════════════════ */}
+          <div style={{ ...cardStyle, marginBottom: 16, borderLeft: "3px solid #10b981" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 800, fontFamily: "monospace", letterSpacing: "0.04em", color: "#10b981" }}>
+                  OPTIMIZED TOP 10 — Last 365 Days
+                </div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", marginTop: 3 }}>
+                  {bestStocksMeta
+                    ? `${bestStocksMeta.combosPerTicker ?? 72} param combos × ${bestStocksMeta.universe ?? '?'} tickers · ${bestStocksMeta.qualified ?? bestStocks.length} qualified · Best Sharpe per stock · 24h cache`
+                    : "72 strategy combos per ticker · ranked by best Sharpe · top 50 liquid OSE"}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                {bestStocksMeta?.computedAt && (
+                  <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", fontFamily: "monospace" }}>
+                    {new Date(bestStocksMeta.computedAt).toLocaleDateString("no-NO", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                )}
+                <button onClick={() => fetchBestStocks(true)} disabled={bestStocksLoading}
+                  style={{ ...btnSecondary, fontSize: 10, padding: "5px 12px", opacity: bestStocksLoading ? 0.5 : 1 }}>
+                  {bestStocksLoading ? "Computing..." : "Refresh"}
+                </button>
+              </div>
+            </div>
+
+            {bestStocksLoading && (
+              <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
+                Running 72-combo sweep across 50 liquid tickers... (may take 10-20s)
+              </div>
+            )}
+            {!bestStocksLoading && bestStocks.length === 0 && (
+              <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
+                Loading optimized rankings...
+              </div>
+            )}
+            {bestStocks.length > 0 && (
+              <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "monospace" }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid #30363d" }}>
+                    {["#", "Ticker", "Sector", "Entry%", "Stop%", "MaxHold", "VolGate", "Mom", "Sharpe", "WinRate", "AvgPnL", "MaxDD", "Trades", "Action"].map((h, hi) => (
+                      <th key={h} style={{ fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.5)", padding: "5px 8px", textAlign: hi < 2 ? "left" as const : "right" as const, letterSpacing: "0.04em" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {bestStocks.map((s, i) => {
+                    const p = s.bestParams;
+                    const st = s.stats;
+                    const sharpeColor = st.sharpe >= 1.5 ? "#10b981" : st.sharpe >= 0.8 ? "#f59e0b" : "#ef4444";
+                    const rowBg = i < 3 ? "rgba(16,185,129,0.04)" : "transparent";
+                    return (
+                      <tr key={s.ticker}
+                        style={{ borderBottom: "1px solid rgba(48,54,61,0.3)", background: rowBg, transition: "background 0.1s" }}
+                        onMouseEnter={e => (e.currentTarget.style.background = "rgba(16,185,129,0.08)")}
+                        onMouseLeave={e => (e.currentTarget.style.background = rowBg)}>
+                        <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, color: i === 0 ? "#10b981" : i < 3 ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.35)" }}>#{s.rank}</td>
+                        <td style={{ padding: "6px 8px", fontSize: 12, fontWeight: 800, color: "#10b981" }}>{s.ticker}</td>
+                        <td style={{ padding: "6px 8px", textAlign: "right" }}>
+                          <span style={{ fontSize: 9, fontWeight: 700, color: sectorColor(s.sector) }}>{s.sector?.slice(0, 10) ?? "—"}</span>
+                        </td>
+                        <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: "rgba(255,255,255,0.7)" }}>{p.entryThreshold.toFixed(1)}%</td>
+                        <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: "#ef4444" }}>{p.stopLossPct.toFixed(0)}%</td>
+                        <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: "rgba(255,255,255,0.6)" }}>{p.maxHoldDays}d</td>
+                        <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: p.volGate === 'hard' ? "#f59e0b" : "rgba(255,255,255,0.4)" }}>{p.volGate.toUpperCase()}</td>
+                        <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: p.momentumFilter > 0 ? "#3b82f6" : "rgba(255,255,255,0.4)" }}>{p.momentumFilter > 0 ? `${p.momentumFilter}/3` : "OFF"}</td>
+                        <td style={{ padding: "6px 8px", fontSize: 12, fontWeight: 800, textAlign: "right", color: sharpeColor }}>{st.sharpe.toFixed(2)}</td>
+                        <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", color: st.winRate >= 0.6 ? "#10b981" : st.winRate >= 0.5 ? "#f59e0b" : "#ef4444" }}>
+                          {(st.winRate * 100).toFixed(0)}%
+                        </td>
+                        <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", color: st.annualizedReturn >= 0 ? "#10b981" : "#ef4444" }}>
+                          {st.annualizedReturn >= 0 ? "+" : ""}{(st.annualizedReturn * 100).toFixed(1)}%
+                        </td>
+                        <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 600, textAlign: "right", color: "#ef4444" }}>
+                          {(st.maxDrawdown * 100).toFixed(1)}%
+                        </td>
+                        <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: "rgba(255,255,255,0.5)" }}>{st.trades}</td>
+                        <td style={{ padding: "6px 8px", textAlign: "right" }}>
+                          <button
+                            onClick={() => {
+                              setSimTicker(s.ticker);
+                              setSimEntry(p.entryThreshold);
+                              setSimStop(p.stopLossPct);
+                              setSimMaxHold(p.maxHoldDays);
+                              setSimVolGate(p.volGate as 'off' | 'soft' | 'hard');
+                              setSimMom(p.momentumFilter as 0 | 1 | 2 | 3);
+                              setTab("simulator");
+                            }}
+                            style={{ ...btnSecondary, fontSize: 9, padding: "3px 8px", color: "#10b981", borderColor: "rgba(16,185,129,0.3)" }}>
+                            SIMULATE
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
 
           {/* ══════════════════════════════════════════════════════════════════
@@ -2800,7 +2943,7 @@ export default function AlphaPage() {
                     {/* Header / toggle */}
                     <div onClick={() => setSimSweepOpen(v => !v)}
                       style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-                      <div style={{ ...sectionTitle, marginBottom: 0 }}>⚡ PARAMETER SWEEP</div>
+                      <div style={{ ...sectionTitle, marginBottom: 0 }}>PARAMETER SWEEP</div>
                       <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.3)" }}>
                         {simSweepResults.length > 0
                           ? `${simSweepResults.length} combos · sorted by ${simSweepSortKey}`
