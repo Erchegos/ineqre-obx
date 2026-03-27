@@ -822,6 +822,53 @@ export default function AlphaPage() {
   [simDoneTrades, simLive]);
   const simProgress = simResult ? Math.max(0, (simPlayIdx / Math.max(1, simResult.series.length - 1)) * 100) : 0;
 
+  // Optimized equity curve — computed client-side from bestStocks trades
+  const optimizedEqData = useMemo(() => {
+    if (bestStocks.length === 0) return null;
+    const allTrades = bestStocks.flatMap(s => (s.trades || []).map(t => ({ ...t, ticker: s.ticker })));
+    if (allTrades.length === 0) return null;
+
+    // Collect all unique dates from trade events
+    const dateSet = new Set<string>();
+    for (const t of allTrades) {
+      dateSet.add(t.entryDate);
+      dateSet.add(t.exitDate);
+    }
+    const sortedDates = Array.from(dateSet).sort();
+
+    let equity = 100;
+    let peak = 100;
+    let maxDD = 0;
+    const SLOT_WEIGHT = 0.10; // 10% per position slot
+    const curve: { date: string; value: number; positions: number }[] = [];
+
+    for (const date of sortedDates) {
+      // Realize pnl for all trades exiting today
+      const exiting = allTrades.filter(t => t.exitDate === date);
+      for (const t of exiting) {
+        equity *= 1 + t.pnlPct * SLOT_WEIGHT;
+      }
+      // Active positions: open at this point
+      const active = allTrades.filter(t => t.entryDate <= date && t.exitDate > date).length;
+      curve.push({ date, value: Math.round(equity * 10000) / 10000, positions: active });
+      if (equity > peak) peak = equity;
+      const dd = (peak - equity) / peak * 100;
+      if (dd > maxDD) maxDD = dd;
+    }
+
+    const wins = allTrades.filter(t => t.pnlPct > 0).length;
+    return {
+      curve,
+      stats: {
+        totalReturn: equity - 100,
+        maxDrawdown: -maxDD,
+        winRate: allTrades.length > 0 ? (wins / allTrades.length) * 100 : 0,
+        trades: allTrades.length,
+      },
+      allTrades,
+    };
+  }, [bestStocks]);
+
   // Sim ticker search
   const simSearchResults = useMemo(() => {
     if (!simSearch) return [];
@@ -1396,50 +1443,62 @@ export default function AlphaPage() {
 
             {/* ── CUMULATIVE PERFORMANCE CHART ── */}
             {(() => {
-              const isPos = (equityCurveStats?.totalReturn ?? 0) >= 0;
-              const lineColor = isPos ? "#10b981" : "#ef4444";
-              const minVal = equityCurve.length > 0 ? Math.min(...equityCurve.map(e => e.value)) : 90;
-              const maxVal = equityCurve.length > 0 ? Math.max(...equityCurve.map(e => e.value)) : 110;
+              // Switch data source based on mode
+              const isOptMode = paperTradingMode === 'optimized';
+              const activeStats = isOptMode ? optimizedEqData?.stats : equityCurveStats;
+              const activeCurve = isOptMode ? (optimizedEqData?.curve ?? []) : equityCurve;
+              const activeLoading = isOptMode ? false : equityCurveLoading;
+              const activeTradeLog = isOptMode ? (optimizedEqData?.allTrades ?? []) : tradeLog;
+
+              const isPos = (activeStats?.totalReturn ?? 0) >= 0;
+              const lineColor = isOptMode ? "#10b981" : (isPos ? "#10b981" : "#ef4444");
+              const minVal = activeCurve.length > 0 ? Math.min(...activeCurve.map(e => e.value)) : 90;
+              const maxVal = activeCurve.length > 0 ? Math.max(...activeCurve.map(e => e.value)) : 110;
               const domainLo = Math.floor(minVal * 0.97);
               const domainHi = Math.ceil(maxVal * 1.02);
               return (
-                <div style={{ ...cardStyle, marginBottom: 16 }}>
+                <div style={{ ...cardStyle, marginBottom: 16, borderLeft: isOptMode ? "2px solid rgba(16,185,129,0.4)" : undefined }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
                     <div>
-                      <div style={sectionTitle}>Cumulative Performance — Last 365 Days · Max 10 Positions · Equal Weight Slots</div>
+                      <div style={sectionTitle}>
+                        Cumulative Performance — Last 365 Days · Max 10 Positions · Equal Weight Slots
+                        {isOptMode && <span style={{ marginLeft: 8, fontSize: 9, fontWeight: 700, color: "#10b981", background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: 3, padding: "1px 6px", letterSpacing: "0.04em" }}>OPTIMIZED</span>}
+                      </div>
                       <div style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", marginTop: -8 }}>
-                        Top 50 liquid OSE · Entry &gt;+1% signal · −5% stop · 21d max · Up to 10 concurrent positions · Indexed to 100
+                        {isOptMode
+                          ? "Per-ticker optimal params from 72-combo sweep · 10% per slot · pnl realized at exit · indexed to 100"
+                          : "Top 50 liquid OSE · Entry >+1% signal · −5% stop · 21d max · Up to 10 concurrent positions · Indexed to 100"}
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      {equityCurveStats && (
+                      {activeStats && (
                         <div style={{ display: "flex", gap: 12, fontSize: 10, fontFamily: "monospace" }}>
-                          <span style={{ color: "rgba(255,255,255,0.4)" }}>Return: <span style={{ color: isPos ? "#10b981" : "#ef4444", fontWeight: 800, fontSize: 13 }}>{isPos ? "+" : ""}{equityCurveStats.totalReturn.toFixed(1)}%</span></span>
-                          <span style={{ color: "rgba(255,255,255,0.4)" }}>Max DD: <span style={{ color: "#ef4444", fontWeight: 700 }}>{equityCurveStats.maxDrawdown.toFixed(1)}%</span></span>
-                          <span style={{ color: "rgba(255,255,255,0.4)" }}>Win Rate: <span style={{ color: "#f59e0b", fontWeight: 700 }}>{equityCurveStats.winRate.toFixed(0)}%</span></span>
-                          <span style={{ color: "rgba(255,255,255,0.4)" }}>Trades: <span style={{ color: "#fff", fontWeight: 700 }}>{equityCurveStats.trades}</span></span>
+                          <span style={{ color: "rgba(255,255,255,0.4)" }}>Return: <span style={{ color: isPos ? "#10b981" : "#ef4444", fontWeight: 800, fontSize: 13 }}>{isPos ? "+" : ""}{activeStats.totalReturn.toFixed(1)}%</span></span>
+                          <span style={{ color: "rgba(255,255,255,0.4)" }}>Max DD: <span style={{ color: "#ef4444", fontWeight: 700 }}>{activeStats.maxDrawdown.toFixed(1)}%</span></span>
+                          <span style={{ color: "rgba(255,255,255,0.4)" }}>Win Rate: <span style={{ color: "#f59e0b", fontWeight: 700 }}>{activeStats.winRate.toFixed(0)}%</span></span>
+                          <span style={{ color: "rgba(255,255,255,0.4)" }}>Trades: <span style={{ color: "#fff", fontWeight: 700 }}>{activeStats.trades}</span></span>
                         </div>
                       )}
-                      <button onClick={() => fetchEquityCurve(true)} disabled={equityCurveLoading}
-                        style={{ ...btnSecondary, fontSize: 9, padding: "4px 10px", opacity: equityCurveLoading ? 0.5 : 1 }}>
-                        {equityCurveLoading ? "Loading..." : "Refresh"}
-                      </button>
+                      {!isOptMode && (
+                        <button onClick={() => fetchEquityCurve(true)} disabled={equityCurveLoading}
+                          style={{ ...btnSecondary, fontSize: 9, padding: "4px 10px", opacity: equityCurveLoading ? 0.5 : 1 }}>
+                          {equityCurveLoading ? "Loading..." : "Refresh"}
+                        </button>
+                      )}
                     </div>
                   </div>
 
-                  {equityCurveLoading && (
+                  {activeLoading && (
                     <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
                       Simulating portfolio across 365 days of trading...
                     </div>
                   )}
 
-                  {!equityCurveLoading && equityCurve.length > 0 && (() => {
-                    // Add gradientId with gradient fill
+                  {!activeLoading && activeCurve.length > 0 && (() => {
                     return (
                       <>
-                        {/* Main equity curve */}
                         <ResponsiveContainer width="100%" height={260}>
-                          <ComposedChart data={equityCurve} margin={{ top: 5, right: 60, left: 10, bottom: 0 }}>
+                          <ComposedChart data={activeCurve} margin={{ top: 5, right: 60, left: 10, bottom: 0 }}>
                             <defs>
                               <linearGradient id="eqGrad" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="0%" stopColor={lineColor} stopOpacity={0.25} />
@@ -1449,11 +1508,9 @@ export default function AlphaPage() {
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                             <XAxis dataKey="date" tick={{ fontSize: 9, fill: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}
                               tickFormatter={d => d.slice(5)} interval="preserveStartEnd" />
-                            {/* Left axis: indexed price */}
                             <YAxis yAxisId="left" domain={[domainLo, domainHi]}
                               tick={{ fontSize: 9, fill: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}
                               tickFormatter={v => v.toFixed(0)} width={42} />
-                            {/* Right axis: returns % */}
                             <YAxis yAxisId="right" orientation="right" domain={[domainLo, domainHi]}
                               tick={{ fontSize: 9, fill: "rgba(255,255,255,0.35)", fontFamily: "monospace" }}
                               tickFormatter={v => `${(v - 100).toFixed(0)}%`} width={50} />
@@ -1474,15 +1531,15 @@ export default function AlphaPage() {
                         {/* Position count bar chart */}
                         <div style={{ marginTop: -8 }}>
                           <ResponsiveContainer width="100%" height={56}>
-                            <BarChart data={equityCurve} margin={{ top: 0, right: 60, left: 10, bottom: 0 }} barCategoryGap="0%">
+                            <BarChart data={activeCurve} margin={{ top: 0, right: 60, left: 10, bottom: 0 }} barCategoryGap="0%">
                               <XAxis dataKey="date" tick={false} axisLine={false} tickLine={false} />
                               <YAxis domain={[0, 10]} tick={{ fontSize: 8, fill: "rgba(255,255,255,0.25)", fontFamily: "monospace" }}
                                 tickCount={3} width={42} tickFormatter={v => `${v}p`} />
                               <Tooltip
                                 contentStyle={{ background: "#0d1117", border: "1px solid #30363d", borderRadius: 6, fontFamily: "monospace", fontSize: 10 }}
-                                formatter={((v: number) => [`${v} / 10 positions`, "Active"]) as Parameters<typeof Tooltip>[0]["formatter"]}
+                                formatter={((v: number) => [`${v} positions active`, "Active"]) as Parameters<typeof Tooltip>[0]["formatter"]}
                                 labelFormatter={l => l} />
-                              <Bar dataKey="positions" fill="rgba(59,130,246,0.4)" isAnimationActive={false} />
+                              <Bar dataKey="positions" fill={isOptMode ? "rgba(16,185,129,0.35)" : "rgba(59,130,246,0.4)"} isAnimationActive={false} />
                             </BarChart>
                           </ResponsiveContainer>
                           <div style={{ fontSize: 8, fontFamily: "monospace", color: "rgba(255,255,255,0.2)", textAlign: "right", marginRight: 64, marginTop: -4 }}>
@@ -1493,45 +1550,69 @@ export default function AlphaPage() {
                     );
                   })()}
 
-                  {!equityCurveLoading && equityCurve.length === 0 && (
+                  {!activeLoading && activeCurve.length === 0 && (
                     <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
-                      Loading equity curve...
+                      {isOptMode ? "Load optimized top 10 first (click Refresh in table above)" : "Loading equity curve..."}
                     </div>
                   )}
 
                   {/* Trade Log */}
-                  {tradeLog.length > 0 && (
+                  {activeTradeLog.length > 0 && (
                     <div style={{ marginTop: 24 }}>
                       <div style={{ fontSize: 10, fontWeight: 700, fontFamily: "monospace", color: "rgba(255,255,255,0.5)", letterSpacing: "0.08em", marginBottom: 8 }}>
-                        TRADE LOG — {tradeLog.length} CLOSED POSITIONS · LAST 365 DAYS · MAX 10 SLOTS
+                        TRADE LOG — {activeTradeLog.length} CLOSED POSITIONS · LAST 365 DAYS{isOptMode ? " · OPTIMIZED PARAMS" : " · MAX 10 SLOTS"}
                       </div>
                       <div style={{ overflowY: "auto", maxHeight: 420, border: "1px solid #21262d", borderRadius: 6 }}>
                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10, fontFamily: "monospace" }}>
                           <thead style={{ position: "sticky", top: 0, background: "#161b22", zIndex: 1 }}>
                             <tr>
-                              {["#", "Ticker", "Entry", "Exit", "Days", "P&L", "Reason"].map(h => (
-                                <th key={h} style={{ padding: "6px 10px", textAlign: h === "P&L" || h === "Days" || h === "#" ? "right" : "left", fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em", borderBottom: "1px solid #30363d", whiteSpace: "nowrap" }}>{h}</th>
+                              {["#", "Ticker", "Entry", "Exit", "Days", isOptMode ? "ML Pred" : null, "P&L", "Max DD", "Reason"].filter(Boolean).map(h => (
+                                <th key={h!} style={{ padding: "6px 10px", textAlign: h === "P&L" || h === "Days" || h === "#" || h === "Max DD" || h === "ML Pred" ? "right" : "left", fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em", borderBottom: "1px solid #30363d", whiteSpace: "nowrap" }}>{h}</th>
                               ))}
                             </tr>
                           </thead>
                           <tbody>
-                            {tradeLog.map((t, i) => {
-                              const isWin = t.pnlPct >= 0;
-                              const reasonColor = t.exitReason === 'stop' ? '#ef4444' : t.exitReason === 'time' ? '#f59e0b' : '#3b82f6';
-                              const reasonLabel = t.exitReason === 'stop' ? 'STOP' : t.exitReason === 'time' ? 'TIME' : 'SIG';
+                            {(isOptMode
+                              ? [...activeTradeLog].sort((a, b) => a.entryDate.localeCompare(b.entryDate))
+                              : activeTradeLog
+                            ).map((t, i) => {
+                              const isWin = t.pnlPct > 0;
+                              const exitReason = (t as any).exitReason ?? (t as any).exit_reason ?? 'signal';
+                              const reasonMap: Record<string, { color: string; label: string }> = {
+                                take_profit: { color: '#10b981', label: 'TP' },
+                                stop_loss: { color: '#ef4444', label: 'SL' },
+                                signal_flip: { color: '#3b82f6', label: 'SIG' },
+                                time_stop: { color: '#f59e0b', label: 'TIME' },
+                                sma_cross: { color: '#a78bfa', label: 'SMA' },
+                                vol_regime: { color: '#fb923c', label: 'VOL' },
+                                stop: { color: '#ef4444', label: 'SL' },
+                                time: { color: '#f59e0b', label: 'TIME' },
+                                signal: { color: '#3b82f6', label: 'SIG' },
+                              };
+                              const r = reasonMap[exitReason] ?? { color: '#64748b', label: exitReason.slice(0, 4).toUpperCase() };
                               return (
                                 <tr key={i} style={{ borderBottom: "1px solid #21262d", background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)" }}>
-                                  <td style={{ padding: "5px 10px", textAlign: "right", color: "rgba(255,255,255,0.25)", fontSize: 9 }}>{tradeLog.length - i}</td>
-                                  <td style={{ padding: "5px 10px", fontWeight: 700, color: "#3b82f6", letterSpacing: "0.04em" }}>{t.ticker}</td>
+                                  <td style={{ padding: "5px 10px", textAlign: "right", color: "rgba(255,255,255,0.25)", fontSize: 9 }}>{i + 1}</td>
+                                  <td style={{ padding: "5px 10px", fontWeight: 700, color: isOptMode ? "#10b981" : "#3b82f6", letterSpacing: "0.04em" }}>{(t as any).ticker}</td>
                                   <td style={{ padding: "5px 10px", color: "rgba(255,255,255,0.5)" }}>{t.entryDate}</td>
                                   <td style={{ padding: "5px 10px", color: "rgba(255,255,255,0.5)" }}>{t.exitDate}</td>
                                   <td style={{ padding: "5px 10px", textAlign: "right", color: "rgba(255,255,255,0.4)" }}>{t.daysHeld}d</td>
+                                  {isOptMode && (
+                                    <td style={{ padding: "5px 10px", textAlign: "right", fontSize: 9, color: (t as any).predAtEntry >= 0.01 ? "#10b981" : "#f59e0b" }}>
+                                      {((t as any).predAtEntry >= 0 ? "+" : "")}{(((t as any).predAtEntry ?? 0) * 100).toFixed(1)}%
+                                    </td>
+                                  )}
                                   <td style={{ padding: "5px 10px", textAlign: "right", fontWeight: 700, color: isWin ? "#10b981" : "#ef4444" }}>
-                                    {isWin ? "+" : ""}{t.pnlPct.toFixed(2)}%
+                                    {isWin ? "+" : ""}{(t.pnlPct * (isOptMode ? 100 : 1)).toFixed(2)}%
                                   </td>
+                                  {isOptMode && (
+                                    <td style={{ padding: "5px 10px", textAlign: "right", fontSize: 9, color: (t as any).maxDrawdown < -0.03 ? "#ef4444" : "rgba(255,255,255,0.4)" }}>
+                                      {(((t as any).maxDrawdown ?? 0) * 100).toFixed(1)}%
+                                    </td>
+                                  )}
                                   <td style={{ padding: "5px 10px" }}>
-                                    <span style={{ background: `${reasonColor}22`, color: reasonColor, border: `1px solid ${reasonColor}44`, borderRadius: 3, padding: "1px 6px", fontSize: 8, fontWeight: 700, letterSpacing: "0.05em" }}>
-                                      {reasonLabel}
+                                    <span style={{ background: `${r.color}22`, color: r.color, border: `1px solid ${r.color}44`, borderRadius: 3, padding: "1px 6px", fontSize: 8, fontWeight: 700, letterSpacing: "0.05em" }}>
+                                      {r.label}
                                     </span>
                                   </td>
                                 </tr>
@@ -1541,9 +1622,11 @@ export default function AlphaPage() {
                         </table>
                       </div>
                       <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.35)" }}>
-                        <span><span style={{ color: "#3b82f6", fontWeight: 700 }}>SIG</span> — signal dropped below exit threshold</span>
-                        <span><span style={{ color: "#f59e0b", fontWeight: 700 }}>TIME</span> — 21-day max hold reached</span>
-                        <span><span style={{ color: "#ef4444", fontWeight: 700 }}>STOP</span> — −5% hard stop loss triggered</span>
+                        <span><span style={{ color: "#10b981", fontWeight: 700 }}>TP</span> — take profit hit</span>
+                        <span><span style={{ color: "#3b82f6", fontWeight: 700 }}>SIG</span> — signal exit</span>
+                        <span><span style={{ color: "#f59e0b", fontWeight: 700 }}>TIME</span> — max hold reached</span>
+                        <span><span style={{ color: "#ef4444", fontWeight: 700 }}>SL</span> — stop loss triggered</span>
+                        {isOptMode && <span><span style={{ color: "#fb923c", fontWeight: 700 }}>VOL</span> — vol regime exit</span>}
                       </div>
                     </div>
                   )}
