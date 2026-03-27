@@ -7,21 +7,23 @@ import { runMLSimulation, type SimInputBar, type SimParams, type SimStats, type 
  * GET /api/alpha/best-stocks
  *
  * Parameter-sweep optimized top 10 stocks from top 50 liquid OSE equities.
- * For each ticker: runs 72 strategy combos over the last 365 days.
- * Returns top 10 tickers ranked by best Sharpe with their optimal params.
+ * For each ticker: runs 108 strategy combos over the last 365 days.
+ * Scoring: Sharpe × TIM_factor (time-in-market weighted) to keep ≥10 concurrent positions.
+ * TIM_factor = 0.5 + 0.5 × min(timeInMarket / 0.5, 1.0)
+ * → strategies with <50% TIM are penalised, favouring more continuous exposure.
  *
- * 72 combos = Entry[0.5,1.0,2.0] × Stop[3,5,8] × MaxHold[21,30] × VolGate[off,hard] × Mom[0,2]
+ * 108 combos = Entry[0.5,1.0,2.0] × Stop[3,5,8] × MaxHold[21,30,45] × VolGate[off,hard] × Mom[0,2]
  * Cached 24h in alpha_result_cache.
  */
 
-const CACHE_KEY = 'best_stocks_v2_365d_with_trades';
+const CACHE_KEY = 'best_stocks_v3_365d_tim_weighted';
 const CACHE_MAX_AGE_H = 24;
 const DAYS = 365 + 250 + 30; // extra for SMA warmup
 
-// 72 param combos for sweep
+// 108 param combos for sweep
 const ENTRY_VALS = [0.5, 1.0, 2.0];
 const STOP_VALS  = [3, 5, 8];
-const HOLD_VALS  = [21, 30];
+const HOLD_VALS  = [21, 30, 45];
 const VOL_VALS   = ['off', 'hard'] as const;
 const MOM_VALS   = [0, 2] as const;
 
@@ -205,19 +207,29 @@ export async function GET(req: NextRequest) {
         if (bar.vol1m != null) bar.volRegime = bar.vol1m > p66 ? 'high' : 'low';
       }
 
-      // Run all combos, pick best Sharpe
-      let bestSharpe = -Infinity;
+      // Run all combos, pick best TIM-weighted Sharpe
+      // score = sharpe × (0.5 + 0.5 × min(timeInMarket / 0.5, 1.0))
+      // Rewards strategies invested ≥50% of the time, penalises very sparse ones.
+      let bestScore = -Infinity;
+      let bestSharpe = 0;
       let bestStats: SimStats | null = null;
       let bestParams: SimParams | null = null;
       let bestTrades: SimTrade[] = [];
 
       for (const params of combos) {
         const result = runMLSimulation(input, params);
-        if (result.stats.trades >= 5 && result.stats.sharpe > bestSharpe) {
-          bestSharpe = result.stats.sharpe;
-          bestStats = result.stats;
-          bestParams = params;
-          bestTrades = result.trades;
+        if (result.stats.trades >= 5 && result.stats.sharpe > 0) {
+          const daysInTrade = result.trades.reduce((s, t) => s + t.daysHeld, 0);
+          const timeInMarket = daysInTrade / Math.max(input.length, 1);
+          const timFactor = 0.5 + 0.5 * Math.min(timeInMarket / 0.5, 1.0);
+          const score = result.stats.sharpe * timFactor;
+          if (score > bestScore) {
+            bestScore = score;
+            bestSharpe = result.stats.sharpe;
+            bestStats = result.stats;
+            bestParams = params;
+            bestTrades = result.trades;
+          }
         }
       }
 
