@@ -392,7 +392,7 @@ export default function AlphaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const BEST_STOCKS_CACHE_KEY = "alpha_best_stocks_v4_365d_walk_forward";
+  const BEST_STOCKS_CACHE_KEY = "alpha_best_stocks_v5_ml_signal";
   const BEST_STOCKS_CACHE_TTL = 24 * 60 * 60 * 1000;
   const fetchBestStocks = useCallback(async (force = false) => {
     if (!token) return;
@@ -1093,8 +1093,8 @@ export default function AlphaPage() {
                 </div>
                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", marginTop: 3 }}>
                   {bestStocksMeta
-                    ? `${bestStocksMeta.combosPerTicker ?? 72} param combos × ${bestStocksMeta.universe ?? '?'} tickers · ${bestStocksMeta.qualified ?? bestStocks.length} qualified · Best Sharpe per stock · 24h cache`
-                    : "72 strategy combos per ticker · ranked by best Sharpe · top 50 liquid OSE"}
+                    ? `ML signal ranking · ${bestStocksMeta.universe ?? '?'} tickers · ${bestStocksMeta.qualified ?? bestStocks.length} qualified · entry >1% · exit <0.25% · 24h cache`
+                    : "ML signal ranking · entry >1% · exit <0.25% · top 50 liquid OSE"}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -1130,8 +1130,8 @@ export default function AlphaPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "monospace" }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid #30363d" }}>
-                    {["#", "Ticker", "Sector", "Entry%", "Stop%", "MaxHold", "VolGate", "Mom", "Sharpe", "WinRate", "AvgPnL", "MaxDD", "Trades", "Action"].map((h, hi) => (
-                      <th key={h} style={{ fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.5)", padding: "5px 8px", textAlign: hi < 2 ? "left" as const : "right" as const, letterSpacing: "0.04em" }}>{h}</th>
+                    {["#", "Ticker", "Sector", "ML Pred", "Sharpe", "WinRate", "AvgPnL", "MaxDD", "Trades", "Action"].map((h, hi) => (
+                      <th key={h} style={{ fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.5)", padding: "5px 8px", textAlign: hi < 3 ? "left" as const : "right" as const, letterSpacing: "0.04em" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -1151,17 +1151,18 @@ export default function AlphaPage() {
                         <td style={{ padding: "6px 8px", textAlign: "right" }}>
                           <span style={{ fontSize: 9, fontWeight: 700, color: sectorColor(s.sector) }}>{s.sector?.slice(0, 10) ?? "—"}</span>
                         </td>
-                        <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: "rgba(255,255,255,0.7)" }}>{p.entryThreshold.toFixed(1)}%</td>
-                        <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: "#ef4444" }}>{p.stopLossPct.toFixed(0)}%</td>
-                        <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: "rgba(255,255,255,0.6)" }}>{p.maxHoldDays}d</td>
-                        <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: p.volGate === 'hard' ? "#f59e0b" : "rgba(255,255,255,0.4)" }}>{p.volGate.toUpperCase()}</td>
-                        <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: p.momentumFilter > 0 ? "#3b82f6" : "rgba(255,255,255,0.4)" }}>{p.momentumFilter > 0 ? `${p.momentumFilter}/3` : "OFF"}</td>
+                        <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right",
+                          color: (s as unknown as { currentPred?: number }).currentPred != null && (s as unknown as { currentPred: number }).currentPred >= 1.0 ? "#10b981" : "#f59e0b" }}>
+                          {(s as unknown as { currentPred?: number }).currentPred != null
+                            ? `+${(s as unknown as { currentPred: number }).currentPred.toFixed(2)}%`
+                            : "—"}
+                        </td>
                         <td style={{ padding: "6px 8px", fontSize: 12, fontWeight: 800, textAlign: "right", color: sharpeColor }}>{st.sharpe.toFixed(2)}</td>
                         <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", color: st.winRate >= 0.6 ? "#10b981" : st.winRate >= 0.5 ? "#f59e0b" : "#ef4444" }}>
                           {(st.winRate * 100).toFixed(0)}%
                         </td>
-                        <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", color: st.annualizedReturn >= 0 ? "#10b981" : "#ef4444" }}>
-                          {st.annualizedReturn >= 0 ? "+" : ""}{(st.annualizedReturn * 100).toFixed(1)}%
+                        <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", color: st.avgWinPct >= 0 ? "#10b981" : "#ef4444" }}>
+                          {st.avgWinPct >= 0 ? "+" : ""}{st.avgWinPct.toFixed(1)}%
                         </td>
                         <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 600, textAlign: "right", color: "#ef4444" }}>
                           {(st.maxDrawdown * 100).toFixed(1)}%
@@ -1171,11 +1172,12 @@ export default function AlphaPage() {
                           <button
                             onClick={() => {
                               setSimTicker(s.ticker);
-                              setSimEntry(p.entryThreshold);
-                              setSimStop(p.stopLossPct);
-                              setSimMaxHold(p.maxHoldDays);
-                              setSimVolGate(p.volGate as 'off' | 'soft' | 'hard');
-                              setSimMom(p.momentumFilter as 0 | 1 | 2 | 3);
+                              setSimEntry(1.0);
+                              setSimExit(0.25);
+                              setSimStop(5.0);
+                              setSimMaxHold(21);
+                              setSimVolGate('off');
+                              setSimMom(0);
                               setTab("simulator");
                             }}
                             style={{ ...btnSecondary, fontSize: 9, padding: "3px 8px", color: "#10b981", borderColor: "rgba(16,185,129,0.3)" }}>

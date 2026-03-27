@@ -8,16 +8,21 @@ export const maxDuration = 60;
 /**
  * GET /api/alpha/best-stocks
  *
- * Cache-first: reads pre-computed walk-forward results from alpha_result_cache.
- * If cache is cold (no fresh result), runs a fast inline computation and stores
- * the result so subsequent requests are instant.
+ * Ranks top 10 OSE stocks by ML signal strength + historical backtest performance.
  *
- * Heavy nightly computation also runs via scripts/precompute-alpha.ts
- * (GitHub Actions ml-pipeline.yml, step "Precompute Alpha Engine cache").
+ * Strategy:
+ *  - Entry:  ML prediction > 1%  (real ensemble_prediction only, no fallback)
+ *  - Exit:   ML prediction drops below 0.25%  (signal_flip exit)
+ *  - Stop:   5% hard stop
+ *  - MaxHold: 21 days
+ *  - Ranking: current ML prediction × max(Sharpe, 0.1) — most bullish + historically consistent
+ *
+ * Cache: 25h TTL (warm by nightly GitHub Actions precompute).
+ * Cache miss: computes inline (fast — single pass, no param sweep).
  */
 
-const CACHE_KEY      = 'best_stocks_v4_365d_walk_forward';
-const CACHE_MAX_AGE_H = 25; // slightly > 24h to tolerate minor scheduling drift
+const CACHE_KEY      = 'best_stocks_v5_ml_signal';
+const CACHE_MAX_AGE_H = 25;
 
 export interface BestStockResult {
   rank: number;
@@ -25,38 +30,33 @@ export interface BestStockResult {
   name: string;
   sector: string;
   avg_nokvol: number;
+  currentPred: number;        // today's ML prediction (%)
   bestParams: SimParams;
   stats: SimStats;
   trades: SimTrade[];
-  combosRun: number;
-  windowsSelected: number;
 }
 
-export interface ForwardTrade extends SimTrade {
-  ticker: string;
-}
-
-// ── Walk-Forward Config (fast inline version) ────────────────────────────────
-const SMA_WARMUP       = 230;
-const TRAIN_DAYS       = 90;
-const FORWARD_DAYS     = 90;
-const TOP_N            = 10;
-const MIN_TRAIN_TRADES = 3;
-
-const ENTRY_VALS = [0.5, 1.0, 2.0];
-const STOP_VALS  = [3, 5, 8];
-const HOLD_VALS  = [21, 30];
-const VOL_VALS   = ['off', 'hard'] as const;
-const MOM_VALS   = [0, 2] as const;
-
-const BASE_PARAMS: Omit<SimParams, 'entryThreshold'|'stopLossPct'|'maxHoldDays'|'volGate'|'momentumFilter'> = {
-  exitThreshold: 0.0, takeProfitPct: 15.0, positionSizePct: 10, minHoldDays: 3,
-  cooldownBars: 2, costBps: 10, sma200Require: false, sma50Require: false,
-  smaExitOnCross: false, valuationFilter: false,
+// Fixed params — entry/exit driven by ML signal level
+const FIXED_PARAMS: SimParams = {
+  entryThreshold:  1.0,    // enter when pred > 1%
+  exitThreshold:   0.25,   // exit when pred drops below 0.25%
+  stopLossPct:     5.0,
+  takeProfitPct:   15.0,
+  maxHoldDays:     21,
+  minHoldDays:     2,
+  positionSizePct: 10,
+  cooldownBars:    1,
+  costBps:         10,
+  volGate:         'off',
+  momentumFilter:  0,
+  sma200Require:   false,
+  sma50Require:    false,
+  smaExitOnCross:  false,
+  valuationFilter: false,
 };
 
 async function computeAndCache(): Promise<object> {
-  const TOTAL_DAYS = 365 + SMA_WARMUP;
+  const TOTAL_DAYS = 365 + 230; // 230-day SMA warmup
 
   // 1. Top 50 liquid tickers
   const liquidRes = await pool.query(`
@@ -111,7 +111,7 @@ async function computeAndCache(): Promise<object> {
     ORDER BY ticker, date ASC
   `, [tickers]);
 
-  // 4. ML predictions (actual model output — no look-ahead)
+  // 4. Real ML predictions only — no fallback
   const mlRes = await pool.query(`
     SELECT DISTINCT ON (ticker, prediction_date::date)
       ticker, prediction_date::date::text AS date,
@@ -130,6 +130,18 @@ async function computeAndCache(): Promise<object> {
     WHERE ticker = 'OBX' AND date >= CURRENT_DATE - 365 * INTERVAL '1 day'
     ORDER BY date ASC
   `);
+
+  // 6. Current (most recent) ML prediction per ticker for ranking
+  const currentPredRes = await pool.query(`
+    SELECT DISTINCT ON (ticker)
+      ticker, ensemble_prediction::float AS pred
+    FROM ml_predictions
+    WHERE ticker = ANY($1)
+      AND ensemble_prediction IS NOT NULL
+    ORDER BY ticker, prediction_date DESC
+  `, [tickers]);
+  const currentPredMap = new Map<string, number>();
+  for (const r of currentPredRes.rows) currentPredMap.set(r.ticker, r.pred);
 
   // Build lookup maps
   const obxMap = new Map<string, number>();
@@ -155,13 +167,23 @@ async function computeAndCache(): Promise<object> {
     pxByTicker.get(r.ticker)!.push(r);
   }
 
-  // 6. Assemble SimInputBar[] per ticker
-  const inputByTicker = new Map<string, SimInputBar[]>();
+  // 7. Build SimInputBar[] and run simulation per ticker
+  type StockResult = {
+    rank: number; ticker: string; name: string; sector: string; avg_nokvol: number;
+    currentPred: number; bestParams: SimParams; stats: SimStats; trades: SimTrade[];
+    score: number;
+  };
+  const results: StockResult[] = [];
+
   for (const ticker of tickers) {
     const pxRows = pxByTicker.get(ticker);
-    if (!pxRows || pxRows.length < TRAIN_DAYS + FORWARD_DAYS) continue;
+    if (!pxRows || pxRows.length < 30) continue;
+
     const momMap = momByTicker.get(ticker) ?? new Map<string, MomRow>();
     const mlMap  = mlByTicker.get(ticker)  ?? new Map<string, number>();
+
+    // Skip tickers with no ML predictions at all
+    if (mlMap.size === 0) continue;
 
     const input: SimInputBar[] = pxRows.map(px => {
       const d = px.date.slice(0,10);
@@ -169,13 +191,8 @@ async function computeAndCache(): Promise<object> {
       return {
         date: d, open: px.close, close: px.close, high: px.close, low: px.close,
         volume: 0, sma200: px.sma200 ?? null, sma50: px.sma50 ?? null,
-        // Use real ML prediction when available; fall back to momentum-based proxy
-        // when predictions are absent (e.g. older dates not in ml_predictions table).
-        // Synthetic: 20% of 6m momentum ≈ expected 1m continuation (fraction → same scale as ensemble_prediction)
-        mlPrediction: mlMap.has(d)
-          ? mlMap.get(d)!
-          : (mom?.mom6m != null ? mom.mom6m * 0.20 : null),
-        mlConfidence: mlMap.has(d) ? 0.7 : (mom?.mom6m != null ? 0.4 : null),
+        mlPrediction: mlMap.get(d) ?? null,   // null when no prediction — no entry fires
+        mlConfidence: mlMap.has(d) ? 0.7 : null,
         mom1m: mom?.mom1m ?? null, mom6m: mom?.mom6m ?? null,
         mom11m: mom?.mom11m ?? null, vol1m: mom?.vol1m ?? null,
         volRegime: null as 'low'|'high'|null,
@@ -189,122 +206,43 @@ async function computeAndCache(): Promise<object> {
     for (const bar of input) {
       if (bar.vol1m != null) bar.volRegime = bar.vol1m > p66 ? 'high' : 'low';
     }
-    inputByTicker.set(ticker, input);
-  }
 
-  // 7. Build combos
-  const combos: SimParams[] = [];
-  for (const entry of ENTRY_VALS)
-    for (const stop of STOP_VALS)
-      for (const hold of HOLD_VALS)
-        for (const vol of VOL_VALS)
-          for (const mom of MOM_VALS)
-            combos.push({ ...BASE_PARAMS, entryThreshold: entry, stopLossPct: stop, maxHoldDays: hold, volGate: vol, momentumFilter: mom });
+    const result = runMLSimulation(input, FIXED_PARAMS);
+    if (result.stats.trades < 2) continue;   // need at least 2 trades to rank meaningfully
 
-  // 8. Walk-forward
-  type ForwardTradeLocal = SimTrade & { ticker: string };
-  const allForwardTrades: ForwardTradeLocal[] = [];
-  const stockAgg = new Map<string, {
-    forwardTrades: SimTrade[]; lastParams: SimParams; lastSharpe: number; windowsSelected: number;
-  }>();
+    const currentPred = currentPredMap.get(ticker) ?? 0;
+    const currentPredPct = currentPred * 100;
 
-  const maxBars = Math.max(...Array.from(inputByTicker.values()).map(v => v.length));
-  const numWindows = Math.floor((maxBars - TRAIN_DAYS) / FORWARD_DAYS);
+    // Score: current ML strength × historical Sharpe (floor Sharpe at 0.1 so positive-pred stocks rank ahead of negatives)
+    const sharpe = result.stats.sharpe;
+    const score = currentPredPct * Math.max(sharpe, 0.1);
 
-  for (let w = 0; w < numWindows; w++) {
-    const fwdStart   = TRAIN_DAYS + w * FORWARD_DAYS;
-    const fwdEnd     = fwdStart + FORWARD_DAYS;
-    const trainStart = fwdStart - TRAIN_DAYS;
-
-    const windowRankings: Array<{ ticker: string; score: number; params: SimParams; sharpe: number }> = [];
-
-    for (const ticker of tickers) {
-      const input = inputByTicker.get(ticker);
-      if (!input || input.length < fwdEnd) continue;
-      const trainSlice = input.slice(trainStart, fwdStart);
-      if (trainSlice.length < 30) continue;
-
-      let bestScore = -Infinity, bestParams: SimParams | null = null, bestSharpe = 0;
-      for (const params of combos) {
-        const result = runMLSimulation(trainSlice, params);
-        if (result.stats.trades >= MIN_TRAIN_TRADES && result.stats.sharpe > 0) {
-          const daysInTrade = result.trades.reduce((s,t) => s + t.daysHeld, 0);
-          const tim = daysInTrade / Math.max(trainSlice.length, 1);
-          const timFactor = 0.5 + 0.5 * Math.min(tim / 0.4, 1.0);
-          const score = result.stats.sharpe * timFactor;
-          if (score > bestScore) { bestScore = score; bestParams = params; bestSharpe = result.stats.sharpe; }
-        }
-      }
-      if (bestParams && bestSharpe > 0) windowRankings.push({ ticker, score: bestScore, params: bestParams, sharpe: bestSharpe });
-    }
-
-    windowRankings.sort((a,b) => b.score - a.score);
-    const windowTop = windowRankings.slice(0, TOP_N);
-
-    for (const { ticker, params, sharpe } of windowTop) {
-      const input = inputByTicker.get(ticker)!;
-      const forwardSlice = input.slice(fwdStart, Math.min(fwdEnd, input.length));
-      if (forwardSlice.length < 3) continue;
-      const forwardResult = runMLSimulation(forwardSlice, params);
-      for (const trade of forwardResult.trades) allForwardTrades.push({ ...trade, ticker });
-
-      const agg = stockAgg.get(ticker) ?? { forwardTrades: [], lastParams: params, lastSharpe: sharpe, windowsSelected: 0 };
-      agg.forwardTrades.push(...forwardResult.trades);
-      agg.lastParams = params; agg.lastSharpe = sharpe; agg.windowsSelected++;
-      stockAgg.set(ticker, agg);
-    }
-  }
-
-  // 9. Build bestStocks
-  const stockResults: Array<{
-    rank: number; ticker: string; name: string; sector: string; avg_nokvol: number;
-    bestParams: SimParams; stats: SimStats; trades: SimTrade[]; combosRun: number; windowsSelected: number;
-  }> = [];
-
-  for (const [ticker, agg] of stockAgg) {
-    if (agg.forwardTrades.length === 0) continue;
-    const trades = agg.forwardTrades;
-    const wins = trades.filter(t => t.pnlPct > 0).length;
-    const totalRet = trades.reduce((s,t) => s + t.pnlPct * 0.1, 0);
-    const avgHold = trades.reduce((s,t) => s + t.daysHeld, 0) / trades.length;
-    const winRate = wins / trades.length;
-    const grossPnls = trades.map(t => t.pnlPct);
-    const mean = grossPnls.reduce((s,v) => s+v, 0) / grossPnls.length;
-    const stdDev = Math.sqrt(grossPnls.reduce((s,v) => s+(v-mean)**2, 0) / grossPnls.length) || 1;
-    const sharpe = mean / stdDev * Math.sqrt(252 / avgHold);
-    const maxDD = trades.reduce((worst,t) => Math.min(worst, t.maxDrawdown ?? 0), 0);
-    const winTrades = trades.filter(t => t.pnlPct > 0);
-    const lossTrades = trades.filter(t => t.pnlPct <= 0);
-
-    stockResults.push({
+    results.push({
       rank: 0, ticker,
       name: (tickerMeta.get(ticker) as { name: string })?.name || ticker,
       sector: (tickerMeta.get(ticker) as { sector: string })?.sector || 'Other',
       avg_nokvol: (tickerMeta.get(ticker) as { avg_nokvol: number })?.avg_nokvol || 0,
-      bestParams: agg.lastParams,
-      stats: {
-        totalReturn: totalRet, annualizedReturn: totalRet * (252 / Math.max(numWindows * FORWARD_DAYS, 1)),
-        benchmarkReturn: 0, benchmarkAnnReturn: 0, excessReturn: totalRet,
-        sharpe, maxDrawdown: maxDD, winRate, trades: trades.length, avgHoldDays: avgHold,
-        avgWinPct: winTrades.length > 0 ? winTrades.reduce((s,t) => s+t.pnlPct, 0)/winTrades.length : 0,
-        avgLossPct: lossTrades.length > 0 ? lossTrades.reduce((s,t) => s+t.pnlPct, 0)/lossTrades.length : 0,
-        profitFactor: winTrades.length > 0 && lossTrades.length > 0
-          ? winTrades.reduce((s,t) => s+t.pnlPct, 0) / Math.abs(lossTrades.reduce((s,t) => s+t.pnlPct, 0))
-          : winTrades.length > 0 ? 999 : 0,
-      },
-      trades, combosRun: combos.length, windowsSelected: agg.windowsSelected,
+      currentPred: currentPredPct,
+      bestParams: FIXED_PARAMS,
+      stats: result.stats,
+      trades: result.trades,
+      score,
     });
   }
 
-  stockResults.sort((a,b) => (b.windowsSelected * Math.max(b.stats.sharpe, 0)) - (a.windowsSelected * Math.max(a.stats.sharpe, 0)));
-  const top10 = stockResults.slice(0, 10).map((r,i) => ({ ...r, rank: i+1 }));
+  // Sort by score (current ML pred × Sharpe), take top 10
+  results.sort((a,b) => b.score - a.score);
+  const top10 = results.slice(0, 10).map((r,i) => ({ ...r, rank: i+1 }));
 
-  const result = {
+  // allForwardTrades: all trades from top 10 for equity curve
+  const allForwardTrades = top10.flatMap(s => s.trades.map(t => ({ ...t, ticker: s.ticker })));
+
+  const payload = {
     bestStocks: top10,
     allForwardTrades,
     meta: {
-      universe: tickers.length, combosPerTicker: combos.length, qualified: stockResults.length,
-      windows: numWindows, days: 365, trainDays: TRAIN_DAYS, forwardDays: FORWARD_DAYS,
+      universe: tickers.length, combosPerTicker: 1, qualified: results.length,
+      days: 365, entryThreshold: 1.0, exitThreshold: 0.25,
       computedAt: new Date().toISOString(),
     },
   };
@@ -314,10 +252,10 @@ async function computeAndCache(): Promise<object> {
     `INSERT INTO alpha_result_cache (cache_key, result, computed_at)
      VALUES ($1, $2, NOW())
      ON CONFLICT (cache_key) DO UPDATE SET result = $2, computed_at = NOW()`,
-    [CACHE_KEY, JSON.stringify(result)]
+    [CACHE_KEY, JSON.stringify(payload)]
   );
 
-  return result;
+  return payload;
 }
 
 export async function GET(req: NextRequest) {
@@ -329,22 +267,17 @@ export async function GET(req: NextRequest) {
       cache_key TEXT PRIMARY KEY, result JSONB NOT NULL, computed_at TIMESTAMPTZ DEFAULT NOW()
     )`);
 
-    // Cache hit → return instantly
+    // Cache hit with real results → return instantly
     const cached = await pool.query(
-      `SELECT result, computed_at FROM alpha_result_cache
+      `SELECT result FROM alpha_result_cache
        WHERE cache_key = $1 AND computed_at > NOW() - INTERVAL '${CACHE_MAX_AGE_H} hours'`,
       [CACHE_KEY]
     );
-
-    if (cached.rows.length > 0) {
-      const hit = cached.rows[0].result;
-      // Only serve cache if it has actual results (treat empty as miss → recompute)
-      if (hit.bestStocks?.length > 0) {
-        return secureJsonResponse(hit);
-      }
+    if (cached.rows.length > 0 && cached.rows[0].result.bestStocks?.length > 0) {
+      return secureJsonResponse(cached.rows[0].result);
     }
 
-    // Cache cold → compute inline and store
+    // Cache cold or empty → compute inline
     const result = await computeAndCache();
     return secureJsonResponse(result);
   } catch (error) {
