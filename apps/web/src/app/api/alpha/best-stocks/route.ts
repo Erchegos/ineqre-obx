@@ -21,7 +21,7 @@ export const maxDuration = 60;
  * Cache miss: computes inline (fast — single pass, no param sweep).
  */
 
-const CACHE_KEY      = 'best_stocks_v11_returns';
+const CACHE_KEY      = 'best_stocks_v12_maxreturn';
 const CACHE_MAX_AGE_H = 25;
 
 export interface BestStockResult {
@@ -36,14 +36,14 @@ export interface BestStockResult {
   trades: SimTrade[];
 }
 
-// Fixed params — lower entry threshold to capture more historical trades
+// Fixed params — wide entry, tight stop, let winners run
 const FIXED_PARAMS: SimParams = {
-  entryThreshold:  0.5,    // enter when pred > 0.5% (needs 6m mom > 3.3% via proxy)
-  exitThreshold:   0.1,    // exit when pred drops below 0.1%
-  stopLossPct:     3.0,    // tighter stop — max -3% per trade
-  takeProfitPct:   12.0,
-  maxHoldDays:     21,
-  minHoldDays:     2,
+  entryThreshold:  0.25,   // enter on mild positive momentum (6m proxy > 1.7%)
+  exitThreshold:   -0.5,   // hold through dips, exit only when trend reverses
+  stopLossPct:     2.0,    // tight 2% stop → low MaxDD per trade
+  takeProfitPct:   25.0,   // let winners run far
+  maxHoldDays:     30,     // longer holds capture full trends
+  minHoldDays:     1,
   positionSizePct: 10,
   cooldownBars:    1,
   costBps:         10,
@@ -230,10 +230,10 @@ async function computeAndCache(): Promise<object> {
     const currentPredPct = currentPred * 100;
 
     const result = runMLSimulation(input, FIXED_PARAMS);
-    if (result.stats.trades < 5) continue;           // at least 5 trades for statistical confidence
-    if (result.stats.sharpe < 1.2) continue;         // Sharpe ≥ 1.2
-    if (result.stats.winRate < 0.55) continue;       // WinRate ≥ 55%
-    if (result.stats.maxDrawdown < -0.12) continue;  // MaxDD no worse than -12%
+    if (result.stats.trades < 3) continue;           // minimum 3 trades
+    if (result.stats.sharpe < 0.8) continue;         // Sharpe ≥ 0.8
+    if (result.stats.winRate < 0.48) continue;       // WinRate ≥ 48%
+    if (result.stats.maxDrawdown < -0.10) continue;  // MaxDD no worse than -10%
     if (result.stats.totalReturn <= 0) continue;     // must have positive total return
 
     // Score: historical total return × Sharpe — best actual performers rise to top
@@ -265,7 +265,7 @@ async function computeAndCache(): Promise<object> {
     allForwardTrades,
     meta: {
       universe: tickers.length, combosPerTicker: 1, qualified: results.length,
-      days: 365, entryThreshold: 0.5, exitThreshold: 0.1,
+      days: 365, entryThreshold: 0.25, exitThreshold: -0.5,
       computedAt: new Date().toISOString(),
     },
   };

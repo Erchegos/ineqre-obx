@@ -392,7 +392,7 @@ export default function AlphaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const BEST_STOCKS_CACHE_KEY = "alpha_best_stocks_v11_returns";
+  const BEST_STOCKS_CACHE_KEY = "alpha_best_stocks_v12_maxreturn";
   const BEST_STOCKS_CACHE_TTL = 24 * 60 * 60 * 1000;
   const fetchBestStocks = useCallback(async (force = false) => {
     if (!token) return;
@@ -1093,8 +1093,8 @@ export default function AlphaPage() {
                 </div>
                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", marginTop: 3 }}>
                   {bestStocksMeta
-                    ? `Best 365d returns · ${bestStocksMeta.universe ?? '?'} tickers · ${bestStocksMeta.qualified ?? bestStocks.length} qualified · entry >0.5% · ranked by return × Sharpe · 24h cache`
-                    : "Best 365d returns · entry >0.5% · ranked by return × Sharpe · top 50 liquid OSE"}
+                    ? `Best 365d returns · ${bestStocksMeta.universe ?? '?'} tickers · ${bestStocksMeta.qualified ?? bestStocks.length} qualified · entry >0.25% · 2% stop · ranked by return × Sharpe · 24h cache`
+                    : "Best 365d returns · entry >0.25% · 2% stop · ranked by return × Sharpe · top 50 liquid OSE"}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -1490,7 +1490,7 @@ export default function AlphaPage() {
                       </div>
                       <div style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", marginTop: -8 }}>
                         {isOptMode
-                          ? "ML signal (ensemble_prediction) where available · 6m momentum proxy for older history · entry >0.5% · exit <0.1% · 10% per slot · indexed to 100"
+                          ? "ML signal (ensemble_prediction) where available · 6m momentum proxy for older history · entry >0.25% · 2% stop · 25% TP · 10% per slot · indexed to 100"
                           : "Top 50 liquid OSE · Entry >+1% signal · −5% stop · 21d max · Up to 10 concurrent positions · Indexed to 100"}
                       </div>
                     </div>
