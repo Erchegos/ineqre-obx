@@ -169,8 +169,13 @@ async function computeAndCache(): Promise<object> {
       return {
         date: d, open: px.close, close: px.close, high: px.close, low: px.close,
         volume: 0, sma200: px.sma200 ?? null, sma50: px.sma50 ?? null,
-        mlPrediction: mlMap.get(d) ?? null,
-        mlConfidence: mlMap.has(d) ? 0.7 : null,
+        // Use real ML prediction when available; fall back to momentum-based proxy
+        // when predictions are absent (e.g. older dates not in ml_predictions table).
+        // Synthetic: 20% of 6m momentum ≈ expected 1m continuation (fraction → same scale as ensemble_prediction)
+        mlPrediction: mlMap.has(d)
+          ? mlMap.get(d)!
+          : (mom?.mom6m != null ? mom.mom6m * 0.20 : null),
+        mlConfidence: mlMap.has(d) ? 0.7 : (mom?.mom6m != null ? 0.4 : null),
         mom1m: mom?.mom1m ?? null, mom6m: mom?.mom6m ?? null,
         mom11m: mom?.mom11m ?? null, vol1m: mom?.vol1m ?? null,
         volRegime: null as 'low'|'high'|null,
@@ -332,7 +337,11 @@ export async function GET(req: NextRequest) {
     );
 
     if (cached.rows.length > 0) {
-      return secureJsonResponse(cached.rows[0].result);
+      const hit = cached.rows[0].result;
+      // Only serve cache if it has actual results (treat empty as miss → recompute)
+      if (hit.bestStocks?.length > 0) {
+        return secureJsonResponse(hit);
+      }
     }
 
     // Cache cold → compute inline and store
