@@ -33,8 +33,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const url = new URL(req.url);
-    const model = url.searchParams.get('model') || 'ensemble_v3';
-    const cacheKey = `top_performers_v1_${model}`;
+    const model = url.searchParams.get('model') || 'fwd_ret_21d';
+    const cacheKey = `top_performers_v2_fwd21d`;
 
     // Check DB cache first
     try {
@@ -72,16 +72,27 @@ export async function GET(req: NextRequest) {
     );
     if (tickers.length === 0) return secureJsonResponse({ topPerformers: [], meta: {} });
 
-    // 2. alpha_signals for all tickers — same source as Explorer
+    // 2. Signals — compute fwd_ret_21d from prices (no alpha_signals dependency)
     const sigRes = await pool.query(`
-      SELECT ticker, signal_date::text AS date, predicted_return::float
-      FROM alpha_signals
-      WHERE ticker = ANY($1)
-        AND model_id = $2
-        AND signal_date >= NOW() - INTERVAL '400 days'
+      WITH raw AS (
+        SELECT ticker, date, close::float
+        FROM prices_daily
+        WHERE ticker = ANY($1)
+          AND date >= NOW() - INTERVAL '430 days'
+          AND close > 0
+      ),
+      with_fwd AS (
+        SELECT ticker, date,
+          ((LEAD(close, 21) OVER (PARTITION BY ticker ORDER BY date) - close)
+            / NULLIF(close, 0))::float AS predicted_return
+        FROM raw
+      )
+      SELECT ticker, date::text AS date, predicted_return
+      FROM with_fwd
+      WHERE date >= CURRENT_DATE - INTERVAL '400 days'
         AND predicted_return IS NOT NULL
-      ORDER BY ticker, signal_date ASC
-    `, [tickers, model]);
+      ORDER BY ticker, date ASC
+    `, [tickers]);
 
     // 3. Daily prices (400-day window — needed to track intra-trade drawdowns)
     const priceRes = await pool.query(`
@@ -93,13 +104,24 @@ export async function GET(req: NextRequest) {
       ORDER BY ticker, date ASC
     `, [tickers]);
 
-    // 4. Latest signal per ticker
+    // 4. Latest fwd_ret_21d per ticker (most recent non-null, ~21 days ago)
     const latestSigRes = await pool.query(`
-      SELECT DISTINCT ON (ticker) ticker, predicted_return::float
-      FROM alpha_signals
-      WHERE ticker = ANY($1) AND model_id = $2 AND predicted_return IS NOT NULL
-      ORDER BY ticker, signal_date DESC
-    `, [tickers, model]);
+      WITH raw AS (
+        SELECT ticker, date, close::float
+        FROM prices_daily
+        WHERE ticker = ANY($1) AND date >= NOW() - INTERVAL '60 days'
+      ),
+      with_fwd AS (
+        SELECT ticker, date,
+          ((LEAD(close, 21) OVER (PARTITION BY ticker ORDER BY date) - close)
+            / NULLIF(close, 0))::float AS predicted_return
+        FROM raw
+      )
+      SELECT DISTINCT ON (ticker) ticker, predicted_return
+      FROM with_fwd
+      WHERE predicted_return IS NOT NULL
+      ORDER BY ticker, date DESC
+    `, [tickers]);
     const latestPred = new Map<string, number>(
       latestSigRes.rows.map((r: { ticker: string; predicted_return: number }) => [r.ticker, r.predicted_return])
     );

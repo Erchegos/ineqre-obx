@@ -331,7 +331,7 @@ export default function AlphaPage() {
   }, [token]);
 
   // Fetch top performers (cached 6h)
-  const TOP_PERF_CACHE_KEY = "alpha_top_performers_v6";
+  const TOP_PERF_CACHE_KEY = "alpha_top_performers_v7_fwd21d";
   const TOP_PERF_CACHE_TTL = 6 * 60 * 60 * 1000;
   const fetchTopPerformers = useCallback(async (force = false) => {
     if (!token) return;
@@ -361,7 +361,7 @@ export default function AlphaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const EQ_CACHE_KEY = `alpha_equity_curve_v1_${selectedModel}`;
+  const EQ_CACHE_KEY = `alpha_equity_curve_v3_fwd21d`;
   const EQ_CACHE_TTL = 6 * 60 * 60 * 1000;
   const fetchEquityCurve = useCallback(async (force = false) => {
     if (!token) return;

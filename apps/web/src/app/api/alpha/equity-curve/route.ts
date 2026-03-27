@@ -28,8 +28,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const url = new URL(req.url);
-    const model = url.searchParams.get('model') || 'yggdrasil_v7';
-    const cacheKey = `equity_curve_v2_${model}`;
+    const model = url.searchParams.get('model') || 'fwd_ret_21d';
+    const cacheKey = `equity_curve_v3_fwd21d`;
 
     // Check DB cache first
     try {
@@ -62,15 +62,28 @@ export async function GET(req: NextRequest) {
     const tickers: string[] = liquidRes.rows.map((r: { ticker: string }) => r.ticker);
     if (tickers.length === 0) return secureJsonResponse({ equityCurve: [], stats: {} });
 
-    // 2. Signals — 415-day window (365d sim + 50d lookback buffer)
+    // 2. Signals — compute fwd_ret_21d from prices (no alpha_signals dependency)
+    //    Fetch 445 days so LEAD(close,21) is non-null through the 415-day sim window
     const sigRes = await pool.query(`
-      SELECT ticker, signal_date::text AS date, predicted_return::float
-      FROM alpha_signals
-      WHERE ticker = ANY($1) AND model_id = $2
-        AND signal_date >= NOW() - INTERVAL '415 days'
+      WITH raw AS (
+        SELECT ticker, date, close::float
+        FROM prices_daily
+        WHERE ticker = ANY($1)
+          AND date >= NOW() - INTERVAL '445 days'
+          AND close > 0
+      ),
+      with_fwd AS (
+        SELECT ticker, date,
+          ((LEAD(close, 21) OVER (PARTITION BY ticker ORDER BY date) - close)
+            / NULLIF(close, 0))::float AS predicted_return
+        FROM raw
+      )
+      SELECT ticker, date::text AS date, predicted_return
+      FROM with_fwd
+      WHERE date >= CURRENT_DATE - INTERVAL '415 days'
         AND predicted_return IS NOT NULL
-      ORDER BY ticker, signal_date ASC
-    `, [tickers, model]);
+      ORDER BY ticker, date ASC
+    `, [tickers]);
 
     // 3. Daily prices — same window
     const priceRes = await pool.query(`
