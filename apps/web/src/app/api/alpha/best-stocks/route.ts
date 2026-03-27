@@ -1,4 +1,6 @@
 import { NextRequest } from 'next/server';
+
+export const maxDuration = 60; // seconds — Vercel Pro max for background computation
 import { pool } from '@/lib/db';
 import { requireAlphaAuth, safeErrorResponse, secureJsonResponse } from '@/lib/security';
 import { runMLSimulation, type SimInputBar, type SimParams, type SimStats, type SimTrade } from '@/lib/mlTradingEngine';
@@ -22,15 +24,16 @@ import { runMLSimulation, type SimInputBar, type SimParams, type SimStats, type 
 const CACHE_KEY = 'best_stocks_v4_365d_walk_forward';
 const CACHE_MAX_AGE_H = 24;
 const SMA_WARMUP = 230;            // bars to discard for SMA stability
-const TRAIN_DAYS = 90;             // training window per walk-forward step
-const FORWARD_DAYS = 30;           // out-of-sample forward window
+const TRAIN_DAYS = 90;             // training window per walk-forward step (3 months)
+const FORWARD_DAYS = 90;           // out-of-sample forward window (3 months — 4 windows max)
 const TOP_N = 10;                  // stocks selected per window
 const MIN_TRAIN_TRADES = 3;        // minimum trades on training slice to qualify
 
-// 108 param combos for sweep
+// 72 param combos — reduced from 108 to keep compute <20s
+// Entry[0.5,1.0,2.0] × Stop[3,5,8] × MaxHold[21,30] × VolGate[off,hard] × Mom[0,2]
 const ENTRY_VALS = [0.5, 1.0, 2.0];
 const STOP_VALS  = [3, 5, 8];
-const HOLD_VALS  = [21, 30, 45];
+const HOLD_VALS  = [21, 30];       // dropped 45 to reduce combos
 const VOL_VALS   = ['off', 'hard'] as const;
 const MOM_VALS   = [0, 2] as const;
 
