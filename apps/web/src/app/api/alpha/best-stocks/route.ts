@@ -21,7 +21,7 @@ export const maxDuration = 60;
  * Cache miss: computes inline (fast — single pass, no param sweep).
  */
 
-const CACHE_KEY      = 'best_stocks_v10_quality';
+const CACHE_KEY      = 'best_stocks_v11_returns';
 const CACHE_MAX_AGE_H = 25;
 
 export interface BestStockResult {
@@ -36,10 +36,10 @@ export interface BestStockResult {
   trades: SimTrade[];
 }
 
-// Fixed params — entry/exit driven by ML signal level
+// Fixed params — lower entry threshold to capture more historical trades
 const FIXED_PARAMS: SimParams = {
-  entryThreshold:  1.0,    // enter when pred > 1%
-  exitThreshold:   0.25,   // exit when pred drops below 0.25%
+  entryThreshold:  0.5,    // enter when pred > 0.5% (needs 6m mom > 3.3% via proxy)
+  exitThreshold:   0.1,    // exit when pred drops below 0.1%
   stopLossPct:     3.0,    // tighter stop — max -3% per trade
   takeProfitPct:   12.0,
   maxHoldDays:     21,
@@ -230,15 +230,15 @@ async function computeAndCache(): Promise<object> {
     const currentPredPct = currentPred * 100;
 
     const result = runMLSimulation(input, FIXED_PARAMS);
-    if (result.stats.trades < 3) continue;
-    if (currentPredPct <= 0.5) continue;            // must have bullish current ML signal
-    if (result.stats.sharpe < 1.2) continue;        // Sharpe ≥ 1.2
-    if (result.stats.winRate < 0.55) continue;      // WinRate ≥ 55%
-    if (result.stats.maxDrawdown < -0.12) continue; // MaxDD no worse than -12%
+    if (result.stats.trades < 5) continue;           // at least 5 trades for statistical confidence
+    if (result.stats.sharpe < 1.2) continue;         // Sharpe ≥ 1.2
+    if (result.stats.winRate < 0.55) continue;       // WinRate ≥ 55%
+    if (result.stats.maxDrawdown < -0.12) continue;  // MaxDD no worse than -12%
+    if (result.stats.totalReturn <= 0) continue;     // must have positive total return
 
-    // Score: current ML strength × historical Sharpe (floor Sharpe at 0.1 so positive-pred stocks rank ahead of negatives)
+    // Score: historical total return × Sharpe — best actual performers rise to top
     const sharpe = result.stats.sharpe;
-    const score = currentPredPct * Math.max(sharpe, 0.1);
+    const score = result.stats.totalReturn * Math.max(sharpe, 0.1);
 
     results.push({
       rank: 0, ticker,
@@ -265,7 +265,7 @@ async function computeAndCache(): Promise<object> {
     allForwardTrades,
     meta: {
       universe: tickers.length, combosPerTicker: 1, qualified: results.length,
-      days: 365, entryThreshold: 1.0, exitThreshold: 0.25,
+      days: 365, entryThreshold: 0.5, exitThreshold: 0.1,
       computedAt: new Date().toISOString(),
     },
   };
