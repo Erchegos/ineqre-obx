@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { pool } from '@/lib/db';
 import { requireAlphaAuth, safeErrorResponse, secureJsonResponse } from '@/lib/security';
-import { runMLSimulation, type SimInputBar, type SimParams, type SimStats } from '@/lib/mlTradingEngine';
+import { runMLSimulation, type SimInputBar, type SimParams, type SimStats, type SimTrade } from '@/lib/mlTradingEngine';
 
 /**
  * GET /api/alpha/best-stocks
@@ -14,7 +14,7 @@ import { runMLSimulation, type SimInputBar, type SimParams, type SimStats } from
  * Cached 24h in alpha_result_cache.
  */
 
-const CACHE_KEY = 'best_stocks_v1_365d';
+const CACHE_KEY = 'best_stocks_v2_365d_with_trades';
 const CACHE_MAX_AGE_H = 24;
 const DAYS = 365 + 250 + 30; // extra for SMA warmup
 
@@ -46,6 +46,7 @@ export interface BestStockResult {
   avg_nokvol: number;
   bestParams: SimParams;
   stats: SimStats;
+  trades: SimTrade[];
   combosRun: number;
 }
 
@@ -208,6 +209,7 @@ export async function GET(req: NextRequest) {
       let bestSharpe = -Infinity;
       let bestStats: SimStats | null = null;
       let bestParams: SimParams | null = null;
+      let bestTrades: SimTrade[] = [];
 
       for (const params of combos) {
         const result = runMLSimulation(input, params);
@@ -215,6 +217,7 @@ export async function GET(req: NextRequest) {
           bestSharpe = result.stats.sharpe;
           bestStats = result.stats;
           bestParams = params;
+          bestTrades = result.trades;
         }
       }
 
@@ -227,6 +230,7 @@ export async function GET(req: NextRequest) {
           avg_nokvol: tickerMeta.get(ticker)?.avg_nokvol || 0,
           bestParams,
           stats: bestStats,
+          trades: bestTrades,
           combosRun: combos.length,
         });
       }

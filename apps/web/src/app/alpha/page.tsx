@@ -8,7 +8,7 @@ import {
   LineChart, Line, BarChart, Bar, Cell, ComposedChart, Area,
   ReferenceLine, ReferenceArea, Scatter,
 } from "recharts";
-import { runMLSimulation, computeProgressiveStats, SIM_DEFAULTS, type SimInputBar, type SimResult, type SimParams, type SimStats } from "@/lib/mlTradingEngine";
+import { runMLSimulation, computeProgressiveStats, SIM_DEFAULTS, type SimInputBar, type SimResult, type SimParams, type SimStats, type SimTrade } from "@/lib/mlTradingEngine";
 
 // ============================================================================
 // Types
@@ -220,10 +220,13 @@ export default function AlphaPage() {
     rank: number; ticker: string; name: string; sector: string; avg_nokvol: number;
     bestParams: SimParams;
     stats: SimStats;
+    trades: SimTrade[];
   };
   const [bestStocks, setBestStocks] = useState<BestStock[]>([]);
   const [bestStocksLoading, setBestStocksLoading] = useState(false);
   const [bestStocksMeta, setBestStocksMeta] = useState<{ computedAt?: string; universe?: number; combosPerTicker?: number; qualified?: number } | null>(null);
+  const [paperTradingMode, setPaperTradingMode] = useState<'standard' | 'optimized'>('standard');
+  const [expandedOptTicker, setExpandedOptTicker] = useState<string | null>(null);
 
   // Equity curve
   type EqCurvePoint = { date: string; value: number; positions: number };
@@ -385,7 +388,7 @@ export default function AlphaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const BEST_STOCKS_CACHE_KEY = "alpha_best_stocks_v1_365d";
+  const BEST_STOCKS_CACHE_KEY = "alpha_best_stocks_v2_365d_with_trades";
   const BEST_STOCKS_CACHE_TTL = 24 * 60 * 60 * 1000;
   const fetchBestStocks = useCallback(async (force = false) => {
     if (!token) return;
@@ -1149,74 +1152,245 @@ export default function AlphaPage() {
 
             {/* ── TOP 10 ALPHA STOCKS ── */}
             <div style={{ ...cardStyle, marginBottom: 16 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              {/* Header row: title + toggle + refresh */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                 <div>
                   <div style={sectionTitle}>TOP 10 ALPHA STOCKS — Last 12 Months (Top 50 Liquid OSE)</div>
                   <div style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", marginTop: 2 }}>
-                    Entry: ML pred &gt;+1% · Exit: signal &lt;+0.25% (min 5d hold) OR −5% stop loss OR 21d max hold
+                    {paperTradingMode === 'standard'
+                      ? "Entry: ML pred >+1% · Exit: signal <+0.25% (min 5d hold) OR −5% stop loss OR 21d max hold"
+                      : "Optimized params per ticker · 72-combo sweep · ranked by Sharpe · click row for trade log"}
                   </div>
                 </div>
-                <button onClick={() => fetchTopPerformers(true)} disabled={topPerfLoading}
-                  style={{ ...btnSecondary, fontSize: 10, padding: "5px 12px", opacity: topPerfLoading ? 0.5 : 1 }}>
-                  {topPerfLoading ? "Loading..." : "Refresh"}
-                </button>
-              </div>
-              {/* Simulation disclaimer */}
-              {topPerfLoading && (
-                <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
-                  Simulating trades across liquid OSE universe...
-                </div>
-              )}
-              {!topPerfLoading && topPerformers.length === 0 && (
-                <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
-                  Loading signal data...
-                </div>
-              )}
-              {topPerformers.length > 0 && (
-                <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "monospace" }}>
-                  <thead>
-                    <tr style={{ borderBottom: "1px solid #30363d" }}>
-                      {["#", "Ticker", "Name", "Sector", "ML Pred", "Trades", "Win Rate", "Avg P&L", "Avg Max DD", "Total Return", "Liquidity"].map((h, hi) => (
-                        <th key={h} style={{ fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.5)", padding: "5px 8px", textAlign: hi < 2 ? "left" as const : "right" as const, letterSpacing: "0.04em" }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {topPerformers.map((p, i) => (
-                      <tr key={p.ticker}
-                        style={{ borderBottom: "1px solid rgba(48,54,61,0.3)", cursor: "pointer", transition: "background 0.1s" }}
-                        onClick={() => { setExplorerTicker(p.ticker); setTab("explorer"); setExplorerDays(365); }}
-                        onMouseEnter={e => (e.currentTarget.style.background = "rgba(59,130,246,0.06)")}
-                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                        <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, color: i === 0 ? "#f59e0b" : i < 3 ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.35)" }}>#{i + 1}</td>
-                        <td style={{ padding: "6px 8px", fontSize: 12, fontWeight: 800, color: "#3b82f6" }}>{p.ticker}</td>
-                        <td style={{ padding: "6px 8px", fontSize: 10, color: "rgba(255,255,255,0.6)", textAlign: "right", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</td>
-                        <td style={{ padding: "6px 8px", textAlign: "right" }}>
-                          <span style={{ fontSize: 9, fontWeight: 700, color: sectorColor(p.sector) }}>{p.sector}</span>
-                        </td>
-                        <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", color: p.latestPred >= 1 ? "#10b981" : p.latestPred >= 0 ? "#f59e0b" : "#ef4444" }}>
-                          {p.latestPred >= 0 ? "+" : ""}{p.latestPred.toFixed(1)}%
-                        </td>
-                        <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: "rgba(255,255,255,0.6)" }}>{p.trades}</td>
-                        <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", color: p.winRate >= 70 ? "#10b981" : p.winRate >= 50 ? "#f59e0b" : "#ef4444" }}>
-                          {p.winRate.toFixed(0)}%
-                        </td>
-                        <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", color: p.avgPnl >= 0 ? "#10b981" : "#ef4444" }}>
-                          {p.avgPnl >= 0 ? "+" : ""}{p.avgPnl.toFixed(1)}%
-                        </td>
-                        <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 600, textAlign: "right", color: "#ef4444" }}>
-                          {(Math.min(p.avgMaxDrawdown ?? 0, 0)).toFixed(1)}%
-                        </td>
-                        <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 800, textAlign: "right", color: p.totalPnl >= 0 ? "#10b981" : "#ef4444" }}>
-                          {p.totalPnl >= 0 ? "+" : ""}{p.totalPnl.toFixed(1)}%
-                        </td>
-                        <td style={{ padding: "6px 8px", fontSize: 9, textAlign: "right", color: "rgba(255,255,255,0.4)" }}>
-                          {p.avg_nokvol >= 1e9 ? (p.avg_nokvol / 1e9).toFixed(1) + "B" : (p.avg_nokvol / 1e6).toFixed(0) + "M"} NOK
-                        </td>
-                      </tr>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  {/* Mode toggle */}
+                  <div style={{ display: "flex", border: "1px solid #30363d", borderRadius: 5, overflow: "hidden" }}>
+                    {(['standard', 'optimized'] as const).map(mode => (
+                      <button key={mode} onClick={() => setPaperTradingMode(mode)}
+                        style={{
+                          padding: "4px 12px", fontSize: 9, fontFamily: "monospace", fontWeight: 700,
+                          letterSpacing: "0.05em", border: "none", cursor: "pointer",
+                          background: paperTradingMode === mode ? (mode === 'optimized' ? "#10b981" : "#3b82f6") : "#0d1117",
+                          color: paperTradingMode === mode ? "#000" : "rgba(255,255,255,0.4)",
+                          transition: "all 0.15s",
+                        }}>
+                        {mode.toUpperCase()}
+                      </button>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                  <button
+                    onClick={() => paperTradingMode === 'standard' ? fetchTopPerformers(true) : fetchBestStocks(true)}
+                    disabled={paperTradingMode === 'standard' ? topPerfLoading : bestStocksLoading}
+                    style={{ ...btnSecondary, fontSize: 10, padding: "5px 12px", opacity: (paperTradingMode === 'standard' ? topPerfLoading : bestStocksLoading) ? 0.5 : 1 }}>
+                    {(paperTradingMode === 'standard' ? topPerfLoading : bestStocksLoading) ? "Loading..." : "Refresh"}
+                  </button>
+                </div>
+              </div>
+
+              {/* ── STANDARD VIEW ── */}
+              {paperTradingMode === 'standard' && (
+                <>
+                  {topPerfLoading && (
+                    <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
+                      Simulating trades across liquid OSE universe...
+                    </div>
+                  )}
+                  {!topPerfLoading && topPerformers.length === 0 && (
+                    <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
+                      Loading signal data...
+                    </div>
+                  )}
+                  {topPerformers.length > 0 && (
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "monospace" }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid #30363d" }}>
+                          {["#", "Ticker", "Name", "Sector", "ML Pred", "Trades", "Win Rate", "Avg P&L", "Avg Max DD", "Total Return", "Liquidity"].map((h, hi) => (
+                            <th key={h} style={{ fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.5)", padding: "5px 8px", textAlign: hi < 2 ? "left" as const : "right" as const, letterSpacing: "0.04em" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {topPerformers.map((p, i) => (
+                          <tr key={p.ticker}
+                            style={{ borderBottom: "1px solid rgba(48,54,61,0.3)", cursor: "pointer", transition: "background 0.1s" }}
+                            onClick={() => { setExplorerTicker(p.ticker); setTab("explorer"); setExplorerDays(365); }}
+                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(59,130,246,0.06)")}
+                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                            <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, color: i === 0 ? "#f59e0b" : i < 3 ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.35)" }}>#{i + 1}</td>
+                            <td style={{ padding: "6px 8px", fontSize: 12, fontWeight: 800, color: "#3b82f6" }}>{p.ticker}</td>
+                            <td style={{ padding: "6px 8px", fontSize: 10, color: "rgba(255,255,255,0.6)", textAlign: "right", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</td>
+                            <td style={{ padding: "6px 8px", textAlign: "right" }}>
+                              <span style={{ fontSize: 9, fontWeight: 700, color: sectorColor(p.sector) }}>{p.sector}</span>
+                            </td>
+                            <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", color: p.latestPred >= 1 ? "#10b981" : p.latestPred >= 0 ? "#f59e0b" : "#ef4444" }}>
+                              {p.latestPred >= 0 ? "+" : ""}{p.latestPred.toFixed(1)}%
+                            </td>
+                            <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: "rgba(255,255,255,0.6)" }}>{p.trades}</td>
+                            <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", color: p.winRate >= 70 ? "#10b981" : p.winRate >= 50 ? "#f59e0b" : "#ef4444" }}>
+                              {p.winRate.toFixed(0)}%
+                            </td>
+                            <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", color: p.avgPnl >= 0 ? "#10b981" : "#ef4444" }}>
+                              {p.avgPnl >= 0 ? "+" : ""}{p.avgPnl.toFixed(1)}%
+                            </td>
+                            <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 600, textAlign: "right", color: "#ef4444" }}>
+                              {(Math.min(p.avgMaxDrawdown ?? 0, 0)).toFixed(1)}%
+                            </td>
+                            <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 800, textAlign: "right", color: p.totalPnl >= 0 ? "#10b981" : "#ef4444" }}>
+                              {p.totalPnl >= 0 ? "+" : ""}{p.totalPnl.toFixed(1)}%
+                            </td>
+                            <td style={{ padding: "6px 8px", fontSize: 9, textAlign: "right", color: "rgba(255,255,255,0.4)" }}>
+                              {p.avg_nokvol >= 1e9 ? (p.avg_nokvol / 1e9).toFixed(1) + "B" : (p.avg_nokvol / 1e6).toFixed(0) + "M"} NOK
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </>
+              )}
+
+              {/* ── OPTIMIZED VIEW ── */}
+              {paperTradingMode === 'optimized' && (
+                <>
+                  {bestStocksLoading && (
+                    <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
+                      Running 72-combo sweep across 50 liquid tickers...
+                    </div>
+                  )}
+                  {!bestStocksLoading && bestStocks.length === 0 && (
+                    <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
+                      Loading optimized rankings...
+                    </div>
+                  )}
+                  {bestStocks.length > 0 && (
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "monospace" }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid #30363d" }}>
+                          {["#", "Ticker", "Sector", "Entry", "Stop", "Hold", "Vol", "Mom", "Sharpe", "Win%", "Ann.Ret", "MaxDD", "Trades", ""].map((h, hi) => (
+                            <th key={hi} style={{ fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.5)", padding: "5px 8px", textAlign: hi < 2 ? "left" as const : "right" as const, letterSpacing: "0.04em" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {bestStocks.map((s, i) => {
+                          const p = s.bestParams;
+                          const st = s.stats;
+                          const isExpanded = expandedOptTicker === s.ticker;
+                          const rowBg = i < 3 ? "rgba(16,185,129,0.04)" : "transparent";
+                          const sharpeColor = st.sharpe >= 1.5 ? "#10b981" : st.sharpe >= 0.8 ? "#f59e0b" : "#ef4444";
+                          return (
+                            <>
+                              <tr key={s.ticker}
+                                onClick={() => setExpandedOptTicker(isExpanded ? null : s.ticker)}
+                                style={{ borderBottom: isExpanded ? "none" : "1px solid rgba(48,54,61,0.3)", background: isExpanded ? "rgba(16,185,129,0.06)" : rowBg, cursor: "pointer", transition: "background 0.1s" }}
+                                onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = "rgba(16,185,129,0.08)"; }}
+                                onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = rowBg; }}>
+                                <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, color: i === 0 ? "#10b981" : i < 3 ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.35)" }}>#{s.rank}</td>
+                                <td style={{ padding: "6px 8px", fontSize: 12, fontWeight: 800, color: "#10b981" }}>{s.ticker}</td>
+                                <td style={{ padding: "6px 8px", textAlign: "right" }}>
+                                  <span style={{ fontSize: 9, fontWeight: 700, color: sectorColor(s.sector) }}>{s.sector?.slice(0, 8) ?? "—"}</span>
+                                </td>
+                                <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: "rgba(255,255,255,0.7)" }}>{p.entryThreshold.toFixed(1)}%</td>
+                                <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: "#ef4444" }}>{p.stopLossPct.toFixed(0)}%</td>
+                                <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: "rgba(255,255,255,0.6)" }}>{p.maxHoldDays}d</td>
+                                <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: p.volGate === 'hard' ? "#f59e0b" : "rgba(255,255,255,0.4)" }}>{p.volGate.toUpperCase()}</td>
+                                <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: p.momentumFilter > 0 ? "#3b82f6" : "rgba(255,255,255,0.4)" }}>{p.momentumFilter > 0 ? `${p.momentumFilter}/3` : "OFF"}</td>
+                                <td style={{ padding: "6px 8px", fontSize: 12, fontWeight: 800, textAlign: "right", color: sharpeColor }}>{st.sharpe.toFixed(2)}</td>
+                                <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", color: st.winRate >= 0.6 ? "#10b981" : st.winRate >= 0.5 ? "#f59e0b" : "#ef4444" }}>
+                                  {(st.winRate * 100).toFixed(0)}%
+                                </td>
+                                <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", color: st.annualizedReturn >= 0 ? "#10b981" : "#ef4444" }}>
+                                  {st.annualizedReturn >= 0 ? "+" : ""}{(st.annualizedReturn * 100).toFixed(1)}%
+                                </td>
+                                <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 600, textAlign: "right", color: "#ef4444" }}>
+                                  {(st.maxDrawdown * 100).toFixed(1)}%
+                                </td>
+                                <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: "rgba(255,255,255,0.5)" }}>{st.trades}</td>
+                                <td style={{ padding: "6px 8px", textAlign: "right", fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
+                                  {isExpanded ? "▲" : "▼"}
+                                </td>
+                              </tr>
+                              {/* Trade log expansion */}
+                              {isExpanded && s.trades && s.trades.length > 0 && (
+                                <tr key={`${s.ticker}-trades`}>
+                                  <td colSpan={14} style={{ padding: "0 8px 10px 32px", background: "rgba(16,185,129,0.03)", borderBottom: "1px solid rgba(48,54,61,0.4)" }}>
+                                    <div style={{ paddingTop: 8 }}>
+                                      {/* Mini stats bar */}
+                                      <div style={{ display: "flex", gap: 20, marginBottom: 8, fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.5)" }}>
+                                        <span>Wins: <span style={{ color: "#10b981", fontWeight: 700 }}>{s.trades.filter(t => t.pnlPct > 0).length}</span></span>
+                                        <span>Losses: <span style={{ color: "#ef4444", fontWeight: 700 }}>{s.trades.filter(t => t.pnlPct <= 0).length}</span></span>
+                                        <span>Avg P&L: <span style={{ color: st.annualizedReturn >= 0 ? "#10b981" : "#ef4444", fontWeight: 700 }}>
+                                          {s.trades.reduce((sum, t) => sum + t.pnlPct, 0) / s.trades.length >= 0 ? "+" : ""}
+                                          {(s.trades.reduce((sum, t) => sum + t.pnlPct, 0) / s.trades.length * 100).toFixed(2)}%
+                                        </span></span>
+                                        <span>Avg Hold: <span style={{ color: "rgba(255,255,255,0.7)", fontWeight: 700 }}>
+                                          {(s.trades.reduce((sum, t) => sum + t.daysHeld, 0) / s.trades.length).toFixed(1)}d
+                                        </span></span>
+                                        <button
+                                          onClick={e => { e.stopPropagation(); setSimTicker(s.ticker); setSimEntry(p.entryThreshold); setSimStop(p.stopLossPct); setSimMaxHold(p.maxHoldDays); setSimVolGate(p.volGate as 'off' | 'soft' | 'hard'); setSimMom(p.momentumFilter as 0 | 1 | 2 | 3); setTab("simulator"); }}
+                                          style={{ ...btnSecondary, fontSize: 9, padding: "2px 8px", color: "#10b981", borderColor: "rgba(16,185,129,0.3)", marginLeft: "auto" }}>
+                                          SIMULATE →
+                                        </button>
+                                      </div>
+                                      {/* Trades table */}
+                                      <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "monospace" }}>
+                                        <thead>
+                                          <tr style={{ borderBottom: "1px solid rgba(48,54,61,0.5)" }}>
+                                            {["Entry", "Exit", "Days", "ML Pred", "P&L", "Max DD", "Exit Reason"].map((h, hi) => (
+                                              <th key={h} style={{ fontSize: 8, fontWeight: 600, color: "rgba(255,255,255,0.35)", padding: "3px 6px", textAlign: hi === 0 ? "left" as const : "right" as const, letterSpacing: "0.04em" }}>{h}</th>
+                                            ))}
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {s.trades.map((t, ti) => {
+                                            const isWin = t.pnlPct > 0;
+                                            const reasonColor: Record<string, string> = {
+                                              take_profit: "#10b981", stop_loss: "#ef4444",
+                                              signal_flip: "#3b82f6", time_stop: "#f59e0b",
+                                              sma_cross: "#a78bfa", vol_regime: "#fb923c",
+                                            };
+                                            const reasonLabel: Record<string, string> = {
+                                              take_profit: "TP", stop_loss: "SL",
+                                              signal_flip: "SIG", time_stop: "TIME",
+                                              sma_cross: "SMA", vol_regime: "VOL",
+                                            };
+                                            return (
+                                              <tr key={ti} style={{ borderBottom: "1px solid rgba(48,54,61,0.2)" }}
+                                                onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.02)")}
+                                                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                                                <td style={{ padding: "3px 6px", fontSize: 9, color: "rgba(255,255,255,0.6)" }}>{t.entryDate}</td>
+                                                <td style={{ padding: "3px 6px", fontSize: 9, textAlign: "right", color: "rgba(255,255,255,0.5)" }}>{t.exitDate}</td>
+                                                <td style={{ padding: "3px 6px", fontSize: 9, textAlign: "right", color: "rgba(255,255,255,0.5)" }}>{t.daysHeld}d</td>
+                                                <td style={{ padding: "3px 6px", fontSize: 9, textAlign: "right", color: t.predAtEntry >= 0.01 ? "#10b981" : "#f59e0b" }}>
+                                                  {t.predAtEntry >= 0 ? "+" : ""}{(t.predAtEntry * 100).toFixed(1)}%
+                                                </td>
+                                                <td style={{ padding: "3px 6px", fontSize: 10, fontWeight: 700, textAlign: "right", color: isWin ? "#10b981" : "#ef4444" }}>
+                                                  {isWin ? "+" : ""}{(t.pnlPct * 100).toFixed(2)}%
+                                                </td>
+                                                <td style={{ padding: "3px 6px", fontSize: 9, textAlign: "right", color: t.maxDrawdown < -0.03 ? "#ef4444" : "rgba(255,255,255,0.4)" }}>
+                                                  {(t.maxDrawdown * 100).toFixed(1)}%
+                                                </td>
+                                                <td style={{ padding: "3px 6px", textAlign: "right" }}>
+                                                  <span style={{ fontSize: 8, fontWeight: 700, padding: "2px 5px", borderRadius: 3, background: `${reasonColor[t.exitReason] ?? "#64748b"}22`, color: reasonColor[t.exitReason] ?? "#64748b", letterSpacing: "0.04em" }}>
+                                                    {reasonLabel[t.exitReason] ?? t.exitReason}
+                                                  </span>
+                                                </td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </>
               )}
             </div>
 
