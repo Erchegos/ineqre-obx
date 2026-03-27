@@ -235,12 +235,13 @@ async function main() {
           const durationHours = durationMs / 3600000;
           const volume = vs.capacity * DEFAULT_LOAD_FACTOR;
 
-          // Get spot price at departure
+          // Get spot price at departure (NOK only — EUR rows have values ~8-10, not ~80-100)
           let spotPrice: number | null = null;
           try {
             const spotRes = await pool.query(
               `SELECT sisalmon_avg::float FROM salmon_spot_weekly
-               WHERE report_date <= $1::date ORDER BY report_date DESC LIMIT 1`,
+               WHERE report_date <= $1::date AND currency = 'NOK'
+               ORDER BY report_date DESC LIMIT 1`,
               [departureTime]
             );
             if (spotRes.rows.length > 0) spotPrice = spotRes.rows[0].sisalmon_avg;

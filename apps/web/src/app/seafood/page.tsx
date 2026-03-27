@@ -2258,7 +2258,7 @@ export default function SeafoodPage() {
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
                       <thead>
                         <tr style={{ background: "#161b22", position: "sticky", top: 0 }}>
-                          {["DATE", "VESSEL", "FARM", "SLAUGHTERHOUSE", "COMPANY", "EST.VOL", "SPOT"].map(h => (
+                          {["DATE", "VESSEL", "FARM", "SLAUGHTERHOUSE", "COMPANY", "EST.VOL", "SPOT (NOK/kg)"].map(h => (
                             <th key={h} style={{ padding: "4px 6px", textAlign: "left", color: "rgba(255,255,255,0.35)", fontWeight: 600, fontSize: 9, borderBottom: "1px solid #30363d" }}>{h}</th>
                           ))}
                         </tr>
@@ -2299,7 +2299,7 @@ export default function SeafoodPage() {
                               {t.origin_ticker || "—"}
                             </td>
                             <td style={{ padding: "3px 6px", color: "rgba(255,255,255,0.7)" }}>{t.estimated_volume_tonnes ? `${t.estimated_volume_tonnes.toFixed(0)}t` : "—"}</td>
-                            <td style={{ padding: "3px 6px", color: "#3b82f6" }}>{t.spot_price_at_harvest ? `${t.spot_price_at_harvest.toFixed(1)}` : "—"}</td>
+                            <td style={{ padding: "3px 6px", color: "#3b82f6" }}>{t.spot_price_at_harvest ? (t.spot_price_at_harvest < 25 ? `${(t.spot_price_at_harvest * 11.3).toFixed(0)}` : `${t.spot_price_at_harvest.toFixed(1)}`) : "—"}</td>
                           </tr>
                           );
                         })}
