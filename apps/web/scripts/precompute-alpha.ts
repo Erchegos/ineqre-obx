@@ -183,8 +183,12 @@ async function computeBestStocks() {
       return {
         date: d, open: px.close, close: px.close, high: px.close, low: px.close,
         volume: 0, sma200: px.sma200 ?? null, sma50: px.sma50 ?? null,
-        mlPrediction: mlMap.get(d) ?? null,
-        mlConfidence: mlMap.has(d) ? 0.7 : null,
+        // Real ML prediction when available; fall back to scaled 6m momentum for
+        // historical dates. Scale: mom6m * 0.15 → entry fires at >6.7% 6m momentum.
+        mlPrediction: mlMap.has(d)
+          ? mlMap.get(d)!
+          : (mom?.mom6m != null ? mom.mom6m * 0.15 : null),
+        mlConfidence: mlMap.has(d) ? 0.7 : (mom?.mom6m != null ? 0.4 : null),
         mom1m: mom?.mom1m ?? null, mom6m: mom?.mom6m ?? null,
         mom11m: mom?.mom11m ?? null, vol1m: mom?.vol1m ?? null,
         volRegime: null as 'low'|'high'|null,

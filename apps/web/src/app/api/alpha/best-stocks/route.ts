@@ -191,8 +191,14 @@ async function computeAndCache(): Promise<object> {
       return {
         date: d, open: px.close, close: px.close, high: px.close, low: px.close,
         volume: 0, sma200: px.sma200 ?? null, sma50: px.sma50 ?? null,
-        mlPrediction: mlMap.get(d) ?? null,   // null when no prediction — no entry fires
-        mlConfidence: mlMap.has(d) ? 0.7 : null,
+        // Real ML prediction when available; fall back to scaled 6m momentum for
+        // historical dates not yet in ml_predictions (no look-ahead — momentum is
+        // computed from past prices only). Scale: mom6m * 0.15 so predPct units
+        // match ML: entry >1% fires when mom6m >6.7%, exit <0.25% when mom6m <1.7%.
+        mlPrediction: mlMap.has(d)
+          ? mlMap.get(d)!
+          : (mom?.mom6m != null ? mom.mom6m * 0.15 : null),
+        mlConfidence: mlMap.has(d) ? 0.7 : (mom?.mom6m != null ? 0.4 : null),
         mom1m: mom?.mom1m ?? null, mom6m: mom?.mom6m ?? null,
         mom11m: mom?.mom11m ?? null, vol1m: mom?.vol1m ?? null,
         volRegime: null as 'low'|'high'|null,

@@ -1490,7 +1490,7 @@ export default function AlphaPage() {
                       </div>
                       <div style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", marginTop: -8 }}>
                         {isOptMode
-                          ? "Walk-forward OOS: params optimised on prior 90d, traded on next 30d · no future data · 10% per slot · indexed to 100"
+                          ? "ML signal (ensemble_prediction) where available · 6m momentum proxy for older history · entry >1% · exit <0.25% · 10% per slot · indexed to 100"
                           : "Top 50 liquid OSE · Entry >+1% signal · −5% stop · 21d max · Up to 10 concurrent positions · Indexed to 100"}
                       </div>
                     </div>
