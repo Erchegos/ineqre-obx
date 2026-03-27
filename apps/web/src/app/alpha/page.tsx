@@ -170,6 +170,7 @@ export default function AlphaPage() {
   const [simIsPlaying, setSimIsPlaying] = useState(false);
   const [simSpeed, setSimSpeed] = useState(5);
   const simIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const explorerPreloadedTicker = useRef<string | null>(null);
   const [simSearch, setSimSearch] = useState("");
   const [simSearchIdx, setSimSearchIdx] = useState(-1);
   const [simShowSectors, setSimShowSectors] = useState(false);
@@ -321,7 +322,13 @@ export default function AlphaPage() {
   }, [token, tab, fetchSignals]);
 
   useEffect(() => {
-    if (token && tab === "explorer" && explorerTicker) fetchTickerHistory(explorerTicker);
+    if (token && tab === "explorer" && explorerTicker) {
+      if (explorerPreloadedTicker.current === explorerTicker) {
+        explorerPreloadedTicker.current = null; // consume the preload
+        return; // skip API fetch — data already set from simulator
+      }
+      fetchTickerHistory(explorerTicker);
+    }
   }, [token, tab, explorerTicker, fetchTickerHistory]);
 
   // Load portfolio backtest on login (from cache if available)
@@ -632,6 +639,35 @@ export default function AlphaPage() {
       .finally(() => setSimLoading(false));
     return () => ctrl.abort();
   }, [tab, simTicker, simDays, token, authLogout]);
+
+  // Preload Explorer with Simulator data for instant tab switching
+  useEffect(() => {
+    if (!simData?.input?.length) return;
+    const bars = simData.input;
+    const actualReturns = bars.map((bar, i) => {
+      const prevClose = i > 0 ? bars[i - 1].close : bar.close;
+      const daily_return = prevClose > 0 ? (bar.close - prevClose) / prevClose : 0;
+      const dist_sma200 = bar.sma200 && bar.sma200 > 0
+        ? (bar.close - bar.sma200) / bar.sma200 : undefined;
+      return {
+        date: bar.date, close: bar.close,
+        sma200: bar.sma200 ?? undefined, sma50: bar.sma50 ?? undefined,
+        daily_return, dist_sma200,
+        fwd_ret_21d: bar.mlPrediction, // read as (r as any).fwd_ret_21d in explorerChartData
+      };
+    });
+    const signals = bars
+      .filter(bar => bar.mlPrediction !== null)
+      .map(bar => ({
+        signal_date: bar.date, model_id: simData.model,
+        signal_value: (bar.mlPrediction ?? 0) * 100,
+        predicted_return: bar.mlPrediction ?? 0,
+        confidence: bar.mlConfidence ?? 0.5,
+      }));
+    explorerPreloadedTicker.current = simData.ticker;
+    setExplorerTicker(simData.ticker);
+    setTickerHistory({ ticker: simData.ticker, sector: simData.sector, signals, actualReturns } as TickerSignalHistory);
+  }, [simData]);
 
   // Run engine client-side (instant on param change)
   const simResult: SimResult | null = useMemo(() => {
