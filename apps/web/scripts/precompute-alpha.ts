@@ -31,7 +31,7 @@ const pool = new Pool({
   max: 5,
 });
 
-const BEST_STOCKS_KEY = 'best_stocks_v5_ml_signal';
+const BEST_STOCKS_KEY = 'best_stocks_v6_ml_momentum_hybrid';
 
 // Fixed params — entry/exit driven by ML signal level
 const FIXED_PARAMS: SimParams = {

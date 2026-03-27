@@ -21,7 +21,7 @@ export const maxDuration = 60;
  * Cache miss: computes inline (fast — single pass, no param sweep).
  */
 
-const CACHE_KEY      = 'best_stocks_v5_ml_signal';
+const CACHE_KEY      = 'best_stocks_v6_ml_momentum_hybrid';
 const CACHE_MAX_AGE_H = 25;
 
 export interface BestStockResult {
