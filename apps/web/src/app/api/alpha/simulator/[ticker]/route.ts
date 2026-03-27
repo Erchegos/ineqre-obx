@@ -130,8 +130,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tick
         volume: px.volume,
         sma200: px.sma200,
         sma50: px.sma50,
-        // 21-day forward return (decimal): engine multiplies by 100 → predPct %
-        // Daily-varying signal — matches original yggdrasil_v7 fwd_ret_medium
         mlPrediction: px.fwd_ret_21d ?? null,
         mlConfidence: px.fwd_ret_21d != null ? 0.8 : null,
         mom1m: mom?.mom1m ?? null,
@@ -146,6 +144,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tick
         benchmarkClose: obx,
       };
     });
+
+    // Compute vol regime from vol1m: top 33% = 'high', bottom 67% = 'low'
+    // Uses the full window distribution so regime is relative to the stock's own history
+    const vol1mVals = input.map(b => b.vol1m).filter((v): v is number => v != null).sort((a, b) => a - b);
+    const p66 = vol1mVals.length > 0 ? vol1mVals[Math.floor(vol1mVals.length * 0.67)] : 0;
+    for (const bar of input) {
+      if (bar.vol1m != null) bar.volRegime = bar.vol1m > p66 ? 'high' : 'low';
+    }
 
     return secureJsonResponse({ ticker: t, sector, input, model: 'fwd_ret_21d' });
   } catch (error) {
