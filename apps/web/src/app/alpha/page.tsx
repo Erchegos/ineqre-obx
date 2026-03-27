@@ -227,6 +227,7 @@ export default function AlphaPage() {
   const [bestStocks, setBestStocks] = useState<BestStock[]>([]);
   const [allForwardTrades, setAllForwardTrades] = useState<ForwardTrade[]>([]);
   const [bestStocksLoading, setBestStocksLoading] = useState(false);
+  const [bestStocksPending, setBestStocksPending] = useState(false);
   const [bestStocksMeta, setBestStocksMeta] = useState<{ computedAt?: string; universe?: number; combosPerTicker?: number; qualified?: number; windows?: number } | null>(null);
   const [paperTradingMode, setPaperTradingMode] = useState<'standard' | 'optimized'>('standard');
   const [expandedOptTicker, setExpandedOptTicker] = useState<string | null>(null);
@@ -409,6 +410,14 @@ export default function AlphaPage() {
       const res = await fetch('/api/alpha/best-stocks', { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
         const d = await res.json();
+        if (d.status === 'pending') {
+          // Nightly precompute not done yet — auto-retry in 2 minutes
+          setBestStocksPending(true);
+          setBestStocksLoading(false);
+          setTimeout(() => fetchBestStocks(true), 120_000);
+          return;
+        }
+        setBestStocksPending(false);
         setBestStocks(d.bestStocks || []);
         setBestStocksMeta(d.meta || null);
         setAllForwardTrades(d.allForwardTrades || []);
@@ -1103,12 +1112,18 @@ export default function AlphaPage() {
 
             {bestStocksLoading && (
               <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
-                Running 108-combo walk-forward sweep across 50 liquid tickers... (may take 10-20s)
+                Loading cached rankings...
               </div>
             )}
-            {!bestStocksLoading && bestStocks.length === 0 && (
+            {bestStocksPending && !bestStocksLoading && (
+              <div style={{ textAlign: "center", padding: 32, fontFamily: "monospace" }}>
+                <div style={{ color: "#f59e0b", fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Nightly precompute not ready yet</div>
+                <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 10 }}>Walk-forward results compute each night at 02:00 UTC via GitHub Actions.<br/>Auto-retrying in 2 minutes...</div>
+              </div>
+            )}
+            {!bestStocksLoading && !bestStocksPending && bestStocks.length === 0 && (
               <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
-                Loading optimized rankings...
+                No cached results — trigger a refresh or wait for tonight&apos;s scheduled run.
               </div>
             )}
             {bestStocks.length > 0 && (
@@ -1306,14 +1321,14 @@ export default function AlphaPage() {
               {/* ── OPTIMIZED VIEW ── */}
               {paperTradingMode === 'optimized' && (
                 <>
-                  {bestStocksLoading && (
+                  {(bestStocksLoading || bestStocksPending) && (
                     <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
-                      Running 108-combo walk-forward sweep across 50 liquid tickers...
+                      {bestStocksPending ? "Nightly precompute not ready — auto-retrying in 2 min..." : "Loading cached results..."}
                     </div>
                   )}
-                  {!bestStocksLoading && bestStocks.length === 0 && (
+                  {!bestStocksLoading && !bestStocksPending && bestStocks.length === 0 && (
                     <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
-                      Loading optimized rankings...
+                      No cached results — check back after 02:00 UTC.
                     </div>
                   )}
                   {bestStocks.length > 0 && (
