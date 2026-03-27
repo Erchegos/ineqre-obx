@@ -31,7 +31,7 @@ const pool = new Pool({
   max: 5,
 });
 
-const BEST_STOCKS_KEY = 'best_stocks_v6_ml_momentum_hybrid';
+const BEST_STOCKS_KEY = 'best_stocks_v7_full_year';
 
 // Fixed params — entry/exit driven by ML signal level
 const FIXED_PARAMS: SimParams = {
@@ -88,15 +88,19 @@ async function computeBestStocks() {
         AND close > 0
       ORDER BY ticker, date
     ),
-    with_sma AS (
+    with_stats AS (
       SELECT ticker, date, close,
         AVG(close) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 199 PRECEDING AND CURRENT ROW) AS sma200,
         AVG(close) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 49 PRECEDING AND CURRENT ROW) AS sma50,
+        LAG(close, 126) OVER (PARTITION BY ticker ORDER BY date) AS close_126d,
         ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date) AS rn
       FROM raw
     )
-    SELECT ticker, date::text AS date, close, sma200, sma50
-    FROM with_sma
+    SELECT ticker, date::text AS date, close, sma200, sma50,
+      CASE WHEN close_126d IS NOT NULL AND close_126d > 0
+        THEN (close - close_126d) / close_126d
+      END AS mom6m_price
+    FROM with_stats
     WHERE rn > 200
       AND date >= CURRENT_DATE - 365 * INTERVAL '1 day'
     ORDER BY ticker, date ASC
@@ -155,7 +159,7 @@ async function computeBestStocks() {
     mlByTicker.get(r.ticker)!.set(r.date.slice(0,10), r.pred);
   }
 
-  type PxRow = { ticker: string; date: string; close: number; sma200: number; sma50: number };
+  type PxRow = { ticker: string; date: string; close: number; sma200: number; sma50: number; mom6m_price: number | null };
   const pxByTicker = new Map<string, PxRow[]>();
   for (const r of priceRes.rows as PxRow[]) {
     if (!pxByTicker.has(r.ticker)) pxByTicker.set(r.ticker, []);
@@ -183,12 +187,12 @@ async function computeBestStocks() {
       return {
         date: d, open: px.close, close: px.close, high: px.close, low: px.close,
         volume: 0, sma200: px.sma200 ?? null, sma50: px.sma50 ?? null,
-        // Real ML prediction when available; fall back to scaled 6m momentum for
-        // historical dates. Scale: mom6m * 0.15 → entry fires at >6.7% 6m momentum.
         mlPrediction: mlMap.has(d)
           ? mlMap.get(d)!
-          : (mom?.mom6m != null ? mom.mom6m * 0.15 : null),
-        mlConfidence: mlMap.has(d) ? 0.7 : (mom?.mom6m != null ? 0.4 : null),
+          : (mom?.mom6m ?? px.mom6m_price) != null
+            ? (mom?.mom6m ?? px.mom6m_price)! * 0.15
+            : null,
+        mlConfidence: mlMap.has(d) ? 0.7 : 0.4,
         mom1m: mom?.mom1m ?? null, mom6m: mom?.mom6m ?? null,
         mom11m: mom?.mom11m ?? null, vol1m: mom?.vol1m ?? null,
         volRegime: null as 'low'|'high'|null,

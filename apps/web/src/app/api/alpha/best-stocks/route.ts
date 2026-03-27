@@ -21,7 +21,7 @@ export const maxDuration = 60;
  * Cache miss: computes inline (fast — single pass, no param sweep).
  */
 
-const CACHE_KEY      = 'best_stocks_v6_ml_momentum_hybrid';
+const CACHE_KEY      = 'best_stocks_v7_full_year';
 const CACHE_MAX_AGE_H = 25;
 
 export interface BestStockResult {
@@ -78,7 +78,8 @@ async function computeAndCache(): Promise<object> {
 
   if (tickers.length === 0) throw new Error('No tickers found in universe');
 
-  // 2. Prices with SMA warmup
+  // 2. Prices + rolling stats. LAG(126) ≈ 6m momentum computed from raw prices
+  //    — works for all 365 days since we pull 595 days total (200d SMA warmup + 395 extra).
   const priceRes = await pool.query(`
     WITH raw AS (
       SELECT ticker, date, close::float
@@ -88,15 +89,19 @@ async function computeAndCache(): Promise<object> {
         AND close > 0
       ORDER BY ticker, date
     ),
-    with_sma AS (
+    with_stats AS (
       SELECT ticker, date, close,
         AVG(close) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 199 PRECEDING AND CURRENT ROW) AS sma200,
         AVG(close) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 49 PRECEDING AND CURRENT ROW) AS sma50,
+        LAG(close, 126) OVER (PARTITION BY ticker ORDER BY date) AS close_126d,
         ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date) AS rn
       FROM raw
     )
-    SELECT ticker, date::text AS date, close, sma200, sma50
-    FROM with_sma
+    SELECT ticker, date::text AS date, close, sma200, sma50,
+      CASE WHEN close_126d IS NOT NULL AND close_126d > 0
+        THEN (close - close_126d) / close_126d
+      END AS mom6m_price
+    FROM with_stats
     WHERE rn > 200
       AND date >= CURRENT_DATE - 365 * INTERVAL '1 day'
     ORDER BY ticker, date ASC
@@ -160,7 +165,7 @@ async function computeAndCache(): Promise<object> {
     mlByTicker.get(r.ticker)!.set(r.date.slice(0,10), r.pred);
   }
 
-  type PxRow = { ticker: string; date: string; close: number; sma200: number; sma50: number };
+  type PxRow = { ticker: string; date: string; close: number; sma200: number; sma50: number; mom6m_price: number | null };
   const pxByTicker = new Map<string, PxRow[]>();
   for (const r of priceRes.rows as PxRow[]) {
     if (!pxByTicker.has(r.ticker)) pxByTicker.set(r.ticker, []);
@@ -191,14 +196,19 @@ async function computeAndCache(): Promise<object> {
       return {
         date: d, open: px.close, close: px.close, high: px.close, low: px.close,
         volume: 0, sma200: px.sma200 ?? null, sma50: px.sma50 ?? null,
-        // Real ML prediction when available; fall back to scaled 6m momentum for
-        // historical dates not yet in ml_predictions (no look-ahead — momentum is
-        // computed from past prices only). Scale: mom6m * 0.15 so predPct units
-        // match ML: entry >1% fires when mom6m >6.7%, exit <0.25% when mom6m <1.7%.
+        // Signal priority:
+        // 1. Real ML prediction (ensemble_prediction) — highest quality
+        // 2. factor_technical mom6m (pipeline-computed, same scale)
+        // 3. Price-derived mom6m via LAG(126) — covers full 365d even when
+        //    factor_technical is sparse. No look-ahead: LAG uses only past prices.
+        // Scale * 0.15: entry >1% fires when 6m momentum >6.7%,
+        //               exit <0.25% when 6m momentum drops below 1.7%
         mlPrediction: mlMap.has(d)
           ? mlMap.get(d)!
-          : (mom?.mom6m != null ? mom.mom6m * 0.15 : null),
-        mlConfidence: mlMap.has(d) ? 0.7 : (mom?.mom6m != null ? 0.4 : null),
+          : (mom?.mom6m ?? px.mom6m_price) != null
+            ? (mom?.mom6m ?? px.mom6m_price)! * 0.15
+            : null,
+        mlConfidence: mlMap.has(d) ? 0.7 : 0.4,
         mom1m: mom?.mom1m ?? null, mom6m: mom?.mom6m ?? null,
         mom11m: mom?.mom11m ?? null, vol1m: mom?.vol1m ?? null,
         volRegime: null as 'low'|'high'|null,

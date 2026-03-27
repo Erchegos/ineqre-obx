@@ -392,7 +392,7 @@ export default function AlphaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const BEST_STOCKS_CACHE_KEY = "alpha_best_stocks_v6_ml_momentum_hybrid";
+  const BEST_STOCKS_CACHE_KEY = "alpha_best_stocks_v7_full_year";
   const BEST_STOCKS_CACHE_TTL = 24 * 60 * 60 * 1000;
   const fetchBestStocks = useCallback(async (force = false) => {
     if (!token) return;
@@ -1162,7 +1162,7 @@ export default function AlphaPage() {
                           {(st.winRate * 100).toFixed(0)}%
                         </td>
                         <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", color: st.avgWinPct >= 0 ? "#10b981" : "#ef4444" }}>
-                          {st.avgWinPct >= 0 ? "+" : ""}{st.avgWinPct.toFixed(1)}%
+                          {st.avgWinPct >= 0 ? "+" : ""}{(st.avgWinPct * 100).toFixed(1)}%
                         </td>
                         <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 600, textAlign: "right", color: "#ef4444" }}>
                           {(st.maxDrawdown * 100).toFixed(1)}%
