@@ -122,7 +122,7 @@ All endpoints in `apps/web/src/app/api/`
 | `GET /api/std-channel-optimize` | Bulk optimization results |
 | `GET /api/std-channel-strategy` | Strategy backtest with trades & signals |
 | `GET /api/alpha/top-performers` | Walk-forward trade sim on top 50 liquid OSE (fixed params, 12M) |
-| `GET /api/alpha/best-stocks` | 72-combo param sweep on top 50 liquid OSE (365d), top 10 by best Sharpe (24h cache) |
+| `GET /api/alpha/best-stocks` | Top 10 OSE stocks by 365d return × Sharpe (cache key `best_stocks_v12_maxreturn`, 25h TTL). Entry >0.25%, exit <-0.5%, 2% stop, 25% TP, 30d max hold. Filters: Sharpe ≥ 0.8, WinRate ≥ 48%, MaxDD ≥ -10%, positive return. Ranking: `totalReturn × max(sharpe, 0.1)`. ML signal priority: real ensemble_prediction → factor_technical mom6m → LAG(126) price mom × 0.15. |
 | `GET /api/alpha/simulator/[ticker]` | Per-ticker SimInputBar[] for client-side ML trading simulation |
 | `GET /api/correlation` | Correlation matrices |
 
@@ -498,6 +498,7 @@ Run after market close alongside ML pipeline:
 | Script | Purpose |
 |--------|---------|
 | `ml-daily-pipeline.ts` | Master ML orchestrator (6 steps) |
+| `precompute-alpha.ts` | Nightly precompute for alpha best-stocks cache (v12). Mirrors `api/alpha/best-stocks/route.ts` logic. Runs at 02:00 UTC via GitHub Actions. Entry 0.25%, 2% stop, 25% TP, 30d hold, ranked by totalReturn × Sharpe. |
 | `ibkr-daily-update.ts` | Fetch OHLCV from IBKR |
 | `backfill-yahoo.mjs` | Yahoo Finance price fallback |
 | `regenerate-predictions.ts` | Generate ML predictions |
