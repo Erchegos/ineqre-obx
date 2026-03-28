@@ -222,6 +222,10 @@ export default function HomeContent({ stats }: { stats: SystemStats }) {
                 description="OSE shipping terminal. Fleet tracking on global map with vessel-level charter rates, BDI/BDTI/BCTI indices, rate exposure matrix, contract expiry tracking, and quarterly TCE comparison across 10 companies."
                 tags={[{ label: "Fleet Map", color: "#06b6d4" }, { label: "Rates", color: "#f59e0b" }, { label: "10 Companies", color: "#10b981" }]}
                 visible={modulesReveal.visible} delay={10} />
+              <FeatureCard href="/financials" title="Financials Intelligence"
+                description="OSE banks and insurance terminal. Interest rate sensitivity heatmap, yield curve tracking, NIBOR/policy rate history, full scorecard comparison across 12 companies, ML signals, short interest, insider transactions, and macro FX exposure."
+                tags={[{ label: "Rates", color: "#3b82f6" }, { label: "12 Companies", color: "#10b981" }, { label: "Scorecard", color: "#f59e0b" }]}
+                visible={modulesReveal.visible} delay={11} />
             </div>
           </section>
 
