@@ -15,13 +15,14 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    // 1. Rate history (NOK, last 2Y)
+    // 1. Rate history (NOK, last 2Y) — deduplicate by date+tenor+rate_type, prefer norgesbank source
     const historyResult = await pool.query(
-      `SELECT date::text, tenor, rate_type, rate::float AS rate
+      `SELECT DISTINCT ON (date, tenor, rate_type)
+        date::text, tenor, rate_type, rate::float AS rate
        FROM interest_rates
        WHERE currency = 'NOK'
          AND date >= CURRENT_DATE - INTERVAL '730 days'
-       ORDER BY date ASC, tenor, rate_type`
+       ORDER BY date, tenor, rate_type, CASE WHEN source = 'norgesbank' THEN 0 ELSE 1 END, rate`
     );
 
     // 2. Current rate strip (latest per tenor+rate_type for NOK)

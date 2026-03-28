@@ -222,31 +222,37 @@ export default function FinancialsPage() {
   const [explorerLoading, setExplorerLoading] = useState(false);
   const [explorerTf, setExplorerTf] = useState<"3M" | "6M" | "1Y" | "2Y">("1Y");
 
-  // Fetch all data on mount
+  // Fetch overview + comparison on mount (fast, needed for initial render)
   useEffect(() => {
     Promise.all([
       fetch("/api/financials/overview").then(r => r.ok ? r.json() : null),
       fetch("/api/financials/comparison").then(r => r.ok ? r.json() : null),
-      fetch("/api/financials/macro").then(r => r.ok ? r.json() : null),
-    ]).then(([ov, comp, mac]) => {
+    ]).then(([ov, comp]) => {
       if (ov) setOverview(ov);
       if (comp) setComparison(comp);
-      if (mac) setMacro(mac);
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
-  // Lazy fetch for analysis tab
+  // Lazy fetch for analysis tab (rates + signals + macro)
   useEffect(() => {
-    if (tab === "ANALYSIS" && !rates) {
-      Promise.all([
-        fetch("/api/financials/rates").then(r => r.ok ? r.json() : null),
-        !signals ? fetch("/api/financials/signals").then(r => r.ok ? r.json() : null) : Promise.resolve(signals),
-      ]).then(([r, s]) => {
-        if (r) setRates(r);
-        if (s && !signals) setSignals(s);
-      }).catch(() => {});
+    if (tab === "ANALYSIS") {
+      const fetches: Promise<any>[] = [];
+      if (!rates) fetches.push(fetch("/api/financials/rates").then(r => r.ok ? r.json() : null));
+      else fetches.push(Promise.resolve(null));
+      if (!signals) fetches.push(fetch("/api/financials/signals").then(r => r.ok ? r.json() : null));
+      else fetches.push(Promise.resolve(null));
+      if (!macro) fetches.push(fetch("/api/financials/macro").then(r => r.ok ? r.json() : null));
+      else fetches.push(Promise.resolve(null));
+      if (fetches.some((_, i) => ![rates, signals, macro][i])) {
+        Promise.all(fetches).then(([r, s, m]) => {
+          if (r) setRates(r);
+          if (s) setSignals(s);
+          if (m) setMacro(m);
+        }).catch(() => {});
+      }
     }
-  }, [tab, rates, signals]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
   // Load explorer data when ticker changes
   useEffect(() => {
@@ -343,13 +349,13 @@ export default function FinancialsPage() {
             <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
               {/* Performance filter */}
               {[
-                { k: "all", l: "ALL", col: "rgba(255,255,255,0.5)" },
-                { k: "green", l: "\u25B2 UP", col: "#10b981" },
-                { k: "red", l: "\u25BC DN", col: "#ef4444" },
+                { k: "all", l: "ALL", col: "#9ca3af", bg: "rgba(156,163,175,0.1)" },
+                { k: "green", l: "\u25B2 UP", col: "#10b981", bg: "rgba(16,185,129,0.1)" },
+                { k: "red", l: "\u25BC DN", col: "#ef4444", bg: "rgba(239,68,68,0.1)" },
               ].map(f => (
                 <button key={f.k} onClick={() => setPerfFilter(f.k as any)} style={{
                   padding: "3px 8px", borderRadius: 3, border: "1px solid " + (perfFilter === f.k ? f.col : "#30363d"),
-                  background: perfFilter === f.k ? f.col + "18" : "transparent", color: perfFilter === f.k ? f.col : "rgba(255,255,255,0.3)",
+                  background: perfFilter === f.k ? f.bg : "transparent", color: perfFilter === f.k ? f.col : "rgba(255,255,255,0.3)",
                   fontSize: 9, fontWeight: 700, fontFamily: "monospace", cursor: "pointer",
                 }}>{f.l}</button>
               ))}
