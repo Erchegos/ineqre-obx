@@ -434,9 +434,12 @@ export default function FinancialsPage() {
                       onMouseEnter={e => (e.currentTarget.style.borderColor = ACCENT)}
                       onMouseLeave={e => (e.currentTarget.style.borderColor = "#30363d")}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>{c.ticker}</span>
-                          {sub && <span style={{ fontSize: 7, fontWeight: 700, padding: "0 4px", borderRadius: 2, background: sub.color + "20", color: sub.color }}>{sub.label}</span>}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>{c.ticker}</span>
+                            {sub && <span style={{ fontSize: 7, fontWeight: 700, padding: "0 4px", borderRadius: 2, background: sub.color + "20", color: sub.color }}>{sub.label}</span>}
+                          </div>
+                          <span style={{ fontSize: 8, color: "rgba(255,255,255,0.35)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const, maxWidth: 140 }}>{c.name}</span>
                         </div>
                         <Sparkline data={c.sparkline90d} width={60} height={20} />
                       </div>
