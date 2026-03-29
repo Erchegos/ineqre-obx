@@ -1187,16 +1187,16 @@ export default function StockTickerPage() {
         {/* Row 3: Deep-dive tool links */}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {([
-            { href: `/volatility/${ticker}`,   icon: "📊", label: "Volatility",     sub: "GARCH · Regime · VaR", color: "#f59e0b" },
-            { href: `/montecarlo/${ticker}`,    icon: "🎲", label: "Monte Carlo",    sub: "10K paths · Price range", color: "#8b5cf6" },
-            { href: `/predictions/${ticker}`,   icon: "🤖", label: "ML Predictions", sub: "XGBoost · 1-month signal", color: "#3b82f6" },
+            { href: `/volatility/${ticker}`,   label: "Volatility",     sub: "GARCH · Regime · VaR", color: "#f59e0b" },
+            { href: `/montecarlo/${ticker}`,    label: "Monte Carlo",    sub: "10K paths · Price range", color: "#8b5cf6" },
+            { href: `/predictions/${ticker}`,   label: "ML Predictions", sub: "XGBoost · 1-month signal", color: "#3b82f6" },
             ...(["EQNR.US", "BORR.US", "FLNG.US", "FRO.US"].includes(ticker)
-              ? [{ href: `/options/${ticker}`, icon: "⚡", label: "Options", sub: "Chain · IV · Greeks", color: "#10b981" }]
+              ? [{ href: `/options/${ticker}`, label: "Options", sub: "Chain · IV · Greeks", color: "#10b981" }]
               : []),
-            { href: "/std-channel-strategy",    icon: "📐", label: "STD Channel",    sub: "Mean reversion · Backtest", color: "#ec4899" },
-          ] as { href: string; icon: string; label: string; sub: string; color: string }[]).map((link) => (
+            { href: "/std-channel-strategy",    label: "STD Channel",    sub: "Mean reversion · Backtest", color: "#ec4899" },
+          ] as { href: string; label: string; sub: string; color: string }[]).map((link) => (
             <Link key={link.href} href={link.href} style={{
-              display: "flex", alignItems: "center", gap: 7,
+              display: "flex", flexDirection: "column", gap: 2,
               padding: "6px 10px", borderRadius: 4,
               background: "rgba(255,255,255,0.03)",
               border: `1px solid rgba(255,255,255,0.1)`,
@@ -1212,11 +1212,8 @@ export default function StockTickerPage() {
               e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)";
             }}
             >
-              <span style={{ fontSize: 14, lineHeight: 1 }}>{link.icon}</span>
-              <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.01em", color: link.color }}>{link.label}</span>
-                <span style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", letterSpacing: "0.03em" }}>{link.sub}</span>
-              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.01em", color: link.color }}>{link.label}</span>
+              <span style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", letterSpacing: "0.03em" }}>{link.sub}</span>
             </Link>
           ))}
         </div>
