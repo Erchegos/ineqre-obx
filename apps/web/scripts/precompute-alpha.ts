@@ -31,18 +31,18 @@ const pool = new Pool({
   max: 5,
 });
 
-const BEST_STOCKS_KEY = 'best_stocks_v13_top10liquid_2y';
+const BEST_STOCKS_KEY = 'best_stocks_v14_simparams_2y';
 
-// Fixed params — entry/exit driven by ML signal level
+// Same params as the individual stock simulator (Entry 1%, Exit 0.25%, Stop 5%, TP 15%, Min 3d, Max 21d, Cooldown 2)
 const FIXED_PARAMS: SimParams = {
-  entryThreshold:  0.25,
-  exitThreshold:   -0.5,
-  stopLossPct:     2.0,
-  takeProfitPct:   25.0,
-  maxHoldDays:     30,
-  minHoldDays:     1,
+  entryThreshold:  1.0,
+  exitThreshold:   0.25,
+  stopLossPct:     5.0,
+  takeProfitPct:   15.0,
+  maxHoldDays:     21,
+  minHoldDays:     3,
   positionSizePct: 10,
-  cooldownBars:    1,
+  cooldownBars:    2,
   costBps:         10,
   volGate:         'off',
   momentumFilter:  0,

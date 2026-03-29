@@ -21,7 +21,7 @@ export const maxDuration = 60;
  * Cache miss: computes inline (fast — single pass, no param sweep).
  */
 
-const CACHE_KEY      = 'best_stocks_v13_top10liquid_2y';
+const CACHE_KEY      = 'best_stocks_v14_simparams_2y';
 const CACHE_MAX_AGE_H = 25;
 
 export interface BestStockResult {
@@ -36,16 +36,16 @@ export interface BestStockResult {
   trades: SimTrade[];
 }
 
-// Fixed params — wide entry, tight stop, let winners run
+// Same params as the individual stock simulator (Entry 1%, Exit 0.25%, Stop 5%, TP 15%, Min 3d, Max 21d, Cooldown 2)
 const FIXED_PARAMS: SimParams = {
-  entryThreshold:  0.25,   // enter on mild positive momentum (6m proxy > 1.7%)
-  exitThreshold:   -0.5,   // hold through dips, exit only when trend reverses
-  stopLossPct:     2.0,    // tight 2% stop → low MaxDD per trade
-  takeProfitPct:   25.0,   // let winners run far
-  maxHoldDays:     30,     // longer holds capture full trends
-  minHoldDays:     1,
+  entryThreshold:  1.0,    // enter when ML prediction > 1%
+  exitThreshold:   0.25,   // exit when prediction drops below 0.25%
+  stopLossPct:     5.0,    // 5% hard stop
+  takeProfitPct:   15.0,   // 15% take profit
+  maxHoldDays:     21,     // 21d max hold — matches prediction horizon
+  minHoldDays:     3,      // 3d min hold — prevents whipsaw
   positionSizePct: 10,
-  cooldownBars:    1,
+  cooldownBars:    2,      // 2 bar cooldown after exit
   costBps:         10,
   volGate:         'off',
   momentumFilter:  0,
