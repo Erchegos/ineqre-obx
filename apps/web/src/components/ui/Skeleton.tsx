@@ -116,7 +116,7 @@ export default function PageSkeleton({
   chartHeight?: number;
 }) {
   return (
-    <main style={{ padding: "20px 24px", maxWidth: 1400, margin: "0 auto", fontFamily: "monospace" }}>
+    <main style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "monospace" }}>
       <style>{`
         @keyframes shimmer {
           0% { background-position: 200% 0; }
@@ -124,32 +124,40 @@ export default function PageSkeleton({
         }
       `}</style>
 
-      {/* Nav skeleton */}
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 20 }}>
-        <SkeletonLine width={40} height={10} />
+      {/* Nav skeleton bar */}
+      <div style={{ padding: "10px 24px", borderBottom: "1px solid #21262d", display: "flex", alignItems: "center", gap: 6 }}>
+        <SkeletonLine width={36} height={10} />
         <span style={{ color: "#30363d", fontSize: 9 }}>/</span>
-        <SkeletonLine width={80} height={10} />
+        <SkeletonLine width={60} height={10} />
+        {title && (
+          <>
+            <span style={{ color: "#30363d", fontSize: 9 }}>/</span>
+            <SkeletonLine width={80} height={10} />
+          </>
+        )}
       </div>
 
-      {/* Title */}
-      {title ? (
-        <div style={{ fontSize: 22, fontWeight: 700, color: "#fff", marginBottom: 20 }}>{title}</div>
-      ) : (
-        <SkeletonLine width={220} height={22} style={{ marginBottom: 20 }} />
-      )}
+      <div style={{ padding: "20px 24px", maxWidth: 1400, margin: "0 auto" }}>
+        {/* Title */}
+        {title ? (
+          <div style={{ fontSize: 22, fontWeight: 700, color: "#fff", marginBottom: 20 }}>{title}</div>
+        ) : (
+          <SkeletonLine width={220} height={22} style={{ marginBottom: 20 }} />
+        )}
 
-      {/* Card grid */}
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(260px, 1fr))`, gap: 12, marginBottom: 24 }}>
-        {Array.from({ length: cards }).map((_, i) => (
-          <SkeletonCard key={i} />
-        ))}
+        {/* Card grid */}
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(260px, 1fr))`, gap: 12, marginBottom: 24 }}>
+          {Array.from({ length: cards }).map((_, i) => (
+            <SkeletonCard key={i} />
+          ))}
+        </div>
+
+        {/* Chart area */}
+        <SkeletonBlock height={chartHeight} style={{ marginBottom: 24 }} />
+
+        {/* Table skeleton */}
+        <SkeletonBlock height={400} />
       </div>
-
-      {/* Chart area */}
-      <SkeletonBlock height={chartHeight} style={{ marginBottom: 24 }} />
-
-      {/* Table skeleton */}
-      <SkeletonBlock height={400} />
     </main>
   );
 }

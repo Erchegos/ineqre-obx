@@ -151,9 +151,10 @@ export default function OBXVolatilityDashboard() {
   return (
     <main style={{ padding: "20px 24px", maxWidth: 1400, margin: "0 auto", fontFamily: "monospace" }}>
 
+      <PageNav crumbs={[{ label: "Home", href: "/" }, { label: "Stocks", href: "/stocks" }, { label: "OBX Volatility" }]} actions={[{ label: "Stocks", href: "/stocks" }]} />
+
       {/* ── HEADER ── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
-        <PageNav crumbs={[{ label: "Home", href: "/" }, { label: "Stocks", href: "/stocks" }, { label: "OBX Volatility" }]} actions={[{ label: "Stocks", href: "/stocks" }]} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
         <div style={{ display: "flex", gap: 2 }}>
           {[{ l: "6M", v: 126 }, { l: "1Y", v: 252 }, { l: "2Y", v: 504 }, { l: "5Y", v: 1260 }].map((tf) => {
             const isActive = limit === tf.v;

@@ -36,6 +36,9 @@ export default function PageNav({
         fontFamily: "monospace",
         fontSize: 10,
         lineHeight: 1,
+        paddingBottom: 10,
+        marginBottom: 12,
+        borderBottom: "1px solid #21262d",
       }}
     >
       {crumbs.map((crumb, i) => {

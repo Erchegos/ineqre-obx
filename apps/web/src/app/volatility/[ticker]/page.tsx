@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import PageNav from "@/components/ui/PageNav";
+import PageSkeleton from "@/components/ui/Skeleton";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 
@@ -227,7 +228,7 @@ export default function VolatilityPage() {
     [regime.current, data?.beta]
   );
   // Early returns
-  if (loading && !data) return <main style={{ padding: 24 }}>Loading...</main>;
+  if (loading && !data) return <PageSkeleton cards={3} chartHeight={400} />;
   if (error || !data) return <main style={{ padding: 24 }}>Error: {error}</main>;
 
   const expectedMoves = data.expectedMoves || { currentPrice: 0, daily1Sigma: 0, weekly1Sigma: 0, daily2Sigma: 0 };
@@ -236,21 +237,19 @@ export default function VolatilityPage() {
   return (
     <main style={{ padding: "20px 24px", maxWidth: 1400, margin: "0 auto" }}>
 
-      {/* ═══ HEADER: ticker + controls ═══ */}
+      <PageNav crumbs={[{label:"Home",href:"/"},{label:"Stocks",href:"/stocks"},{label:ticker,href:`/stocks/${ticker}`},{label:"Volatility"}]} actions={[{label:"OBX Dashboard",href:"/volatility/obx"}]} />
+
+      {/* ═══ HEADER: controls ═══ */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
+          justifyContent: "flex-end",
           marginBottom: 20,
           flexWrap: "wrap",
           gap: 12,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <PageNav crumbs={[{label:"Home",href:"/"},{label:"Stocks",href:"/stocks"},{label:ticker,href:`/stocks/${ticker}`},{label:"Volatility"}]} actions={[{label:"OBX Dashboard",href:"/volatility/obx"}]} />
-        </div>
-
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <div style={{ display: "flex", background: "rgba(255,255,255,0.02)", borderRadius: 4, border: "1px solid #30363d", padding: 2 }}>
             {[{ label: "Raw", val: false }, { label: "Total Return", val: true }].map((opt) => {

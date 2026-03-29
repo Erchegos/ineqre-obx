@@ -227,7 +227,13 @@ export default function SectorsPage() {
       </div>
 
       {loading ? (
-        <div style={{ padding: 40, textAlign: "center", color: "rgba(255,255,255,0.4)", fontSize: 13 }}>Loading sector data…</div>
+        <div style={{ padding: "16px 24px" }}>
+          <style>{`@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12, marginBottom: 16 }}>
+            {[0,1,2,3].map(i => <div key={i} style={{ height: 120, borderRadius: 8, border: "1px solid #30363d", background: "linear-gradient(90deg, #21262d 25%, #30363d 50%, #21262d 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.5s ease-in-out infinite" }} />)}
+          </div>
+          <div style={{ height: 300, borderRadius: 8, background: "linear-gradient(90deg, #21262d 25%, #30363d 50%, #21262d 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.5s ease-in-out infinite" }} />
+        </div>
       ) : (
         <div style={{ padding: "24px", maxWidth: 1200, margin: "0 auto" }}>
 

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import PageNav from "@/components/ui/PageNav";
+import { SkeletonBlock, SkeletonCard } from "@/components/ui/Skeleton";
 import {
   LineChart, Line, BarChart, Bar, ScatterChart, Scatter,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -341,7 +342,7 @@ export default function FinancialsPage() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-            ) : <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 10, padding: 20, textAlign: "center" }}>Loading...</div>}
+            ) : <div style={{ padding: 20 }}><SkeletonBlock height={100} /></div>}
           </Card>
 
           {/* News Feed */}
@@ -1359,7 +1360,13 @@ export default function FinancialsPage() {
 
         {/* Content */}
         {loading && !overview && tab === "OVERVIEW" && (
-          <div style={{ color: "rgba(255,255,255,0.4)", padding: 60, textAlign: "center" }}>Loading...</div>
+          <div style={{ padding: "16px 0" }}>
+            <style>{`@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12, marginBottom: 16 }}>
+              <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard />
+            </div>
+            <SkeletonBlock height={250} />
+          </div>
         )}
         {tab === "OVERVIEW" && renderOverview()}
         {tab === "RATES" && renderRates()}

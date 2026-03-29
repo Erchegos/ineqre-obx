@@ -472,8 +472,8 @@ export default function OptionsPage() {
   if (loading && !data) {
     return (
       <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff" }}>
-        <PageNav crumbs={[{label:"Home",href:"/"},{label:"Options",href:"/options"},{label:`${ticker} Options`}]} />
-        <div style={{ maxWidth: 1400, margin: "0 auto", padding: "0 24px" }}>
+        <div style={{ maxWidth: 1400, margin: "0 auto", padding: "16px 24px 0" }}>
+          <PageNav crumbs={[{label:"Home",href:"/"},{label:"Options",href:"/options"},{label:`${ticker} Options`}]} />
           <h1 style={{ fontSize: 22, fontWeight: 700, marginTop: 4, fontFamily: "monospace" }}>{ticker} Options</h1>
         </div>
         <main style={{ maxWidth: 1400, margin: "0 auto", padding: 24 }}>
@@ -491,9 +491,9 @@ export default function OptionsPage() {
 
   if (error && !data) {
     return (
-      <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff", padding: 24 }}>
-        <PageNav crumbs={[{label:"Home",href:"/"},{label:"Options",href:"/options"},{label:`${ticker} Options`}]} />
-        <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+      <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff" }}>
+        <div style={{ maxWidth: 1400, margin: "0 auto", padding: "16px 24px" }}>
+          <PageNav crumbs={[{label:"Home",href:"/"},{label:"Options",href:"/options"},{label:`${ticker} Options`}]} />
           <h1 style={{ fontSize: 22, fontWeight: 700, marginTop: 8, marginBottom: 16, fontFamily: "monospace" }}>{ticker} Options</h1>
           <div style={{ ...panel, borderColor: "#7f1d1d" }}>
             <div style={{ color: "#ef4444", fontWeight: 700, fontSize: 12, marginBottom: 6, fontFamily: "monospace" }}>ERROR</div>
@@ -531,9 +531,11 @@ export default function OptionsPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "monospace" }}>
-      <PageNav crumbs={[{label:"Home",href:"/"},{label:"Options",href:"/options"},{label:data?.symbol||ticker}]} actions={[{label:"Stocks",href:"/stocks"}]} />
       {/* ═══ HEADER ═══ */}
-      <header style={{ padding: "0 24px 10px", background: "transparent" }}>
+      <header style={{ padding: "16px 24px 10px", background: "transparent" }}>
+        <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+          <PageNav crumbs={[{label:"Home",href:"/"},{label:"Options",href:"/options"},{label:data?.symbol||ticker}]} actions={[{label:"Stocks",href:"/stocks"}]} />
+        </div>
         <div style={{ maxWidth: 1400, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
             <div>

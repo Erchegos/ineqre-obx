@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import PageNav from "@/components/ui/PageNav";
+import { SkeletonBlock, SkeletonCard } from "@/components/ui/Skeleton";
 import SalmonPriceChart from "@/components/SalmonPriceChart";
 import LiceChart from "@/components/LiceChart";
 import ProductionAreaMap from "@/components/ProductionAreaMap";
@@ -343,7 +344,15 @@ export default function SeafoodPage() {
   };
 
   if (loading) {
-    return (<main style={S.page}><div style={S.container}><div style={S.header}><span style={S.title}>SEAFOOD INTELLIGENCE</span></div><div style={{ padding: "40px 0", textAlign: "center", color: "rgba(255,255,255,0.35)" }}>Loading...</div></div></main>);
+    return (<main style={S.page}><div style={S.container}>
+      <style>{`@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
+      <div style={S.header}><span style={S.title}>SEAFOOD INTELLIGENCE</span></div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12, padding: "16px 0" }}>
+        <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard />
+      </div>
+      <SkeletonBlock height={300} style={{ marginBottom: 16 }} />
+      <SkeletonBlock height={200} />
+    </div></main>);
   }
 
   if (error) {
