@@ -52,6 +52,75 @@ export async function GET(req: NextRequest) {
   try {
     await ensureTable();
 
+    const url = new URL(req.url);
+    const portfolioOnly = url.searchParams.get('portfolio') === '1';
+
+    // Fast path: skip expensive signal queries, only return portfolio state
+    if (portfolioOnly) {
+      const pendingRes = await pool.query(`
+        SELECT lts.id, lts.ticker, lts.name,
+          lts.entry_price::float, lts.limit_price::float,
+          lts.stop_price::float, lts.tp_price::float,
+          lts.order_type, lts.tif,
+          lts.ml_pred::float, lts.pos_size_pct::float,
+          lts.accepted_at::text, lts.notes,
+          pd.close::float AS current_close
+        FROM live_trade_signals lts
+        LEFT JOIN (
+          SELECT DISTINCT ON (ticker) ticker, close FROM prices_daily WHERE close > 0 ORDER BY ticker, date DESC
+        ) pd ON pd.ticker = lts.ticker
+        WHERE lts.profile = $1 AND lts.status = 'pending'
+        ORDER BY lts.accepted_at DESC
+      `, [PROFILE]);
+
+      const posRes = await pool.query(`
+        SELECT lts.id, lts.ticker, lts.name,
+          lts.entry_price::float, lts.stop_price::float, lts.tp_price::float,
+          lts.trailing_stop_pct::float, lts.trailing_high::float,
+          lts.min_exit_date::text, lts.max_exit_date::text,
+          lts.ml_pred::float, lts.pos_size_pct::float,
+          lts.order_type, lts.limit_price::float, lts.accepted_at::text,
+          GREATEST(EXTRACT(DAY FROM NOW() - lts.accepted_at)::int, 0) AS days_held,
+          pd.close::float AS current_close, pd.date::text AS price_date
+        FROM live_trade_signals lts
+        LEFT JOIN (
+          SELECT DISTINCT ON (ticker) ticker, close, date FROM prices_daily WHERE close > 0 ORDER BY ticker, date DESC
+        ) pd ON pd.ticker = lts.ticker
+        WHERE lts.profile = $1 AND lts.status = 'open'
+        ORDER BY lts.accepted_at DESC
+      `, [PROFILE]);
+
+      const closedRes = await pool.query(`
+        SELECT id, ticker, name,
+          entry_price::float, exit_price::float,
+          pnl_pct::float, gross_pnl_pct::float,
+          accepted_at::text, closed_at::text, exit_reason, ml_pred::float,
+          pos_size_pct::float,
+          GREATEST(EXTRACT(DAY FROM closed_at - accepted_at)::int, 0) AS days_held
+        FROM live_trade_signals
+        WHERE profile = $1 AND status = 'closed'
+        ORDER BY closed_at DESC LIMIT 30
+      `, [PROFILE]);
+
+      const positions = posRes.rows.map(r => ({
+        ...r,
+        pnl_pct: r.current_close && r.entry_price ? ((r.current_close - r.entry_price) / r.entry_price) * 100 : null,
+        gross_pnl_pct: r.current_close && r.entry_price ? ((r.current_close - r.entry_price) / r.entry_price) * 100 : null,
+        effective_stop: r.trailing_stop_pct && r.trailing_high
+          ? Math.max(r.stop_price, r.trailing_high * (1 - r.trailing_stop_pct / 100))
+          : r.stop_price,
+      }));
+
+      const totalExposurePct = positions.reduce((s, p) => s + (p.pos_size_pct ?? 10), 0);
+      const totalUnrealizedPnl = positions.reduce((s, p) => s + (p.pnl_pct ?? 0), 0);
+      return secureJsonResponse({
+        pending: pendingRes.rows,
+        positions,
+        closed: closedRes.rows,
+        portfolio: { totalExposurePct, totalUnrealizedPnl, openCount: positions.length, pendingCount: pendingRes.rows.length, sectorBreakdown: {} },
+      });
+    }
+
     // 1. Top 20 liquid OSE stocks with current ML signal
     const signalRes = await pool.query(`
       SELECT

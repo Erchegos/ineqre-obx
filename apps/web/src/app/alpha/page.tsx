@@ -578,6 +578,23 @@ export default function AlphaPage() {
     setLiveLoading(false);
   }, [token, authLogout]);
 
+  // Fast refresh: only portfolio state (no signal queries) — used after order actions
+  const fetchPortfolioOnly = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch("/api/alpha/live?portfolio=1", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.status === 401) { authLogout(); return; }
+      if (res.ok) {
+        const d = await res.json();
+        setLivePending(d.pending || []);
+        setLivePositions(d.positions || []);
+        setLiveTrades(d.closed || []);
+        setLivePortfolio(d.portfolio || null);
+        // signals are intentionally NOT updated here — they stay from last full fetch
+      }
+    } catch (e) { console.error("Portfolio refresh failed:", e); }
+  }, [token, authLogout]);
+
   const liveAction = useCallback(async (action: string, body: Record<string, unknown>) => {
     if (!token) return;
     const key = action === "enter" ? String(body.ticker) : String(body.id ?? action);
@@ -595,11 +612,11 @@ export default function AlphaPage() {
         if (action === "check_rules" && d.triggered?.length > 0) {
           setLiveCheckResult(d);
         }
-        await fetchLiveData();
+        await fetchPortfolioOnly();
       }
     } catch (e) { console.error("Live action failed:", e); }
     setLiveActionLoading(null);
-  }, [token, authLogout, fetchLiveData]);
+  }, [token, authLogout, fetchPortfolioOnly]);
 
   useEffect(() => {
     if (token && tab === "live") fetchLiveData();
