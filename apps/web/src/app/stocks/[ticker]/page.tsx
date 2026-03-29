@@ -1193,7 +1193,6 @@ export default function StockTickerPage() {
             ...(["EQNR.US", "BORR.US", "FLNG.US", "FRO.US"].includes(ticker)
               ? [{ href: `/options/${ticker}`, label: "Options", sub: "Chain · IV · Greeks", color: "#10b981" }]
               : []),
-            { href: "/std-channel-strategy",    label: "STD Channel",    sub: "Mean reversion · Backtest", color: "#ec4899" },
           ] as { href: string; label: string; sub: string; color: string }[]).map((link) => (
             <Link key={link.href} href={link.href} style={{
               display: "flex", flexDirection: "column", gap: 2,
