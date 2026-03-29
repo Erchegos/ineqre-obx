@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import PageNav from "@/components/ui/PageNav";
 import { useEffect, useState } from "react";
 import {
   BarChart,
@@ -465,6 +466,7 @@ export default function TickerBacktestPage() {
         background: "#0a0a0a",
       }}
     >
+      <PageNav crumbs={[{label:"Home",href:"/"},{label:"Stocks",href:"/stocks"},{label:ticker,href:`/stocks/${ticker}`},{label:"Backtest"}]} actions={[{label:"Predictions",href:`/predictions/${ticker}`},{label:"All Backtests",href:"/backtest"}]} />
       {/* Header */}
       <div
         style={{
@@ -537,40 +539,6 @@ export default function TickerBacktestPage() {
                   : `${summary.n_predictions} REALIZED PREDICTIONS • ${summary.n_total} TOTAL • WALK-FORWARD OUT-OF-SAMPLE`}
               </div>
             </div>
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <Link
-              href={`/predictions/${ticker}`}
-              style={{
-                fontSize: 10,
-                color: "#3b82f6",
-                textDecoration: "none",
-                fontFamily: "monospace",
-                fontWeight: 600,
-                padding: "6px 12px",
-                border: "1px solid #3b82f6",
-                borderRadius: 2,
-                background: "#0d1117",
-              }}
-            >
-              &larr; BACK TO PREDICTIONS
-            </Link>
-            <Link
-              href={`/backtest?from=${ticker}`}
-              style={{
-                fontSize: 10,
-                color: "#10b981",
-                textDecoration: "none",
-                fontFamily: "monospace",
-                fontWeight: 600,
-                padding: "6px 12px",
-                border: "1px solid #10b981",
-                borderRadius: 2,
-                background: "#0d1117",
-              }}
-            >
-              BACKTEST ALL STOCKS &rarr;
-            </Link>
           </div>
         </div>
       </div>

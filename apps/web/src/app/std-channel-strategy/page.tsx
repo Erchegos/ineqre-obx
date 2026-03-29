@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import PageNav from "@/components/ui/PageNav";
 import {
   AreaChart,
   Area,
@@ -326,15 +327,13 @@ export default function STDChannelStrategyPage() {
     return (
       <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff" }}>
         {/* Header */}
-        <header style={{ borderBottom: "1px solid #30363d", padding: "16px 16px" }}>
-          <div style={{ maxWidth: 1600, margin: "0 auto" }}>
-            <Link href="/stocks" style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, textDecoration: "none" }}>← Back to Stocks</Link>
-            <h1 style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>STD Channel Mean Reversion</h1>
-            <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, marginTop: 2 }}>
-              Slope-aligned mean reversion with fundamental quality filter
-            </p>
-          </div>
-        </header>
+        <PageNav crumbs={[{label:"Home",href:"/"},{label:"Stocks",href:"/stocks"},{label:"Std Channel Strategy"}]} />
+        <div style={{ maxWidth: 1600, margin: "0 auto", padding: "0 16px" }}>
+          <h1 style={{ fontSize: 22, fontWeight: 700, marginTop: 4, fontFamily: "monospace" }}>STD Channel Mean Reversion</h1>
+          <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, marginTop: 2 }}>
+            Slope-aligned mean reversion with fundamental quality filter
+          </p>
+        </div>
 
         <main style={{ maxWidth: 1600, margin: "0 auto", padding: 24 }}>
           {/* Status card - changes based on loading state */}
@@ -863,13 +862,11 @@ export default function STDChannelStrategyPage() {
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff" }}>
       {/* Header */}
-      <header style={{ borderBottom: "1px solid #30363d", padding: "16px 16px" }}>
+      <PageNav crumbs={[{label:"Home",href:"/"},{label:"Stocks",href:"/stocks"},{label:"Std Channel Strategy"}]} />
+      <header style={{ padding: "0 16px 16px" }}>
         <div style={{ maxWidth: 1600, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <Link href="/stocks" style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, textDecoration: "none" }}>
-              ← Back to Stocks
-            </Link>
-            <h1 style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>STD Channel Mean Reversion</h1>
+            <h1 style={{ fontSize: 22, fontWeight: 700, marginTop: 4, fontFamily: "monospace" }}>STD Channel Mean Reversion</h1>
             <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, marginTop: 2 }}>
               Slope-aligned mean reversion with fundamental quality filter
             </p>

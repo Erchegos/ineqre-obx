@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
+import PageNav from "@/components/ui/PageNav";
 import { useAuth } from "@/lib/useAuth";
 
 /* ------------------------------------------------------------------ */
@@ -1153,7 +1154,7 @@ export default function FXTerminalPage() {
         <div style={{ ...S.header, textAlign: "center", paddingTop: 80 }}>
           <div style={{ ...S.title, color: "#ef4444" }}>Error</div>
           <div style={{ ...S.subtitle, marginTop: 10 }}>{error}</div>
-          <Link href="/" style={{ color: "#3b82f6", marginTop: 20, display: "inline-block" }}>&larr; Back to Dashboard</Link>
+          <Link href="/" style={{ color: "#3b82f6", marginTop: 20, display: "inline-block", textDecoration: "none", fontFamily: "monospace", fontSize: 12 }}>Home</Link>
         </div>
       </div>
     );
@@ -1175,8 +1176,8 @@ export default function FXTerminalPage() {
       {/* Header */}
       <div style={S.header}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", minWidth: 0 }}>
-          <Link href="/" style={{ color: "rgba(255,255,255,0.5)", textDecoration: "none", fontSize: 12, flexShrink: 0 }}>&larr; HOME</Link>
-          <span style={{ ...S.title, flexShrink: 0 }}>FX TERMINAL</span>
+          <PageNav crumbs={[{ label: "Home", href: "/" }, { label: "FX Terminal" }]} />
+          <span style={{ width: 6, flexShrink: 0 }} />
           {nokIndexCurrent && (
             <span style={{ ...S.badge, background: "rgba(59,130,246,0.15)", color: "#3b82f6", flexShrink: 0 }}>
               NOK TWI: {nokIndexCurrent.index.toFixed(2)} ({fmtPct(nokIndexCurrent.change1d)})

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import PageNav from "@/components/ui/PageNav";
 import {
   LineChart, Line, BarChart, Bar, ScatterChart, Scatter,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -1334,14 +1335,14 @@ export default function FinancialsPage() {
       <div style={{ maxWidth: 1400, margin: "0 auto", padding: "20px 24px" }}>
 
         {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <PageNav crumbs={[{ label: "Home", href: "/" }, { label: "Financials" }]} actions={[{ label: "Stocks", href: "/stocks" }]} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, marginTop: 6 }}>
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, color: "#fff", margin: 0, letterSpacing: "-0.02em" }}>
               <span style={{ color: ACCENT }}>// </span>FINANCIALS & INSURANCE
             </h1>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginTop: 3, letterSpacing: "0.04em" }}>Banks · Insurance · Financial Services · Investment Companies</div>
           </div>
-          <Link href="/" style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", textDecoration: "none", padding: "4px 10px", border: "1px solid #30363d", borderRadius: 4 }}>HOME</Link>
         </div>
 
         {/* Tabs */}

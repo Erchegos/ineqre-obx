@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import PageNav from "@/components/ui/PageNav";
 import { use } from "react";
 import {
   ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid,
@@ -169,15 +170,7 @@ export default function CommodityDetailPage({ params }: { params: Promise<{ symb
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#e6edf3", fontFamily: "monospace" }}>
-      {/* Header */}
-      <div style={{ borderBottom: "1px solid #21262d", padding: "12px 24px", display: "flex", alignItems: "center", gap: 16, background: "#0d1117" }}>
-        <Link href="/commodities" style={{ color: "rgba(255,255,255,0.5)", textDecoration: "none", fontSize: 12 }}>
-          ← Commodities
-        </Link>
-        <span style={{ color: "#30363d" }}>|</span>
-        <span style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>{displayName}</span>
-        {unit && <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", background: "#161b22", border: "1px solid #30363d", borderRadius: 3, padding: "2px 6px" }}>{unit}</span>}
-      </div>
+      <PageNav crumbs={[{label:"Home",href:"/"},{label:"Commodities",href:"/commodities"},{label:displayName}]} />
 
       <div style={{ padding: "24px", maxWidth: 1200, margin: "0 auto" }}>
         {/* Hero */}

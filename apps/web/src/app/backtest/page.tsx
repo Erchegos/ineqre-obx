@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import PageNav from "@/components/ui/PageNav";
 import { useEffect, useState } from "react";
 import {
   AreaChart,
@@ -224,6 +225,7 @@ export default function BacktestPage() {
         background: "#0a0a0a",
       }}
     >
+      <PageNav crumbs={[{label:"Home",href:"/"},{label:"Backtest"}]} actions={[{label:"Stocks",href:"/stocks"}]} />
       {/* Header */}
       <div
         style={{
@@ -284,41 +286,6 @@ export default function BacktestPage() {
             >
               {run.n_months} MONTHS &bull; {run.n_total_predictions.toLocaleString()} PREDICTIONS &bull; WALK-FORWARD OUT-OF-SAMPLE
             </div>
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={() => window.history.back()}
-              style={{
-                fontSize: 10,
-                color: "#3b82f6",
-                textDecoration: "none",
-                fontFamily: "monospace",
-                fontWeight: 600,
-                padding: "6px 12px",
-                border: "1px solid #3b82f6",
-                borderRadius: 2,
-                background: "#0d1117",
-                cursor: "pointer",
-              }}
-            >
-              &larr; BACK TO STOCK BACKTEST
-            </button>
-            <Link
-              href="/"
-              style={{
-                fontSize: 10,
-                color: "rgba(255,255,255,0.5)",
-                textDecoration: "none",
-                fontFamily: "monospace",
-                fontWeight: 600,
-                padding: "6px 12px",
-                border: "1px solid #30363d",
-                borderRadius: 2,
-                background: "#0d1117",
-              }}
-            >
-              HOME
-            </Link>
           </div>
         </div>
       </div>

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
+import PageNav from "@/components/ui/PageNav";
 import ShippingMap from "@/components/ShippingMap";
 import type { VesselMapItem, PortItem } from "@/components/ShippingMap";
 
@@ -554,9 +555,8 @@ export default function ShippingPage() {
           {/* ─── Header Bar ─────────────────────────────────── */}
           <div style={S.header}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <Link href="/" style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", textDecoration: "none" }}>HOME</Link>
-              <span style={{ color: "#30363d" }}>/</span>
-              <span style={S.title}>SHIPPING INTELLIGENCE</span>
+              <PageNav crumbs={[{ label: "Home", href: "/" }, { label: "Shipping" }]} />
+              <span style={{ width: 8 }} />
               <span style={{ ...S.badge("#0d1117"), color: "#22c55e", border: "1px solid #22c55e33" }}>
                 {positions.filter(p => p.latitude != null).length} AIS TRACKED
               </span>

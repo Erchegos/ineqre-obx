@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import PageNav from "@/components/ui/PageNav";
 import { useEffect, useState } from "react";
 import FactorDashboard from "@/components/FactorDashboard";
 import PredictionChart from "@/components/PredictionChart";
@@ -175,6 +176,7 @@ export default function PredictionsPage() {
         overflowX: "hidden" as const,
       }}
     >
+      <PageNav crumbs={[{label:"Home",href:"/"},{label:"Stocks",href:"/stocks"},{label:ticker,href:`/stocks/${ticker}`},{label:"Predictions"}]} actions={[{label:"Backtest",href:`/backtest/${ticker}`}]} />
       {/* Terminal-style Header */}
       <div
         style={{
@@ -227,23 +229,6 @@ export default function PredictionsPage() {
             </div>
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            <Link
-              href={`/stocks/${ticker}`}
-              style={{
-                fontSize: 10,
-                color: "#3b82f6",
-                textDecoration: "none",
-                fontFamily: "monospace",
-                fontWeight: 600,
-                padding: "6px 12px",
-                border: "1px solid #3b82f6",
-                borderRadius: 2,
-                background: "#0d1117",
-                whiteSpace: "nowrap",
-              }}
-            >
-              &larr; BACK TO STOCK
-            </Link>
             <Link
               href={`/backtest/${ticker}`}
               style={{
@@ -328,7 +313,7 @@ export default function PredictionsPage() {
                 background: "#0d1117",
               }}
             >
-              ← BACK TO {ticker}
+              {ticker} Stock Page
             </Link>
           </div>
         </div>

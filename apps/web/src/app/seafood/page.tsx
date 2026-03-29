@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import PageNav from "@/components/ui/PageNav";
 import SalmonPriceChart from "@/components/SalmonPriceChart";
 import LiceChart from "@/components/LiceChart";
 import ProductionAreaMap from "@/components/ProductionAreaMap";
@@ -364,9 +365,8 @@ export default function SeafoodPage() {
           {/* ─── Header Bar ─────────────────────────────────── */}
           <div style={S.header}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <Link href="/" style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", textDecoration: "none" }}>HOME</Link>
-              <span style={{ color: "#30363d" }}>/</span>
-              <span style={S.title}>SEAFOOD INTELLIGENCE</span>
+              <PageNav crumbs={[{ label: "Home", href: "/" }, { label: "Seafood" }]} />
+              <span style={{ width: 8 }} />
               {aboveCount > 0 && <span style={S.badge("#ef4444")}>{aboveCount} ABOVE THRESHOLD</span>}
               {redAreas > 0 && <span style={S.badge("#ef4444")}>{redAreas} RED AREAS</span>}
               {diseases.filter(d => d.isActive).length > 0 && (

@@ -335,7 +335,6 @@ export default function StocksContent({
             {[
               { href: "/options", label: "Options" },
               { href: "/correlation", label: "Correlation" },
-              { href: "/valuation", label: "Valuation" },
             ].map(({ href, label }) => (
               <Link key={href} href={href} className="nav-link">{label} →</Link>
             ))}

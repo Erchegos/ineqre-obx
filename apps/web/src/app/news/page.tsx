@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, useCallback, useRef } from "react";
+import PageNav from "@/components/ui/PageNav";
 
 /* ─── Types ────────────────────────────────────────────────────── */
 
@@ -552,9 +553,8 @@ export default function IntelligencePage() {
           display: "flex", alignItems: "center", gap: 8, padding: "4px 16px",
           borderBottom: "1px solid #30363d", background: "#161b22", flexWrap: "wrap",
         }}>
-          <Link href="/" style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", textDecoration: "none" }}>HOME</Link>
-          <span style={{ color: "#30363d" }}>/</span>
-          <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.08em", color: "#3b82f6" }}>INTELLIGENCE TERMINAL</span>
+          <PageNav crumbs={[{ label: "Home", href: "/" }, { label: "Intelligence" }]} />
+          <span style={{ width: 4 }} />
 
           <span style={{ width: 1, height: 14, background: "#30363d", margin: "0 4px" }} />
 

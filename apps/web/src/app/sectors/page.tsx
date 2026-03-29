@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import PageNav from "@/components/ui/PageNav";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   ResponsiveContainer, Tooltip, RadarChart, Radar,
@@ -219,14 +220,10 @@ export default function SectorsPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#e6edf3", fontFamily: "monospace" }}>
-      {/* Header */}
-      <div style={{ borderBottom: "1px solid #21262d", padding: "12px 24px", display: "flex", alignItems: "center", gap: 16, background: "#0d1117" }}>
-        <Link href="/" style={{ color: "rgba(255,255,255,0.5)", textDecoration: "none", fontSize: 12 }}>← Home</Link>
-        <Link href="/commodities" style={{ color: "rgba(255,255,255,0.5)", textDecoration: "none", fontSize: 12 }}>Commodity Terminal</Link>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 16, fontWeight: 700 }}>SECTOR INTELLIGENCE</div>
-          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Energy · Seafood · Shipping · Materials</div>
-        </div>
+      <PageNav crumbs={[{label:"Home",href:"/"},{label:"Sectors"}]} actions={[{label:"Commodities",href:"/commodities"}]} />
+      <div style={{ padding: "12px 24px 0" }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, fontFamily: "monospace" }}>Sector Intelligence</h1>
+        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>Energy · Seafood · Shipping · Materials</div>
       </div>
 
       {loading ? (

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import PageNav from "@/components/ui/PageNav";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 
@@ -247,35 +248,7 @@ export default function VolatilityPage() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Link
-            href="/stocks"
-            style={{
-              fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.5)",
-              textDecoration: "none", fontFamily: "monospace",
-            }}
-          >
-            ← Asset List
-          </Link>
-          <span style={{ color: "#30363d" }}>|</span>
-          <Link
-            href="/volatility/obx"
-            style={{
-              fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.5)",
-              textDecoration: "none", fontFamily: "monospace",
-            }}
-          >
-            OBX Dashboard
-          </Link>
-          <span style={{ color: "#30363d" }}>|</span>
-          <span style={{ fontSize: 24, fontWeight: 700, fontFamily: "monospace", color: "#fff" }}>
-            {ticker}
-          </span>
-          <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", fontFamily: "monospace" }}>
-            Volatility Analysis
-          </span>
-          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontFamily: "monospace" }}>
-            ({data.count}d)
-          </span>
+          <PageNav crumbs={[{label:"Home",href:"/"},{label:"Stocks",href:"/stocks"},{label:ticker,href:`/stocks/${ticker}`},{label:"Volatility"}]} actions={[{label:"OBX Dashboard",href:"/volatility/obx"}]} />
         </div>
 
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>

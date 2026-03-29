@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import PageNav from "@/components/ui/PageNav";
 import CorrelationHeatmap from "@/components/CorrelationHeatmap";
 import RollingCorrelationChart from "@/components/RollingCorrelationChart";
 
@@ -388,9 +389,7 @@ export default function CorrelationPage() {
       <div style={{ maxWidth: 1400, margin: "0 auto" }}>
 
         {/* Header */}
-        <Link href="/" style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", textDecoration: "none", fontFamily: "monospace" }}>
-          ← HOME
-        </Link>
+        <PageNav crumbs={[{ label: "Home", href: "/" }, { label: "Correlation" }]} actions={[{ label: "Stocks", href: "/stocks" }]} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 12, marginTop: 4 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, fontFamily: "monospace", letterSpacing: "-0.02em" }}>

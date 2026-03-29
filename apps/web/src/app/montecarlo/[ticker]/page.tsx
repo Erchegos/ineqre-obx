@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import PageNav from "@/components/ui/PageNav";
 import MonteCarloChart from "@/components/MonteCarloChart";
 import {
   generateMonteCarloSimulation,
@@ -171,36 +172,12 @@ export default function MonteCarloPage() {
 
   return (
     <main style={{ padding: 24, maxWidth: 1400, margin: "0 auto" }}>
+      <PageNav crumbs={[{label:"Home",href:"/"},{label:"Stocks",href:"/stocks"},{label:ticker||"?",href:`/stocks/${ticker}`},{label:"Monte Carlo"}]} />
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
-        <h1 style={{ fontSize: 32, fontWeight: 600, margin: 0, letterSpacing: "-0.02em", color: "#fff" }}>
-          {ticker || "?"} - Monte Carlo Simulation
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: "-0.02em", color: "#fff", fontFamily: "monospace" }}>
+          {ticker || "?"} — Monte Carlo Simulation
         </h1>
-        <Link
-          href={`/stocks/${ticker}`}
-          style={{
-            display: "inline-block",
-            color: "#fff",
-            textDecoration: "none",
-            fontSize: 14,
-            fontWeight: 600,
-            padding: "8px 16px",
-            border: "1px solid #30363d",
-            borderRadius: 2,
-            background: "rgba(255,255,255,0.02)",
-            transition: "all 0.15s ease"
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = "#fff";
-            e.currentTarget.style.background = "rgba(59,130,246,0.08)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = "#30363d";
-            e.currentTarget.style.background = "rgba(255,255,255,0.02)";
-          }}
-        >
-          {ticker} Analysis
-        </Link>
         <button
           onClick={() => setShowInfo(!showInfo)}
           title="About this simulation"

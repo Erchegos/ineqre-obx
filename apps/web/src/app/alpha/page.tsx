@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
+import PageNav from "@/components/ui/PageNav";
 import { useAuth } from "@/lib/useAuth";
 import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -946,7 +947,7 @@ export default function AlphaPage() {
           </button>
           {authError && <div style={{ color: "#ef4444", fontSize: 11, marginTop: 12, fontFamily: "monospace", textAlign: "center" }}>{authError}</div>}
           <div style={{ textAlign: "center", marginTop: 20 }}>
-            <Link href="/" style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", textDecoration: "none", fontFamily: "monospace" }}>← Back to Home</Link>
+            <Link href="/" style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", textDecoration: "none", fontFamily: "monospace" }}>Home</Link>
           </div>
         </form>
       </main>
@@ -1018,11 +1019,11 @@ export default function AlphaPage() {
         </>
       )}
 
+      <PageNav crumbs={[{label:"Home",href:"/"},{label:"Alpha Engine"}]} actions={[{label:"Stocks",href:"/stocks"}]} />
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div>
-          <Link href="/" style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", textDecoration: "none", fontFamily: "monospace" }}>← Home</Link>
-          <h1 style={{ fontSize: 22, fontWeight: 700, margin: "4px 0 0", fontFamily: "monospace", letterSpacing: "-0.02em" }}>
+          <h1 style={{ fontSize: 22, fontWeight: 700, margin: "0", fontFamily: "monospace", letterSpacing: "-0.02em" }}>
             Alpha Engine <span style={{ color: "#3b82f6", fontSize: 14, fontWeight: 800, letterSpacing: "0.08em" }}>CROSS-SECTIONAL</span>
           </h1>
           <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", fontFamily: "monospace", marginTop: 2 }}>

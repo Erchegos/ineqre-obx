@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import PageNav from "@/components/ui/PageNav";
 
 interface OptionsStock {
   ticker: string;
@@ -89,19 +90,10 @@ export default function OptionsOverviewPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "monospace" }}>
-      <header style={{ borderBottom: "1px solid #30363d", padding: "10px 16px", background: "#161b22" }}>
+      <PageNav crumbs={[{label:"Home",href:"/"},{label:"Stocks",href:"/stocks"},{label:"Options"}]} />
+      <header style={{ padding: "0 16px 10px", background: "transparent" }}>
         <div style={{ maxWidth: 1400, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <Link href="/stocks" style={{ color: "rgba(255,255,255,0.35)", textDecoration: "none", fontSize: 16, lineHeight: 1, padding: "6px 10px", border: "1px solid #30363d", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center" }} title="Back to Assets">
-              &larr;
-            </Link>
-            <div>
-              <Link href="/stocks" style={{ color: "rgba(255,255,255,0.35)", fontSize: 10, textDecoration: "none", fontFamily: "monospace", letterSpacing: "0.05em" }}>
-                ASSET LIST
-              </Link>
-              <h1 style={{ fontSize: 16, fontWeight: 800, marginTop: 2, fontFamily: "monospace", letterSpacing: "0.02em" }}>OPTIONS ANALYSIS</h1>
-            </div>
-          </div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, fontFamily: "monospace" }}>Options Analysis</h1>
           <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>
             {stocks.length > 0 && (
               <>

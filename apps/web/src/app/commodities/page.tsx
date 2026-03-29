@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
+import PageNav from "@/components/ui/PageNav";
 import {
   Treemap, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid,
   ResponsiveContainer, Cell, Tooltip, RadarChart, Radar,
@@ -748,9 +749,7 @@ export default function CommoditiesPage() {
       <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#e6edf3", fontFamily: "monospace" }}>
         {/* Header */}
         <div style={{ borderBottom: "1px solid #21262d", padding: "12px 24px", display: "flex", alignItems: "center", gap: 16, background: "#0d1117" }}>
-          <Link href="/" style={{ color: "rgba(255,255,255,0.5)", textDecoration: "none", fontSize: 12, transition: "color 0.2s" }}>
-            ← Home
-          </Link>
+          <PageNav crumbs={[{ label: "Home", href: "/" }, { label: "Commodities" }]} />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 16, fontWeight: 700 }}>COMMODITY & SECTOR TERMINAL</div>
             <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>

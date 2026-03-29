@@ -6,9 +6,9 @@
  * Designed for all users, not just professionals. Every number has context.
  */
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import PageNav from "@/components/ui/PageNav";
 import ConstituentHeatmap from "@/components/ConstituentHeatmap";
 import VolConeChart from "@/components/VolConeChart";
 import RegimeTimeline from "@/components/RegimeTimeline";
@@ -152,44 +152,33 @@ export default function OBXVolatilityDashboard() {
     <main style={{ padding: "20px 24px", maxWidth: 1400, margin: "0 auto", fontFamily: "monospace" }}>
 
       {/* ── HEADER ── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Link href="/stocks" style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.5)", textDecoration: "none" }}>
-            ← Asset List
-          </Link>
-          <span style={{ color: "#30363d" }}>|</span>
-          <div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <span style={{ fontSize: 20, fontWeight: 700, color: "#fff" }}>OBX</span>
-              <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>Oslo Bors — Market Volatility Dashboard</span>
-            </div>
-            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginTop: 2 }}>
-              Volatility = how much prices are swinging day to day. Higher = more uncertainty.
-            </div>
-          </div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
+        <PageNav crumbs={[{ label: "Home", href: "/" }, { label: "Stocks", href: "/stocks" }, { label: "OBX Volatility" }]} actions={[{ label: "Stocks", href: "/stocks" }]} />
+        <div style={{ display: "flex", gap: 2 }}>
+          {[{ l: "6M", v: 126 }, { l: "1Y", v: 252 }, { l: "2Y", v: 504 }, { l: "5Y", v: 1260 }].map((tf) => {
+            const isActive = limit === tf.v;
+            return (
+              <button
+                key={tf.v}
+                onClick={() => setLimit(tf.v)}
+                style={{
+                  padding: "4px 10px", borderRadius: 3, fontSize: 11, fontWeight: 600,
+                  border: `1px solid ${isActive ? "#3b82f6" : "#30363d"}`,
+                  background: isActive ? "#3b82f6" : "transparent",
+                  color: isActive ? "#fff" : "rgba(255,255,255,0.5)",
+                  cursor: "pointer",
+                }}
+              >
+                {tf.l}
+              </button>
+            );
+          })}
         </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>History shown</div>
-          <div style={{ display: "flex", gap: 2 }}>
-            {[{ l: "6M", v: 126 }, { l: "1Y", v: 252 }, { l: "2Y", v: 504 }, { l: "5Y", v: 1260 }].map((tf) => {
-              const isActive = limit === tf.v;
-              return (
-                <button
-                  key={tf.v}
-                  onClick={() => setLimit(tf.v)}
-                  style={{
-                    padding: "4px 10px", borderRadius: 3, fontSize: 11, fontWeight: 600,
-                    border: `1px solid ${isActive ? "#3b82f6" : "#30363d"}`,
-                    background: isActive ? "#3b82f6" : "transparent",
-                    color: isActive ? "#fff" : "rgba(255,255,255,0.5)",
-                    cursor: "pointer",
-                  }}
-                >
-                  {tf.l}
-                </button>
-              );
-            })}
-          </div>
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: "#fff", margin: 0 }}>OBX Market Volatility</h1>
+        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginTop: 3 }}>
+          Volatility = how much prices are swinging day to day. Higher = more uncertainty.
         </div>
       </div>
 
