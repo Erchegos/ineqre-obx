@@ -3,8 +3,6 @@ import StocksContent from "./StocksContent";
 
 export const dynamic = "force-dynamic";
 
-// Pre-fetch equity stocks on the server so the list renders on first paint
-// instead of waiting for JS hydration → client fetch → re-render.
 async function getEquityStocks() {
   try {
     const result = await pool.query(
@@ -87,7 +85,61 @@ async function getEquityStocks() {
   }
 }
 
+async function getFactorTickers(): Promise<string[]> {
+  try {
+    const result = await pool.query<{ ticker: string }>(`
+      SELECT ft_agg.ticker
+      FROM (
+        SELECT ticker FROM factor_technical GROUP BY ticker HAVING COUNT(*) >= 100
+      ) ft_agg
+      INNER JOIN LATERAL (
+        SELECT 1 FROM factor_technical ft2
+        WHERE ft2.ticker = ft_agg.ticker
+          AND ft2.beta IS NOT NULL AND ft2.ivol IS NOT NULL
+        ORDER BY ft2.date DESC LIMIT 1
+      ) beta_check ON true
+      INNER JOIN LATERAL (
+        SELECT 1 FROM factor_fundamentals ff
+        WHERE ff.ticker = ft_agg.ticker
+          AND ff.bm IS NOT NULL AND ff.mktcap IS NOT NULL AND ff.nokvol IS NOT NULL
+        ORDER BY ff.date DESC LIMIT 1
+      ) fund_check ON true
+      ORDER BY ft_agg.ticker
+    `);
+    return result.rows.map((r) => r.ticker);
+  } catch {
+    return [];
+  }
+}
+
+async function getBacktestTickers(): Promise<string[]> {
+  try {
+    const result = await pool.query<{ ticker: string }>(`
+      SELECT DISTINCT bp.ticker
+      FROM backtest_predictions bp
+      WHERE bp.backtest_run_id = (
+        SELECT id FROM backtest_runs ORDER BY created_at DESC LIMIT 1
+      )
+      ORDER BY bp.ticker
+    `);
+    return result.rows.map((r) => r.ticker);
+  } catch {
+    return [];
+  }
+}
+
 export default async function StocksPage() {
-  const initialStocks = await getEquityStocks();
-  return <StocksContent initialStocks={initialStocks} />;
+  const [initialStocks, initialFactorTickers, initialBacktestTickers] = await Promise.all([
+    getEquityStocks(),
+    getFactorTickers(),
+    getBacktestTickers(),
+  ]);
+
+  return (
+    <StocksContent
+      initialStocks={initialStocks}
+      initialFactorTickers={initialFactorTickers}
+      initialBacktestTickers={initialBacktestTickers}
+    />
+  );
 }

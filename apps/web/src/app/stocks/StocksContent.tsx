@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { calculateDataQualityMetrics, type DataTier } from "@/lib/dataQuality";
 
-type AssetType = 'equity' | 'index' | 'commodity_etf' | 'index_etf';
+type AssetType = "equity" | "index" | "commodity_etf" | "index_etf";
 
 type StockData = {
   ticker: string;
@@ -18,22 +19,13 @@ type StockData = {
   end_date: string;
   rows: number;
   mktcap: number | null;
-  // Data quality metrics
   expectedDays: number;
   completenessPct: number;
   dataTier: DataTier;
   dualPair?: string;
 };
 
-const ASSET_TYPE_LABELS: Record<AssetType, string> = {
-  equity: 'Equities',
-  index: 'Indexes',
-  commodity_etf: 'Commodity ETFs',
-  index_etf: 'Index ETFs',
-};
-
-// Raw shape from /api/stocks (before client-side quality metrics are applied)
-type RawApiStock = Omit<StockData, 'expectedDays' | 'completenessPct' | 'dataTier' | 'dualPair'>;
+type RawApiStock = Omit<StockData, "expectedDays" | "completenessPct" | "dataTier" | "dualPair">;
 
 function enrichRaw(raw: RawApiStock[]): StockData[] {
   return raw.map((stock) => {
@@ -43,575 +35,342 @@ function enrichRaw(raw: RawApiStock[]): StockData[] {
       stock.rows,
       stock.ticker
     );
-    return { ...stock, expectedDays: metrics.expectedDays, completenessPct: metrics.completenessPct, dataTier: metrics.dataTier, dualPair: metrics.dualPair };
+    return { ...stock, ...metrics };
   });
 }
 
-export default function StocksContent({ initialStocks }: { initialStocks?: RawApiStock[] }) {
+const ASSET_TYPE_LABELS: Record<AssetType, string> = {
+  equity: "Equities",
+  index: "Indexes",
+  commodity_etf: "Commodity ETFs",
+  index_etf: "Index ETFs",
+};
+
+const SECTOR_COLORS: Record<string, string> = {
+  Energy: "#f97316",
+  "Oil & Gas": "#f97316",
+  Seafood: "#10b981",
+  Aquaculture: "#10b981",
+  Shipping: "#38bdf8",
+  Financials: "#6366f1",
+  Finance: "#6366f1",
+  Banking: "#6366f1",
+  Materials: "#fbbf24",
+  "Real Estate": "#a78bfa",
+  Technology: "#60a5fa",
+  "Technology & IT": "#60a5fa",
+  Consumer: "#ec4899",
+  "Consumer Discretionary": "#ec4899",
+  "Consumer Staples": "#f472b6",
+  Healthcare: "#34d399",
+  Industrials: "#94a3b8",
+  Utilities: "#fb7185",
+  Telecom: "#e879f9",
+  Communication: "#e879f9",
+  Offshore: "#fb923c",
+  "Oil Services": "#fb923c",
+};
+
+function getSectorColor(sector: string | null): string {
+  if (!sector) return "rgba(255,255,255,0.25)";
+  if (SECTOR_COLORS[sector]) return SECTOR_COLORS[sector];
+  for (const [key, color] of Object.entries(SECTOR_COLORS)) {
+    if (
+      sector.toLowerCase().includes(key.toLowerCase()) ||
+      key.toLowerCase().includes(sector.toLowerCase())
+    ) return color;
+  }
+  return "#64748b";
+}
+
+function formatMktCap(mktcap: number | null): string {
+  if (mktcap == null) return "—";
+  if (mktcap >= 1e12) return `${(mktcap / 1e12).toFixed(1)}T`;
+  if (mktcap >= 1e9) return `${(mktcap / 1e9).toFixed(1)}B`;
+  if (mktcap >= 1e6) return `${(mktcap / 1e6).toFixed(0)}M`;
+  return `${(mktcap / 1e3).toFixed(0)}K`;
+}
+
+const CSS = `
+  .uni-table { width: 100%; border-collapse: collapse; }
+  .uni-table tbody tr {
+    transition: background 0.12s;
+    cursor: pointer;
+    border-bottom: 1px solid #1e2530;
+  }
+  .uni-table tbody tr:hover { background: rgba(59,130,246,0.07) !important; }
+  .uni-table tbody tr:hover .row-ticker { color: #60a5fa !important; }
+  .th-btn {
+    background: none; border: none; color: rgba(255,255,255,0.45);
+    cursor: pointer; font-family: monospace; font-size: 9px; font-weight: 700;
+    letter-spacing: 0.09em; text-transform: uppercase; display: inline-flex;
+    align-items: center; gap: 5px; padding: 0; white-space: nowrap;
+  }
+  .th-btn:hover { color: rgba(255,255,255,0.85); }
+  .badge-link {
+    text-decoration: none; display: inline-flex; align-items: center;
+    transition: opacity 0.15s;
+  }
+  .badge-link:hover { opacity: 0.65; }
+  .filter-pill {
+    cursor: pointer; transition: all 0.15s ease; border: none;
+    background: none; font-family: monospace;
+  }
+  .type-btn {
+    cursor: pointer; border-radius: 5px; border: 1px solid #30363d;
+    background: #161b22; color: rgba(255,255,255,0.55); font-family: monospace;
+    font-size: 10px; font-weight: 600; transition: all 0.15s; white-space: nowrap;
+    letter-spacing: 0.05em; padding: 6px 12px;
+  }
+  .type-btn.active { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+  .type-btn:hover:not(.active) { border-color: #3b82f6; color: #fff; background: rgba(59,130,246,0.1); }
+  .search-inp {
+    width: 100%; padding: 10px 14px; font-size: 13px; background: #161b22;
+    border: 1px solid #30363d; border-radius: 6px; color: #fff; outline: none;
+    font-family: monospace; transition: border-color 0.2s; box-sizing: border-box;
+  }
+  .search-inp:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+  .search-inp::placeholder { color: rgba(255,255,255,0.25); }
+  .sector-chip {
+    cursor: pointer; transition: all 0.15s; font-family: monospace;
+    font-size: 10px; font-weight: 600; border-radius: 4px; padding: 4px 9px;
+  }
+  .nav-link {
+    color: rgba(255,255,255,0.55); text-decoration: none; font-size: 10px;
+    font-weight: 600; padding: 6px 12px; border: 1px solid #30363d;
+    border-radius: 5px; background: #161b22; font-family: monospace;
+    letter-spacing: 0.06em; transition: all 0.15s; display: inline-block;
+  }
+  .nav-link:hover { border-color: #3b82f6; color: #3b82f6; }
+  .skeleton { background: linear-gradient(90deg, #1e2530 25%, #252d3a 50%, #1e2530 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 3px; }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+`;
+
+export default function StocksContent({
+  initialStocks,
+  initialFactorTickers,
+  initialBacktestTickers,
+}: {
+  initialStocks?: RawApiStock[];
+  initialFactorTickers?: string[];
+  initialBacktestTickers?: string[];
+}) {
+  const router = useRouter();
+
   const [stocks, setStocks] = useState<StockData[]>(() =>
     initialStocks ? enrichRaw(initialStocks) : []
   );
-  const [loading, setLoading] = useState(!initialStocks || initialStocks.length === 0);
+  const [loading, setLoading] = useState(!initialStocks?.length);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<keyof StockData>("rows");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc"); // Default: most data (biggest companies) first
-  const [selectedAssetTypes, setSelectedAssetTypes] = useState<Set<AssetType>>(
-    new Set(['equity']) // Default to equities only
-  );
-  const [selectedSectors, setSelectedSectors] = useState<Set<string>>(new Set());
-  const [selectedTiers, setSelectedTiers] = useState<Set<string>>(new Set(['A', 'B']));
-  const [tagFilter, setTagFilter] = useState<string | null>(null);
-  const [tickersWithFactors, setTickersWithFactors] = useState<Set<string>>(new Set());
-  const [tickersWithOptimizer, setTickersWithOptimizer] = useState<Set<string>>(new Set());
-  const [tickersWithBacktest, setTickersWithBacktest] = useState<Set<string>>(new Set());
-  const [tickersWithOptions, setTickersWithOptions] = useState<Set<string>>(new Set());
-  const [tickersWithExcel, setTickersWithExcel] = useState<Set<string>>(new Set());
 
-  const fetchStocks = useCallback(async (assetTypes: Set<AssetType>) => {
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<keyof StockData>("mktcap");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [selectedTypes, setSelectedTypes] = useState<Set<AssetType>>(new Set(["equity"]));
+  const [selectedSectors, setSelectedSectors] = useState<Set<string>>(new Set());
+  const [featureFilter, setFeatureFilter] = useState<string | null>(null);
+
+  // Tag data — seeded from SSR for the two most-visible badges
+  const [factorTickers, setFactorTickers] = useState<Set<string>>(
+    () => new Set(initialFactorTickers ?? [])
+  );
+  const [backtestTickers, setBacktestTickers] = useState<Set<string>>(
+    () => new Set(initialBacktestTickers ?? [])
+  );
+  const [optionsTickers, setOptionsTickers] = useState<Set<string>>(new Set());
+  const [valuationTickers, setValuationTickers] = useState<Set<string>>(new Set());
+
+  const fetchStocks = useCallback(async (types: Set<AssetType>) => {
     setLoading(true);
     try {
-      const typesParam = Array.from(assetTypes).join(',');
-      const res = await fetch(`/api/stocks?assetTypes=${typesParam}`, {
-        method: "GET",
-        headers: { accept: "application/json" },
-      });
-
-      if (!res.ok) {
-        throw new Error(`Failed to fetch stocks: ${res.statusText}`);
-      }
-
+      const typesParam = Array.from(types).join(",");
+      const res = await fetch(`/api/stocks?assetTypes=${typesParam}`);
+      if (!res.ok) throw new Error(res.statusText);
       const data = await res.json();
-
-      // Calculate data quality metrics for each stock
-      const enrichedData = data.map((stock: any) => {
-        const metrics = calculateDataQualityMetrics(
-          stock.start_date,
-          stock.end_date,
-          stock.rows,
-          stock.ticker
-        );
-
-        return {
-          ...stock,
-          mktcap: stock.mktcap ?? null,
-          expectedDays: metrics.expectedDays,
-          completenessPct: metrics.completenessPct,
-          dataTier: metrics.dataTier,
-          dualPair: metrics.dualPair,
-        };
-      });
-
-      setStocks(enrichedData);
-      setLoading(false);
+      setStocks(enrichRaw(data));
     } catch (e: any) {
       setError(e?.message ?? String(e));
+    } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    // Skip the initial equity fetch when SSR already provided the data
-    const isDefaultEquities = selectedAssetTypes.size === 1 && selectedAssetTypes.has('equity');
+    const isDefaultEquities = selectedTypes.size === 1 && selectedTypes.has("equity");
     if (initialStocks && isDefaultEquities) return;
-    fetchStocks(selectedAssetTypes);
-  }, [selectedAssetTypes, fetchStocks, initialStocks]);
+    fetchStocks(selectedTypes);
+  }, [selectedTypes, fetchStocks, initialStocks]);
 
-  // Fetch tag data immediately on mount — runs in parallel with stocks fetch
+  // Client-side: only fetch options + valuation (factors/backtest come from SSR)
   useEffect(() => {
-    async function fetchTagData() {
-      try {
-        const [factorRes, optimizerRes, optionsRes, backtestRes, excelRes, editsRes] = await Promise.all([
-          fetch("/api/factors/tickers", { headers: { accept: "application/json" } }),
-          fetch("/api/optimizer-config/tickers", { headers: { accept: "application/json" } }),
-          fetch("/api/options", { headers: { accept: "application/json" } }),
-          fetch("/api/backtest/tickers", { headers: { accept: "application/json" } }),
-          fetch("/api/valuation/excel?list=true", { headers: { accept: "application/json" } }),
-          fetch("/api/valuation/excel/edits?list=true", { headers: { accept: "application/json" } }).catch(() => null),
-        ]);
-
-        if (factorRes.ok) {
-          const data = await factorRes.json();
-          if (data.success && data.tickers) setTickersWithFactors(new Set(data.tickers));
-        }
-        if (optimizerRes.ok) {
-          const data = await optimizerRes.json();
-          if (data.success && data.tickers) setTickersWithOptimizer(new Set(data.tickers));
-        }
-        if (optionsRes.ok) {
-          const data = await optionsRes.json();
-          if (data.stocks) setTickersWithOptions(new Set(data.stocks.map((s: { ticker: string }) => s.ticker)));
-        }
-        if (backtestRes.ok) {
-          const data = await backtestRes.json();
-          if (data.success && data.tickers) setTickersWithBacktest(new Set(data.tickers));
-        }
-
-        // Combine Excel files (local) + spreadsheet_edits (DB) for XLS tag
-        const xlsTickers = new Set<string>();
-        if (excelRes.ok) {
-          const data = await excelRes.json();
-          if (data.success && data.tickers) data.tickers.forEach((t: string) => xlsTickers.add(t));
-        }
-        if (editsRes && editsRes.ok) {
-          try {
-            const data = await editsRes.json();
-            if (data.success && data.tickers) data.tickers.forEach((t: string) => xlsTickers.add(t));
-          } catch { /* non-fatal */ }
-        }
-        if (xlsTickers.size > 0) setTickersWithExcel(xlsTickers);
-      } catch (e) {
-        // Silently skip on error
+    const fetchRemainingTags = async () => {
+      const [optionsRes, excelRes, editsRes] = await Promise.all([
+        fetch("/api/options").catch(() => null),
+        fetch("/api/valuation/excel?list=true").catch(() => null),
+        fetch("/api/valuation/excel/edits?list=true").catch(() => null),
+      ]);
+      if (optionsRes?.ok) {
+        const d = await optionsRes.json().catch(() => ({}));
+        if (d.stocks) setOptionsTickers(new Set(d.stocks.map((s: { ticker: string }) => s.ticker)));
       }
+      const xlsTickers = new Set<string>();
+      if (excelRes?.ok) {
+        const d = await excelRes.json().catch(() => ({}));
+        if (d.tickers) d.tickers.forEach((t: string) => xlsTickers.add(t));
+      }
+      if (editsRes?.ok) {
+        const d = await editsRes.json().catch(() => ({}));
+        if (d?.tickers) d.tickers.forEach((t: string) => xlsTickers.add(t));
+      }
+      if (xlsTickers.size > 0) setValuationTickers(xlsTickers);
     }
-
-    fetchTagData();
+    fetchRemainingTags();
   }, []);
 
-  const toggleAssetType = (type: AssetType) => {
-    setSelectedAssetTypes(prev => {
-      const next = new Set(prev);
-      if (next.has(type)) {
-        // Don't allow deselecting all types
-        if (next.size > 1) {
-          next.delete(type);
-        }
-      } else {
-        next.add(type);
-      }
-      return next;
-    });
-  };
+  const hasOptions = useCallback(
+    (ticker: string) => {
+      if (ticker.endsWith(".US")) return optionsTickers.has(ticker.replace(".US", ""));
+      return false;
+    },
+    [optionsTickers]
+  );
 
-  // Check if stock has options — only US-listed tickers (e.g. EQNR.US matches EQNR in options API)
-  const hasOptions = useCallback((ticker: string) => {
-    if (ticker.endsWith('.US')) return tickersWithOptions.has(ticker.replace('.US', ''));
-    return false;
-  }, [tickersWithOptions]);
-
-  // Get unique sectors from stocks
   const availableSectors = useMemo(() => {
     const sectors = new Set<string>();
-    stocks.forEach(stock => {
-      if (stock.sector) sectors.add(stock.sector);
-    });
+    stocks.forEach((s) => { if (s.sector) sectors.add(s.sector); });
     return Array.from(sectors).sort();
   }, [stocks]);
 
-  const filteredAndSortedStocks = useMemo(() => {
-    let filtered = stocks;
+  const filteredAndSorted = useMemo(() => {
+    // Hide F-tier (insufficient data) by default
+    let filtered = stocks.filter((s) => s.dataTier !== "F");
 
-    // Filter by tier toggles
-    if (selectedTiers.size > 0) {
-      filtered = filtered.filter(stock => selectedTiers.has(stock.dataTier));
-    }
+    if (featureFilter === "predictions")
+      filtered = filtered.filter((s) => factorTickers.has(s.ticker));
+    else if (featureFilter === "options")
+      filtered = filtered.filter((s) => hasOptions(s.ticker));
+    else if (featureFilter === "backtest")
+      filtered = filtered.filter((s) => backtestTickers.has(s.ticker));
+    else if (featureFilter === "valuation")
+      filtered = filtered.filter((s) => valuationTickers.has(s.ticker));
 
-    // Filter by tag
-    if (tagFilter === 'ml') {
-      filtered = filtered.filter(stock => tickersWithFactors.has(stock.ticker));
-    } else if (tagFilter === 'bt') {
-      filtered = filtered.filter(stock => tickersWithBacktest.has(stock.ticker));
-    } else if (tagFilter === 'options') {
-      filtered = filtered.filter(stock => hasOptions(stock.ticker));
-    } else if (tagFilter === 'xls') {
-      filtered = filtered.filter(stock => tickersWithExcel.has(stock.ticker));
-    }
+    if (selectedSectors.size > 0)
+      filtered = filtered.filter((s) => s.sector && selectedSectors.has(s.sector));
 
-    // Filter by sector
-    if (selectedSectors.size > 0) {
-      filtered = filtered.filter(stock =>
-        stock.sector && selectedSectors.has(stock.sector)
-      );
-    }
-
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
+    if (search.trim()) {
+      const q = search.toLowerCase();
       filtered = filtered.filter(
-        (stock) =>
-          stock.ticker.toLowerCase().includes(query) ||
-          stock.name.toLowerCase().includes(query)
+        (s) => s.ticker.toLowerCase().includes(q) || s.name.toLowerCase().includes(q)
       );
     }
 
-    // Sort
-    const sorted = [...filtered].sort((a, b) => {
-      let aVal: any = a[sortBy];
-      let bVal: any = b[sortBy];
-
-      // Handle nulls — push them to the end regardless of sort direction
-      if (aVal == null && bVal == null) return 0;
-      if (aVal == null) return 1;
-      if (bVal == null) return -1;
-
-      if (typeof aVal === "string") {
-        aVal = aVal.toLowerCase();
-        bVal = (bVal as string).toLowerCase();
-      }
-
-      if (sortOrder === "asc") {
-        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-      } else {
-        return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
-      }
+    return [...filtered].sort((a, b) => {
+      let av: any = a[sortBy];
+      let bv: any = b[sortBy];
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (typeof av === "string") { av = av.toLowerCase(); bv = (bv as string).toLowerCase(); }
+      return sortOrder === "asc"
+        ? av > bv ? 1 : av < bv ? -1 : 0
+        : av < bv ? 1 : av > bv ? -1 : 0;
     });
+  }, [
+    stocks, featureFilter, selectedSectors, search, sortBy, sortOrder,
+    factorTickers, backtestTickers, valuationTickers, hasOptions,
+  ]);
 
-    return sorted;
-  }, [stocks, searchQuery, sortBy, sortOrder, selectedSectors, selectedTiers, tagFilter, tickersWithFactors, tickersWithBacktest, tickersWithExcel, hasOptions]);
-
-  // Calculate tier counts and ML predictions count for summary panel
-  const tierCounts = useMemo(() => {
-    const counts = { A: 0, B: 0, C: 0, F: 0 };
-    stocks.forEach(stock => {
-      counts[stock.dataTier]++;
-    });
-    return counts;
-  }, [stocks]);
-
-  const mlCount = useMemo(() => {
-    return tickersWithFactors.size;
-  }, [tickersWithFactors]);
-
-  const optCount = useMemo(() => {
-    return tickersWithOptimizer.size;
-  }, [tickersWithOptimizer]);
-
-  const btCount = useMemo(() => {
-    return tickersWithBacktest.size;
-  }, [tickersWithBacktest]);
-
-  const optionsCount = useMemo(() => {
-    return stocks.filter(s => hasOptions(s.ticker)).length;
-  }, [stocks, hasOptions]);
-
-  const toggleSort = (column: keyof StockData) => {
-    if (sortBy === column) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortBy(column);
-      setSortOrder("asc");
-    }
+  const toggleSort = (col: keyof StockData) => {
+    if (sortBy === col) setSortOrder((o) => (o === "asc" ? "desc" : "asc"));
+    else { setSortBy(col); setSortOrder("desc"); }
   };
 
-  const SortIcon = ({ column }: { column: keyof StockData }) => {
-    if (sortBy !== column) return <span style={{ opacity: 0.4 }}>↕</span>;
-    return sortOrder === "asc" ? <span>↑</span> : <span>↓</span>;
-  };
+  const SortArrow = ({ col }: { col: keyof StockData }) =>
+    sortBy !== col
+      ? <span style={{ opacity: 0.25 }}>↕</span>
+      : sortOrder === "asc"
+        ? <span style={{ color: "#3b82f6" }}>↑</span>
+        : <span style={{ color: "#3b82f6" }}>↓</span>;
 
-  const getTierColor = (tier: DataTier): string => {
-    switch (tier) {
-      case 'A': return '#10b981'; // Green
-      case 'B': return '#f59e0b'; // Amber
-      case 'C': return '#f97316'; // Orange
-      case 'F': return '#ef4444'; // Red
-      default: return 'rgba(255,255,255,0.5)';
-    }
-  };
-
-  if (loading) {
-    return (
-      <div style={{
-        minHeight: "100vh",
-        background: "#0a0a0a",
-        color: "#fff",
-        padding: 32,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center"
-      }}>
-        <div>Loading stocks...</div>
-      </div>
-    );
-  }
+  const optionsCount = useMemo(
+    () => stocks.filter((s) => hasOptions(s.ticker)).length,
+    [stocks, hasOptions]
+  );
 
   if (error) {
     return (
-      <div style={{
-        minHeight: "100vh",
-        background: "#0a0a0a",
-        color: "#fff",
-        padding: 32
-      }}>
-        <div style={{ maxWidth: 1600, margin: "0 auto" }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 16 }}>Error</h1>
-          <p style={{ color: "#ef4444" }}>{error}</p>
-        </div>
+      <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff", padding: 32 }}>
+        <p style={{ color: "#ef4444", fontFamily: "monospace", fontSize: 13 }}>{error}</p>
       </div>
     );
   }
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "#0a0a0a",
-      color: "#fff",
-      padding: 32
-    }}>
-      <style dangerouslySetInnerHTML={{ __html: `
-        .stock-table tbody tr {
-          border-bottom: 1px solid #30363d;
-          transition: background 0.15s;
-        }
-        .stock-table tbody tr:hover {
-          background: rgba(59,130,246,0.08) !important;
-        }
-        .search-input {
-          width: 100%;
-          padding: 12px 16px;
-          font-size: 14px;
-          border: 1px solid #30363d;
-          border-radius: 4px;
-          background: #161b22;
-          color: #fff;
-          outline: none;
-          transition: border-color 0.2s;
-        }
-        .search-input:focus {
-          border-color: #3b82f6;
-        }
-        .search-input::placeholder {
-          color: rgba(255,255,255,0.5);
-        }
-      `}} />
+    <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff", padding: "24px 28px" }}>
+      <style>{CSS}</style>
 
-      <div style={{ maxWidth: 1600, margin: "0 auto" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Assets</h1>
-            <Link
-              href="/"
-              style={{
-                display: "inline-block",
-                color: "#fff",
-                textDecoration: "none",
-                fontSize: 13,
-                fontWeight: 500,
-                padding: "8px 16px",
-                border: "1px solid #30363d",
-                borderRadius: 4,
-                background: "#161b22",
-                transition: "all 0.15s ease"
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = "#fff";
-                e.currentTarget.style.background = "rgba(59,130,246,0.08)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = "#30363d";
-                e.currentTarget.style.background = "#161b22";
-              }}
-            >
-              Home
-            </Link>
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <Link
-              href="/options"
-              style={{
-                color: "#fff",
-                textDecoration: "none",
-                fontSize: 13,
-                fontWeight: 500,
-                padding: "8px 16px",
-                border: "1px solid #30363d",
-                borderRadius: 4,
-                background: "#161b22",
-                transition: "all 0.15s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = "#fff";
-                e.currentTarget.style.background = "rgba(59,130,246,0.08)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = "#30363d";
-                e.currentTarget.style.background = "#161b22";
-              }}
-            >
-              Options
-            </Link>
-            <Link
-              href="/correlation"
-              style={{
-                color: "#3b82f6",
-                textDecoration: "none",
-                fontSize: 14,
-                fontWeight: 500,
-                padding: "8px 16px",
-                borderRadius: 4,
-                border: "1px solid #3b82f6",
-                transition: "all 0.15s",
-              }}
-            >
-              Correlation
-            </Link>
-            <Link
-              href="/valuation"
-              style={{
-                color: "#3b82f6",
-                textDecoration: "none",
-                fontSize: 14,
-                fontWeight: 500,
-                padding: "8px 16px",
-                borderRadius: 4,
-                border: "1px solid #3b82f6",
-                transition: "all 0.15s",
-              }}
-            >
-              Valuation
-            </Link>
-          </div>
-        </div>
-        <p style={{ color: "rgba(255,255,255,0.5)", marginBottom: 16, fontSize: 14 }}>
-          Universe: {stocks.length} assets | Tier A: {tierCounts.A} | Tier B: {tierCounts.B} | Tier C: {tierCounts.C} | <span style={{ color: '#10b981', fontWeight: 600 }}>ML: {mlCount}</span> | <span style={{ color: '#60a5fa', fontWeight: 600 }}>Backtested: {btCount}</span> | <span style={{ color: '#f59e0b', fontWeight: 600 }}>Options: {optionsCount}</span>
-          <span style={{ marginLeft: 16, fontSize: 13 }}>Source: Interactive Brokers</span>
-        </p>
+      <div style={{ maxWidth: 1400, margin: "0 auto" }}>
 
-        {/* Tier + Tag Filters */}
+        {/* ── HEADER ── */}
         <div style={{
-          display: "flex",
-          gap: 16,
-          marginBottom: 16,
-          flexWrap: "wrap",
-          alignItems: "center",
+          display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+          marginBottom: 22, gap: 16, flexWrap: "wrap",
         }}>
-          {/* Tier toggles — independent, multi-select */}
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em", textTransform: "uppercase", marginRight: 4 }}>Tier</span>
-            {(['A', 'B', 'C'] as const).map((tier) => {
-              const isSelected = selectedTiers.has(tier);
-              return (
-                <button
-                  key={tier}
-                  onClick={() => {
-                    setSelectedTiers(prev => {
-                      const next = new Set(prev);
-                      if (next.has(tier)) {
-                        next.delete(tier);
-                      } else {
-                        next.add(tier);
-                      }
-                      return next;
-                    });
-                  }}
-                  style={{
-                    padding: "6px 12px",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    border: isSelected ? `1px solid ${getTierColor(tier)}` : "1px solid #30363d",
-                    borderRadius: 4,
-                    background: isSelected ? `${getTierColor(tier)}18` : "#161b22",
-                    color: isSelected ? getTierColor(tier) : "rgba(255,255,255,0.5)",
-                    cursor: "pointer",
-                    transition: "all 0.15s ease",
-                  }}
-                >
-                  {tier}
-                </button>
-              );
-            })}
+          <div>
+            <h1 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 5px", letterSpacing: "-0.02em" }}>
+              OSE Universe
+            </h1>
+            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.38)", margin: 0, fontFamily: "monospace" }}>
+              {loading ? "Loading…" : `${stocks.filter(s => s.dataTier !== "F").length} companies`}
+              {factorTickers.size > 0 && (
+                <span style={{ color: "#10b981" }}>{" · "}{factorTickers.size} with ML predictions</span>
+              )}
+              {optionsCount > 0 && (
+                <span style={{ color: "#f59e0b" }}>{" · "}{optionsCount} with options</span>
+              )}
+              <span style={{ color: "rgba(255,255,255,0.2)" }}>{" · Oslo Stock Exchange"}</span>
+            </p>
           </div>
-
-          <span style={{ width: 1, height: 24, background: "#30363d" }} />
-
-          {/* Tag filters — single-select (or none) */}
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em", textTransform: "uppercase", marginRight: 4 }}>Tags</span>
+          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
             {[
-              { key: 'ml', label: 'ML', color: '#10b981' },
-              { key: 'bt', label: 'BT', color: '#60a5fa' },
-              { key: 'options', label: 'Options', color: '#fbbf24' },
-              { key: 'xls', label: 'XLS', color: '#4ade80' },
-            ].map((tag) => {
-              const isSelected = tagFilter === tag.key;
-              return (
-                <button
-                  key={tag.key}
-                  onClick={() => setTagFilter(isSelected ? null : tag.key)}
-                  style={{
-                    padding: "6px 12px",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    border: isSelected ? `1px solid ${tag.color}` : "1px solid #30363d",
-                    borderRadius: 4,
-                    background: isSelected ? `${tag.color}18` : "#161b22",
-                    color: isSelected ? tag.color : "rgba(255,255,255,0.5)",
-                    cursor: "pointer",
-                    transition: "all 0.15s ease",
-                  }}
-                >
-                  {tag.label}
-                </button>
-              );
-            })}
+              { href: "/options", label: "Options" },
+              { href: "/correlation", label: "Correlation" },
+              { href: "/valuation", label: "Valuation" },
+            ].map(({ href, label }) => (
+              <Link key={href} href={href} className="nav-link">{label} →</Link>
+            ))}
           </div>
         </div>
 
-        {/* Search Bar with Asset Type Filters */}
+        {/* ── FILTER ROW 1: Search + Asset Type ── */}
         <div style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          marginBottom: 24,
-          flexWrap: "wrap"
+          display: "flex", gap: 10, marginBottom: 10,
+          alignItems: "center", flexWrap: "wrap",
         }}>
           <div style={{ flex: 1, minWidth: 200 }}>
             <input
               type="text"
-              className="search-input"
-              placeholder="Search by ticker or name..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              className="search-inp"
+              placeholder="Search ticker or company…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-
-          {/* Asset Type Toggles */}
-          <div style={{
-            display: "flex",
-            gap: 6,
-            flexWrap: "wrap"
-          }}>
+          <div style={{ display: "flex", gap: 5, flexShrink: 0, flexWrap: "wrap" }}>
             {(Object.keys(ASSET_TYPE_LABELS) as AssetType[]).map((type) => {
-              const isSelected = selectedAssetTypes.has(type);
+              const isActive = selectedTypes.has(type);
               return (
                 <button
                   key={type}
-                  onClick={() => toggleAssetType(type)}
-                  style={{
-                    padding: "10px 14px",
-                    fontSize: 12,
-                    fontWeight: 500,
-                    border: isSelected ? "1px solid #3b82f6" : "1px solid #30363d",
-                    borderRadius: 4,
-                    background: isSelected ? "#3b82f6" : "#161b22",
-                    color: isSelected ? "#fff" : "#fff",
-                    cursor: "pointer",
-                    transition: "all 0.15s ease",
-                    whiteSpace: "nowrap",
-                    transform: "scale(1)",
-                    boxShadow: isSelected ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (isSelected) {
-                      e.currentTarget.style.filter = "brightness(0.9)";
-                    } else {
-                      e.currentTarget.style.borderColor = "#3b82f6";
-                      e.currentTarget.style.background = "rgba(59,130,246,0.08)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (isSelected) {
-                      e.currentTarget.style.filter = "brightness(1)";
-                    } else {
-                      e.currentTarget.style.borderColor = "#30363d";
-                      e.currentTarget.style.background = "#161b22";
-                    }
-                  }}
-                  onMouseDown={(e) => {
-                    e.currentTarget.style.transform = "scale(0.95)";
-                  }}
-                  onMouseUp={(e) => {
-                    e.currentTarget.style.transform = "scale(1)";
-                  }}
+                  className={`type-btn${isActive ? " active" : ""}`}
+                  onClick={() =>
+                    setSelectedTypes((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(type)) { if (next.size > 1) next.delete(type); }
+                      else next.add(type);
+                      return next;
+                    })
+                  }
                 >
                   {ASSET_TYPE_LABELS[type]}
                 </button>
@@ -620,561 +379,319 @@ export default function StocksContent({ initialStocks }: { initialStocks?: RawAp
           </div>
         </div>
 
-        {/* Sector Filters */}
-        {availableSectors.length > 0 && (
+        {/* ── FILTER ROW 2: Feature pills + Sector chips ── */}
+        <div style={{
+          display: "flex", gap: 8, marginBottom: 20,
+          alignItems: "center", flexWrap: "wrap",
+        }}>
+          {/* Feature quick-filter */}
+          {[
+            { key: null,          label: "All",         color: "#3b82f6" },
+            { key: "predictions", label: "Predictions", color: "#10b981" },
+            { key: "options",     label: "Options",     color: "#f59e0b" },
+            { key: "backtest",    label: "Backtest",    color: "#60a5fa" },
+            { key: "valuation",   label: "Valuation",   color: "#4ade80" },
+          ].map(({ key, label, color }) => {
+            const isActive = featureFilter === key;
+            return (
+              <button
+                key={String(key)}
+                className="filter-pill"
+                onClick={() => setFeatureFilter(key)}
+                style={{
+                  padding: "5px 11px",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  borderRadius: 4,
+                  border: isActive ? `1px solid ${color}` : "1px solid #30363d",
+                  background: isActive ? `${color}18` : "transparent",
+                  color: isActive ? color : "rgba(255,255,255,0.4)",
+                  letterSpacing: "0.07em",
+                  textTransform: "uppercase",
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+
+          {availableSectors.length > 0 && (
+            <span style={{ width: 1, height: 16, background: "#30363d", flexShrink: 0 }} />
+          )}
+
+          {/* Sector chips */}
+          {availableSectors.map((sector) => {
+            const isActive = selectedSectors.has(sector);
+            const color = getSectorColor(sector);
+            return (
+              <button
+                key={sector}
+                className="sector-chip"
+                onClick={() =>
+                  setSelectedSectors((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(sector)) next.delete(sector); else next.add(sector);
+                    return next;
+                  })
+                }
+                style={{
+                  border: isActive ? `1px solid ${color}` : "1px solid #30363d",
+                  background: isActive ? `${color}18` : "transparent",
+                  color: isActive ? color : "rgba(255,255,255,0.4)",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                {sector}
+              </button>
+            );
+          })}
+
+          {selectedSectors.size > 0 && (
+            <button
+              onClick={() => setSelectedSectors(new Set())}
+              style={{
+                padding: "4px 9px", fontSize: 10, fontWeight: 700,
+                borderRadius: 4, border: "1px solid #ef4444", background: "transparent",
+                color: "#ef4444", fontFamily: "monospace", cursor: "pointer",
+                letterSpacing: "0.06em",
+              }}
+            >
+              Clear ×
+            </button>
+          )}
+        </div>
+
+        {/* Result count */}
+        {(search || featureFilter || selectedSectors.size > 0) && !loading && (
           <div style={{
-            marginBottom: 24,
-            padding: 16,
-            background: "#161b22",
-            border: "1px solid #30363d",
-            borderRadius: 4,
+            fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 10,
+            fontFamily: "monospace", letterSpacing: "0.04em",
           }}>
-            <div style={{
-              fontSize: 12,
-              fontWeight: 600,
-              color: "rgba(255,255,255,0.5)",
-              marginBottom: 12,
-              textTransform: "uppercase",
-              letterSpacing: "0.05em"
-            }}>
-              Filter by Sector
-            </div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {availableSectors.map((sector) => {
-                const isSelected = selectedSectors.has(sector);
-                return (
-                  <button
-                    key={sector}
-                    onClick={() => {
-                      setSelectedSectors(prev => {
-                        const next = new Set(prev);
-                        if (next.has(sector)) {
-                          next.delete(sector);
-                        } else {
-                          next.add(sector);
-                        }
-                        return next;
-                      });
-                    }}
-                    style={{
-                      padding: "6px 12px",
-                      fontSize: 11.5,
-                      fontWeight: 500,
-                      border: isSelected ? "1px solid #3b82f6" : "1px solid #30363d",
-                      borderRadius: 3,
-                      background: isSelected ? "#3b82f6" : "transparent",
-                      color: isSelected ? "#fff" : "#fff",
-                      cursor: "pointer",
-                      transition: "all 0.15s ease",
-                      whiteSpace: "nowrap",
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.borderColor = "#3b82f6";
-                        e.currentTarget.style.background = "rgba(59,130,246,0.08)";
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.borderColor = "#30363d";
-                        e.currentTarget.style.background = "transparent";
-                      }
-                    }}
-                  >
-                    {sector}
-                  </button>
-                );
-              })}
-              {selectedSectors.size > 0 && (
-                <button
-                  onClick={() => setSelectedSectors(new Set())}
-                  style={{
-                    padding: "6px 12px",
-                    fontSize: 11.5,
-                    fontWeight: 500,
-                    border: "1px solid #ef4444",
-                    borderRadius: 3,
-                    background: "transparent",
-                    color: "#ef4444",
-                    cursor: "pointer",
-                    transition: "all 0.15s ease",
-                    whiteSpace: "nowrap",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#ef4444";
-                    e.currentTarget.style.color = "#fff";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.color = "#ef4444";
-                  }}
-                >
-                  Clear Filters
-                </button>
-              )}
-            </div>
+            {filteredAndSorted.length} result{filteredAndSorted.length !== 1 ? "s" : ""}
           </div>
         )}
 
-        {searchQuery && (
-          <div style={{ marginTop: -16, marginBottom: 16, fontSize: 13, color: "rgba(255,255,255,0.5)" }}>
-            Found {filteredAndSortedStocks.length} result{filteredAndSortedStocks.length !== 1 ? 's' : ''}
-          </div>
-        )}
-
-        <div style={{ width: "100%", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-          <table className="stock-table" style={{
-            width: "100%",
-            minWidth: 800,
-            borderCollapse: "collapse",
-            background: "#161b22",
-            border: "1px solid #30363d",
-            borderRadius: 4,
-          }}>
+        {/* ── TABLE ── */}
+        <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+          <table
+            className="uni-table"
+            style={{
+              background: "#161b22",
+              border: "1px solid #30363d",
+              borderRadius: 8,
+              overflow: "hidden",
+              minWidth: 640,
+            }}
+          >
             <thead>
-              <tr style={{ borderBottom: "1px solid #30363d" }}>
-                <th style={{ textAlign: "left", padding: "16px" }}>
-                  <button
-                    onClick={() => toggleSort("ticker")}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#fff",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      padding: 0,
-                    }}
-                  >
-                    Ticker <SortIcon column="ticker" />
+              <tr style={{ borderBottom: "2px solid #30363d", background: "#0d1117" }}>
+                <th style={{ textAlign: "left", padding: "11px 18px 11px 18px" }}>
+                  <button className="th-btn" onClick={() => toggleSort("ticker")}>
+                    Company <SortArrow col="ticker" />
                   </button>
                 </th>
-                <th style={{ textAlign: "left", padding: "12px 8px", fontSize: 13, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "#fff", minWidth: 140 }}>
-                  Tags
-                </th>
-                <th style={{ textAlign: "left", padding: "16px" }}>
-                  <button
-                    onClick={() => toggleSort("name")}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#fff",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      padding: 0,
-                    }}
-                  >
-                    Name <SortIcon column="name" />
+                <th style={{ textAlign: "left", padding: "11px 16px" }}>
+                  <button className="th-btn" onClick={() => toggleSort("sector")}>
+                    Sector <SortArrow col="sector" />
                   </button>
                 </th>
-                <th style={{ textAlign: "left", padding: "16px" }}>
-                  <button
-                    onClick={() => toggleSort("sector")}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#fff",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      padding: 0,
-                    }}
-                  >
-                    Sector <SortIcon column="sector" />
+                <th style={{ textAlign: "right", padding: "11px 16px" }}>
+                  <button className="th-btn" style={{ marginLeft: "auto" }} onClick={() => toggleSort("mktcap")}>
+                    Mkt Cap <SortArrow col="mktcap" />
                   </button>
                 </th>
-                <th style={{ textAlign: "right", padding: "16px" }}>
-                  <button
-                    onClick={() => toggleSort("mktcap")}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#fff",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "flex-end",
-                      gap: 8,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      padding: 0,
-                      marginLeft: "auto",
-                    }}
-                  >
-                    Mkt Cap <SortIcon column="mktcap" />
+                <th style={{ textAlign: "right", padding: "11px 16px" }}>
+                  <button className="th-btn" style={{ marginLeft: "auto" }} onClick={() => toggleSort("last_close")}>
+                    Last Close <SortArrow col="last_close" />
                   </button>
                 </th>
-                <th style={{ textAlign: "center", padding: "12px 8px" }}>
+                <th style={{ textAlign: "left", padding: "11px 18px", minWidth: 210 }}>
                   <span style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    color: "#fff",
+                    fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.35)",
+                    letterSpacing: "0.09em", textTransform: "uppercase",
                   }}>
-                    Ccy
+                    Features
                   </span>
-                </th>
-                <th style={{ textAlign: "right", padding: "16px" }}>
-                  <button
-                    onClick={() => toggleSort("last_close")}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#fff",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "flex-end",
-                      gap: 8,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      padding: 0,
-                      marginLeft: "auto",
-                    }}
-                  >
-                    Last Close <SortIcon column="last_close" />
-                  </button>
-                </th>
-                <th style={{ textAlign: "right", padding: "16px" }}>
-                  <button
-                    onClick={() => toggleSort("start_date")}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#fff",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "flex-end",
-                      gap: 8,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      padding: 0,
-                      marginLeft: "auto",
-                    }}
-                  >
-                    Start Date <SortIcon column="start_date" />
-                  </button>
-                </th>
-                <th style={{ textAlign: "right", padding: "16px" }}>
-                  <button
-                    onClick={() => toggleSort("end_date")}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#fff",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "flex-end",
-                      gap: 8,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      padding: 0,
-                      marginLeft: "auto",
-                    }}
-                  >
-                    End Date <SortIcon column="end_date" />
-                  </button>
-                </th>
-                <th style={{ textAlign: "right", padding: "16px" }}>
-                  <button
-                    onClick={() => toggleSort("rows")}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#fff",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "flex-end",
-                      gap: 8,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      padding: 0,
-                      marginLeft: "auto",
-                    }}
-                  >
-                    Rows <SortIcon column="rows" />
-                  </button>
-                </th>
-                <th style={{ textAlign: "right", padding: "16px" }}>
-                  <button
-                    onClick={() => toggleSort("expectedDays")}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#fff",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "flex-end",
-                      gap: 8,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      padding: 0,
-                      marginLeft: "auto",
-                    }}
-                  >
-                    Expected <SortIcon column="expectedDays" />
-                  </button>
-                </th>
-                <th style={{ textAlign: "right", padding: "16px" }}>
-                  <button
-                    onClick={() => toggleSort("completenessPct")}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#fff",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "flex-end",
-                      gap: 8,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      padding: 0,
-                      marginLeft: "auto",
-                    }}
-                  >
-                    Complete <SortIcon column="completenessPct" />
-                  </button>
-                </th>
-                <th style={{ textAlign: "center", padding: "16px" }}>
-                  <button
-                    onClick={() => toggleSort("dataTier")}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#fff",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 8,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      padding: 0,
-                      margin: "0 auto",
-                    }}
-                  >
-                    Tier <SortIcon column="dataTier" />
-                  </button>
                 </th>
               </tr>
             </thead>
             <tbody>
-              {filteredAndSortedStocks.map((stock) => (
-                <tr
-                  key={stock.ticker}
-                  onClick={() => window.location.href = `/stocks/${stock.ticker}`}
-                  style={{ cursor: "pointer" }}
-                >
-                  <td style={{ padding: "16px" }}>
-                    <span style={{
-                      color: "#3b82f6",
-                      fontWeight: 600,
-                      fontSize: 14,
-                    }}>
-                      {stock.ticker}
-                    </span>
-                  </td>
-                  <td style={{ padding: "8px 12px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
-                      {tickersWithFactors.has(stock.ticker) && (
-                        <span style={{
-                          fontSize: 9.5,
-                          fontWeight: 600,
-                          padding: "3px 8px",
-                          borderRadius: 10,
-                          background: "rgba(16, 185, 129, 0.12)",
-                          color: "#10b981",
-                          border: "1px solid rgba(16, 185, 129, 0.3)",
-                          fontFamily: "monospace",
-                          letterSpacing: "0.04em",
-                        }}>ML</span>
-                      )}
-                      {tickersWithBacktest.has(stock.ticker) && (
-                        <span style={{
-                          fontSize: 9.5,
-                          fontWeight: 600,
-                          padding: "3px 8px",
-                          borderRadius: 10,
-                          background: "rgba(59, 130, 246, 0.12)",
-                          color: "#60a5fa",
-                          border: "1px solid rgba(59, 130, 246, 0.3)",
-                          fontFamily: "monospace",
-                          letterSpacing: "0.04em",
-                        }}>BT</span>
-                      )}
-                      {tickersWithOptimizer.has(stock.ticker) && (
-                        <span style={{
-                          fontSize: 9.5,
-                          fontWeight: 600,
-                          padding: "3px 8px",
-                          borderRadius: 10,
-                          background: "rgba(139, 92, 246, 0.12)",
-                          color: "#a78bfa",
-                          border: "1px solid rgba(139, 92, 246, 0.3)",
-                          fontFamily: "monospace",
-                          letterSpacing: "0.04em",
-                        }}>OPT</span>
-                      )}
-                      {hasOptions(stock.ticker) && (
-                        <span style={{
-                          fontSize: 9.5,
-                          fontWeight: 600,
-                          padding: "3px 8px",
-                          borderRadius: 10,
-                          background: "rgba(245, 158, 11, 0.12)",
-                          color: "#fbbf24",
-                          border: "1px solid rgba(245, 158, 11, 0.3)",
-                          fontFamily: "monospace",
-                          letterSpacing: "0.04em",
-                        }}>OPTN</span>
-                      )}
-                      {tickersWithExcel.has(stock.ticker) && (
-                        <span style={{
-                          fontSize: 9.5,
-                          fontWeight: 600,
-                          padding: "3px 8px",
-                          borderRadius: 10,
-                          background: "rgba(34, 197, 94, 0.12)",
-                          color: "#4ade80",
-                          border: "1px solid rgba(34, 197, 94, 0.3)",
-                          fontFamily: "monospace",
-                          letterSpacing: "0.04em",
-                        }}>XLS</span>
-                      )}
-                      {selectedAssetTypes.size > 1 && stock.asset_type !== 'equity' && (
-                        <span style={{
-                          fontSize: 9.5,
-                          fontWeight: 600,
-                          padding: "3px 8px",
-                          borderRadius: 10,
-                          background: stock.asset_type === 'index' ? 'rgba(59, 130, 246, 0.12)' : stock.asset_type === 'commodity_etf' ? 'rgba(245, 158, 11, 0.12)' : stock.asset_type === 'index_etf' ? 'rgba(139, 92, 246, 0.12)' : 'rgba(156, 163, 175, 0.12)',
-                          color: stock.asset_type === 'index' ? '#60a5fa' : stock.asset_type === 'commodity_etf' ? '#fbbf24' : stock.asset_type === 'index_etf' ? '#a78bfa' : 'rgba(255,255,255,0.5)',
-                          border: `1px solid ${stock.asset_type === 'index' ? 'rgba(59, 130, 246, 0.3)' : stock.asset_type === 'commodity_etf' ? 'rgba(245, 158, 11, 0.3)' : stock.asset_type === 'index_etf' ? 'rgba(139, 92, 246, 0.3)' : 'rgba(156, 163, 175, 0.3)'}`,
-                          fontFamily: "monospace",
-                          letterSpacing: "0.04em",
-                          textTransform: "uppercase",
-                        }}>
-                          {stock.asset_type === 'index' ? 'IDX' : stock.asset_type === 'commodity_etf' ? 'C-ETF' : stock.asset_type === 'index_etf' ? 'I-ETF' : stock.asset_type}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td style={{ padding: "16px", color: "#fff", fontSize: 14 }}>
-                    {stock.name}
-                  </td>
-                  <td style={{ padding: "16px", color: "rgba(255,255,255,0.5)", fontSize: 13 }}>
-                    {stock.sector || '—'}
-                  </td>
-                  <td style={{ padding: "16px", textAlign: "right", fontFamily: "monospace", color: "#fff", fontSize: 13, fontWeight: 500 }}>
-                    {stock.mktcap != null
-                      ? stock.mktcap >= 1e9
-                        ? `${(stock.mktcap / 1e9).toFixed(1)}B`
-                        : stock.mktcap >= 1e6
-                          ? `${(stock.mktcap / 1e6).toFixed(0)}M`
-                          : `${(stock.mktcap / 1e3).toFixed(0)}K`
-                      : '—'}
-                  </td>
-                  <td style={{ padding: "12px 8px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: 12 }}>
-                    {stock.currency || 'NOK'}
-                  </td>
-                  <td style={{
-                    padding: "16px",
-                    textAlign: "right",
-                    fontFamily: "monospace",
-                    color: "#fff",
-                    fontSize: 14,
-                  }}>
-                    {stock.last_close.toFixed(2)}
-                  </td>
-                  <td style={{ padding: "16px", textAlign: "right", color: "rgba(255,255,255,0.5)", fontSize: 13 }}>
-                    {stock.start_date}
-                  </td>
-                  <td style={{ padding: "16px", textAlign: "right", color: "rgba(255,255,255,0.5)", fontSize: 13 }}>
-                    {stock.end_date}
-                  </td>
-                  <td style={{ padding: "16px", textAlign: "right", color: "rgba(255,255,255,0.5)", fontSize: 13 }}>
-                    {stock.rows.toLocaleString()}
-                  </td>
-                  <td style={{
-                    padding: "16px",
-                    textAlign: "right",
-                    fontFamily: "monospace",
-                    color: "rgba(255,255,255,0.5)",
-                    fontSize: 13,
-                  }}>
-                    {stock.expectedDays.toLocaleString()}
-                  </td>
-                  <td style={{
-                    padding: "16px",
-                    textAlign: "right",
-                    fontFamily: "monospace",
-                    color: "#fff",
-                    fontSize: 13,
-                    fontWeight: 500,
-                  }}>
-                    {stock.completenessPct.toFixed(1)}%
-                  </td>
-                  <td style={{
-                    padding: "16px",
-                    textAlign: "center",
-                    fontFamily: "monospace",
-                    color: getTierColor(stock.dataTier),
-                    fontSize: 14,
-                    fontWeight: 700,
-                  }}>
-                    {stock.dataTier}
-                  </td>
+              {/* Loading skeleton */}
+              {loading && Array.from({ length: 14 }).map((_, i) => (
+                <tr key={i} style={{ borderBottom: "1px solid #1e2530" }}>
+                  {[["60%", 18], ["45%", 16], ["30%", 16], ["30%", 16], ["70%", 18]].map(([w, p], j) => (
+                    <td key={j} style={{ padding: `13px ${p}px` }}>
+                      <div className="skeleton" style={{ height: 12, width: w, marginLeft: j >= 2 && j <= 3 ? "auto" : 0 }} />
+                    </td>
+                  ))}
                 </tr>
               ))}
+
+              {/* Empty state */}
+              {!loading && filteredAndSorted.length === 0 && (
+                <tr>
+                  <td colSpan={5} style={{
+                    padding: "56px 18px", textAlign: "center",
+                    color: "rgba(255,255,255,0.25)", fontFamily: "monospace", fontSize: 12,
+                  }}>
+                    {search
+                      ? `No companies matching "${search}"`
+                      : "No companies found for the selected filters"}
+                  </td>
+                </tr>
+              )}
+
+              {/* Data rows */}
+              {!loading && filteredAndSorted.map((stock) => {
+                const sectorColor = getSectorColor(stock.sector);
+                const hasPred = factorTickers.has(stock.ticker);
+                const hasBT = backtestTickers.has(stock.ticker);
+                const hasOpt = hasOptions(stock.ticker);
+                const hasVal = valuationTickers.has(stock.ticker);
+
+                return (
+                  <tr key={stock.ticker} onClick={() => router.push(`/stocks/${stock.ticker}`)}>
+
+                    {/* Company: ticker + name */}
+                    <td style={{ padding: "13px 18px" }}>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+                        <span
+                          className="row-ticker"
+                          style={{
+                            fontSize: 13, fontWeight: 700, color: "#3b82f6",
+                            fontFamily: "monospace", transition: "color 0.12s", whiteSpace: "nowrap",
+                          }}
+                        >
+                          {stock.ticker}
+                        </span>
+                        <span style={{
+                          fontSize: 12, color: "rgba(255,255,255,0.65)",
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          maxWidth: 230,
+                        }}>
+                          {stock.name}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Sector */}
+                    <td style={{ padding: "13px 16px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                        <span style={{
+                          width: 6, height: 6, borderRadius: "50%",
+                          background: sectorColor, flexShrink: 0,
+                        }} />
+                        <span style={{
+                          fontSize: 11, color: "rgba(255,255,255,0.5)",
+                          fontFamily: "monospace", whiteSpace: "nowrap",
+                        }}>
+                          {stock.sector ?? "—"}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Mkt Cap */}
+                    <td style={{ padding: "13px 16px", textAlign: "right" }}>
+                      <span style={{
+                        fontFamily: "monospace", fontSize: 12, fontWeight: 600,
+                        color: stock.mktcap ? "#e2e8f0" : "rgba(255,255,255,0.2)",
+                      }}>
+                        {formatMktCap(stock.mktcap)}
+                      </span>
+                    </td>
+
+                    {/* Last Close + Currency */}
+                    <td style={{ padding: "13px 16px", textAlign: "right" }}>
+                      <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 600, color: "#fff" }}>
+                        {stock.last_close.toFixed(2)}
+                      </span>
+                      <span style={{
+                        fontSize: 9, color: "rgba(255,255,255,0.3)",
+                        marginLeft: 4, fontFamily: "monospace",
+                      }}>
+                        {stock.currency}
+                      </span>
+                    </td>
+
+                    {/* Features — stop row-click propagation so badge links work */}
+                    <td style={{ padding: "13px 18px" }}>
+                      <div
+                        style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center" }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {hasPred && (
+                          <Link
+                            href={`/predictions/${stock.ticker}`}
+                            className="badge-link"
+                            style={{
+                              fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 3,
+                              background: "rgba(16,185,129,0.12)", color: "#10b981",
+                              border: "1px solid rgba(16,185,129,0.25)", fontFamily: "monospace",
+                              letterSpacing: "0.04em",
+                            }}
+                          >
+                            Predictions
+                          </Link>
+                        )}
+                        {hasBT && (
+                          <Link
+                            href={`/backtest/${stock.ticker}`}
+                            className="badge-link"
+                            style={{
+                              fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 3,
+                              background: "rgba(59,130,246,0.12)", color: "#60a5fa",
+                              border: "1px solid rgba(59,130,246,0.25)", fontFamily: "monospace",
+                              letterSpacing: "0.04em",
+                            }}
+                          >
+                            Backtest
+                          </Link>
+                        )}
+                        {hasOpt && (
+                          <Link
+                            href={`/options/${stock.ticker.replace(".US", "")}`}
+                            className="badge-link"
+                            style={{
+                              fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 3,
+                              background: "rgba(245,158,11,0.12)", color: "#fbbf24",
+                              border: "1px solid rgba(245,158,11,0.25)", fontFamily: "monospace",
+                              letterSpacing: "0.04em",
+                            }}
+                          >
+                            Options
+                          </Link>
+                        )}
+                        {hasVal && (
+                          <Link
+                            href="/valuation"
+                            className="badge-link"
+                            style={{
+                              fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 3,
+                              background: "rgba(74,222,128,0.12)", color: "#4ade80",
+                              border: "1px solid rgba(74,222,128,0.25)", fontFamily: "monospace",
+                              letterSpacing: "0.04em",
+                            }}
+                          >
+                            Valuation
+                          </Link>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
 
-        {filteredAndSortedStocks.length === 0 && (
+        {/* Footer */}
+        {!loading && filteredAndSorted.length > 0 && (
           <div style={{
-            textAlign: "center",
-            padding: 48,
-            color: "rgba(255,255,255,0.5)"
+            marginTop: 12, fontSize: 10, fontFamily: "monospace",
+            color: "rgba(255,255,255,0.2)", textAlign: "right",
           }}>
-            {searchQuery ? `No stocks found matching "${searchQuery}"` : "No stocks found with sufficient IBKR data"}
+            {filteredAndSorted.length} of {stocks.filter(s => s.dataTier !== "F").length} companies
+            {" · "}Source: Interactive Brokers
           </div>
         )}
       </div>

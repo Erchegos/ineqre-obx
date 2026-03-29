@@ -202,8 +202,8 @@ export default function StockTickerPage() {
   const fullDateRangeRef = useRef<{ start: string; end: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // UI State: Toggle between historical analysis and STD channel
-  const [viewMode, setViewMode] = useState<"historical" | "std_channel" | "model">("historical");
+  // UI State: Toggle between tabs
+  const [viewMode, setViewMode] = useState<"overview" | "analytics" | "std_channel" | "model">("overview");
 
   // Auth state — shared across all pages via localStorage
   const { token: modelToken, profile: modelProfile, ready: authReady, login: authLogin, logout: authLogout } = useAuth();
@@ -311,6 +311,7 @@ export default function StockTickerPage() {
   const [showOptimizerParams, setShowOptimizerParams] = useState<boolean>(false);
   const [showWindowSettings, setShowWindowSettings] = useState<boolean>(false);
   const [showTrades, setShowTrades] = useState<boolean>(false);
+  const [showMoves, setShowMoves] = useState<boolean>(true);
 
   // Optimizer parameter state - use Sets for checkbox selections
   // Better risk/reward: stop offset from entry (not absolute sigma)
@@ -520,13 +521,12 @@ export default function StockTickerPage() {
     };
   }, [ticker]);
 
-  // Fetch residuals data
+  // Fetch residuals data — lazy: only when Analytics tab is active
   useEffect(() => {
     let cancelled = false;
 
     async function fetchResiduals() {
-      if (!ticker) {
-        setResidualsData(null);
+      if (!ticker || viewMode !== "analytics") {
         return;
       }
 
@@ -576,7 +576,7 @@ export default function StockTickerPage() {
     return () => {
       cancelled = true;
     };
-  }, [ticker, limit, chartMode]);
+  }, [ticker, limit, chartMode, viewMode]);
 
   // Fetch STD Channel data
   useEffect(() => {
@@ -993,6 +993,37 @@ export default function StockTickerPage() {
     return (Math.pow(1 + activeStats.totalReturn / 100, 1 / years) - 1) * 100;
   }, [activeStats, data]);
 
+  // Multi-timeframe returns strip (computed from price array)
+  const multiTimeframeReturns = useMemo(() => {
+    if (!data?.prices || data.prices.length < 2) return null;
+    const prices = data.prices;
+    const last = prices[prices.length - 1];
+    const lastPrice = last.adj_close ?? last.close;
+
+    const pctReturn = (daysBack: number): number | null => {
+      const idx = prices.length - 1 - daysBack;
+      if (idx < 0) return null;
+      const base = prices[idx].adj_close ?? prices[idx].close;
+      if (!base || base === 0) return null;
+      return ((lastPrice - base) / base) * 100;
+    };
+
+    const maxBase = prices[0].adj_close ?? prices[0].close;
+    const maxReturn = maxBase && maxBase !== 0 ? ((lastPrice - maxBase) / maxBase) * 100 : null;
+
+    return [
+      { label: "1D",  value: pctReturn(1) },
+      { label: "1W",  value: pctReturn(5) },
+      { label: "1M",  value: pctReturn(21) },
+      { label: "3M",  value: pctReturn(63) },
+      { label: "6M",  value: pctReturn(126) },
+      { label: "1Y",  value: pctReturn(252) },
+      { label: "2Y",  value: pctReturn(504) },
+      { label: "5Y",  value: pctReturn(1260) },
+      { label: "MAX", value: maxReturn },
+    ];
+  }, [data?.prices]);
+
   return (
     <main style={{ padding: viewMode === "model" ? "8px 16px" : "16px 32px", maxWidth: viewMode === "model" ? "100%" : 1600, margin: "0 auto", minHeight: "100vh", background: "#0a0a0a", color: "#fff", overflowX: "hidden" }}>
       <style>{`
@@ -1174,11 +1205,38 @@ export default function StockTickerPage() {
         </div>
       </div>
 
+      {/* Multi-timeframe returns strip */}
+      {multiTimeframeReturns && (
+        <div style={{
+          display: "flex", gap: 2, marginBottom: 10, flexWrap: "wrap",
+          background: "rgba(255,255,255,0.02)", border: "1px solid #30363d",
+          borderRadius: 3, padding: "6px 10px", fontFamily: "monospace",
+        }}>
+          {multiTimeframeReturns.map((item, i) => (
+            item.value !== null && (
+              <div key={item.label} style={{
+                display: "flex", flexDirection: "column", alignItems: "center",
+                padding: "4px 10px",
+                borderRight: i < multiTimeframeReturns.length - 1 ? "1px solid #21262d" : "none",
+                minWidth: 52,
+              }}>
+                <span style={{ fontSize: 8, fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "0.06em", marginBottom: 3 }}>
+                  {item.label}
+                </span>
+                <span style={{
+                  fontSize: 12, fontWeight: 700,
+                  color: item.value >= 0 ? "#22c55e" : "#ef4444",
+                }}>
+                  {item.value >= 0 ? "+" : ""}{item.value.toFixed(1)}%
+                </span>
+              </div>
+            )
+          ))}
+        </div>
+      )}
+
       {/* View Mode Toggle + Inline Fundamentals */}
       <div className="stock-mode-fundamentals">
-        <span style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", letterSpacing: "0.02em", textTransform: "uppercase" }}>
-          Analysis Mode
-        </span>
         <div style={{
           display: "inline-flex",
           border: "1px solid #30363d",
@@ -1186,75 +1244,36 @@ export default function StockTickerPage() {
           background: "#161b22",
           padding: 2,
         }}>
-          <button
-            onClick={() => setViewMode("historical")}
-            style={{
-              padding: "9px 16px",
-              borderRadius: 4,
-              border: "none",
-              background: viewMode === "historical" ? "#3b82f6" : "transparent",
-              color: viewMode === "historical" ? "white" : "#fff",
-              fontSize: 13,
-              fontWeight: 500,
-              cursor: "pointer",
-              transition: "all 0.2s",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-start",
-              gap: 3,
-            }}
-          >
-            <span>Historical Analysis</span>
-            <span style={{ fontSize: 10, opacity: 0.7, fontWeight: 400 }}>
-              Returns • Drawdowns • Beta
-            </span>
-          </button>
-          <button
-            onClick={() => setViewMode("std_channel")}
-            style={{
-              padding: "9px 16px",
-              borderRadius: 4,
-              border: "none",
-              background: viewMode === "std_channel" ? "#2962ff" : "transparent",
-              color: viewMode === "std_channel" ? "white" : "#fff",
-              fontSize: 13,
-              fontWeight: 500,
-              cursor: "pointer",
-              transition: "all 0.2s",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-start",
-              gap: 3,
-            }}
-          >
-            <span>STD Channel Analysis</span>
-            <span style={{ fontSize: 10, opacity: 0.7, fontWeight: 400 }}>
-              Regression • Bands • Mean reversion
-            </span>
-          </button>
-          <button
-            onClick={() => setViewMode("model")}
-            style={{
-              padding: "9px 16px",
-              borderRadius: 4,
-              border: "none",
-              background: viewMode === "model" ? "#00897B" : "transparent",
-              color: viewMode === "model" ? "white" : "#fff",
-              fontSize: 13,
-              fontWeight: 500,
-              cursor: "pointer",
-              transition: "all 0.2s",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-start",
-              gap: 3,
-            }}
-          >
-            <span>Financial Model</span>
-            <span style={{ fontSize: 10, opacity: 0.7, fontWeight: 400 }}>
-              P&L • Balance Sheet • Valuation
-            </span>
-          </button>
+          {([
+            { mode: "overview" as const, label: "Overview", sub: "Chart · News · Moves" },
+            { mode: "analytics" as const, label: "Analytics", sub: "Distribution · Residuals" },
+            { mode: "std_channel" as const, label: "STD Channel", sub: "Regression · Mean Rev" },
+            { mode: "model" as const, label: "Financials", sub: "P&L · Balance Sheet" },
+          ] as const).map(({ mode, label, sub }) => (
+            <button
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              style={{
+                padding: "7px 14px",
+                borderRadius: 4,
+                border: "none",
+                background: viewMode === mode ? "#3b82f6" : "transparent",
+                color: viewMode === mode ? "white" : "rgba(255,255,255,0.6)",
+                fontSize: 12,
+                fontWeight: viewMode === mode ? 600 : 500,
+                cursor: "pointer",
+                transition: "all 0.15s",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-start",
+                gap: 2,
+                fontFamily: "monospace",
+              }}
+            >
+              <span>{label}</span>
+              <span style={{ fontSize: 9, opacity: 0.7, fontWeight: 400 }}>{sub}</span>
+            </button>
+          ))}
         </div>
 
         {/* Inline Fundamentals Strip — 5 multiples matching portfolio optimizer VAL */}
@@ -1317,8 +1336,8 @@ export default function StockTickerPage() {
         )}
       </div>
 
-      {/* Timeframe Selector - compact, only in Historical mode */}
-      {viewMode === "historical" && (
+      {/* Timeframe Selector - compact, only in Overview + Analytics modes */}
+      {(viewMode === "overview" || viewMode === "analytics") && (
         <div style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "monospace", fontWeight: 700 }}>
             Timeframe
@@ -1352,42 +1371,10 @@ export default function StockTickerPage() {
         </div>
       )}
 
-      {/* ═══ HISTORICAL ANALYSIS ═══ */}
-      {!loading && data && activeStats && viewMode === "historical" && (
+      {/* ═══ OVERVIEW TAB ═══ */}
+      {!loading && data && activeStats && viewMode === "overview" && (
         <>
-          {/* Row 1: Metric cards — full width, single row */}
-          <div className="stock-metric-grid" style={{ marginBottom: 10 }}>
-            {[
-              { label: "TOT RET", value: fmtPct(activeStats.totalReturn), color: activeStats.totalReturn >= 0 ? "#22c55e" : "#ef4444" },
-              { label: "CAGR", value: cagr !== null ? fmtPct(cagr) : "—", color: (cagr ?? 0) >= 0 ? "#22c55e" : "#ef4444" },
-              { label: "MAX DD", value: fmtPct(activeStats.maxDrawdown), color: "#ef4444" },
-              { label: "VaR 95%", value: fmtPct(activeStats.var95), color: "#fff" },
-              { label: "CVaR 95%", value: fmtPct(activeStats.cvar95), color: "#fff" },
-              { label: "SHARPE", value: fmtNum(activeStats.sharpeRatio, 3), color: "#fff" },
-              { label: `β vs ${data.betaInfo?.benchmark || "OBX"}`, value: fmtNum(activeStats.beta, 3), color: "#fff", sub: data.betaInfo ? `${data.betaInfo.rawDataPoints}d overlap` : undefined, warn: data.betaInfo && data.betaInfo.rawDataPoints < 200 },
-            ].map((m) => (
-              <div key={m.label} style={{
-                padding: "6px 8px",
-                background: "rgba(255,255,255,0.02)",
-                border: `1px solid ${(m as any).warn ? "rgba(245,158,11,0.3)" : "#30363d"}`,
-                borderRadius: 3,
-              }}>
-                <div style={{ fontSize: 8, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3, fontFamily: "monospace" }}>
-                  {m.label}
-                </div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: m.color, fontFamily: "monospace" }}>
-                  {m.value}
-                </div>
-                {(m as any).sub && (
-                  <div style={{ fontSize: 8, color: (m as any).warn ? "#f59e0b" : "rgba(255,255,255,0.5)", marginTop: 1, fontFamily: "monospace" }}>
-                    {(m as any).sub}{(m as any).warn ? " ⚠" : ""}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Row 2: Chart + News side-by-side */}
+          {/* Row 1: Chart + News side-by-side (chart-first) */}
           <div className="stock-chart-news" style={{ marginBottom: 10 }}>
             {/* Chart panel (left) */}
             <div style={{ padding: "8px 12px", borderRadius: 3, border: "1px solid #30363d", background: "rgba(255,255,255,0.02)" }}>
@@ -1494,19 +1481,58 @@ export default function StockTickerPage() {
             </div>
           </div>
 
-          {/* Row 4: Significant Moves — full width */}
+          {/* Row 2: Metric cards — below chart */}
+          <div className="stock-metric-grid" style={{ marginBottom: 10 }}>
+            {[
+              { label: "TOT RET", value: fmtPct(activeStats.totalReturn), color: activeStats.totalReturn >= 0 ? "#22c55e" : "#ef4444" },
+              { label: "CAGR", value: cagr !== null ? fmtPct(cagr) : "—", color: (cagr ?? 0) >= 0 ? "#22c55e" : "#ef4444" },
+              { label: "MAX DD", value: fmtPct(activeStats.maxDrawdown), color: "#ef4444" },
+              { label: "VaR 95%", value: fmtPct(activeStats.var95), color: "#fff" },
+              { label: "CVaR 95%", value: fmtPct(activeStats.cvar95), color: "#fff" },
+              { label: "SHARPE", value: fmtNum(activeStats.sharpeRatio, 3), color: "#fff" },
+              { label: `β vs ${data.betaInfo?.benchmark || "OBX"}`, value: fmtNum(activeStats.beta, 3), color: "#fff", sub: data.betaInfo ? `${data.betaInfo.rawDataPoints}d overlap` : undefined, warn: data.betaInfo && data.betaInfo.rawDataPoints < 200 },
+            ].map((m) => (
+              <div key={m.label} style={{
+                padding: "6px 8px",
+                background: "rgba(255,255,255,0.02)",
+                border: `1px solid ${(m as any).warn ? "rgba(245,158,11,0.3)" : "#30363d"}`,
+                borderRadius: 3,
+              }}>
+                <div style={{ fontSize: 8, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3, fontFamily: "monospace" }}>
+                  {m.label}
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: m.color, fontFamily: "monospace" }}>
+                  {m.value}
+                </div>
+                {(m as any).sub && (
+                  <div style={{ fontSize: 8, color: (m as any).warn ? "#f59e0b" : "rgba(255,255,255,0.5)", marginTop: 1, fontFamily: "monospace" }}>
+                    {(m as any).sub}{(m as any).warn ? " ⚠" : ""}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Row 3: Significant Moves — collapsible */}
           <div style={{ border: "1px solid #30363d", borderRadius: 3, overflow: "hidden", marginBottom: 10 }}>
-            <div style={{
-              padding: "4px 8px", background: "rgba(255,255,255,0.03)",
-              borderBottom: "1px solid #30363d",
-              fontSize: 9, fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.06em",
-              color: "rgba(255,255,255,0.5)",
-            }}>
-              SIGNIFICANT MOVES (2σ)
-            </div>
-            <div style={{ maxHeight: 500, overflowY: "auto", padding: "4px 10px 10px" }}>
-              <WhyDidItMove ticker={ticker} days={60} sigma={2} />
-            </div>
+            <button
+              onClick={() => setShowMoves(!showMoves)}
+              style={{
+                width: "100%", padding: "6px 10px", background: "rgba(255,255,255,0.03)",
+                border: "none", borderBottom: showMoves ? "1px solid #30363d" : "none",
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                cursor: "pointer", color: "rgba(255,255,255,0.5)",
+                fontSize: 9, fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.06em",
+              }}
+            >
+              <span>SIGNIFICANT MOVES (2σ)</span>
+              <span style={{ fontSize: 10, opacity: 0.6 }}>{showMoves ? "▲" : "▼"}</span>
+            </button>
+            {showMoves && (
+              <div style={{ maxHeight: 400, overflowY: "auto", padding: "4px 10px 10px" }}>
+                <WhyDidItMove ticker={ticker} days={60} sigma={2} />
+              </div>
+            )}
           </div>
         </>
       )}
@@ -2528,8 +2554,8 @@ export default function StockTickerPage() {
         </div>
       )}
 
-      {/* SHARED ANALYSIS SECTIONS */}
-      {!loading && data && activeReturns && (
+      {/* ═══ ANALYTICS TAB SECTIONS ═══ */}
+      {!loading && data && activeReturns && viewMode === "analytics" && (
         <>
           <div style={{ marginBottom: 24, padding: 20, borderRadius: 4, border: "1px solid #30363d", background: "#161b22" }}>
             <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "#fff" }}>
