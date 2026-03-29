@@ -15,6 +15,42 @@ import { runMLSimulation, computeProgressiveStats, SIM_DEFAULTS, type SimInputBa
 // Types
 // ============================================================================
 
+interface LiveSettings {
+  // Entry
+  entryThreshold: number;
+  requireSma200: boolean;
+  requireSma50: boolean;
+  momentumFilter: 0 | 1 | 2 | 3;   // 0=off, 1=mom1m>0, 2=mom6m>0, 3=both
+  volGate: 'off' | 'soft' | 'hard';
+  maxPositions: number;
+  maxSectorPct: number;
+  maxDailyLossPct: number;
+  // Exit
+  stopLossPct: number;
+  takeProfitPct: number;
+  maxHoldDays: number;
+  minHoldDays: number;
+  useSignalExit: boolean;
+  exitThreshold: number;
+  useTrailingStop: boolean;
+  trailingStopPct: number;
+  // Sizing & Costs
+  positionSizePct: number;
+  portfolioValueNOK: number;
+  useVolAdjustedSizing: boolean;
+  costBps: number;
+}
+
+const DEFAULT_LIVE_SETTINGS: LiveSettings = {
+  entryThreshold: 1.0, requireSma200: false, requireSma50: false,
+  momentumFilter: 0, volGate: 'off', maxPositions: 5, maxSectorPct: 40, maxDailyLossPct: 3.0,
+  stopLossPct: 5.0, takeProfitPct: 15.0, maxHoldDays: 21, minHoldDays: 3,
+  useSignalExit: true, exitThreshold: 0.25,
+  useTrailingStop: false, trailingStopPct: 3.0,
+  positionSizePct: 10.0, portfolioValueNOK: 1_000_000, useVolAdjustedSizing: false,
+  costBps: 10,
+};
+
 interface SignalRow {
   ticker: string;
   name: string;
@@ -183,12 +219,6 @@ export default function AlphaPage() {
   const [simShowMLGuide, setSimShowMLGuide] = useState(false);
   const [explorerShowMLGuide, setExplorerShowMLGuide] = useState(false);
   // Parameter sweep
-  const [simSweepOpen, setSimSweepOpen] = useState(false);
-  const [simSweepRunning, setSimSweepRunning] = useState(false);
-  const [simSweepProgress, setSimSweepProgress] = useState(0);
-  const [simSweepResults, setSimSweepResults] = useState<{ params: SimParams; stats: SimStats }[]>([]);
-  const [simSweepSortKey, setSimSweepSortKey] = useState<string>("sharpe");
-  const [simSweepSortDir, setSimSweepSortDir] = useState<1 | -1>(-1);
   const [signalsShowMLGuide, setSignalsShowMLGuide] = useState(false);
   // Strategy params
   const [simEntry, setSimEntry] = useState(SIM_DEFAULTS.entryThreshold);
@@ -247,25 +277,44 @@ export default function AlphaPage() {
     ticker: string; name: string; sector: string;
     ml_pred: number; prediction_date: string;
     last_close: number; avg_nokvol: number;
+    sma200?: number | null; sma50?: number | null;
+    mom1m?: number | null; mom6m?: number | null; mom11m?: number | null; vol1m?: number | null;
   };
   type LivePosition = {
     id: number; ticker: string; name: string;
-    entry_price: number; stop_price: number; tp_price: number;
+    entry_price: number; stop_price: number; tp_price: number; effective_stop?: number;
+    trailing_stop_pct?: number; trailing_high?: number;
     min_exit_date: string; max_exit_date: string; ml_pred: number;
-    accepted_at: string; days_held: number;
-    current_close?: number; price_date?: string; pnl_pct?: number;
+    accepted_at: string; days_held: number; pos_size_pct?: number;
+    current_close?: number; price_date?: string;
+    pnl_pct?: number; gross_pnl_pct?: number;
   };
   type LiveTrade = {
     id: number; ticker: string; name: string;
-    entry_price: number; exit_price: number; pnl_pct: number;
+    entry_price: number; exit_price: number;
+    pnl_pct: number; gross_pnl_pct?: number;
     accepted_at: string; closed_at: string; exit_reason: string;
-    days_held: number; ml_pred: number;
+    days_held: number; ml_pred: number; pos_size_pct?: number;
+  };
+  type LivePortfolio = {
+    totalExposurePct: number; totalUnrealizedPnl: number;
+    openCount: number; sectorBreakdown: Record<string, number>;
   };
   const [liveSignals, setLiveSignals] = useState<LiveSignal[]>([]);
   const [livePositions, setLivePositions] = useState<LivePosition[]>([]);
   const [liveTrades, setLiveTrades] = useState<LiveTrade[]>([]);
+  const [livePortfolio, setLivePortfolio] = useState<LivePortfolio | null>(null);
   const [liveLoading, setLiveLoading] = useState(false);
   const [liveActionLoading, setLiveActionLoading] = useState<string | null>(null);
+  const [liveSettingsOpen, setLiveSettingsOpen] = useState(false);
+  const [liveSettings, setLiveSettings] = useState<LiveSettings>(() => {
+    try {
+      const raw = localStorage.getItem('alpha_live_settings_v1');
+      if (raw) return { ...DEFAULT_LIVE_SETTINGS, ...JSON.parse(raw) };
+    } catch { /* ignore */ }
+    return DEFAULT_LIVE_SETTINGS;
+  });
+  const [liveCheckResult, setLiveCheckResult] = useState<{ triggered: { ticker: string; exitReason: string; pnlPct: string }[] } | null>(null);
 
   // ============================================================================
   // Auth
@@ -501,6 +550,7 @@ export default function AlphaPage() {
         setLiveSignals(d.signals || []);
         setLivePositions(d.positions || []);
         setLiveTrades(d.closed || []);
+        setLivePortfolio(d.portfolio || null);
       }
     } catch (e) { console.error("Live data failed:", e); }
     setLiveLoading(false);
@@ -510,6 +560,7 @@ export default function AlphaPage() {
     if (!token) return;
     const key = action === "enter" ? String(body.ticker) : String(body.id ?? action);
     setLiveActionLoading(key);
+    setLiveCheckResult(null);
     try {
       const res = await fetch("/api/alpha/live", {
         method: "POST",
@@ -517,7 +568,13 @@ export default function AlphaPage() {
         body: JSON.stringify({ action, ...body }),
       });
       if (res.status === 401) { authLogout(); return; }
-      if (res.ok) await fetchLiveData();
+      if (res.ok) {
+        const d = await res.json();
+        if (action === "check_rules" && d.triggered?.length > 0) {
+          setLiveCheckResult(d);
+        }
+        await fetchLiveData();
+      }
     } catch (e) { console.error("Live action failed:", e); }
     setLiveActionLoading(null);
   }, [token, authLogout, fetchLiveData]);
@@ -525,6 +582,10 @@ export default function AlphaPage() {
   useEffect(() => {
     if (token && tab === "live") fetchLiveData();
   }, [token, tab, fetchLiveData]);
+
+  useEffect(() => {
+    try { localStorage.setItem('alpha_live_settings_v1', JSON.stringify(liveSettings)); } catch { /* ignore */ }
+  }, [liveSettings]);
 
   // Load full stock list for Explorer search (no auth needed)
   useEffect(() => {
@@ -795,52 +856,6 @@ export default function AlphaPage() {
   }, [simData]);
 
   // Parameter sweep — runs all combinations client-side
-  const runSweep = useCallback(async () => {
-    if (!simData?.input?.length) return;
-    setSimSweepRunning(true);
-    setSimSweepProgress(0);
-    setSimSweepResults([]);
-
-    const entryVals = [0, 0.5, 1.0, 2.0];
-    const stopVals  = [3, 5, 8];
-    const holdVals  = [10, 21, 30];
-    const volVals   = ['off', 'hard'] as const;
-    const smaVals   = [false, true];
-    const momVals   = [0, 2] as const;
-
-    const combos: SimParams[] = [];
-    for (const entry of entryVals)
-      for (const stop of stopVals)
-        for (const hold of holdVals)
-          for (const vol of volVals)
-            for (const sma of smaVals)
-              for (const mom of momVals)
-                combos.push({
-                  entryThreshold: entry, exitThreshold: simExit,
-                  stopLossPct: stop, takeProfitPct: simTP,
-                  positionSizePct: simPosSize, minHoldDays: simMinHold,
-                  maxHoldDays: hold, cooldownBars: simCooldown, costBps: simCost,
-                  momentumFilter: mom, volGate: vol,
-                  sma200Require: sma, sma50Require: false, smaExitOnCross: false, valuationFilter: false,
-                });
-
-    const results: { params: SimParams; stats: SimStats }[] = [];
-    const BATCH = 40;
-    for (let i = 0; i < combos.length; i += BATCH) {
-      const slice = combos.slice(i, i + BATCH);
-      for (const p of slice) {
-        const r = runMLSimulation(simData.input, p);
-        if (r.stats.trades >= 5) results.push({ params: p, stats: r.stats });
-      }
-      setSimSweepProgress(Math.round(Math.min(i + BATCH, combos.length) / combos.length * 100));
-      await new Promise(res => setTimeout(res, 0));
-    }
-
-    results.sort((a, b) => b.stats.sharpe - a.stats.sharpe);
-    setSimSweepResults(results.slice(0, 50));
-    setSimSweepRunning(false);
-  }, [simData, simExit, simTP, simPosSize, simMinHold, simCooldown, simCost]);
-
   // Run engine client-side (instant on param change)
   const simResult: SimResult | null = useMemo(() => {
     if (!simData?.input?.length) return null;
@@ -1154,7 +1169,7 @@ export default function AlphaPage() {
                   ML SIGNAL PAPER TRADING
                 </div>
                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", marginTop: 3 }}>
-                  10 most liquid OSE stocks · fwd_ret_21d signal · entry &gt;1% · 5% stop · 15% TP · 10% per slot · compounding
+                  10 most liquid OSE stocks · ensemble_prediction (real ML) · entry &gt;1% · 5% stop · 15% TP · 10% per slot · compounding
                 </div>
               </div>
               <div style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.25)", borderRadius: 5, padding: "4px 10px", fontSize: 9, color: "#10b981", fontFamily: "monospace", fontWeight: 700 }}>
@@ -1169,7 +1184,7 @@ export default function AlphaPage() {
                 <div>
                   <div style={sectionTitle}>TOP 10 LIQUID OSE — {bestStocksDays === 365 ? "Last 1 Year" : bestStocksDays === 1825 ? "Last 5 Years" : "Last 2 Years"}</div>
                   <div style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", marginTop: 2 }}>
-                    Entry: fwd_ret_21d &gt;1% · Exit: signal &lt;0.25% (min 3d) OR −5% stop OR 21d max hold
+                    Entry: ensemble_prediction &gt;1% · Exit: signal &lt;0.25% (min 3d) OR −5% stop OR 21d max hold
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -1289,7 +1304,7 @@ export default function AlphaPage() {
                         Cumulative Performance — Last {tfLabel} · 10 Largest OSE Stocks · 10% Per Slot · Compounding
                       </div>
                       <div style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", marginTop: -8 }}>
-                        21-day forward return signal (fwd_ret_21d) · entry &gt;1% · exit &lt;0.25% · 5% stop · 15% TP · min 3d · 10% per slot · compounding · indexed to 100
+                        ensemble_prediction (real ML, no look-ahead) · entry &gt;1% · exit &lt;0.25% · 5% stop · 15% TP · min 3d · 10% per slot · compounding · indexed to 100
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -1810,7 +1825,7 @@ export default function AlphaPage() {
       {/* ================================================================ */}
       {tab === "live" && (
         <div>
-          {/* Header */}
+          {/* ── Header ── */}
           <div style={{ ...cardStyle, marginBottom: 12, background: "linear-gradient(135deg, rgba(16,185,129,0.04), rgba(59,130,246,0.03))", border: "1px solid rgba(16,185,129,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
@@ -1818,12 +1833,17 @@ export default function AlphaPage() {
                   LIVE TRADING — SEMI-AUTOMATIC
                 </div>
                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>
-                  Signal: real ensemble_prediction from ML pipeline · Entry &gt;1% · Stop 5% · TP 15% · 21d max hold · 3d min hold
+                  Signal: ensemble_prediction · Entry &gt;{liveSettings.entryThreshold}% · Stop {liveSettings.stopLossPct}% · TP {liveSettings.takeProfitPct}% · {liveSettings.maxHoldDays}d max · {liveSettings.minHoldDays}d min
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <button
-                  onClick={() => liveAction("check_rules", {})}
+                  onClick={() => setLiveSettingsOpen(v => !v)}
+                  style={{ ...btnSecondary, fontSize: 10, padding: "6px 14px", borderColor: liveSettingsOpen ? "#3b82f6" : "#30363d", color: liveSettingsOpen ? "#3b82f6" : "rgba(255,255,255,0.6)" }}>
+                  ⚙ PARAMETERS {liveSettingsOpen ? "▲" : "▼"}
+                </button>
+                <button
+                  onClick={() => liveAction("check_rules", { settings: liveSettings })}
                   disabled={!!liveActionLoading}
                   style={{ ...btnSecondary, fontSize: 10, padding: "6px 14px", borderColor: "#f59e0b", color: "#f59e0b" }}>
                   ⚡ CHECK RULES
@@ -1838,12 +1858,229 @@ export default function AlphaPage() {
             </div>
           </div>
 
-          {/* Signal Monitor */}
+          {/* ── Settings Panel ── */}
+          {liveSettingsOpen && (
+            <div style={{ ...cardStyle, marginBottom: 12, border: "1px solid rgba(59,130,246,0.3)", background: "#0d1117" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20 }}>
+
+                {/* ENTRY RULES */}
+                <div>
+                  <div style={{ ...sectionTitle, marginBottom: 10, color: "#10b981" }}>ENTRY RULES</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
+                      ML ENTRY THRESHOLD (%)
+                      <input type="number" min={0} max={10} step={0.1}
+                        value={liveSettings.entryThreshold}
+                        onChange={e => setLiveSettings(s => ({ ...s, entryThreshold: parseFloat(e.target.value) || 0 }))}
+                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 12 }} />
+                    </label>
+                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
+                      MAX OPEN POSITIONS
+                      <input type="number" min={1} max={20} step={1}
+                        value={liveSettings.maxPositions}
+                        onChange={e => setLiveSettings(s => ({ ...s, maxPositions: parseInt(e.target.value) || 1 }))}
+                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 12 }} />
+                    </label>
+                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
+                      MAX SECTOR WEIGHT (%)
+                      <input type="number" min={10} max={100} step={5}
+                        value={liveSettings.maxSectorPct}
+                        onChange={e => setLiveSettings(s => ({ ...s, maxSectorPct: parseFloat(e.target.value) || 40 }))}
+                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 12 }} />
+                    </label>
+                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
+                      MAX DAILY LOSS (%)
+                      <input type="number" min={0.5} max={10} step={0.5}
+                        value={liveSettings.maxDailyLossPct}
+                        onChange={e => setLiveSettings(s => ({ ...s, maxDailyLossPct: parseFloat(e.target.value) || 3 }))}
+                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 12 }} />
+                    </label>
+                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
+                      MOMENTUM FILTER
+                      <select value={liveSettings.momentumFilter}
+                        onChange={e => setLiveSettings(s => ({ ...s, momentumFilter: parseInt(e.target.value) as 0|1|2|3 }))}
+                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 11 }}>
+                        <option value={0}>Off</option>
+                        <option value={1}>Mom1m &gt; 0</option>
+                        <option value={2}>Mom6m &gt; 0</option>
+                        <option value={3}>Both &gt; 0</option>
+                      </select>
+                    </label>
+                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
+                      VOL GATE
+                      <select value={liveSettings.volGate}
+                        onChange={e => setLiveSettings(s => ({ ...s, volGate: e.target.value as 'off'|'soft'|'hard' }))}
+                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 11 }}>
+                        <option value="off">Off</option>
+                        <option value="soft">Soft (reduce size in high-vol)</option>
+                        <option value="hard">Hard (skip trades in high-vol)</option>
+                      </select>
+                    </label>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em", display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
+                        <input type="checkbox" checked={liveSettings.requireSma200}
+                          onChange={e => setLiveSettings(s => ({ ...s, requireSma200: e.target.checked }))}
+                          style={{ accentColor: "#3b82f6" }} />
+                        REQUIRE SMA200
+                      </label>
+                      <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em", display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
+                        <input type="checkbox" checked={liveSettings.requireSma50}
+                          onChange={e => setLiveSettings(s => ({ ...s, requireSma50: e.target.checked }))}
+                          style={{ accentColor: "#3b82f6" }} />
+                        REQUIRE SMA50
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* EXIT RULES */}
+                <div>
+                  <div style={{ ...sectionTitle, marginBottom: 10, color: "#ef4444" }}>EXIT RULES</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
+                      STOP LOSS (%)
+                      <input type="number" min={1} max={20} step={0.5}
+                        value={liveSettings.stopLossPct}
+                        onChange={e => setLiveSettings(s => ({ ...s, stopLossPct: parseFloat(e.target.value) || 5 }))}
+                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 12 }} />
+                    </label>
+                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
+                      TAKE PROFIT (%)
+                      <input type="number" min={2} max={50} step={1}
+                        value={liveSettings.takeProfitPct}
+                        onChange={e => setLiveSettings(s => ({ ...s, takeProfitPct: parseFloat(e.target.value) || 15 }))}
+                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 12 }} />
+                    </label>
+                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
+                      MAX HOLD DAYS
+                      <input type="number" min={3} max={90} step={1}
+                        value={liveSettings.maxHoldDays}
+                        onChange={e => setLiveSettings(s => ({ ...s, maxHoldDays: parseInt(e.target.value) || 21 }))}
+                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 12 }} />
+                    </label>
+                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
+                      MIN HOLD DAYS (whipsaw protection)
+                      <input type="number" min={0} max={10} step={1}
+                        value={liveSettings.minHoldDays}
+                        onChange={e => setLiveSettings(s => ({ ...s, minHoldDays: parseInt(e.target.value) || 3 }))}
+                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 12 }} />
+                    </label>
+                    <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em", display: "flex", alignItems: "center", gap: 5, cursor: "pointer", marginBottom: 4 }}>
+                          <input type="checkbox" checked={liveSettings.useSignalExit}
+                            onChange={e => setLiveSettings(s => ({ ...s, useSignalExit: e.target.checked }))}
+                            style={{ accentColor: "#3b82f6" }} />
+                          SIGNAL EXIT
+                        </label>
+                        {liveSettings.useSignalExit && (
+                          <input type="number" min={0} max={2} step={0.05}
+                            value={liveSettings.exitThreshold}
+                            onChange={e => setLiveSettings(s => ({ ...s, exitThreshold: parseFloat(e.target.value) || 0.25 }))}
+                            style={{ width: "100%", background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 11 }} />
+                        )}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em", display: "flex", alignItems: "center", gap: 5, cursor: "pointer", marginBottom: 4 }}>
+                          <input type="checkbox" checked={liveSettings.useTrailingStop}
+                            onChange={e => setLiveSettings(s => ({ ...s, useTrailingStop: e.target.checked }))}
+                            style={{ accentColor: "#f59e0b" }} />
+                          TRAILING STOP
+                        </label>
+                        {liveSettings.useTrailingStop && (
+                          <input type="number" min={1} max={15} step={0.5}
+                            value={liveSettings.trailingStopPct}
+                            onChange={e => setLiveSettings(s => ({ ...s, trailingStopPct: parseFloat(e.target.value) || 3 }))}
+                            style={{ width: "100%", background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 11 }} />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* POSITION SIZING & COSTS */}
+                <div>
+                  <div style={{ ...sectionTitle, marginBottom: 10, color: "#3b82f6" }}>POSITION SIZING &amp; COSTS</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
+                      POSITION SIZE (% of portfolio)
+                      <input type="number" min={1} max={50} step={1}
+                        value={liveSettings.positionSizePct}
+                        onChange={e => setLiveSettings(s => ({ ...s, positionSizePct: parseFloat(e.target.value) || 10 }))}
+                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 12 }} />
+                    </label>
+                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
+                      PORTFOLIO VALUE (NOK)
+                      <input type="number" min={100000} max={100000000} step={100000}
+                        value={liveSettings.portfolioValueNOK}
+                        onChange={e => setLiveSettings(s => ({ ...s, portfolioValueNOK: parseInt(e.target.value) || 1000000 }))}
+                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 12 }} />
+                    </label>
+                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
+                      TRANSACTION COSTS (bps)
+                      <input type="number" min={0} max={100} step={1}
+                        value={liveSettings.costBps}
+                        onChange={e => setLiveSettings(s => ({ ...s, costBps: parseInt(e.target.value) || 10 }))}
+                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 12 }} />
+                    </label>
+                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em", display: "flex", alignItems: "center", gap: 5, cursor: "pointer", marginTop: 4 }}>
+                      <input type="checkbox" checked={liveSettings.useVolAdjustedSizing}
+                        onChange={e => setLiveSettings(s => ({ ...s, useVolAdjustedSizing: e.target.checked }))}
+                        style={{ accentColor: "#3b82f6" }} />
+                      VOL-ADJUSTED SIZING
+                    </label>
+                    <div style={{ marginTop: 4, padding: 8, background: "#161b22", border: "1px solid #21262d", borderRadius: 4 }}>
+                      <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", marginBottom: 4 }}>POSITION SIZE PER TRADE</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "#3b82f6", fontFamily: "monospace" }}>
+                        {((liveSettings.positionSizePct / 100) * liveSettings.portfolioValueNOK).toLocaleString("nb-NO", { maximumFractionDigits: 0 })} NOK
+                      </div>
+                      <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", marginTop: 2 }}>
+                        Max {liveSettings.maxPositions} positions · {(liveSettings.positionSizePct * liveSettings.maxPositions).toFixed(0)}% max deployed
+                      </div>
+                    </div>
+                    <div style={{ marginTop: 2 }}>
+                      <button onClick={() => setLiveSettings(DEFAULT_LIVE_SETTINGS)}
+                        style={{ ...btnSecondary, fontSize: 9, padding: "4px 10px", color: "rgba(255,255,255,0.4)" }}>
+                        RESET TO DEFAULTS
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Portfolio Summary (when positions open) ── */}
+          {livePositions.length > 0 && (() => {
+            const totalPnl = livePositions.reduce((s, p) => s + (p.pnl_pct ?? 0), 0) / livePositions.length;
+            const deployed = livePositions.length * liveSettings.positionSizePct;
+            const atRisk = livePositions.filter(p => (p.pnl_pct ?? 0) < -liveSettings.stopLossPct * 0.5).length;
+            return (
+              <div style={{ ...cardStyle, marginBottom: 12, padding: "10px 16px", background: "#0d1117", border: "1px solid rgba(59,130,246,0.2)" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
+                  {[
+                    { label: "OPEN POSITIONS", value: String(livePositions.length), color: "#fff" },
+                    { label: "DEPLOYED", value: `${deployed.toFixed(0)}%`, color: deployed > 80 ? "#f59e0b" : "#3b82f6" },
+                    { label: "AVG P&L", value: `${totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(2)}%`, color: totalPnl >= 0 ? "#10b981" : "#ef4444" },
+                    { label: "AT RISK", value: String(atRisk), color: atRisk > 0 ? "#ef4444" : "rgba(255,255,255,0.4)" },
+                    { label: "FREE SLOTS", value: String(Math.max(0, liveSettings.maxPositions - livePositions.length)), color: "rgba(255,255,255,0.5)" },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", letterSpacing: "0.05em", marginBottom: 2 }}>{label}</div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color, fontFamily: "monospace" }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ── Signal Monitor ── */}
           <div style={{ ...cardStyle, marginBottom: 12, border: "1px solid rgba(16,185,129,0.25)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <div style={sectionTitle}>SIGNAL MONITOR — TOP LIQUID OSE</div>
               <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", fontFamily: "monospace" }}>
-                {liveSignals.length} stocks · live ensemble_prediction
+                {liveSignals.length} stocks · entry threshold: {liveSettings.entryThreshold}%
               </div>
             </div>
             {liveLoading ? (
@@ -1854,50 +2091,85 @@ export default function AlphaPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid #30363d" }}>
-                    {(["TICKER", "COMPANY", "SECTOR", "ML PRED", "LAST CLOSE", "VOL/DAY", "ACTION"] as const).map(h => (
+                    {(["TICKER", "COMPANY", "SECTOR", "ML PRED", "SMA", "MOM", "VOL/DAY", "CLOSE", "ACTION"] as const).map(h => (
                       <th key={h} style={{ padding: "4px 8px", fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.5)", textAlign: h === "TICKER" || h === "ACTION" ? "center" : "right", fontFamily: "monospace", letterSpacing: "0.05em", whiteSpace: "nowrap" as const }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {liveSignals.map(sig => {
-                    const isActive = sig.ml_pred >= 1.0;
+                    const isSignal = sig.ml_pred >= liveSettings.entryThreshold;
                     const isOpen = livePositions.some(p => p.ticker === sig.ticker);
                     const isLoading = liveActionLoading === sig.ticker;
+                    const sma200ok = !liveSettings.requireSma200 || (sig.sma200 != null && sig.last_close >= sig.sma200);
+                    const sma50ok  = !liveSettings.requireSma50  || (sig.sma50  != null && sig.last_close >= sig.sma50);
+                    const momOk = liveSettings.momentumFilter === 0 ? true
+                      : liveSettings.momentumFilter === 1 ? (sig.mom1m ?? 0) > 0
+                      : liveSettings.momentumFilter === 2 ? (sig.mom6m ?? 0) > 0
+                      : (sig.mom1m ?? 0) > 0 && (sig.mom6m ?? 0) > 0;
+                    const canEnter = isSignal && sma200ok && sma50ok && momOk && !isOpen && livePositions.length < liveSettings.maxPositions;
+                    const chipStyle = (ok: boolean, active: boolean): React.CSSProperties => ({
+                      fontSize: 8, padding: "1px 4px", borderRadius: 2, fontFamily: "monospace", fontWeight: 700,
+                      background: !active ? "rgba(48,54,61,0.5)" : ok ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)",
+                      color: !active ? "rgba(255,255,255,0.25)" : ok ? "#10b981" : "#ef4444",
+                      border: `1px solid ${!active ? "#30363d" : ok ? "rgba(16,185,129,0.4)" : "rgba(239,68,68,0.4)"}`,
+                    });
                     return (
-                      <tr key={sig.ticker} style={{ borderBottom: "1px solid rgba(48,54,61,0.3)", background: isActive ? "rgba(16,185,129,0.03)" : "transparent" }}>
+                      <tr key={sig.ticker} style={{ borderBottom: "1px solid rgba(48,54,61,0.3)", background: isSignal ? "rgba(16,185,129,0.03)" : "transparent" }}>
                         <td style={{ padding: "5px 8px", fontWeight: 700, textAlign: "center", fontFamily: "monospace" }}>
-                          <span style={{ color: isActive ? "#10b981" : "rgba(255,255,255,0.6)" }}>{sig.ticker}</span>
-                          {isActive && <span style={{ marginLeft: 4, fontSize: 8, background: "rgba(16,185,129,0.2)", color: "#10b981", padding: "1px 4px", borderRadius: 2, border: "1px solid rgba(16,185,129,0.4)" }}>SIGNAL</span>}
+                          <span style={{ color: isSignal ? "#10b981" : "rgba(255,255,255,0.6)" }}>{sig.ticker}</span>
+                          {isSignal && <span style={{ marginLeft: 4, fontSize: 8, background: "rgba(16,185,129,0.2)", color: "#10b981", padding: "1px 4px", borderRadius: 2, border: "1px solid rgba(16,185,129,0.4)" }}>SIGNAL</span>}
                         </td>
-                        <td style={{ padding: "5px 8px", color: "rgba(255,255,255,0.6)", textAlign: "right", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{sig.name}</td>
+                        <td style={{ padding: "5px 8px", color: "rgba(255,255,255,0.6)", textAlign: "right", maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{sig.name}</td>
                         <td style={{ padding: "5px 8px", textAlign: "right" }}>
                           <span style={{ color: sectorColor(sig.sector), fontSize: 9, fontWeight: 700 }}>{sig.sector}</span>
                         </td>
                         <td style={{ padding: "5px 8px", textAlign: "right", fontWeight: 700, fontFamily: "monospace",
-                          color: sig.ml_pred >= 1.0 ? "#10b981" : sig.ml_pred >= 0 ? "rgba(255,255,255,0.5)" : "#ef4444" }}>
+                          color: sig.ml_pred >= liveSettings.entryThreshold ? "#10b981" : sig.ml_pred >= 0 ? "rgba(255,255,255,0.5)" : "#ef4444" }}>
                           {sig.ml_pred >= 0 ? "+" : ""}{sig.ml_pred.toFixed(2)}%
                         </td>
-                        <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace", color: "rgba(255,255,255,0.7)" }}>
-                          {sig.last_close ? (sig.last_close >= 100 ? sig.last_close.toFixed(0) : sig.last_close.toFixed(2)) : "—"}
+                        <td style={{ padding: "5px 8px", textAlign: "right" }}>
+                          <div style={{ display: "flex", gap: 3, justifyContent: "flex-end" }}>
+                            <span style={chipStyle(sma200ok, liveSettings.requireSma200)}>200</span>
+                            <span style={chipStyle(sma50ok, liveSettings.requireSma50)}>50</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: "5px 8px", textAlign: "right" }}>
+                          <div style={{ display: "flex", gap: 3, justifyContent: "flex-end" }}>
+                            <span style={chipStyle((sig.mom1m ?? 0) > 0, liveSettings.momentumFilter >= 1)} title={`1m: ${sig.mom1m?.toFixed(1) ?? "—"}%`}>1M</span>
+                            <span style={chipStyle((sig.mom6m ?? 0) > 0, liveSettings.momentumFilter >= 2)} title={`6m: ${sig.mom6m?.toFixed(1) ?? "—"}%`}>6M</span>
+                          </div>
                         </td>
                         <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace", color: "rgba(255,255,255,0.5)", fontSize: 10 }}>
                           {sig.avg_nokvol >= 1e9 ? `${(sig.avg_nokvol / 1e9).toFixed(1)}B`
                             : sig.avg_nokvol >= 1e6 ? `${(sig.avg_nokvol / 1e6).toFixed(0)}M`
                             : `${(sig.avg_nokvol / 1e3).toFixed(0)}K`}
                         </td>
+                        <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace", color: "rgba(255,255,255,0.7)" }}>
+                          {sig.last_close ? (sig.last_close >= 100 ? sig.last_close.toFixed(0) : sig.last_close.toFixed(2)) : "—"}
+                        </td>
                         <td style={{ padding: "5px 8px", textAlign: "center" }}>
                           {isOpen ? (
                             <span style={{ fontSize: 9, color: "#3b82f6", fontFamily: "monospace" }}>IN POSITION</span>
                           ) : (
                             <button
-                              disabled={isLoading || !isActive}
-                              onClick={() => liveAction("enter", { ticker: sig.ticker, name: sig.name, entry_price: sig.last_close, ml_pred: sig.ml_pred })}
+                              disabled={isLoading || !canEnter}
+                              onClick={() => liveAction("enter", {
+                                ticker: sig.ticker, name: sig.name, entry_price: sig.last_close, ml_pred: sig.ml_pred,
+                                stopLossPct: liveSettings.stopLossPct,
+                                takeProfitPct: liveSettings.takeProfitPct,
+                                maxHoldDays: liveSettings.maxHoldDays,
+                                minHoldDays: liveSettings.minHoldDays,
+                                positionSizePct: liveSettings.positionSizePct,
+                                useTrailingStop: liveSettings.useTrailingStop,
+                                trailingStopPct: liveSettings.trailingStopPct,
+                                costBps: liveSettings.costBps,
+                              })}
                               style={{
                                 ...btnPrimary, padding: "4px 12px", fontSize: 10,
-                                opacity: isActive ? 1 : 0.3,
-                                background: isActive ? "linear-gradient(135deg, #10b981, #059669)" : "#21262d",
-                                cursor: isActive ? "pointer" : "not-allowed",
+                                opacity: canEnter ? 1 : 0.3,
+                                background: canEnter ? "linear-gradient(135deg, #10b981, #059669)" : "#21262d",
+                                cursor: canEnter ? "pointer" : "not-allowed",
                               }}>
                               {isLoading ? "..." : "ENTER"}
                             </button>
@@ -1911,13 +2183,14 @@ export default function AlphaPage() {
             )}
           </div>
 
-          {/* Open Positions */}
+          {/* ── Open Positions ── */}
           <div style={{ ...cardStyle, marginBottom: 12, border: "1px solid rgba(59,130,246,0.25)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <div style={sectionTitle}>OPEN POSITIONS ({livePositions.length})</div>
               {livePositions.length > 0 && (
                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>
-                  Stop 5% · TP 15% · 21d max hold · 3d min hold
+                  Stop {liveSettings.stopLossPct}% · TP {liveSettings.takeProfitPct}% · {liveSettings.maxHoldDays}d max · {liveSettings.minHoldDays}d min
+                  {liveSettings.useTrailingStop && ` · Trail ${liveSettings.trailingStopPct}%`}
                 </div>
               )}
             </div>
@@ -1927,10 +2200,10 @@ export default function AlphaPage() {
               </div>
             ) : (
               <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, minWidth: 780 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, minWidth: 860 }}>
                   <thead>
                     <tr style={{ borderBottom: "1px solid #30363d" }}>
-                      {(["TICKER", "ENTRY DATE", "ENTRY", "CURRENT", "STOP", "TP", "DAYS", "P&L", "MAX EXIT", "ACTION"] as const).map(h => (
+                      {(["TICKER", "ENTRY DATE", "ENTRY", "CURRENT", "STOP", "TP", "DAYS", "P&L", "NOK VALUE", "ACTION"] as const).map(h => (
                         <th key={h} style={{ padding: "4px 8px", fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.5)", textAlign: h === "TICKER" || h === "ACTION" ? "left" : "right", fontFamily: "monospace", letterSpacing: "0.05em", whiteSpace: "nowrap" as const }}>{h}</th>
                       ))}
                     </tr>
@@ -1940,8 +2213,10 @@ export default function AlphaPage() {
                       const pnl = pos.pnl_pct ?? 0;
                       const atStop = pos.current_close != null && pos.current_close <= pos.stop_price;
                       const atTP = pos.current_close != null && pos.current_close >= pos.tp_price;
-                      const atTime = (pos.days_held ?? 0) >= 21;
+                      const atTime = (pos.days_held ?? 0) >= liveSettings.maxHoldDays;
                       const isLoading = liveActionLoading === String(pos.id);
+                      const tradeValueNOK = (liveSettings.positionSizePct / 100) * liveSettings.portfolioValueNOK;
+                      const currentValueNOK = tradeValueNOK * (1 + pnl / 100);
                       return (
                         <tr key={pos.id} style={{ borderBottom: "1px solid rgba(48,54,61,0.3)", background: atStop ? "rgba(239,68,68,0.05)" : atTP ? "rgba(16,185,129,0.05)" : "transparent" }}>
                           <td style={{ padding: "5px 8px", fontWeight: 700, color: "#fff", fontFamily: "monospace" }}>
@@ -1974,9 +2249,9 @@ export default function AlphaPage() {
                             color: pnl > 0 ? "#10b981" : pnl < 0 ? "#ef4444" : "rgba(255,255,255,0.5)" }}>
                             {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}%
                           </td>
-                          <td style={{ padding: "5px 8px", textAlign: "right", fontSize: 10, fontFamily: "monospace",
-                            color: atTime ? "#f59e0b" : "rgba(255,255,255,0.4)", whiteSpace: "nowrap" as const }}>
-                            {pos.max_exit_date}
+                          <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace", fontSize: 10,
+                            color: pnl > 0 ? "#10b981" : pnl < 0 ? "#ef4444" : "rgba(255,255,255,0.4)" }}>
+                            {currentValueNOK.toLocaleString("nb-NO", { maximumFractionDigits: 0 })}
                           </td>
                           <td style={{ padding: "5px 8px", textAlign: "left" }}>
                             <button
@@ -1995,17 +2270,23 @@ export default function AlphaPage() {
             )}
           </div>
 
-          {/* Closed Trade History */}
+          {/* ── Closed Trade History ── */}
           <div style={{ ...cardStyle, border: "1px solid rgba(48,54,61,0.5)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <div style={sectionTitle}>CLOSED TRADES ({liveTrades.length})</div>
               {liveTrades.length > 0 && (() => {
                 const wins = liveTrades.filter(t => (t.pnl_pct ?? 0) > 0).length;
                 const avgPnl = liveTrades.reduce((s, t) => s + (t.pnl_pct ?? 0), 0) / liveTrades.length;
+                const totalPnl = liveTrades.reduce((s, t) => s + (t.pnl_pct ?? 0), 0);
+                const maxWin = Math.max(...liveTrades.map(t => t.pnl_pct ?? 0));
+                const maxLoss = Math.min(...liveTrades.map(t => t.pnl_pct ?? 0));
                 return (
                   <div style={{ display: "flex", gap: 16, fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.4)" }}>
-                    <span>Win rate: <span style={{ color: wins / liveTrades.length >= 0.5 ? "#10b981" : "#ef4444" }}>{(wins / liveTrades.length * 100).toFixed(0)}%</span></span>
-                    <span>Avg P&L: <span style={{ color: avgPnl >= 0 ? "#10b981" : "#ef4444" }}>{avgPnl >= 0 ? "+" : ""}{avgPnl.toFixed(2)}%</span></span>
+                    <span>Win rate: <span style={{ color: wins / liveTrades.length >= 0.5 ? "#10b981" : "#ef4444", fontWeight: 700 }}>{(wins / liveTrades.length * 100).toFixed(0)}%</span></span>
+                    <span>Avg P&amp;L: <span style={{ color: avgPnl >= 0 ? "#10b981" : "#ef4444" }}>{avgPnl >= 0 ? "+" : ""}{avgPnl.toFixed(2)}%</span></span>
+                    <span>Total: <span style={{ color: totalPnl >= 0 ? "#10b981" : "#ef4444" }}>{totalPnl >= 0 ? "+" : ""}{totalPnl.toFixed(1)}%</span></span>
+                    <span>Best: <span style={{ color: "#10b981" }}>+{maxWin.toFixed(2)}%</span></span>
+                    <span>Worst: <span style={{ color: "#ef4444" }}>{maxLoss.toFixed(2)}%</span></span>
                   </div>
                 );
               })()}
@@ -2018,7 +2299,7 @@ export default function AlphaPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid #30363d" }}>
-                    {(["TICKER", "ENTRY DATE", "EXIT DATE", "ENTRY", "EXIT", "DAYS", "EXIT REASON", "P&L"] as const).map(h => (
+                    {(["TICKER", "ENTRY", "EXIT", "ENTRY PRICE", "EXIT PRICE", "DAYS", "EXIT REASON", "P&L", "NOK P&L"] as const).map(h => (
                       <th key={h} style={{ padding: "4px 8px", fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.5)", textAlign: h === "TICKER" ? "left" : "right", fontFamily: "monospace", letterSpacing: "0.05em", whiteSpace: "nowrap" as const }}>{h}</th>
                     ))}
                   </tr>
@@ -2030,6 +2311,7 @@ export default function AlphaPage() {
                       : trade.exit_reason === "tp" ? "#10b981"
                       : trade.exit_reason === "time" ? "#f59e0b"
                       : "rgba(255,255,255,0.5)";
+                    const nokPnl = ((liveSettings.positionSizePct / 100) * liveSettings.portfolioValueNOK) * (pnl / 100);
                     return (
                       <tr key={trade.id} style={{ borderBottom: "1px solid rgba(48,54,61,0.3)" }}>
                         <td style={{ padding: "5px 8px", fontWeight: 700, color: "#fff", fontFamily: "monospace" }}>{trade.ticker}</td>
@@ -2046,6 +2328,10 @@ export default function AlphaPage() {
                         <td style={{ padding: "5px 8px", textAlign: "right", fontWeight: 700, fontFamily: "monospace",
                           color: pnl > 0 ? "#10b981" : pnl < 0 ? "#ef4444" : "rgba(255,255,255,0.5)" }}>
                           {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}%
+                        </td>
+                        <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace", fontSize: 10,
+                          color: nokPnl > 0 ? "#10b981" : nokPnl < 0 ? "#ef4444" : "rgba(255,255,255,0.4)" }}>
+                          {nokPnl >= 0 ? "+" : ""}{nokPnl.toLocaleString("nb-NO", { maximumFractionDigits: 0 })}
                         </td>
                       </tr>
                     );
@@ -2754,172 +3040,6 @@ export default function AlphaPage() {
                 )}
               </div>
 
-              {/* ── Parameter Sweep ── */}
-              {(() => {
-                const SWEEP_COLS: { key: string; label: string; fmt: (r: { params: SimParams; stats: SimStats }) => string; num?: boolean }[] = [
-                  { key: "entry",       label: "Entry",     fmt: r => `${r.params.entryThreshold}%`,  num: true },
-                  { key: "stop",        label: "Stop",      fmt: r => `-${r.params.stopLossPct}%`,     num: true },
-                  { key: "maxHold",     label: "MaxHold",   fmt: r => `${r.params.maxHoldDays}d`,      num: true },
-                  { key: "vol",         label: "Vol",       fmt: r => r.params.volGate.toUpperCase() },
-                  { key: "sma200",      label: "SMA200",    fmt: r => r.params.sma200Require ? "ON" : "—" },
-                  { key: "mom",         label: "Mom",       fmt: r => r.params.momentumFilter > 0 ? `${r.params.momentumFilter}/3` : "—" },
-                  { key: "trades",      label: "Trades",    fmt: r => `${r.stats.trades}`,             num: true },
-                  { key: "winRate",     label: "Win%",      fmt: r => `${(r.stats.winRate * 100).toFixed(0)}%`, num: true },
-                  { key: "totalReturn", label: "Total Ret", fmt: r => `${r.stats.totalReturn >= 0 ? "+" : ""}${(r.stats.totalReturn * 100).toFixed(0)}%`, num: true },
-                  { key: "annReturn",   label: "Ann Ret",   fmt: r => `${r.stats.annualizedReturn >= 0 ? "+" : ""}${(r.stats.annualizedReturn * 100).toFixed(1)}%`, num: true },
-                  { key: "sharpe",      label: "Sharpe",    fmt: r => r.stats.sharpe.toFixed(2),       num: true },
-                  { key: "maxDD",       label: "MaxDD",     fmt: r => `${(r.stats.maxDrawdown * 100).toFixed(1)}%`, num: true },
-                  { key: "vsObx",       label: "vs OBX",   fmt: r => `${r.stats.excessReturn >= 0 ? "+" : ""}${(r.stats.excessReturn * 100).toFixed(1)}%`, num: true },
-                ];
-
-                const sortedSweep = [...simSweepResults].sort((a, b) => {
-                  const getVal = (r: { params: SimParams; stats: SimStats }) => {
-                    if (simSweepSortKey === "entry")       return r.params.entryThreshold;
-                    if (simSweepSortKey === "stop")        return r.params.stopLossPct;
-                    if (simSweepSortKey === "maxHold")     return r.params.maxHoldDays;
-                    if (simSweepSortKey === "vol")         return r.params.volGate === 'hard' ? 1 : 0;
-                    if (simSweepSortKey === "sma200")      return r.params.sma200Require ? 1 : 0;
-                    if (simSweepSortKey === "mom")         return r.params.momentumFilter;
-                    if (simSweepSortKey === "trades")      return r.stats.trades;
-                    if (simSweepSortKey === "winRate")     return r.stats.winRate;
-                    if (simSweepSortKey === "totalReturn") return r.stats.totalReturn;
-                    if (simSweepSortKey === "annReturn")   return r.stats.annualizedReturn;
-                    if (simSweepSortKey === "sharpe")      return r.stats.sharpe;
-                    if (simSweepSortKey === "maxDD")       return r.stats.maxDrawdown; // lower is better but sort as number
-                    if (simSweepSortKey === "vsObx")       return r.stats.excessReturn;
-                    return 0;
-                  };
-                  return (getVal(a) - getVal(b)) * simSweepSortDir;
-                });
-
-                const thStyle = (key: string): React.CSSProperties => ({
-                  padding: "5px 8px", fontSize: 9, fontFamily: "monospace", fontWeight: 700,
-                  color: simSweepSortKey === key ? "#3b82f6" : "rgba(255,255,255,0.4)",
-                  textAlign: "right" as const, textTransform: "uppercase" as const, letterSpacing: "0.05em",
-                  cursor: "pointer", whiteSpace: "nowrap" as const, borderBottom: "1px solid #30363d",
-                  background: simSweepSortKey === key ? "rgba(59,130,246,0.06)" : "transparent",
-                  userSelect: "none" as const,
-                });
-
-                return (
-                  <div style={{ ...cardStyle, marginBottom: 12 }}>
-                    {/* Header / toggle */}
-                    <div onClick={() => setSimSweepOpen(v => !v)}
-                      style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-                      <div style={{ ...sectionTitle, marginBottom: 0 }}>PARAMETER SWEEP</div>
-                      <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.3)" }}>
-                        {simSweepResults.length > 0
-                          ? `${simSweepResults.length} combos · sorted by ${simSweepSortKey}`
-                          : "288 strategy combos — entry × stop × hold × vol × sma × mom"}
-                      </span>
-                      <span style={{ marginLeft: "auto", fontSize: 10, color: "rgba(255,255,255,0.3)" }}>
-                        {simSweepOpen ? "▲" : "▼"}
-                      </span>
-                    </div>
-
-                    {simSweepOpen && (
-                      <div style={{ marginTop: 12 }}>
-                        {/* Run controls */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                          <button onClick={runSweep} disabled={simSweepRunning || !simData}
-                            style={{ padding: "6px 16px", fontSize: 10, fontWeight: 700, fontFamily: "monospace",
-                              background: simSweepRunning ? "#21262d" : "linear-gradient(135deg,#3b82f6,#2563eb)",
-                              color: simSweepRunning ? "rgba(255,255,255,0.4)" : "#fff",
-                              border: "none", borderRadius: 5, cursor: simSweepRunning ? "default" : "pointer" }}>
-                            {simSweepRunning ? `Running… ${simSweepProgress}%` : "▶ RUN SWEEP"}
-                          </button>
-                          {simSweepRunning && (
-                            <div style={{ flex: 1, height: 4, background: "#21262d", borderRadius: 2, overflow: "hidden" }}>
-                              <div style={{ width: `${simSweepProgress}%`, height: "100%", background: "#3b82f6", borderRadius: 2, transition: "width 0.2s" }} />
-                            </div>
-                          )}
-                          {simSweepResults.length > 0 && !simSweepRunning && (
-                            <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.35)" }}>
-                              Top 50 · click row to apply params · click column header to sort
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Results table */}
-                        {sortedSweep.length > 0 && (
-                          <div style={{ overflowX: "auto", maxHeight: 420, overflowY: "auto", border: "1px solid #21262d", borderRadius: 6 }}>
-                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10, fontFamily: "monospace" }}>
-                              <thead style={{ position: "sticky", top: 0, background: "#0d1117", zIndex: 1 }}>
-                                <tr>
-                                  <th style={{ ...thStyle("rank"), textAlign: "center" as const }}>#</th>
-                                  {SWEEP_COLS.map(c => (
-                                    <th key={c.key} style={thStyle(c.key)}
-                                      onClick={e => { e.stopPropagation(); setSimSweepSortKey(c.key); setSimSweepSortDir(d => simSweepSortKey === c.key ? (d === -1 ? 1 : -1) : -1); }}>
-                                      {c.label} {simSweepSortKey === c.key ? (simSweepSortDir === -1 ? "↓" : "↑") : ""}
-                                    </th>
-                                  ))}
-                                  <th style={{ ...thStyle("apply"), textAlign: "center" as const }}></th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {sortedSweep.map((r, i) => {
-                                  const isTop = i < 5;
-                                  const sharpeColor = r.stats.sharpe >= 2 ? "#10b981" : r.stats.sharpe >= 1 ? "#3b82f6" : r.stats.sharpe >= 0 ? "rgba(255,255,255,0.6)" : "#ef4444";
-                                  const retColor = r.stats.totalReturn >= 0.5 ? "#10b981" : r.stats.totalReturn >= 0 ? "rgba(255,255,255,0.6)" : "#ef4444";
-                                  const ddColor = Math.abs(r.stats.maxDrawdown) < 0.1 ? "#10b981" : Math.abs(r.stats.maxDrawdown) < 0.2 ? "#f59e0b" : "#ef4444";
-                                  return (
-                                    <tr key={i}
-                                      onMouseEnter={e => e.currentTarget.style.background = "rgba(59,130,246,0.07)"}
-                                      onMouseLeave={e => e.currentTarget.style.background = isTop ? "rgba(16,185,129,0.04)" : "transparent"}
-                                      style={{ background: isTop ? "rgba(16,185,129,0.04)" : "transparent", borderBottom: "1px solid rgba(48,54,61,0.4)", cursor: "pointer" }}>
-                                      <td style={{ padding: "4px 8px", textAlign: "center", fontSize: 9, color: isTop ? "#10b981" : "rgba(255,255,255,0.3)", fontWeight: isTop ? 700 : 400 }}>{i + 1}</td>
-                                      {SWEEP_COLS.map(c => {
-                                        const val = c.fmt(r);
-                                        const color = c.key === "sharpe" ? sharpeColor
-                                          : c.key === "totalReturn" || c.key === "annReturn" || c.key === "vsObx" ? retColor
-                                          : c.key === "maxDD" ? ddColor
-                                          : c.key === "vol" && r.params.volGate === 'hard' ? "#f59e0b"
-                                          : c.key === "sma200" && r.params.sma200Require ? "#3b82f6"
-                                          : c.key === "mom" && r.params.momentumFilter > 0 ? "#3b82f6"
-                                          : "rgba(255,255,255,0.7)";
-                                        return (
-                                          <td key={c.key} style={{ padding: "4px 8px", textAlign: "right", color, fontWeight: (c.key === "sharpe" && isTop) ? 700 : 400 }}>
-                                            {val}
-                                          </td>
-                                        );
-                                      })}
-                                      <td style={{ padding: "4px 8px", textAlign: "center" }}>
-                                        <button onClick={e => {
-                                          e.stopPropagation();
-                                          setSimEntry(r.params.entryThreshold);
-                                          setSimExit(r.params.exitThreshold);
-                                          setSimStop(r.params.stopLossPct);
-                                          setSimTP(r.params.takeProfitPct);
-                                          setSimMaxHold(r.params.maxHoldDays);
-                                          setSimMom(r.params.momentumFilter);
-                                          setSimVolGate(r.params.volGate);
-                                          setSimSma200(r.params.sma200Require);
-                                          setSimPlayIdx(-1);
-                                          setSimIsPlaying(false);
-                                        }}
-                                          style={{ fontSize: 8, padding: "2px 7px", background: "#21262d", border: "1px solid #30363d",
-                                            borderRadius: 3, color: "#3b82f6", cursor: "pointer", fontFamily: "monospace", fontWeight: 700 }}>
-                                          APPLY
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-
-                        {!simSweepRunning && simSweepResults.length === 0 && (
-                          <div style={{ textAlign: "center", padding: "20px 0", fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.25)" }}>
-                            Click RUN SWEEP to test all parameter combinations on {simTicker}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
 
               {/* ── Row 5: Equity Curve vs OBX (full width, bottom) ── */}
               <div style={cardStyle}>

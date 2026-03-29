@@ -81,6 +81,7 @@ InEqRe_OBX/
 | **Commodity Terminal** | `/commodities` | `apps/web/src/app/commodities/page.tsx` |
 | **Commodity Detail** | `/commodities/[symbol]` | `apps/web/src/app/commodities/[symbol]/page.tsx` |
 | **Sector Intelligence** | `/sectors` | `apps/web/src/app/sectors/page.tsx` |
+| **Financials Intelligence** | `/financials` | `apps/web/src/app/financials/page.tsx` |
 
 ---
 
@@ -224,6 +225,15 @@ All endpoints in `apps/web/src/app/api/`
 | `GET /api/shipping/contracts` | Vessel contracts with rate vs spot comparison |
 | `GET /api/shipping/ports` | Reference ports |
 | `GET /api/shipping/exposure-matrix` | Company x vessel_class rate heatmap |
+
+### Financials APIs
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/financials/overview` | Company cards (price, returns, fundamentals, ML signal, shorts), rate snapshot, sector performance, recent news |
+| `GET /api/financials/rates` | Interest rate environment: current rates, yield curve, 2Y history, OLS rate sensitivity heatmap, cross-currency comparison |
+| `GET /api/financials/comparison` | Full scorecard: all sector stocks with fundamentals + technicals + price returns |
+| `GET /api/financials/signals` | ML predictions (full distribution), short interest with history + holders, insider transactions, auto-generated risk alerts |
+| `GET /api/financials/macro` | FX rates + 90d history, CB balance sheet regimes, oil/commodity exposure betas, FX revenue breakdown |
 
 ### System APIs
 | Endpoint | Purpose |
@@ -945,6 +955,30 @@ Toggle between OPTIMIZER and MANUAL PORTFOLIO at the top. Manual mode provides t
 ### Persistence
 - Save/load named portfolios via `portfolio_configs` table (scoped by profile)
 - CRUD API at `/api/portfolio/configs` (filtered by JWT profile)
+
+---
+
+## Financials & Insurance Intelligence Details
+
+Located at `/financials`. Monolithic "use client" page following the shipping/seafood terminal pattern. Accent color: `#6366f1` (indigo).
+
+### Companies Tracked (12 OSE-Listed)
+- **Banks (7)**: DNB, NOBA (Nordea), MING (SpareBank 1 SMN), SRBNK (SpareBank 1 SR-Bank), NOFI (SpareBank 1 Nord-Norge), HELG (SpareBank 1 Helgeland), PARB (Pareto Bank)
+- **Insurers (3)**: GJENSIDI (Gjensidige), STB (Storebrand), PROTCT (Protector Forsikring)
+- **Financial Services (2)**: AKER (Aker ASA), ABG (ABG Sundal Collier)
+
+### 5 Tabs
+1. **OVERVIEW** -- KPI strip (NB policy rate, NIBOR 3M, sector daily return, sector YTD), horizontal bar chart sorted by daily return, company grid cards with 90d sparklines, news feed
+2. **RATES** -- Rate strip, yield curve (LineChart), 2Y rate history (stepAfter for policy, monotone for NIBOR), OLS rate sensitivity heatmap (stock returns vs NIBOR 3M first-differences), scenario calculator with bps slider, cross-currency comparison table
+3. **SCORECARD** -- Sub-sector filter (all/bank/ins/fin), sortable comparison table (11 columns), valuation scatter (P/E vs Mom6M), momentum grouped bars
+4. **SIGNALS** -- Risk alert banner, ML prediction grid cards with signal labels (STRONG BUY to STRONG SELL), short interest table with expandable holders, insider transactions table
+5. **MACRO** -- FX strip (4 pairs), FX history dual-axis chart (90d), CB balance sheet regime table, oil/commodity exposure table, FX revenue heatmap
+
+### Data Sources
+- All data from existing DB tables (no new tables or dependencies)
+- Rate sensitivity computed server-side via OLS regression (min 60 aligned observations)
+- Interest rates stored as decimals (0.045 = 4.5%), multiplied by 100 for display
+- Tickers validated per API call -- only those present in `stocks` table are queried
 
 ---
 

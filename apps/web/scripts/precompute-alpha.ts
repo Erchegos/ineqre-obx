@@ -31,7 +31,7 @@ const pool = new Pool({
   max: 5,
 });
 
-const BEST_STOCKS_KEY = 'best_stocks_v15_fwdret_730d';
+const BEST_STOCKS_KEY = 'best_stocks_v16_ensemble_730d';
 
 // Same params as the individual stock simulator (Entry 1%, Exit 0.25%, Stop 5%, TP 15%, Min 3d, Max 21d, Cooldown 2)
 const FIXED_PARAMS: SimParams = {
@@ -92,17 +92,24 @@ async function computeBestStocks() {
       SELECT ticker, date, close,
         AVG(close) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 199 PRECEDING AND CURRENT ROW) AS sma200,
         AVG(close) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 49 PRECEDING AND CURRENT ROW) AS sma50,
-        (LEAD(close, 21) OVER (PARTITION BY ticker ORDER BY date) - close)
-          / NULLIF(close, 0) AS fwd_ret_21d,
         ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date) AS rn
       FROM raw
     )
-    SELECT ticker, date::text AS date, close, sma200, sma50, fwd_ret_21d
+    SELECT ticker, date::text AS date, close, sma200, sma50
     FROM with_stats
     WHERE rn > 200
       AND date >= CURRENT_DATE - 730 * INTERVAL '1 day'
     ORDER BY ticker, date ASC
   `, [tickers, TOTAL_DAYS]);
+
+  const mlPredRes = await pool.query(`
+    SELECT ticker, prediction_date::text AS date, ensemble_prediction::float AS ml_pred
+    FROM ml_predictions
+    WHERE ticker = ANY($1)
+      AND prediction_date >= CURRENT_DATE - 730 * INTERVAL '1 day'
+      AND ensemble_prediction IS NOT NULL
+    ORDER BY ticker, prediction_date ASC
+  `, [tickers]);
 
   const momRes = await pool.query(`
     SELECT ticker, date::text AS date, mom1m::float, mom6m::float, mom11m::float, vol1m::float
@@ -140,7 +147,13 @@ async function computeBestStocks() {
     momByTicker.get(r.ticker)!.set(r.date.slice(0,10), r);
   }
 
-  type PxRow = { ticker: string; date: string; close: number; sma200: number; sma50: number; fwd_ret_21d: number | null };
+  const mlPredByTicker = new Map<string, Map<string, number>>();
+  for (const r of mlPredRes.rows) {
+    if (!mlPredByTicker.has(r.ticker)) mlPredByTicker.set(r.ticker, new Map());
+    mlPredByTicker.get(r.ticker)!.set(r.date.slice(0,10), r.ml_pred);
+  }
+
+  type PxRow = { ticker: string; date: string; close: number; sma200: number; sma50: number };
   const pxByTicker = new Map<string, PxRow[]>();
   for (const r of priceRes.rows as PxRow[]) {
     if (!pxByTicker.has(r.ticker)) pxByTicker.set(r.ticker, []);
@@ -160,14 +173,16 @@ async function computeBestStocks() {
 
     const momMap = momByTicker.get(ticker) ?? new Map<string, MomRow>();
 
+    const mlMap = mlPredByTicker.get(ticker) ?? new Map<string, number>();
     const input: SimInputBar[] = pxRows.map(px => {
       const d = px.date.slice(0,10);
       const mom = momMap.get(d);
+      const mlPred = mlMap.get(d) ?? null;
       return {
         date: d, open: px.close, close: px.close, high: px.close, low: px.close,
         volume: 0, sma200: px.sma200 ?? null, sma50: px.sma50 ?? null,
-        mlPrediction: px.fwd_ret_21d ?? null,
-        mlConfidence: px.fwd_ret_21d != null ? 0.8 : null,
+        mlPrediction: mlPred,
+        mlConfidence: mlPred != null ? 0.8 : null,
         mom1m: mom?.mom1m ?? null, mom6m: mom?.mom6m ?? null,
         mom11m: mom?.mom11m ?? null, vol1m: mom?.vol1m ?? null,
         volRegime: null as 'low'|'high'|null,
