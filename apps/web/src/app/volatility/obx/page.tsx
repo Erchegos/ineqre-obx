@@ -3,23 +3,12 @@
 /**
  * OBX Index-Level Volatility Dashboard
  *
- * Phase 5: Market-wide volatility intelligence for the Oslo Bors.
- * Shows OBX regime, constituent heatmap, vol cone, systemic risk,
- * and links to ML models for OBX index.
+ * Market-wide volatility intelligence for the Oslo Bors.
+ * Shows OBX regime, constituent heatmap, vol cone, systemic risk.
  */
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  ReferenceLine,
-} from "recharts";
+import { useEffect, useState } from "react";
 
 import ConstituentHeatmap from "@/components/ConstituentHeatmap";
 import VolConeChart from "@/components/VolConeChart";
@@ -81,15 +70,15 @@ export default function OBXVolatilityDashboard() {
 
   if (loading && !data) {
     return (
-      <main style={{ padding: 24, fontFamily: "monospace" }}>
+      <main style={{ padding: 24, fontFamily: "monospace", background: "#0a0a0a", minHeight: "100vh" }}>
         <div style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>Loading OBX dashboard...</div>
       </main>
     );
   }
   if (error || !data) {
     return (
-      <main style={{ padding: 24, fontFamily: "monospace" }}>
-        <div style={{ color: "#F44336" }}>Error: {error}</div>
+      <main style={{ padding: 24, fontFamily: "monospace", background: "#0a0a0a", minHeight: "100vh" }}>
+        <div style={{ color: "#ef4444" }}>Error: {error}</div>
       </main>
     );
   }
@@ -99,16 +88,17 @@ export default function OBXVolatilityDashboard() {
   const regimeColor = getRegimeColor(regime);
 
   return (
-    <main style={{ padding: "20px 16px", maxWidth: 1400, margin: "0 auto" }}>
-      {/* ═══ HEADER ═══ */}
+    <main style={{ padding: "20px 24px", maxWidth: 1400, margin: "0 auto", fontFamily: "monospace" }}>
+
+      {/* ── HEADER ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Link href="/stocks" style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.5)", textDecoration: "none", fontFamily: "monospace" }}>
+          <Link href="/stocks" style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.5)", textDecoration: "none" }}>
             ← Asset List
           </Link>
           <span style={{ color: "#30363d" }}>|</span>
-          <span style={{ fontSize: 20, fontWeight: 700, fontFamily: "monospace", color: "#fff" }}>OBX</span>
-          <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", fontFamily: "monospace" }}>Index Volatility Dashboard</span>
+          <span style={{ fontSize: 20, fontWeight: 700, color: "#fff" }}>OBX</span>
+          <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>Index Volatility Dashboard</span>
         </div>
         <div style={{ display: "flex", gap: 2 }}>
           {[
@@ -127,7 +117,7 @@ export default function OBXVolatilityDashboard() {
                   border: `1px solid ${isActive ? "#3b82f6" : "#30363d"}`,
                   background: isActive ? "#3b82f6" : "transparent",
                   color: isActive ? "#fff" : "rgba(255,255,255,0.5)",
-                  cursor: "pointer", fontFamily: "monospace",
+                  cursor: "pointer",
                 }}
               >
                 {tf.l}
@@ -137,18 +127,19 @@ export default function OBXVolatilityDashboard() {
         </div>
       </div>
 
-      {/* ═══ 1. REGIME STATUS BAR ═══ */}
+      {/* ── REGIME STATUS BAR ── */}
       <div
         style={{
-          padding: "10px 16px",
-          borderRadius: 6,
+          padding: "12px 16px",
+          borderRadius: 8,
           marginBottom: 16,
           background: getRegimeBackgroundTint(regime),
           border: `1px solid ${regimeColor}33`,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          fontFamily: "monospace",
+          flexWrap: "wrap",
+          gap: 8,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -163,46 +154,50 @@ export default function OBXVolatilityDashboard() {
         </span>
       </div>
 
-      {/* ═══ 2. DASHBOARD: 3-column layout ═══ */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 24 }}>
+      {/* ── 3-COLUMN METRICS ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginBottom: 20 }}>
         {/* Col 1: Index Vol Metrics */}
-        <DashboardCard title="Index Volatility">
+        <MetricCard title="Index Volatility">
           <MetricRow label="Yang-Zhang" value={fmtPct(idx.yangZhang)} />
           <MetricRow label="20d Rolling" value={fmtPct(idx.rolling20)} />
           <MetricRow label="60d Rolling" value={fmtPct(idx.rolling60)} />
           <MetricRow label="120d Rolling" value={fmtPct(idx.rolling120)} />
           <MetricRow label="EWMA (λ=.94)" value={fmtPct(idx.ewma94)} />
-          <MetricRow label="Percentile" value={`P${idx.percentile?.toFixed(0) ?? "—"}`} highlight />
-        </DashboardCard>
-
-        {/* Col 2: Constituent Distribution */}
-        <DashboardCard title="Regime Distribution">
-          <RegimeDistribution distribution={data.summary.regimeDistribution} total={data.constituentCount} />
-          <div style={{ marginTop: 8, borderTop: "1px solid #30363d", paddingTop: 8 }}>
-            <MetricRow label="Constituents" value={String(data.constituentCount)} />
-            <MetricRow label="High Vol" value={String(data.summary.highVolCount)} color="#F44336" />
-            <MetricRow label="Low Vol" value={String(data.summary.lowVolCount)} color="#4CAF50" />
+          <div style={{ borderTop: "1px solid #30363d", marginTop: 6, paddingTop: 6 }}>
+            <MetricRow label="Percentile" value={`P${idx.percentile?.toFixed(0) ?? "—"}`} highlight />
           </div>
-        </DashboardCard>
+        </MetricCard>
+
+        {/* Col 2: Regime Distribution */}
+        <MetricCard title="Regime Distribution">
+          <RegimeDistribution distribution={data.summary.regimeDistribution} total={data.constituentCount} />
+          <div style={{ marginTop: 10, borderTop: "1px solid #30363d", paddingTop: 8 }}>
+            <MetricRow label="Constituents" value={String(data.constituentCount)} />
+            <MetricRow label="High Vol" value={String(data.summary.highVolCount)} color="#ef4444" />
+            <MetricRow label="Low Vol" value={String(data.summary.lowVolCount)} color="#10b981" />
+          </div>
+        </MetricCard>
 
         {/* Col 3: Systemic Risk */}
-        <DashboardCard title="Systemic Risk">
+        <MetricCard title="Systemic Risk">
           <MetricRow label="Avg Correlation" value={data.currentAvgCorrelation != null ? data.currentAvgCorrelation.toFixed(3) : "—"} highlight />
           <MetricRow label="Avg Vol" value={fmtPct(data.summary.avgConstituentVol)} />
           <MetricRow label="Vol Dispersion" value={fmtPct(data.summary.volDispersion)} />
-          <div style={{ marginTop: 6, fontSize: 10, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>
-            {data.currentAvgCorrelation != null && data.currentAvgCorrelation > 0.6
-              ? "High correlation — diversification benefit reduced. Systemic risk elevated."
-              : data.currentAvgCorrelation != null && data.currentAvgCorrelation < 0.3
-                ? "Low correlation — good diversification. Idiosyncratic moves dominate."
-                : "Moderate correlation — normal market conditions."}
+          <div style={{ marginTop: 8, padding: "6px 8px", borderRadius: 4, background: "rgba(255,255,255,0.03)", border: "1px solid #21262d" }}>
+            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>
+              {data.currentAvgCorrelation != null && data.currentAvgCorrelation > 0.6
+                ? "High correlation — diversification benefit reduced. Systemic risk elevated."
+                : data.currentAvgCorrelation != null && data.currentAvgCorrelation < 0.3
+                  ? "Low correlation — good diversification. Idiosyncratic moves dominate."
+                  : "Moderate correlation — normal market conditions."}
+            </div>
           </div>
-        </DashboardCard>
+        </MetricCard>
       </div>
 
-      {/* ═══ 3. REGIME TIMELINE (price + regime overlay) ═══ */}
+      {/* ── REGIME TIMELINE ── */}
       {data.regimeHistory && data.regimeHistory.length > 0 && (
-        <div style={{ marginBottom: 24 }}>
+        <div style={{ marginBottom: 20 }}>
           <RegimeTimeline
             data={data.regimeHistory}
             regimeStats={{
@@ -214,82 +209,84 @@ export default function OBXVolatilityDashboard() {
         </div>
       )}
 
-      {/* ═══ 4. TWO-COLUMN: Vol Cone + Avg Correlation ═══ */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20, marginBottom: 24 }}>
-        {/* Vol Cone */}
-        <div>
-          {data.volCone && <VolConeChart data={data.volCone} />}
+      {/* ── VOL CONE ── */}
+      {data.volCone && (
+        <div style={{ marginBottom: 20 }}>
+          <VolConeChart data={data.volCone} />
         </div>
+      )}
 
-        {/* Rolling Avg Pairwise Correlation */}
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(255,255,255,0.6)", fontFamily: "monospace", marginBottom: 8 }}>
-            Rolling Avg Pairwise Correlation (60d)
-          </div>
-          <CorrelationChart data={data.avgPairwiseCorrelation} />
-        </div>
-      </div>
-
-      {/* ═══ 5. CONSTITUENT HEATMAP ═══ */}
-      <div style={{ marginBottom: 24 }}>
+      {/* ── CONSTITUENT HEATMAP ── */}
+      <div style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(255,255,255,0.6)", fontFamily: "monospace" }}>
-            Constituent Volatility
-          </div>
-          <span style={{ fontSize: 11, fontFamily: "monospace", color: "rgba(255,255,255,0.5)" }}>
+          <SectionTitle>Constituent Volatility</SectionTitle>
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
             {data.constituentCount} stocks · Click ticker for detail
           </span>
         </div>
-        <div style={{ padding: 16, borderRadius: 6, border: "1px solid #30363d", background: "#161b22" }}>
+        <div style={{ padding: 16, borderRadius: 8, border: "1px solid #30363d", background: "rgba(255,255,255,0.02)" }}>
           <ConstituentHeatmap constituents={data.constituents} />
         </div>
       </div>
 
-      {/* ═══ 6. INTERPRETATION ═══ */}
+      {/* ── MARKET ASSESSMENT ── */}
       <div style={{
-        padding: "12px 16px",
-        borderRadius: 6,
+        padding: "14px 16px",
+        borderRadius: 8,
         border: "1px solid #30363d",
-        background: "#161b22",
-        fontFamily: "monospace",
+        background: "rgba(255,255,255,0.02)",
         fontSize: 12,
         color: "rgba(255,255,255,0.5)",
-        lineHeight: 1.6,
+        lineHeight: 1.7,
+        marginBottom: 16,
       }}>
-        <span style={{ fontWeight: 700, color: "#fff" }}>Market Assessment:</span>{" "}
-        {idx.interpretation}
+        <span style={{ fontWeight: 700, color: "rgba(255,255,255,0.8)", fontSize: 11, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+          Market Assessment
+        </span>
+        <div style={{ marginTop: 6 }}>{idx.interpretation}</div>
       </div>
 
-      {/* Data Sources */}
-      <div style={{ borderTop: "1px solid #30363d", marginTop: 16, padding: "12px 16px", fontSize: 9, color: "rgba(255,255,255,0.5)", lineHeight: 1.8 }}>
-        <span style={{ fontWeight: 700, letterSpacing: "0.06em" }}>DATA SOURCES</span>
+      {/* ── DATA SOURCES ── */}
+      <div style={{ borderTop: "1px solid #21262d", paddingTop: 12, fontSize: 9, color: "rgba(255,255,255,0.3)", lineHeight: 1.8 }}>
+        <span style={{ fontWeight: 700, letterSpacing: "0.06em", color: "rgba(255,255,255,0.4)" }}>DATA SOURCES</span>
         <div style={{ marginTop: 4 }}>
-          <span style={{ color: "#fff", opacity: 0.5 }}>Prices:</span> Interactive Brokers TWS API, Yahoo Finance &middot;{" "}
-          <span style={{ color: "#fff", opacity: 0.5 }}>Volatility:</span> Yang-Zhang estimator, EWMA &middot;{" "}
-          <span style={{ color: "#fff", opacity: 0.5 }}>Regime:</span> 6-regime classification (percentile-based) &middot;{" "}
-          <span style={{ color: "#fff", opacity: 0.5 }}>Correlation:</span> Rolling 60-day window, OBX constituent data
+          Prices: Interactive Brokers TWS API, Yahoo Finance &middot;{" "}
+          Volatility: Yang-Zhang estimator, EWMA &middot;{" "}
+          Regime: 6-regime classification (percentile-based) &middot;{" "}
+          Correlation: Rolling 60-day window, OBX constituent data
         </div>
       </div>
+
     </main>
   );
 }
 
 // ── Helper Components ──
 
-function DashboardCard({ title, children }: { title: string; children: React.ReactNode }) {
+function MetricCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{
-      padding: 16, borderRadius: 8,
+      padding: 16,
+      borderRadius: 8,
       border: "1px solid #30363d",
-      background: "#161b22",
+      background: "rgba(255,255,255,0.02)",
     }}>
-      <div style={{
-        fontSize: 11, fontWeight: 700, textTransform: "uppercase",
-        letterSpacing: "0.08em", color: "rgba(255,255,255,0.6)",
-        fontFamily: "monospace", marginBottom: 10,
-      }}>
-        {title}
-      </div>
+      <SectionTitle>{title}</SectionTitle>
+      <div style={{ marginTop: 10 }}>{children}</div>
+    </div>
+  );
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      fontSize: 11,
+      fontWeight: 700,
+      textTransform: "uppercase",
+      letterSpacing: "0.08em",
+      color: "rgba(255,255,255,0.6)",
+      fontFamily: "monospace",
+    }}>
       {children}
     </div>
   );
@@ -297,12 +294,12 @@ function DashboardCard({ title, children }: { title: string; children: React.Rea
 
 function MetricRow({ label, value, highlight, color }: { label: string; value: string; highlight?: boolean; color?: string }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 0", fontFamily: "monospace", fontSize: 12 }}>
+    <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontFamily: "monospace", fontSize: 12 }}>
       <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>{label}</span>
       <span style={{
         fontWeight: highlight ? 700 : 600,
         fontSize: highlight ? 14 : 12,
-        color: color || "#fff",
+        color: color ?? "#fff",
       }}>
         {value}
       </span>
@@ -313,17 +310,17 @@ function MetricRow({ label, value, highlight, color }: { label: string; value: s
 function RegimeDistribution({ distribution, total }: { distribution: Record<string, number>; total: number }) {
   const regimes = [
     { key: "Crisis", color: "#B71C1C" },
-    { key: "Extreme High", color: "#F44336" },
-    { key: "Elevated", color: "#FF9800" },
+    { key: "Extreme High", color: "#ef4444" },
+    { key: "Elevated", color: "#f59e0b" },
     { key: "Normal", color: "#9E9E9E" },
-    { key: "Low & Contracting", color: "#4CAF50" },
+    { key: "Low & Contracting", color: "#10b981" },
     { key: "Low & Stable", color: "#1B5E20" },
   ];
 
   return (
     <div>
       {/* Stacked bar */}
-      <div style={{ display: "flex", height: 12, borderRadius: 3, overflow: "hidden", marginBottom: 8 }}>
+      <div style={{ display: "flex", height: 12, borderRadius: 4, overflow: "hidden", marginBottom: 8, border: "1px solid #21262d" }}>
         {regimes.map(({ key, color }) => {
           const count = distribution[key] || 0;
           if (count === 0) return null;
@@ -338,7 +335,7 @@ function RegimeDistribution({ distribution, total }: { distribution: Record<stri
         })}
       </div>
       {/* Labels */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 8px" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 8px" }}>
         {regimes.map(({ key, color }) => {
           const count = distribution[key] || 0;
           if (count === 0) return null;
@@ -349,66 +346,6 @@ function RegimeDistribution({ distribution, total }: { distribution: Record<stri
           );
         })}
       </div>
-    </div>
-  );
-}
-
-function CorrelationChart({ data }: { data: Array<{ date: string; avgCorrelation: number }> }) {
-  if (!data || data.length === 0) {
-    return (
-      <div style={{ padding: 16, borderRadius: 6, border: "1px solid #30363d", background: "#0d1117", height: 260, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "monospace", fontSize: 12, color: "rgba(255,255,255,0.5)" }}>
-        Insufficient data for correlation
-      </div>
-    );
-  }
-
-  const chartData = data.map((d) => ({
-    date: d.date,
-    correlation: d.avgCorrelation,
-  }));
-
-  const fmtDate = (d: string) => (d.length >= 10 ? d.slice(5) : d);
-
-  return (
-    <div style={{ padding: 16, borderRadius: 6, border: "1px solid #30363d", background: "#0d1117" }}>
-      <ResponsiveContainer width="100%" height={228}>
-        <AreaChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#30363d" strokeOpacity={0.3} />
-          <XAxis
-            dataKey="date"
-            tickFormatter={fmtDate}
-            tick={{ fontSize: 10, fill: "rgba(255,255,255,0.5)" }}
-            interval="preserveStartEnd"
-            minTickGap={50}
-          />
-          <YAxis
-            domain={[0, 1]}
-            tickFormatter={(v: number) => v.toFixed(2)}
-            tick={{ fontSize: 10, fill: "rgba(255,255,255,0.5)" }}
-            width={35}
-          />
-          <Tooltip
-            contentStyle={{
-              background: "#161b22",
-              border: "1px solid #30363d",
-              borderRadius: 4,
-              fontSize: 11,
-              fontFamily: "monospace",
-            }}
-            formatter={(v: unknown) => [`${Number(v).toFixed(3)}`, "Avg Correlation"]}
-          />
-          <ReferenceLine y={0.5} stroke="rgba(255,255,255,0.5)" strokeDasharray="4 4" strokeOpacity={0.4} />
-          <ReferenceLine y={0.3} stroke="#4CAF50" strokeDasharray="2 4" strokeOpacity={0.3} />
-          <ReferenceLine y={0.6} stroke="#F44336" strokeDasharray="2 4" strokeOpacity={0.3} />
-          <Area
-            type="monotone"
-            dataKey="correlation"
-            stroke="#3b82f6"
-            strokeWidth={1.5}
-            fill="rgba(59,130,246,0.1)"
-          />
-        </AreaChart>
-      </ResponsiveContainer>
     </div>
   );
 }
