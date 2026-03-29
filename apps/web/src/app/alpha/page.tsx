@@ -298,15 +298,34 @@ export default function AlphaPage() {
   };
   type LivePortfolio = {
     totalExposurePct: number; totalUnrealizedPnl: number;
-    openCount: number; sectorBreakdown: Record<string, number>;
+    openCount: number; pendingCount: number; sectorBreakdown: Record<string, number>;
   };
+  type LivePending = {
+    id: number; ticker: string; name: string;
+    entry_price: number; limit_price?: number;
+    stop_price: number; tp_price: number;
+    order_type: string; tif: string;
+    ml_pred?: number; pos_size_pct?: number;
+    accepted_at: string; notes?: string;
+    current_close?: number;
+  };
+  type OrderEntry = {
+    ticker: string; name: string;
+    order_type: 'MARKET' | 'LIMIT' | 'STOP';
+    limit_price: string;
+    tif: 'DAY' | 'GTC' | 'OPG';
+    ml_pred: number;
+    last_close: number;
+    notes: string;
+  };
+
   const [liveSignals, setLiveSignals] = useState<LiveSignal[]>([]);
+  const [livePending, setLivePending] = useState<LivePending[]>([]);
   const [livePositions, setLivePositions] = useState<LivePosition[]>([]);
   const [liveTrades, setLiveTrades] = useState<LiveTrade[]>([]);
   const [livePortfolio, setLivePortfolio] = useState<LivePortfolio | null>(null);
   const [liveLoading, setLiveLoading] = useState(false);
   const [liveActionLoading, setLiveActionLoading] = useState<string | null>(null);
-  const [liveSettingsOpen, setLiveSettingsOpen] = useState(false);
   const [liveSettings, setLiveSettings] = useState<LiveSettings>(() => {
     try {
       const raw = localStorage.getItem('alpha_live_settings_v1');
@@ -315,6 +334,8 @@ export default function AlphaPage() {
     return DEFAULT_LIVE_SETTINGS;
   });
   const [liveCheckResult, setLiveCheckResult] = useState<{ triggered: { ticker: string; exitReason: string; pnlPct: string }[] } | null>(null);
+  const [liveOrderEntry, setLiveOrderEntry] = useState<OrderEntry | null>(null);
+  const [liveSettingsExpanded, setLiveSettingsExpanded] = useState(false);
 
   // ============================================================================
   // Auth
@@ -548,6 +569,7 @@ export default function AlphaPage() {
       if (res.ok) {
         const d = await res.json();
         setLiveSignals(d.signals || []);
+        setLivePending(d.pending || []);
         setLivePositions(d.positions || []);
         setLiveTrades(d.closed || []);
         setLivePortfolio(d.portfolio || null);
@@ -1823,442 +1845,553 @@ export default function AlphaPage() {
       {/* ================================================================ */}
       {/* LIVE TRADING TAB                                                  */}
       {/* ================================================================ */}
-      {tab === "live" && (
-        <div>
-          {/* ── Header ── */}
-          <div style={{ ...cardStyle, marginBottom: 12, background: "linear-gradient(135deg, rgba(16,185,129,0.04), rgba(59,130,246,0.03))", border: "1px solid rgba(16,185,129,0.2)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#10b981", fontFamily: "monospace", marginBottom: 4 }}>
-                  LIVE TRADING — SEMI-AUTOMATIC
-                </div>
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>
-                  Signal: ensemble_prediction · Entry &gt;{liveSettings.entryThreshold}% · Stop {liveSettings.stopLossPct}% · TP {liveSettings.takeProfitPct}% · {liveSettings.maxHoldDays}d max · {liveSettings.minHoldDays}d min
-                </div>
+      {tab === "live" && (() => {
+        // ── Market hours util (Oslo Børs: Mon-Fri 09:00-16:25 CET/CEST) ──
+        const oseMarketStatus = (() => {
+          const now = new Date();
+          const parts = new Intl.DateTimeFormat('en-GB', {
+            timeZone: 'Europe/Oslo',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            weekday: 'short', year: 'numeric', month: '2-digit', day: '2-digit',
+          }).formatToParts(now);
+          const get = (type: string) => parts.find(p => p.type === type)?.value ?? '';
+          const h = parseInt(get('hour')), m = parseInt(get('minute'));
+          const wd = get('weekday');
+          const isWeekend = wd === 'Sat' || wd === 'Sun';
+          const mins = h * 60 + m;
+          const isOpen = !isWeekend && mins >= 9 * 60 && mins < 16 * 60 + 25;
+          const isPreOpen = !isWeekend && mins >= 8 * 60 + 15 && mins < 9 * 60;
+          const timeStr = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')} CET`;
+          const dateStr = `${get('day')} ${get('month').replace('.','').toUpperCase()} ${get('year')}`;
+          const sessionStatus = isOpen ? 'OPEN' : isPreOpen ? 'PRE-OPEN' : 'CLOSED';
+          return { isOpen, isPreOpen, timeStr, dateStr, sessionStatus };
+        })();
+
+        // ── Derived portfolio stats ──
+        const totalPnl = livePositions.length > 0
+          ? livePositions.reduce((s, p) => s + (p.pnl_pct ?? 0), 0)
+          : 0;
+        const deployed = livePositions.length * liveSettings.positionSizePct;
+        const freeSlots = Math.max(0, liveSettings.maxPositions - livePositions.length);
+        const winCount = liveTrades.filter(t => (t.pnl_pct ?? 0) > 0).length;
+        const winRate = liveTrades.length > 0 ? winCount / liveTrades.length * 100 : 0;
+
+        // ── Styles (Bloomberg terminal palette) ──
+        const T = {
+          bg: "#060a0f",
+          panel: "#0a0f17",
+          panelBorder: "#1a2535",
+          rowBorder: "#111922",
+          headerBg: "#0d1420",
+          headerBorder: "#1e2d42",
+          label: "#4a6b8a",
+          dimText: "rgba(180,200,220,0.4)",
+          mutedText: "rgba(180,200,220,0.6)",
+          text: "#c8d8e8",
+          bright: "#e8f0f8",
+          accent: "#2196f3",
+          success: "#00c896",
+          danger: "#ff4d4f",
+          warning: "#ffa726",
+          pending: "#9c6bff",
+          inputBg: "#0a1420",
+          inputBorder: "#1e2d42",
+        };
+
+        const labelStyle: React.CSSProperties = {
+          fontSize: 8, fontWeight: 700, color: T.label,
+          fontFamily: "monospace", letterSpacing: "0.08em", textTransform: "uppercase",
+        };
+        const cellStyle: React.CSSProperties = {
+          padding: "2px 0 6px 0",
+        };
+        const inputStyle: React.CSSProperties = {
+          width: "100%", background: T.inputBg, border: `1px solid ${T.inputBorder}`,
+          borderRadius: 0, color: T.text, padding: "4px 6px",
+          fontFamily: "monospace", fontSize: 11, outline: "none",
+        };
+        const selectStyle: React.CSSProperties = {
+          ...inputStyle, cursor: "pointer",
+        };
+        const dividerV: React.CSSProperties = {
+          borderLeft: `1px solid ${T.headerBorder}`,
+          margin: "0 12px",
+        };
+        const thS: React.CSSProperties = {
+          padding: "4px 8px", fontSize: 8, fontWeight: 700, color: T.label,
+          fontFamily: "monospace", letterSpacing: "0.06em", textTransform: "uppercase",
+          borderBottom: `1px solid ${T.headerBorder}`, whiteSpace: "nowrap",
+        };
+        const tdS = (align: "left"|"right"|"center" = "right"): React.CSSProperties => ({
+          padding: "4px 8px", fontSize: 10, fontFamily: "monospace",
+          color: T.text, textAlign: align, borderBottom: `1px solid ${T.rowBorder}`,
+          whiteSpace: "nowrap",
+        });
+
+        const statusColor = oseMarketStatus.isOpen ? T.success
+          : oseMarketStatus.isPreOpen ? T.warning : T.danger;
+
+        return (
+          <div style={{ background: T.bg, fontFamily: "monospace" }}>
+
+            {/* ══ STATUS BAR ══════════════════════════════════════════════════ */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: 0,
+              background: T.headerBg, border: `1px solid ${T.headerBorder}`,
+              borderBottom: `1px solid ${T.headerBorder}`, marginBottom: 1, padding: "0 12px",
+              height: 28,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, paddingRight: 12, borderRight: `1px solid ${T.headerBorder}` }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: T.label }}>OSE</span>
+                <span style={{ fontSize: 9, fontWeight: 800, color: statusColor, letterSpacing: "0.06em" }}>{oseMarketStatus.sessionStatus}</span>
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 12px", borderRight: `1px solid ${T.headerBorder}` }}>
+                <span style={{ fontSize: 9, color: T.label }}>TIME</span>
+                <span style={{ fontSize: 9, fontWeight: 700, color: T.text }}>{oseMarketStatus.timeStr}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 12px", borderRight: `1px solid ${T.headerBorder}` }}>
+                <span style={{ fontSize: 9, color: T.label }}>DATE</span>
+                <span style={{ fontSize: 9, color: T.text }}>{oseMarketStatus.dateStr}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 12px", borderRight: `1px solid ${T.headerBorder}` }}>
+                <span style={{ fontSize: 9, color: T.label }}>DEPLOYED</span>
+                <span style={{ fontSize: 9, fontWeight: 700, color: deployed > 60 ? T.warning : T.accent }}>{deployed.toFixed(0)}%</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 12px", borderRight: `1px solid ${T.headerBorder}` }}>
+                <span style={{ fontSize: 9, color: T.label }}>UNREALIZED P&amp;L</span>
+                <span style={{ fontSize: 9, fontWeight: 700, color: totalPnl >= 0 ? T.success : T.danger }}>
+                  {totalPnl >= 0 ? "+" : ""}{totalPnl.toFixed(2)}%
+                </span>
+              </div>
+              {liveTrades.length > 0 && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 12px", borderRight: `1px solid ${T.headerBorder}` }}>
+                  <span style={{ fontSize: 9, color: T.label }}>WIN RATE</span>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: winRate >= 50 ? T.success : T.danger }}>{winRate.toFixed(0)}%</span>
+                </div>
+              )}
+              <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+                {livePending.length > 0 && (
+                  <button
+                    onClick={() => liveAction("activate_pending", { market_is_open: oseMarketStatus.isOpen })}
+                    disabled={!!liveActionLoading}
+                    style={{ fontSize: 8, fontWeight: 700, padding: "3px 10px", background: "transparent",
+                      border: `1px solid ${T.pending}`, color: T.pending, cursor: "pointer", letterSpacing: "0.05em" }}>
+                    ACTIVATE PENDING ({livePending.length})
+                  </button>
+                )}
                 <button
-                  onClick={() => setLiveSettingsOpen(v => !v)}
-                  style={{ ...btnSecondary, fontSize: 10, padding: "6px 14px", borderColor: liveSettingsOpen ? "#3b82f6" : "#30363d", color: liveSettingsOpen ? "#3b82f6" : "rgba(255,255,255,0.6)" }}>
-                  ⚙ PARAMETERS {liveSettingsOpen ? "▲" : "▼"}
-                </button>
-                <button
-                  onClick={() => liveAction("check_rules", { settings: liveSettings })}
+                  onClick={() => liveAction("check_rules", { settings: liveSettings, market_is_open: oseMarketStatus.isOpen })}
                   disabled={!!liveActionLoading}
-                  style={{ ...btnSecondary, fontSize: 10, padding: "6px 14px", borderColor: "#f59e0b", color: "#f59e0b" }}>
-                  ⚡ CHECK RULES
+                  style={{ fontSize: 8, fontWeight: 700, padding: "3px 10px", background: "transparent",
+                    border: `1px solid ${T.warning}`, color: T.warning, cursor: "pointer", letterSpacing: "0.05em" }}>
+                  CHECK RULES
                 </button>
                 <button
                   onClick={() => fetchLiveData()}
                   disabled={liveLoading}
-                  style={{ ...btnSecondary, fontSize: 10, padding: "6px 14px" }}>
-                  {liveLoading ? "..." : "↺ REFRESH"}
+                  style={{ fontSize: 8, fontWeight: 700, padding: "3px 10px", background: "transparent",
+                    border: `1px solid ${T.inputBorder}`, color: T.mutedText, cursor: "pointer", letterSpacing: "0.05em" }}>
+                  {liveLoading ? "..." : "REFRESH"}
                 </button>
               </div>
             </div>
-          </div>
 
-          {/* ── Settings Panel ── */}
-          {liveSettingsOpen && (
-            <div style={{ ...cardStyle, marginBottom: 12, border: "1px solid rgba(59,130,246,0.3)", background: "#0d1117" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20 }}>
+            {/* ══ MAIN PANELS: ORDER ENTRY  |  RISK CONTROLS ═════════════════ */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1, marginBottom: 1 }}>
 
-                {/* ENTRY RULES */}
-                <div>
-                  <div style={{ ...sectionTitle, marginBottom: 10, color: "#10b981" }}>ENTRY RULES</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
-                      ML ENTRY THRESHOLD (%)
-                      <input type="number" min={0} max={10} step={0.1}
-                        value={liveSettings.entryThreshold}
-                        onChange={e => setLiveSettings(s => ({ ...s, entryThreshold: parseFloat(e.target.value) || 0 }))}
-                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 12 }} />
-                    </label>
-                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
-                      MAX OPEN POSITIONS
-                      <input type="number" min={1} max={20} step={1}
-                        value={liveSettings.maxPositions}
-                        onChange={e => setLiveSettings(s => ({ ...s, maxPositions: parseInt(e.target.value) || 1 }))}
-                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 12 }} />
-                    </label>
-                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
-                      MAX SECTOR WEIGHT (%)
-                      <input type="number" min={10} max={100} step={5}
-                        value={liveSettings.maxSectorPct}
-                        onChange={e => setLiveSettings(s => ({ ...s, maxSectorPct: parseFloat(e.target.value) || 40 }))}
-                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 12 }} />
-                    </label>
-                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
-                      MAX DAILY LOSS (%)
-                      <input type="number" min={0.5} max={10} step={0.5}
-                        value={liveSettings.maxDailyLossPct}
-                        onChange={e => setLiveSettings(s => ({ ...s, maxDailyLossPct: parseFloat(e.target.value) || 3 }))}
-                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 12 }} />
-                    </label>
-                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
-                      MOMENTUM FILTER
-                      <select value={liveSettings.momentumFilter}
-                        onChange={e => setLiveSettings(s => ({ ...s, momentumFilter: parseInt(e.target.value) as 0|1|2|3 }))}
-                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 11 }}>
-                        <option value={0}>Off</option>
-                        <option value={1}>Mom1m &gt; 0</option>
-                        <option value={2}>Mom6m &gt; 0</option>
-                        <option value={3}>Both &gt; 0</option>
-                      </select>
-                    </label>
-                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
-                      VOL GATE
-                      <select value={liveSettings.volGate}
-                        onChange={e => setLiveSettings(s => ({ ...s, volGate: e.target.value as 'off'|'soft'|'hard' }))}
-                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 11 }}>
-                        <option value="off">Off</option>
-                        <option value="soft">Soft (reduce size in high-vol)</option>
-                        <option value="hard">Hard (skip trades in high-vol)</option>
-                      </select>
-                    </label>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em", display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
-                        <input type="checkbox" checked={liveSettings.requireSma200}
-                          onChange={e => setLiveSettings(s => ({ ...s, requireSma200: e.target.checked }))}
-                          style={{ accentColor: "#3b82f6" }} />
-                        REQUIRE SMA200
-                      </label>
-                      <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em", display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
-                        <input type="checkbox" checked={liveSettings.requireSma50}
-                          onChange={e => setLiveSettings(s => ({ ...s, requireSma50: e.target.checked }))}
-                          style={{ accentColor: "#3b82f6" }} />
-                        REQUIRE SMA50
-                      </label>
-                    </div>
-                  </div>
+              {/* ORDER ENTRY PANEL */}
+              <div style={{ background: T.panel, border: `1px solid ${T.panelBorder}` }}>
+                <div style={{ background: T.headerBg, borderBottom: `1px solid ${T.headerBorder}`,
+                  padding: "5px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: T.accent, letterSpacing: "0.08em" }}>ORDER ENTRY</span>
+                  {liveOrderEntry && (
+                    <span style={{ fontSize: 8, color: T.mutedText }}>
+                      {liveOrderEntry.ticker} — ML {liveOrderEntry.ml_pred >= 0 ? "+" : ""}{liveOrderEntry.ml_pred.toFixed(2)}%
+                    </span>
+                  )}
                 </div>
-
-                {/* EXIT RULES */}
-                <div>
-                  <div style={{ ...sectionTitle, marginBottom: 10, color: "#ef4444" }}>EXIT RULES</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
-                      STOP LOSS (%)
-                      <input type="number" min={1} max={20} step={0.5}
-                        value={liveSettings.stopLossPct}
-                        onChange={e => setLiveSettings(s => ({ ...s, stopLossPct: parseFloat(e.target.value) || 5 }))}
-                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 12 }} />
-                    </label>
-                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
-                      TAKE PROFIT (%)
-                      <input type="number" min={2} max={50} step={1}
-                        value={liveSettings.takeProfitPct}
-                        onChange={e => setLiveSettings(s => ({ ...s, takeProfitPct: parseFloat(e.target.value) || 15 }))}
-                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 12 }} />
-                    </label>
-                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
-                      MAX HOLD DAYS
-                      <input type="number" min={3} max={90} step={1}
-                        value={liveSettings.maxHoldDays}
-                        onChange={e => setLiveSettings(s => ({ ...s, maxHoldDays: parseInt(e.target.value) || 21 }))}
-                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 12 }} />
-                    </label>
-                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
-                      MIN HOLD DAYS (whipsaw protection)
-                      <input type="number" min={0} max={10} step={1}
-                        value={liveSettings.minHoldDays}
-                        onChange={e => setLiveSettings(s => ({ ...s, minHoldDays: parseInt(e.target.value) || 3 }))}
-                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 12 }} />
-                    </label>
-                    <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                      <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em", display: "flex", alignItems: "center", gap: 5, cursor: "pointer", marginBottom: 4 }}>
-                          <input type="checkbox" checked={liveSettings.useSignalExit}
-                            onChange={e => setLiveSettings(s => ({ ...s, useSignalExit: e.target.checked }))}
-                            style={{ accentColor: "#3b82f6" }} />
-                          SIGNAL EXIT
-                        </label>
-                        {liveSettings.useSignalExit && (
-                          <input type="number" min={0} max={2} step={0.05}
-                            value={liveSettings.exitThreshold}
-                            onChange={e => setLiveSettings(s => ({ ...s, exitThreshold: parseFloat(e.target.value) || 0.25 }))}
-                            style={{ width: "100%", background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 11 }} />
-                        )}
+                <div style={{ padding: "10px 12px" }}>
+                  {!liveOrderEntry ? (
+                    <div style={{ textAlign: "center", padding: "20px 0", fontSize: 10, color: T.label }}>
+                      SELECT A TICKER FROM THE SIGNAL MONITOR BELOW TO COMPOSE AN ORDER
+                    </div>
+                  ) : (
+                    <div>
+                      {/* Row 1: Instrument + Signal */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 8 }}>
+                        <div style={cellStyle}>
+                          <div style={labelStyle}>INSTRUMENT</div>
+                          <div style={{ ...inputStyle, padding: "4px 6px", display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 3 }}>
+                            <span style={{ fontWeight: 700, color: T.bright }}>{liveOrderEntry.ticker}</span>
+                            <span style={{ fontSize: 9, color: T.dimText }}>{liveOrderEntry.name}</span>
+                          </div>
+                        </div>
+                        <div style={cellStyle}>
+                          <div style={labelStyle}>LAST PRICE</div>
+                          <div style={{ ...inputStyle, padding: "4px 6px", marginTop: 3, color: T.text }}>
+                            {liveOrderEntry.last_close.toFixed(2)} NOK
+                          </div>
+                        </div>
                       </div>
-                      <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em", display: "flex", alignItems: "center", gap: 5, cursor: "pointer", marginBottom: 4 }}>
-                          <input type="checkbox" checked={liveSettings.useTrailingStop}
-                            onChange={e => setLiveSettings(s => ({ ...s, useTrailingStop: e.target.checked }))}
-                            style={{ accentColor: "#f59e0b" }} />
-                          TRAILING STOP
-                        </label>
-                        {liveSettings.useTrailingStop && (
-                          <input type="number" min={1} max={15} step={0.5}
-                            value={liveSettings.trailingStopPct}
-                            onChange={e => setLiveSettings(s => ({ ...s, trailingStopPct: parseFloat(e.target.value) || 3 }))}
-                            style={{ width: "100%", background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 11 }} />
-                        )}
+
+                      {/* Row 2: Order Type + TIF */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 8 }}>
+                        <div style={cellStyle}>
+                          <div style={labelStyle}>ORDER TYPE</div>
+                          <select value={liveOrderEntry.order_type}
+                            onChange={e => setLiveOrderEntry(o => o ? { ...o, order_type: e.target.value as 'MARKET'|'LIMIT'|'STOP' } : o)}
+                            style={{ ...selectStyle, marginTop: 3 }}>
+                            <option value="MARKET">MARKET — Fill at best available</option>
+                            <option value="LIMIT">LIMIT — Fill at price or better</option>
+                            <option value="STOP">STOP — Trigger at price</option>
+                          </select>
+                        </div>
+                        <div style={cellStyle}>
+                          <div style={labelStyle}>TIME IN FORCE</div>
+                          <select value={liveOrderEntry.tif}
+                            onChange={e => setLiveOrderEntry(o => o ? { ...o, tif: e.target.value as 'DAY'|'GTC'|'OPG' } : o)}
+                            style={{ ...selectStyle, marginTop: 3 }}>
+                            <option value="DAY">DAY — Expires at session close</option>
+                            <option value="GTC">GTC — Good till cancelled</option>
+                            <option value="OPG">OPG — At market open</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Row 3: Limit Price (shown for LIMIT/STOP) */}
+                      {liveOrderEntry.order_type !== 'MARKET' && (
+                        <div style={{ marginBottom: 8 }}>
+                          <div style={labelStyle}>
+                            {liveOrderEntry.order_type === 'LIMIT' ? "LIMIT PRICE — enter when price reaches or falls to" : "STOP TRIGGER PRICE — enter when price rises to"}
+                          </div>
+                          <input
+                            type="number" step="0.01" min="0"
+                            value={liveOrderEntry.limit_price}
+                            onChange={e => setLiveOrderEntry(o => o ? { ...o, limit_price: e.target.value } : o)}
+                            style={{ ...inputStyle, marginTop: 3 }}
+                            placeholder={liveOrderEntry.last_close.toFixed(2)}
+                          />
+                          {liveOrderEntry.limit_price && parseFloat(liveOrderEntry.limit_price) > 0 && (
+                            <div style={{ fontSize: 9, color: T.dimText, marginTop: 3 }}>
+                              {liveOrderEntry.order_type === 'LIMIT'
+                                ? parseFloat(liveOrderEntry.limit_price) < liveOrderEntry.last_close
+                                  ? `Wait for price to fall ${((liveOrderEntry.last_close - parseFloat(liveOrderEntry.limit_price)) / liveOrderEntry.last_close * 100).toFixed(1)}% below current`
+                                  : "Limit above current price — will fill immediately at market open"
+                                : `Trigger ${((parseFloat(liveOrderEntry.limit_price) - liveOrderEntry.last_close) / liveOrderEntry.last_close * 100).toFixed(1)}% above current`
+                              }
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Row 4: Notes */}
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={labelStyle}>TRADE RATIONALE (OPTIONAL)</div>
+                        <input type="text" maxLength={120}
+                          value={liveOrderEntry.notes}
+                          onChange={e => setLiveOrderEntry(o => o ? { ...o, notes: e.target.value } : o)}
+                          style={{ ...inputStyle, marginTop: 3 }}
+                          placeholder="e.g. ML breakout + SMA200 support"
+                        />
+                      </div>
+
+                      {/* Order Preview */}
+                      {(() => {
+                        const limitPriceNum = liveOrderEntry.limit_price ? parseFloat(liveOrderEntry.limit_price) : 0;
+                        const effectiveEp = liveOrderEntry.order_type !== 'MARKET' && limitPriceNum > 0
+                          ? limitPriceNum : liveOrderEntry.last_close;
+                        const stopPx = effectiveEp * (1 - liveSettings.stopLossPct / 100);
+                        const tpPx = effectiveEp * (1 + liveSettings.takeProfitPct / 100);
+                        const notional = (liveSettings.positionSizePct / 100) * liveSettings.portfolioValueNOK;
+                        const priceNotReached = liveOrderEntry.order_type === 'LIMIT' && limitPriceNum > 0 && liveOrderEntry.last_close > limitPriceNum;
+                        const isPending = !oseMarketStatus.isOpen || priceNotReached || liveOrderEntry.tif === 'OPG';
+                        return (
+                          <div style={{ background: T.inputBg, border: `1px solid ${T.inputBorder}`, padding: 8, marginBottom: 10 }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 6 }}>
+                              {[
+                                { label: "NOTIONAL", value: `${(notional / 1000).toFixed(0)}K NOK`, color: T.text },
+                                { label: "STOP LOSS", value: stopPx.toFixed(2), color: T.danger },
+                                { label: "TAKE PROFIT", value: tpPx.toFixed(2), color: T.success },
+                                { label: "MAX HOLD", value: `${liveSettings.maxHoldDays}D`, color: T.dimText },
+                              ].map(({ label, value, color }) => (
+                                <div key={label}>
+                                  <div style={{ ...labelStyle, marginBottom: 2 }}>{label}</div>
+                                  <div style={{ fontSize: 11, fontWeight: 700, color, fontFamily: "monospace" }}>{value}</div>
+                                </div>
+                              ))}
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <div style={{
+                                fontSize: 9, fontWeight: 700, padding: "2px 8px",
+                                background: isPending ? "rgba(156,107,255,0.1)" : "rgba(0,200,150,0.1)",
+                                border: `1px solid ${isPending ? T.pending : T.success}`,
+                                color: isPending ? T.pending : T.success, letterSpacing: "0.05em",
+                              }}>
+                                {isPending
+                                  ? oseMarketStatus.isOpen ? "PENDING — AWAITING PRICE LEVEL" : "PENDING — MARKET CLOSED, QUEUED FOR OPEN"
+                                  : "ACTIVE — FILLS AT MARKET OPEN"}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Buttons */}
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          disabled={!!liveActionLoading}
+                          onClick={() => {
+                            if (!liveOrderEntry) return;
+                            const limitPriceNum = liveOrderEntry.limit_price ? parseFloat(liveOrderEntry.limit_price) : undefined;
+                            const isAlreadyOpen = livePositions.some(p => p.ticker === liveOrderEntry.ticker);
+                            const isAlreadyPending = livePending.some(p => p.ticker === liveOrderEntry.ticker);
+                            if (isAlreadyOpen || isAlreadyPending) return;
+                            liveAction("enter", {
+                              ticker: liveOrderEntry.ticker,
+                              name: liveOrderEntry.name,
+                              entry_price: liveOrderEntry.last_close,
+                              ml_pred: liveOrderEntry.ml_pred,
+                              order_type: liveOrderEntry.order_type,
+                              limit_price: limitPriceNum,
+                              tif: liveOrderEntry.tif,
+                              notes: liveOrderEntry.notes || undefined,
+                              market_is_open: oseMarketStatus.isOpen,
+                              stopLossPct: liveSettings.stopLossPct,
+                              takeProfitPct: liveSettings.takeProfitPct,
+                              maxHoldDays: liveSettings.maxHoldDays,
+                              minHoldDays: liveSettings.minHoldDays,
+                              positionSizePct: liveSettings.positionSizePct,
+                              useTrailingStop: liveSettings.useTrailingStop,
+                              trailingStopPct: liveSettings.trailingStopPct,
+                              costBps: liveSettings.costBps,
+                            });
+                            setLiveOrderEntry(null);
+                          }}
+                          style={{
+                            flex: 1, padding: "7px 0", fontSize: 10, fontWeight: 800,
+                            background: livePositions.some(p => p.ticker === liveOrderEntry.ticker) || livePending.some(p => p.ticker === liveOrderEntry.ticker)
+                              ? T.inputBg : T.success,
+                            color: livePositions.some(p => p.ticker === liveOrderEntry.ticker) || livePending.some(p => p.ticker === liveOrderEntry.ticker)
+                              ? T.label : "#000",
+                            border: "none", cursor: "pointer", fontFamily: "monospace", letterSpacing: "0.06em",
+                          }}>
+                          {livePositions.some(p => p.ticker === liveOrderEntry.ticker) ? "ALREADY IN POSITION"
+                            : livePending.some(p => p.ticker === liveOrderEntry.ticker) ? "PENDING ORDER EXISTS"
+                            : "SUBMIT ORDER"}
+                        </button>
+                        <button
+                          onClick={() => setLiveOrderEntry(null)}
+                          style={{ padding: "7px 16px", fontSize: 10, fontWeight: 700, background: "transparent",
+                            border: `1px solid ${T.inputBorder}`, color: T.mutedText, cursor: "pointer", fontFamily: "monospace", letterSpacing: "0.06em" }}>
+                          CLEAR
+                        </button>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
+              </div>
 
-                {/* POSITION SIZING & COSTS */}
-                <div>
-                  <div style={{ ...sectionTitle, marginBottom: 10, color: "#3b82f6" }}>POSITION SIZING &amp; COSTS</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
-                      POSITION SIZE (% of portfolio)
-                      <input type="number" min={1} max={50} step={1}
-                        value={liveSettings.positionSizePct}
-                        onChange={e => setLiveSettings(s => ({ ...s, positionSizePct: parseFloat(e.target.value) || 10 }))}
-                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 12 }} />
-                    </label>
-                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
-                      PORTFOLIO VALUE (NOK)
-                      <input type="number" min={100000} max={100000000} step={100000}
-                        value={liveSettings.portfolioValueNOK}
-                        onChange={e => setLiveSettings(s => ({ ...s, portfolioValueNOK: parseInt(e.target.value) || 1000000 }))}
-                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 12 }} />
-                    </label>
-                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
-                      TRANSACTION COSTS (bps)
-                      <input type="number" min={0} max={100} step={1}
-                        value={liveSettings.costBps}
-                        onChange={e => setLiveSettings(s => ({ ...s, costBps: parseInt(e.target.value) || 10 }))}
-                        style={{ display: "block", width: "100%", marginTop: 4, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, color: "#fff", padding: "5px 8px", fontFamily: "monospace", fontSize: 12 }} />
-                    </label>
-                    <label style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", letterSpacing: "0.05em", display: "flex", alignItems: "center", gap: 5, cursor: "pointer", marginTop: 4 }}>
-                      <input type="checkbox" checked={liveSettings.useVolAdjustedSizing}
-                        onChange={e => setLiveSettings(s => ({ ...s, useVolAdjustedSizing: e.target.checked }))}
-                        style={{ accentColor: "#3b82f6" }} />
-                      VOL-ADJUSTED SIZING
-                    </label>
-                    <div style={{ marginTop: 4, padding: 8, background: "#161b22", border: "1px solid #21262d", borderRadius: 4 }}>
-                      <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", marginBottom: 4 }}>POSITION SIZE PER TRADE</div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: "#3b82f6", fontFamily: "monospace" }}>
-                        {((liveSettings.positionSizePct / 100) * liveSettings.portfolioValueNOK).toLocaleString("nb-NO", { maximumFractionDigits: 0 })} NOK
+              {/* RISK CONTROLS PANEL */}
+              <div style={{ background: T.panel, border: `1px solid ${T.panelBorder}` }}>
+                <div style={{ background: T.headerBg, borderBottom: `1px solid ${T.headerBorder}`,
+                  padding: "5px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: T.warning, letterSpacing: "0.08em" }}>RISK CONTROLS</span>
+                  <button onClick={() => setLiveSettingsExpanded(v => !v)}
+                    style={{ fontSize: 8, color: T.dimText, background: "transparent", border: "none", cursor: "pointer" }}>
+                    {liveSettingsExpanded ? "COLLAPSE" : "EXPAND ALL"}
+                  </button>
+                </div>
+                <div style={{ padding: "10px 12px" }}>
+                  {/* Always-visible risk grid */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px 12px", marginBottom: 8 }}>
+                    {[
+                      { label: "STOP LOSS %", key: "stopLossPct" as keyof LiveSettings, min: 1, max: 20, step: 0.5 },
+                      { label: "TAKE PROFIT %", key: "takeProfitPct" as keyof LiveSettings, min: 2, max: 50, step: 1 },
+                      { label: "MAX HOLD DAYS", key: "maxHoldDays" as keyof LiveSettings, min: 3, max: 90, step: 1 },
+                      { label: "MIN HOLD DAYS", key: "minHoldDays" as keyof LiveSettings, min: 0, max: 10, step: 1 },
+                      { label: "ML ENTRY %", key: "entryThreshold" as keyof LiveSettings, min: 0, max: 10, step: 0.1 },
+                      { label: "MAX POSITIONS", key: "maxPositions" as keyof LiveSettings, min: 1, max: 20, step: 1 },
+                    ].map(({ label, key, min, max, step }) => (
+                      <div key={key} style={cellStyle}>
+                        <div style={labelStyle}>{label}</div>
+                        <input type="number" min={min} max={max} step={step}
+                          value={liveSettings[key] as number}
+                          onChange={e => setLiveSettings(s => ({ ...s, [key]: parseFloat(e.target.value) || min }))}
+                          style={{ ...inputStyle, marginTop: 2, textAlign: "right" }} />
                       </div>
-                      <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", marginTop: 2 }}>
-                        Max {liveSettings.maxPositions} positions · {(liveSettings.positionSizePct * liveSettings.maxPositions).toFixed(0)}% max deployed
+                    ))}
+                  </div>
+
+                  {/* Signal exit row */}
+                  <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto 1fr", gap: "0 8px", alignItems: "center", marginBottom: 6, paddingBottom: 6, borderBottom: `1px solid ${T.rowBorder}` }}>
+                    <label style={{ ...labelStyle, display: "flex", alignItems: "center", gap: 4, cursor: "pointer", whiteSpace: "nowrap" }}>
+                      <input type="checkbox" checked={liveSettings.useSignalExit}
+                        onChange={e => setLiveSettings(s => ({ ...s, useSignalExit: e.target.checked }))}
+                        style={{ accentColor: T.accent }} />
+                      SIGNAL EXIT
+                    </label>
+                    <input type="number" min={0} max={2} step={0.05}
+                      value={liveSettings.exitThreshold} disabled={!liveSettings.useSignalExit}
+                      onChange={e => setLiveSettings(s => ({ ...s, exitThreshold: parseFloat(e.target.value) || 0.25 }))}
+                      style={{ ...inputStyle, opacity: liveSettings.useSignalExit ? 1 : 0.3, textAlign: "right" }} />
+                    <label style={{ ...labelStyle, display: "flex", alignItems: "center", gap: 4, cursor: "pointer", whiteSpace: "nowrap" }}>
+                      <input type="checkbox" checked={liveSettings.useTrailingStop}
+                        onChange={e => setLiveSettings(s => ({ ...s, useTrailingStop: e.target.checked }))}
+                        style={{ accentColor: T.warning }} />
+                      TRAILING %
+                    </label>
+                    <input type="number" min={1} max={15} step={0.5}
+                      value={liveSettings.trailingStopPct} disabled={!liveSettings.useTrailingStop}
+                      onChange={e => setLiveSettings(s => ({ ...s, trailingStopPct: parseFloat(e.target.value) || 3 }))}
+                      style={{ ...inputStyle, opacity: liveSettings.useTrailingStop ? 1 : 0.3, textAlign: "right" }} />
+                  </div>
+
+                  {/* Expanded controls */}
+                  {liveSettingsExpanded && (
+                    <div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 12px", marginBottom: 8 }}>
+                        <div style={cellStyle}>
+                          <div style={labelStyle}>MOMENTUM FILTER</div>
+                          <select value={liveSettings.momentumFilter}
+                            onChange={e => setLiveSettings(s => ({ ...s, momentumFilter: parseInt(e.target.value) as 0|1|2|3 }))}
+                            style={{ ...selectStyle, marginTop: 2 }}>
+                            <option value={0}>OFF</option>
+                            <option value={1}>MOM1M &gt; 0</option>
+                            <option value={2}>MOM6M &gt; 0</option>
+                            <option value={3}>BOTH &gt; 0</option>
+                          </select>
+                        </div>
+                        <div style={cellStyle}>
+                          <div style={labelStyle}>VOL GATE</div>
+                          <select value={liveSettings.volGate}
+                            onChange={e => setLiveSettings(s => ({ ...s, volGate: e.target.value as 'off'|'soft'|'hard' }))}
+                            style={{ ...selectStyle, marginTop: 2 }}>
+                            <option value="off">OFF</option>
+                            <option value="soft">SOFT (reduce size)</option>
+                            <option value="hard">HARD (block entry)</option>
+                          </select>
+                        </div>
+                        <div style={cellStyle}>
+                          <div style={labelStyle}>POSITION SIZE %</div>
+                          <input type="number" min={1} max={50} step={1}
+                            value={liveSettings.positionSizePct}
+                            onChange={e => setLiveSettings(s => ({ ...s, positionSizePct: parseFloat(e.target.value) || 10 }))}
+                            style={{ ...inputStyle, marginTop: 2, textAlign: "right" }} />
+                        </div>
+                        <div style={cellStyle}>
+                          <div style={labelStyle}>PORTFOLIO VALUE (NOK)</div>
+                          <input type="number" min={100000} step={100000}
+                            value={liveSettings.portfolioValueNOK}
+                            onChange={e => setLiveSettings(s => ({ ...s, portfolioValueNOK: parseInt(e.target.value) || 1000000 }))}
+                            style={{ ...inputStyle, marginTop: 2, textAlign: "right" }} />
+                        </div>
+                        <div style={cellStyle}>
+                          <div style={labelStyle}>COST (BPS)</div>
+                          <input type="number" min={0} max={100} step={1}
+                            value={liveSettings.costBps}
+                            onChange={e => setLiveSettings(s => ({ ...s, costBps: parseInt(e.target.value) || 10 }))}
+                            style={{ ...inputStyle, marginTop: 2, textAlign: "right" }} />
+                        </div>
+                        <div style={cellStyle}>
+                          <div style={labelStyle}>MAX SECTOR %</div>
+                          <input type="number" min={10} max={100} step={5}
+                            value={liveSettings.maxSectorPct}
+                            onChange={e => setLiveSettings(s => ({ ...s, maxSectorPct: parseFloat(e.target.value) || 40 }))}
+                            style={{ ...inputStyle, marginTop: 2, textAlign: "right" }} />
+                        </div>
                       </div>
-                    </div>
-                    <div style={{ marginTop: 2 }}>
+                      <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 6 }}>
+                        <label style={{ ...labelStyle, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                          <input type="checkbox" checked={liveSettings.requireSma200}
+                            onChange={e => setLiveSettings(s => ({ ...s, requireSma200: e.target.checked }))}
+                            style={{ accentColor: T.accent }} /> SMA200 REQUIRED
+                        </label>
+                        <label style={{ ...labelStyle, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                          <input type="checkbox" checked={liveSettings.requireSma50}
+                            onChange={e => setLiveSettings(s => ({ ...s, requireSma50: e.target.checked }))}
+                            style={{ accentColor: T.accent }} /> SMA50 REQUIRED
+                        </label>
+                        <label style={{ ...labelStyle, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                          <input type="checkbox" checked={liveSettings.useVolAdjustedSizing}
+                            onChange={e => setLiveSettings(s => ({ ...s, useVolAdjustedSizing: e.target.checked }))}
+                            style={{ accentColor: T.accent }} /> VOL-ADJ SIZING
+                        </label>
+                      </div>
                       <button onClick={() => setLiveSettings(DEFAULT_LIVE_SETTINGS)}
-                        style={{ ...btnSecondary, fontSize: 9, padding: "4px 10px", color: "rgba(255,255,255,0.4)" }}>
+                        style={{ fontSize: 8, padding: "3px 10px", background: "transparent",
+                          border: `1px solid ${T.inputBorder}`, color: T.dimText, cursor: "pointer", letterSpacing: "0.05em" }}>
                         RESET TO DEFAULTS
                       </button>
                     </div>
+                  )}
+
+                  {/* Position size display */}
+                  <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${T.rowBorder}`,
+                    display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                    {[
+                      { label: "NOTIONAL / TRADE", value: `${((liveSettings.positionSizePct / 100) * liveSettings.portfolioValueNOK / 1000).toFixed(0)}K NOK` },
+                      { label: "FREE SLOTS", value: `${freeSlots}/${liveSettings.maxPositions}` },
+                      { label: "ROUND-TRIP COST", value: `${(liveSettings.costBps * 2 / 100).toFixed(2)}%` },
+                    ].map(({ label, value }) => (
+                      <div key={label} style={{ textAlign: "center" }}>
+                        <div style={{ ...labelStyle, marginBottom: 2 }}>{label}</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: T.accent, fontFamily: "monospace" }}>{value}</div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
             </div>
-          )}
 
-          {/* ── Portfolio Summary (when positions open) ── */}
-          {livePositions.length > 0 && (() => {
-            const totalPnl = livePositions.reduce((s, p) => s + (p.pnl_pct ?? 0), 0) / livePositions.length;
-            const deployed = livePositions.length * liveSettings.positionSizePct;
-            const atRisk = livePositions.filter(p => (p.pnl_pct ?? 0) < -liveSettings.stopLossPct * 0.5).length;
-            return (
-              <div style={{ ...cardStyle, marginBottom: 12, padding: "10px 16px", background: "#0d1117", border: "1px solid rgba(59,130,246,0.2)" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
-                  {[
-                    { label: "OPEN POSITIONS", value: String(livePositions.length), color: "#fff" },
-                    { label: "DEPLOYED", value: `${deployed.toFixed(0)}%`, color: deployed > 80 ? "#f59e0b" : "#3b82f6" },
-                    { label: "AVG P&L", value: `${totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(2)}%`, color: totalPnl >= 0 ? "#10b981" : "#ef4444" },
-                    { label: "AT RISK", value: String(atRisk), color: atRisk > 0 ? "#ef4444" : "rgba(255,255,255,0.4)" },
-                    { label: "FREE SLOTS", value: String(Math.max(0, liveSettings.maxPositions - livePositions.length)), color: "rgba(255,255,255,0.5)" },
-                  ].map(({ label, value, color }) => (
-                    <div key={label} style={{ textAlign: "center" }}>
-                      <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", letterSpacing: "0.05em", marginBottom: 2 }}>{label}</div>
-                      <div style={{ fontSize: 16, fontWeight: 800, color, fontFamily: "monospace" }}>{value}</div>
-                    </div>
-                  ))}
+            {/* ══ PENDING ORDERS ══════════════════════════════════════════════ */}
+            {livePending.length > 0 && (
+              <div style={{ background: T.panel, border: `1px solid ${T.panelBorder}`, borderLeft: `2px solid ${T.pending}`, marginBottom: 1 }}>
+                <div style={{ background: T.headerBg, borderBottom: `1px solid ${T.headerBorder}`, padding: "5px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: T.pending, letterSpacing: "0.08em" }}>PENDING ORDERS ({livePending.length})</span>
+                  <span style={{ fontSize: 8, color: T.dimText }}>
+                    {oseMarketStatus.isOpen ? "MARKET OPEN — ORDERS WILL ACTIVATE IF PRICE CONDITIONS MET" : "QUEUED — WILL ACTIVATE AT MARKET OPEN IF CONDITIONS MET"}
+                  </span>
                 </div>
-              </div>
-            );
-          })()}
-
-          {/* ── Signal Monitor ── */}
-          <div style={{ ...cardStyle, marginBottom: 12, border: "1px solid rgba(16,185,129,0.25)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <div style={sectionTitle}>SIGNAL MONITOR — TOP LIQUID OSE</div>
-              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", fontFamily: "monospace" }}>
-                {liveSignals.length} stocks · entry threshold: {liveSettings.entryThreshold}%
-              </div>
-            </div>
-            {liveLoading ? (
-              <div style={{ textAlign: "center", padding: 24, color: "rgba(255,255,255,0.3)", fontSize: 11, fontFamily: "monospace" }}>Loading signals...</div>
-            ) : liveSignals.length === 0 ? (
-              <div style={{ textAlign: "center", padding: 24, color: "rgba(255,255,255,0.3)", fontSize: 11, fontFamily: "monospace" }}>No signal data — ML pipeline may not have run yet</div>
-            ) : (
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
-                <thead>
-                  <tr style={{ borderBottom: "1px solid #30363d" }}>
-                    {(["TICKER", "COMPANY", "SECTOR", "ML PRED", "SMA", "MOM", "VOL/DAY", "CLOSE", "ACTION"] as const).map(h => (
-                      <th key={h} style={{ padding: "4px 8px", fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.5)", textAlign: h === "TICKER" || h === "ACTION" ? "center" : "right", fontFamily: "monospace", letterSpacing: "0.05em", whiteSpace: "nowrap" as const }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {liveSignals.map(sig => {
-                    const isSignal = sig.ml_pred >= liveSettings.entryThreshold;
-                    const isOpen = livePositions.some(p => p.ticker === sig.ticker);
-                    const isLoading = liveActionLoading === sig.ticker;
-                    const sma200ok = !liveSettings.requireSma200 || (sig.sma200 != null && sig.last_close >= sig.sma200);
-                    const sma50ok  = !liveSettings.requireSma50  || (sig.sma50  != null && sig.last_close >= sig.sma50);
-                    const momOk = liveSettings.momentumFilter === 0 ? true
-                      : liveSettings.momentumFilter === 1 ? (sig.mom1m ?? 0) > 0
-                      : liveSettings.momentumFilter === 2 ? (sig.mom6m ?? 0) > 0
-                      : (sig.mom1m ?? 0) > 0 && (sig.mom6m ?? 0) > 0;
-                    const canEnter = isSignal && sma200ok && sma50ok && momOk && !isOpen && livePositions.length < liveSettings.maxPositions;
-                    const chipStyle = (ok: boolean, active: boolean): React.CSSProperties => ({
-                      fontSize: 8, padding: "1px 4px", borderRadius: 2, fontFamily: "monospace", fontWeight: 700,
-                      background: !active ? "rgba(48,54,61,0.5)" : ok ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)",
-                      color: !active ? "rgba(255,255,255,0.25)" : ok ? "#10b981" : "#ef4444",
-                      border: `1px solid ${!active ? "#30363d" : ok ? "rgba(16,185,129,0.4)" : "rgba(239,68,68,0.4)"}`,
-                    });
-                    return (
-                      <tr key={sig.ticker} style={{ borderBottom: "1px solid rgba(48,54,61,0.3)", background: isSignal ? "rgba(16,185,129,0.03)" : "transparent" }}>
-                        <td style={{ padding: "5px 8px", fontWeight: 700, textAlign: "center", fontFamily: "monospace" }}>
-                          <span style={{ color: isSignal ? "#10b981" : "rgba(255,255,255,0.6)" }}>{sig.ticker}</span>
-                          {isSignal && <span style={{ marginLeft: 4, fontSize: 8, background: "rgba(16,185,129,0.2)", color: "#10b981", padding: "1px 4px", borderRadius: 2, border: "1px solid rgba(16,185,129,0.4)" }}>SIGNAL</span>}
-                        </td>
-                        <td style={{ padding: "5px 8px", color: "rgba(255,255,255,0.6)", textAlign: "right", maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{sig.name}</td>
-                        <td style={{ padding: "5px 8px", textAlign: "right" }}>
-                          <span style={{ color: sectorColor(sig.sector), fontSize: 9, fontWeight: 700 }}>{sig.sector}</span>
-                        </td>
-                        <td style={{ padding: "5px 8px", textAlign: "right", fontWeight: 700, fontFamily: "monospace",
-                          color: sig.ml_pred >= liveSettings.entryThreshold ? "#10b981" : sig.ml_pred >= 0 ? "rgba(255,255,255,0.5)" : "#ef4444" }}>
-                          {sig.ml_pred >= 0 ? "+" : ""}{sig.ml_pred.toFixed(2)}%
-                        </td>
-                        <td style={{ padding: "5px 8px", textAlign: "right" }}>
-                          <div style={{ display: "flex", gap: 3, justifyContent: "flex-end" }}>
-                            <span style={chipStyle(sma200ok, liveSettings.requireSma200)}>200</span>
-                            <span style={chipStyle(sma50ok, liveSettings.requireSma50)}>50</span>
-                          </div>
-                        </td>
-                        <td style={{ padding: "5px 8px", textAlign: "right" }}>
-                          <div style={{ display: "flex", gap: 3, justifyContent: "flex-end" }}>
-                            <span style={chipStyle((sig.mom1m ?? 0) > 0, liveSettings.momentumFilter >= 1)} title={`1m: ${sig.mom1m?.toFixed(1) ?? "—"}%`}>1M</span>
-                            <span style={chipStyle((sig.mom6m ?? 0) > 0, liveSettings.momentumFilter >= 2)} title={`6m: ${sig.mom6m?.toFixed(1) ?? "—"}%`}>6M</span>
-                          </div>
-                        </td>
-                        <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace", color: "rgba(255,255,255,0.5)", fontSize: 10 }}>
-                          {sig.avg_nokvol >= 1e9 ? `${(sig.avg_nokvol / 1e9).toFixed(1)}B`
-                            : sig.avg_nokvol >= 1e6 ? `${(sig.avg_nokvol / 1e6).toFixed(0)}M`
-                            : `${(sig.avg_nokvol / 1e3).toFixed(0)}K`}
-                        </td>
-                        <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace", color: "rgba(255,255,255,0.7)" }}>
-                          {sig.last_close ? (sig.last_close >= 100 ? sig.last_close.toFixed(0) : sig.last_close.toFixed(2)) : "—"}
-                        </td>
-                        <td style={{ padding: "5px 8px", textAlign: "center" }}>
-                          {isOpen ? (
-                            <span style={{ fontSize: 9, color: "#3b82f6", fontFamily: "monospace" }}>IN POSITION</span>
-                          ) : (
-                            <button
-                              disabled={isLoading || !canEnter}
-                              onClick={() => liveAction("enter", {
-                                ticker: sig.ticker, name: sig.name, entry_price: sig.last_close, ml_pred: sig.ml_pred,
-                                stopLossPct: liveSettings.stopLossPct,
-                                takeProfitPct: liveSettings.takeProfitPct,
-                                maxHoldDays: liveSettings.maxHoldDays,
-                                minHoldDays: liveSettings.minHoldDays,
-                                positionSizePct: liveSettings.positionSizePct,
-                                useTrailingStop: liveSettings.useTrailingStop,
-                                trailingStopPct: liveSettings.trailingStopPct,
-                                costBps: liveSettings.costBps,
-                              })}
-                              style={{
-                                ...btnPrimary, padding: "4px 12px", fontSize: 10,
-                                opacity: canEnter ? 1 : 0.3,
-                                background: canEnter ? "linear-gradient(135deg, #10b981, #059669)" : "#21262d",
-                                cursor: canEnter ? "pointer" : "not-allowed",
-                              }}>
-                              {isLoading ? "..." : "ENTER"}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          {/* ── Open Positions ── */}
-          <div style={{ ...cardStyle, marginBottom: 12, border: "1px solid rgba(59,130,246,0.25)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <div style={sectionTitle}>OPEN POSITIONS ({livePositions.length})</div>
-              {livePositions.length > 0 && (
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>
-                  Stop {liveSettings.stopLossPct}% · TP {liveSettings.takeProfitPct}% · {liveSettings.maxHoldDays}d max · {liveSettings.minHoldDays}d min
-                  {liveSettings.useTrailingStop && ` · Trail ${liveSettings.trailingStopPct}%`}
-                </div>
-              )}
-            </div>
-            {livePositions.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "20px 0", color: "rgba(255,255,255,0.2)", fontSize: 11, fontFamily: "monospace" }}>
-                No open positions — enter a trade from the signal monitor above
-              </div>
-            ) : (
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, minWidth: 860 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
-                    <tr style={{ borderBottom: "1px solid #30363d" }}>
-                      {(["TICKER", "ENTRY DATE", "ENTRY", "CURRENT", "STOP", "TP", "DAYS", "P&L", "NOK VALUE", "ACTION"] as const).map(h => (
-                        <th key={h} style={{ padding: "4px 8px", fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.5)", textAlign: h === "TICKER" || h === "ACTION" ? "left" : "right", fontFamily: "monospace", letterSpacing: "0.05em", whiteSpace: "nowrap" as const }}>{h}</th>
+                    <tr>
+                      {["TICKER", "TYPE", "LIMIT PRICE", "LAST PRICE", "TIF", "STOP", "TP", "SIZE NOK", "ML PRED", "QUEUED AT", "ACTION"].map(h => (
+                        <th key={h} style={{ ...thS, textAlign: h === "TICKER" || h === "ACTION" ? "left" : "right" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {livePositions.map(pos => {
-                      const pnl = pos.pnl_pct ?? 0;
-                      const atStop = pos.current_close != null && pos.current_close <= pos.stop_price;
-                      const atTP = pos.current_close != null && pos.current_close >= pos.tp_price;
-                      const atTime = (pos.days_held ?? 0) >= liveSettings.maxHoldDays;
-                      const isLoading = liveActionLoading === String(pos.id);
-                      const tradeValueNOK = (liveSettings.positionSizePct / 100) * liveSettings.portfolioValueNOK;
-                      const currentValueNOK = tradeValueNOK * (1 + pnl / 100);
+                    {livePending.map(order => {
+                      const isLoading = liveActionLoading === String(order.id);
+                      const priceOk = order.order_type === 'MARKET' ? true
+                        : order.order_type === 'LIMIT' ? (order.current_close ?? 9999) <= (order.limit_price ?? order.entry_price)
+                        : (order.current_close ?? 0) >= (order.limit_price ?? order.entry_price);
+                      const notional = ((order.pos_size_pct ?? liveSettings.positionSizePct) / 100) * liveSettings.portfolioValueNOK;
                       return (
-                        <tr key={pos.id} style={{ borderBottom: "1px solid rgba(48,54,61,0.3)", background: atStop ? "rgba(239,68,68,0.05)" : atTP ? "rgba(16,185,129,0.05)" : "transparent" }}>
-                          <td style={{ padding: "5px 8px", fontWeight: 700, color: "#fff", fontFamily: "monospace" }}>
-                            {pos.ticker}
-                            {pos.name && <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginLeft: 4 }}>{pos.name}</span>}
+                        <tr key={order.id}>
+                          <td style={{ ...tdS("left"), fontWeight: 700, color: T.bright }}>{order.ticker}</td>
+                          <td style={{ ...tdS(), color: T.pending }}>{order.order_type}</td>
+                          <td style={{ ...tdS(), color: order.limit_price ? T.text : T.dimText }}>
+                            {order.limit_price ? order.limit_price.toFixed(2) : "—"}
                           </td>
-                          <td style={{ padding: "5px 8px", textAlign: "right", color: "rgba(255,255,255,0.5)", fontSize: 10, whiteSpace: "nowrap" as const }}>
-                            {pos.accepted_at?.slice(0, 10) ?? "—"}
+                          <td style={{ ...tdS(), color: priceOk ? T.success : T.label }}>
+                            {order.current_close ? order.current_close.toFixed(2) : "—"}
+                            {priceOk && <span style={{ fontSize: 8, color: T.success, marginLeft: 4 }}>[FILLABLE]</span>}
                           </td>
-                          <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace", color: "rgba(255,255,255,0.7)" }}>
-                            {pos.entry_price.toFixed(2)}
+                          <td style={{ ...tdS() }}>{order.tif}</td>
+                          <td style={{ ...tdS(), color: T.danger }}>{order.stop_price.toFixed(2)}</td>
+                          <td style={{ ...tdS(), color: T.success }}>{order.tp_price.toFixed(2)}</td>
+                          <td style={{ ...tdS() }}>{(notional / 1000).toFixed(0)}K</td>
+                          <td style={{ ...tdS(), color: (order.ml_pred ?? 0) >= liveSettings.entryThreshold ? T.success : T.dimText }}>
+                            {order.ml_pred != null ? `${order.ml_pred >= 0 ? "+" : ""}${order.ml_pred.toFixed(2)}%` : "—"}
                           </td>
-                          <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace", fontWeight: 700,
-                            color: pnl > 0 ? "#10b981" : pnl < 0 ? "#ef4444" : "rgba(255,255,255,0.5)" }}>
-                            {pos.current_close != null ? pos.current_close.toFixed(2) : "—"}
-                          </td>
-                          <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace",
-                            color: atStop ? "#ef4444" : "rgba(255,255,255,0.4)", fontWeight: atStop ? 700 : 400 }}>
-                            {pos.stop_price.toFixed(2)}{atStop ? " ⚠" : ""}
-                          </td>
-                          <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace",
-                            color: atTP ? "#10b981" : "rgba(255,255,255,0.4)", fontWeight: atTP ? 700 : 400 }}>
-                            {pos.tp_price.toFixed(2)}{atTP ? " ✓" : ""}
-                          </td>
-                          <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace",
-                            color: atTime ? "#f59e0b" : "rgba(255,255,255,0.5)", fontWeight: atTime ? 700 : 400 }}>
-                            {pos.days_held ?? 0}d{atTime ? " ⏱" : ""}
-                          </td>
-                          <td style={{ padding: "5px 8px", textAlign: "right", fontWeight: 700, fontFamily: "monospace",
-                            color: pnl > 0 ? "#10b981" : pnl < 0 ? "#ef4444" : "rgba(255,255,255,0.5)" }}>
-                            {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}%
-                          </td>
-                          <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace", fontSize: 10,
-                            color: pnl > 0 ? "#10b981" : pnl < 0 ? "#ef4444" : "rgba(255,255,255,0.4)" }}>
-                            {currentValueNOK.toLocaleString("nb-NO", { maximumFractionDigits: 0 })}
-                          </td>
-                          <td style={{ padding: "5px 8px", textAlign: "left" }}>
-                            <button
-                              disabled={isLoading}
-                              onClick={() => liveAction("close", { id: pos.id, exit_price: pos.current_close, exit_reason: "manual" })}
-                              style={{ ...btnSecondary, fontSize: 9, padding: "3px 10px", borderColor: "#ef4444", color: "#ef4444" }}>
-                              {isLoading ? "..." : "CLOSE"}
+                          <td style={{ ...tdS(), color: T.dimText, fontSize: 9 }}>{order.accepted_at?.slice(0, 16) ?? "—"}</td>
+                          <td style={{ ...tdS("left") }}>
+                            <button disabled={isLoading}
+                              onClick={() => liveAction("cancel_pending", { id: order.id })}
+                              style={{ fontSize: 8, padding: "2px 8px", background: "transparent",
+                                border: `1px solid ${T.danger}`, color: T.danger, cursor: "pointer", letterSpacing: "0.04em" }}>
+                              {isLoading ? "..." : "CANCEL"}
                             </button>
                           </td>
                         </tr>
@@ -2268,80 +2401,270 @@ export default function AlphaPage() {
                 </table>
               </div>
             )}
-          </div>
 
-          {/* ── Closed Trade History ── */}
-          <div style={{ ...cardStyle, border: "1px solid rgba(48,54,61,0.5)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <div style={sectionTitle}>CLOSED TRADES ({liveTrades.length})</div>
-              {liveTrades.length > 0 && (() => {
-                const wins = liveTrades.filter(t => (t.pnl_pct ?? 0) > 0).length;
-                const avgPnl = liveTrades.reduce((s, t) => s + (t.pnl_pct ?? 0), 0) / liveTrades.length;
-                const totalPnl = liveTrades.reduce((s, t) => s + (t.pnl_pct ?? 0), 0);
-                const maxWin = Math.max(...liveTrades.map(t => t.pnl_pct ?? 0));
-                const maxLoss = Math.min(...liveTrades.map(t => t.pnl_pct ?? 0));
-                return (
-                  <div style={{ display: "flex", gap: 16, fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.4)" }}>
-                    <span>Win rate: <span style={{ color: wins / liveTrades.length >= 0.5 ? "#10b981" : "#ef4444", fontWeight: 700 }}>{(wins / liveTrades.length * 100).toFixed(0)}%</span></span>
-                    <span>Avg P&amp;L: <span style={{ color: avgPnl >= 0 ? "#10b981" : "#ef4444" }}>{avgPnl >= 0 ? "+" : ""}{avgPnl.toFixed(2)}%</span></span>
-                    <span>Total: <span style={{ color: totalPnl >= 0 ? "#10b981" : "#ef4444" }}>{totalPnl >= 0 ? "+" : ""}{totalPnl.toFixed(1)}%</span></span>
-                    <span>Best: <span style={{ color: "#10b981" }}>+{maxWin.toFixed(2)}%</span></span>
-                    <span>Worst: <span style={{ color: "#ef4444" }}>{maxLoss.toFixed(2)}%</span></span>
-                  </div>
-                );
-              })()}
-            </div>
-            {liveTrades.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "20px 0", color: "rgba(255,255,255,0.2)", fontSize: 11, fontFamily: "monospace" }}>
-                No closed trades yet
+            {/* ══ OPEN POSITIONS ══════════════════════════════════════════════ */}
+            <div style={{ background: T.panel, border: `1px solid ${T.panelBorder}`, borderLeft: `2px solid ${T.accent}`, marginBottom: 1 }}>
+              <div style={{ background: T.headerBg, borderBottom: `1px solid ${T.headerBorder}`, padding: "5px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: T.accent, letterSpacing: "0.08em" }}>
+                  OPEN POSITIONS ({livePositions.length})
+                </span>
+                {livePositions.length > 0 && (
+                  <span style={{ fontSize: 8, color: T.dimText }}>
+                    STOP {liveSettings.stopLossPct}% / TP {liveSettings.takeProfitPct}% / MAX {liveSettings.maxHoldDays}D
+                    {liveSettings.useTrailingStop ? ` / TRAIL ${liveSettings.trailingStopPct}%` : ""}
+                  </span>
+                )}
               </div>
-            ) : (
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
-                <thead>
-                  <tr style={{ borderBottom: "1px solid #30363d" }}>
-                    {(["TICKER", "ENTRY", "EXIT", "ENTRY PRICE", "EXIT PRICE", "DAYS", "EXIT REASON", "P&L", "NOK P&L"] as const).map(h => (
-                      <th key={h} style={{ padding: "4px 8px", fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.5)", textAlign: h === "TICKER" ? "left" : "right", fontFamily: "monospace", letterSpacing: "0.05em", whiteSpace: "nowrap" as const }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {liveTrades.map(trade => {
-                    const pnl = trade.pnl_pct ?? 0;
-                    const reasonColor = trade.exit_reason === "stop" ? "#ef4444"
-                      : trade.exit_reason === "tp" ? "#10b981"
-                      : trade.exit_reason === "time" ? "#f59e0b"
-                      : "rgba(255,255,255,0.5)";
-                    const nokPnl = ((liveSettings.positionSizePct / 100) * liveSettings.portfolioValueNOK) * (pnl / 100);
-                    return (
-                      <tr key={trade.id} style={{ borderBottom: "1px solid rgba(48,54,61,0.3)" }}>
-                        <td style={{ padding: "5px 8px", fontWeight: 700, color: "#fff", fontFamily: "monospace" }}>{trade.ticker}</td>
-                        <td style={{ padding: "5px 8px", textAlign: "right", color: "rgba(255,255,255,0.5)", fontSize: 10 }}>{trade.accepted_at?.slice(0, 10) ?? "—"}</td>
-                        <td style={{ padding: "5px 8px", textAlign: "right", color: "rgba(255,255,255,0.5)", fontSize: 10 }}>{trade.closed_at?.slice(0, 10) ?? "—"}</td>
-                        <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace", color: "rgba(255,255,255,0.6)" }}>{trade.entry_price?.toFixed(2) ?? "—"}</td>
-                        <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace", color: "rgba(255,255,255,0.6)" }}>{trade.exit_price?.toFixed(2) ?? "—"}</td>
-                        <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace", color: "rgba(255,255,255,0.4)" }}>{trade.days_held ?? "—"}d</td>
-                        <td style={{ padding: "5px 8px", textAlign: "right" }}>
-                          <span style={{ fontSize: 9, fontWeight: 700, color: reasonColor, textTransform: "uppercase" as const, fontFamily: "monospace" }}>
-                            {trade.exit_reason ?? "—"}
-                          </span>
-                        </td>
-                        <td style={{ padding: "5px 8px", textAlign: "right", fontWeight: 700, fontFamily: "monospace",
-                          color: pnl > 0 ? "#10b981" : pnl < 0 ? "#ef4444" : "rgba(255,255,255,0.5)" }}>
-                          {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}%
-                        </td>
-                        <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace", fontSize: 10,
-                          color: nokPnl > 0 ? "#10b981" : nokPnl < 0 ? "#ef4444" : "rgba(255,255,255,0.4)" }}>
-                          {nokPnl >= 0 ? "+" : ""}{nokPnl.toLocaleString("nb-NO", { maximumFractionDigits: 0 })}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
+              {livePositions.length === 0 ? (
+                <div style={{ padding: "16px", textAlign: "center", fontSize: 10, color: T.label }}>
+                  NO OPEN POSITIONS
+                </div>
+              ) : (
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      {["TICKER", "ENTRY DATE", "ENTRY PX", "LAST PX", "STOP", "TP", "DAYS", "UNREALIZED P&L", "NOTIONAL", "ACTION"].map(h => (
+                        <th key={h} style={{ ...thS, textAlign: h === "TICKER" || h === "ACTION" ? "left" : "right" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {livePositions.map(pos => {
+                      const pnl = pos.pnl_pct ?? 0;
+                      const atStop = pos.current_close != null && pos.current_close <= (pos.effective_stop ?? pos.stop_price);
+                      const atTP = pos.current_close != null && pos.current_close >= pos.tp_price;
+                      const atTime = (pos.days_held ?? 0) >= liveSettings.maxHoldDays;
+                      const isLoading = liveActionLoading === String(pos.id);
+                      const notional = ((pos.pos_size_pct ?? liveSettings.positionSizePct) / 100) * liveSettings.portfolioValueNOK;
+                      const nokPnl = notional * (pnl / 100);
+                      const rowBg = atStop ? "rgba(255,77,79,0.04)" : atTP ? "rgba(0,200,150,0.04)" : "transparent";
+                      return (
+                        <tr key={pos.id} style={{ background: rowBg }}>
+                          <td style={{ ...tdS("left"), fontWeight: 700, color: T.bright }}>
+                            {pos.ticker}
+                            {pos.name && <span style={{ fontSize: 8, color: T.dimText, marginLeft: 4 }}>{pos.name}</span>}
+                          </td>
+                          <td style={{ ...tdS(), fontSize: 9, color: T.dimText }}>{pos.accepted_at?.slice(0, 10)}</td>
+                          <td style={{ ...tdS() }}>{pos.entry_price.toFixed(2)}</td>
+                          <td style={{ ...tdS(), fontWeight: 700, color: pnl > 0 ? T.success : pnl < 0 ? T.danger : T.text }}>
+                            {pos.current_close != null ? pos.current_close.toFixed(2) : "—"}
+                          </td>
+                          <td style={{ ...tdS(), color: atStop ? T.danger : T.label, fontWeight: atStop ? 700 : 400 }}>
+                            {(pos.effective_stop ?? pos.stop_price).toFixed(2)}{atStop ? " [!]" : ""}
+                          </td>
+                          <td style={{ ...tdS(), color: atTP ? T.success : T.label, fontWeight: atTP ? 700 : 400 }}>
+                            {pos.tp_price.toFixed(2)}{atTP ? " [+]" : ""}
+                          </td>
+                          <td style={{ ...tdS(), color: atTime ? T.warning : T.text, fontWeight: atTime ? 700 : 400 }}>
+                            {pos.days_held ?? 0}D{atTime ? " [!]" : ""}
+                          </td>
+                          <td style={{ ...tdS(), fontWeight: 700 }}>
+                            <span style={{ color: pnl >= 0 ? T.success : T.danger }}>
+                              {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}%
+                            </span>
+                            <span style={{ fontSize: 8, color: T.dimText, marginLeft: 6 }}>
+                              ({nokPnl >= 0 ? "+" : ""}{(nokPnl / 1000).toFixed(1)}K)
+                            </span>
+                          </td>
+                          <td style={{ ...tdS(), color: T.dimText, fontSize: 9 }}>{(notional / 1000).toFixed(0)}K</td>
+                          <td style={{ ...tdS("left") }}>
+                            <button disabled={isLoading}
+                              onClick={() => liveAction("close", { id: pos.id, exit_price: pos.current_close, exit_reason: "manual" })}
+                              style={{ fontSize: 8, padding: "2px 8px", background: "transparent",
+                                border: `1px solid ${T.danger}`, color: T.danger, cursor: "pointer", letterSpacing: "0.04em" }}>
+                              {isLoading ? "..." : "CLOSE"}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* ══ SIGNAL MONITOR ══════════════════════════════════════════════ */}
+            <div style={{ background: T.panel, border: `1px solid ${T.panelBorder}`, marginBottom: 1 }}>
+              <div style={{ background: T.headerBg, borderBottom: `1px solid ${T.headerBorder}`, padding: "5px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: T.text, letterSpacing: "0.08em" }}>SIGNAL MONITOR — TOP 20 LIQUID OSE</span>
+                <span style={{ fontSize: 8, color: T.dimText }}>ensemble_prediction · entry threshold {liveSettings.entryThreshold}% · click row to compose order</span>
+              </div>
+              {liveLoading ? (
+                <div style={{ padding: "20px", textAlign: "center", fontSize: 10, color: T.label }}>LOADING...</div>
+              ) : liveSignals.length === 0 ? (
+                <div style={{ padding: "20px", textAlign: "center", fontSize: 10, color: T.label }}>NO SIGNAL DATA — ML PIPELINE MAY NOT HAVE RUN</div>
+              ) : (
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      {["TICKER", "COMPANY", "SECTOR", "ML PRED", "SMA200", "SMA50", "MOM1M", "MOM6M", "VOL/DAY", "LAST PX", "SIGNAL"].map(h => (
+                        <th key={h} style={{ ...thS, textAlign: h === "TICKER" || h === "COMPANY" || h === "SECTOR" ? "left" : "right" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {liveSignals.map(sig => {
+                      const isSignal = sig.ml_pred >= liveSettings.entryThreshold;
+                      const isOpen = livePositions.some(p => p.ticker === sig.ticker);
+                      const isPendingOrder = livePending.some(p => p.ticker === sig.ticker);
+                      const sma200ok = !liveSettings.requireSma200 || (sig.sma200 != null && sig.last_close >= sig.sma200);
+                      const sma50ok  = !liveSettings.requireSma50  || (sig.sma50  != null && sig.last_close >= sig.sma50);
+                      const momOk = liveSettings.momentumFilter === 0 ? true
+                        : liveSettings.momentumFilter === 1 ? (sig.mom1m ?? 0) > 0
+                        : liveSettings.momentumFilter === 2 ? (sig.mom6m ?? 0) > 0
+                        : (sig.mom1m ?? 0) > 0 && (sig.mom6m ?? 0) > 0;
+                      const allFiltersOk = isSignal && sma200ok && sma50ok && momOk;
+                      const rowBg = allFiltersOk && !isOpen && !isPendingOrder ? "rgba(0,200,150,0.02)" : "transparent";
+                      const above200 = sig.sma200 != null && sig.last_close >= sig.sma200;
+                      const above50 = sig.sma50 != null && sig.last_close >= sig.sma50;
+
+                      const filterChip = (ok: boolean, active: boolean, val: string) => (
+                        <span style={{
+                          fontSize: 8, padding: "1px 4px", fontFamily: "monospace", fontWeight: 700,
+                          color: !active ? T.label : ok ? T.success : T.danger,
+                        }}>{val}</span>
+                      );
+
+                      return (
+                        <tr key={sig.ticker}
+                          onClick={() => {
+                            if (!isOpen && !isPendingOrder) {
+                              setLiveOrderEntry({
+                                ticker: sig.ticker, name: sig.name,
+                                order_type: 'MARKET', limit_price: '', tif: 'DAY',
+                                ml_pred: sig.ml_pred, last_close: sig.last_close, notes: '',
+                              });
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }
+                          }}
+                          style={{ background: rowBg, cursor: isOpen || isPendingOrder ? "default" : "pointer" }}
+                          onMouseEnter={e => { if (!isOpen && !isPendingOrder) e.currentTarget.style.background = "rgba(33,150,243,0.05)"; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = rowBg; }}>
+                          <td style={{ ...tdS("left"), fontWeight: 700, color: isSignal ? T.success : T.text }}>
+                            {sig.ticker}
+                          </td>
+                          <td style={{ ...tdS("left"), fontSize: 9, color: T.mutedText, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {sig.name}
+                          </td>
+                          <td style={{ ...tdS("left") }}>
+                            <span style={{ fontSize: 9, color: sectorColor(sig.sector), fontWeight: 700 }}>{sig.sector}</span>
+                          </td>
+                          <td style={{ ...tdS(), fontWeight: 700, color: sig.ml_pred >= liveSettings.entryThreshold ? T.success : sig.ml_pred >= 0 ? T.dimText : T.danger }}>
+                            {sig.ml_pred >= 0 ? "+" : ""}{sig.ml_pred.toFixed(2)}%
+                          </td>
+                          <td style={{ ...tdS() }}>
+                            {filterChip(above200, liveSettings.requireSma200, above200 ? "ABOVE" : "BELOW")}
+                          </td>
+                          <td style={{ ...tdS() }}>
+                            {filterChip(above50, liveSettings.requireSma50, above50 ? "ABOVE" : "BELOW")}
+                          </td>
+                          <td style={{ ...tdS(), color: (sig.mom1m ?? 0) >= 0 ? T.success : T.danger }}>
+                            {sig.mom1m != null ? `${sig.mom1m >= 0 ? "+" : ""}${(sig.mom1m * 100).toFixed(1)}%` : "—"}
+                          </td>
+                          <td style={{ ...tdS(), color: (sig.mom6m ?? 0) >= 0 ? T.success : T.danger }}>
+                            {sig.mom6m != null ? `${sig.mom6m >= 0 ? "+" : ""}${(sig.mom6m * 100).toFixed(1)}%` : "—"}
+                          </td>
+                          <td style={{ ...tdS(), color: T.dimText, fontSize: 9 }}>
+                            {sig.avg_nokvol >= 1e9 ? `${(sig.avg_nokvol / 1e9).toFixed(1)}B`
+                              : sig.avg_nokvol >= 1e6 ? `${(sig.avg_nokvol / 1e6).toFixed(0)}M`
+                              : `${(sig.avg_nokvol / 1e3).toFixed(0)}K`}
+                          </td>
+                          <td style={{ ...tdS() }}>{sig.last_close >= 100 ? sig.last_close.toFixed(0) : sig.last_close.toFixed(2)}</td>
+                          <td style={{ ...tdS() }}>
+                            {isOpen ? (
+                              <span style={{ fontSize: 8, color: T.accent, fontWeight: 700 }}>IN POSITION</span>
+                            ) : isPendingOrder ? (
+                              <span style={{ fontSize: 8, color: T.pending, fontWeight: 700 }}>PENDING</span>
+                            ) : allFiltersOk ? (
+                              <span style={{ fontSize: 8, fontWeight: 700, color: T.success }}>BUY SIGNAL</span>
+                            ) : isSignal ? (
+                              <span style={{ fontSize: 8, color: T.warning }}>SIGNAL (FILTERED)</span>
+                            ) : (
+                              <span style={{ fontSize: 8, color: T.label }}>—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* ══ TRADE HISTORY ═══════════════════════════════════════════════ */}
+            <div style={{ background: T.panel, border: `1px solid ${T.panelBorder}` }}>
+              <div style={{ background: T.headerBg, borderBottom: `1px solid ${T.headerBorder}`, padding: "5px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: T.text, letterSpacing: "0.08em" }}>TRADE HISTORY ({liveTrades.length})</span>
+                {liveTrades.length > 0 && (() => {
+                  const wins = liveTrades.filter(t => (t.pnl_pct ?? 0) > 0).length;
+                  const avgPnl = liveTrades.reduce((s, t) => s + (t.pnl_pct ?? 0), 0) / liveTrades.length;
+                  const totalNokPnl = liveTrades.reduce((s, t) => {
+                    const notional = ((t.pos_size_pct ?? liveSettings.positionSizePct) / 100) * liveSettings.portfolioValueNOK;
+                    return s + notional * ((t.pnl_pct ?? 0) / 100);
+                  }, 0);
+                  return (
+                    <div style={{ display: "flex", gap: 16, fontSize: 8, color: T.label }}>
+                      <span>WIN RATE <span style={{ color: wins / liveTrades.length >= 0.5 ? T.success : T.danger, fontWeight: 700 }}>{(wins / liveTrades.length * 100).toFixed(0)}%</span></span>
+                      <span>AVG P&amp;L <span style={{ color: avgPnl >= 0 ? T.success : T.danger }}>{avgPnl >= 0 ? "+" : ""}{avgPnl.toFixed(2)}%</span></span>
+                      <span>TOTAL NOK <span style={{ color: totalNokPnl >= 0 ? T.success : T.danger, fontWeight: 700 }}>
+                        {totalNokPnl >= 0 ? "+" : ""}{(totalNokPnl / 1000).toFixed(1)}K
+                      </span></span>
+                    </div>
+                  );
+                })()}
+              </div>
+              {liveTrades.length === 0 ? (
+                <div style={{ padding: "16px", textAlign: "center", fontSize: 10, color: T.label }}>NO CLOSED TRADES</div>
+              ) : (
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      {["TICKER", "ENTRY", "EXIT", "ENTRY PX", "EXIT PX", "DAYS", "EXIT REASON", "P&L %", "NOK P&L"].map(h => (
+                        <th key={h} style={{ ...thS, textAlign: h === "TICKER" ? "left" : "right" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {liveTrades.map(trade => {
+                      const pnl = trade.pnl_pct ?? 0;
+                      const reasonColor = trade.exit_reason === "stop" || trade.exit_reason === "trailing_stop" ? T.danger
+                        : trade.exit_reason === "tp" ? T.success
+                        : trade.exit_reason === "time" ? T.warning
+                        : trade.exit_reason === "signal_exit" ? T.accent
+                        : T.dimText;
+                      const notional = ((trade.pos_size_pct ?? liveSettings.positionSizePct) / 100) * liveSettings.portfolioValueNOK;
+                      const nokPnl = notional * (pnl / 100);
+                      return (
+                        <tr key={trade.id}>
+                          <td style={{ ...tdS("left"), fontWeight: 700, color: T.bright }}>{trade.ticker}</td>
+                          <td style={{ ...tdS(), fontSize: 9, color: T.dimText }}>{trade.accepted_at?.slice(0, 10)}</td>
+                          <td style={{ ...tdS(), fontSize: 9, color: T.dimText }}>{trade.closed_at?.slice(0, 10)}</td>
+                          <td style={{ ...tdS() }}>{trade.entry_price?.toFixed(2) ?? "—"}</td>
+                          <td style={{ ...tdS() }}>{trade.exit_price?.toFixed(2) ?? "—"}</td>
+                          <td style={{ ...tdS(), color: T.dimText }}>{trade.days_held ?? "—"}D</td>
+                          <td style={{ ...tdS() }}>
+                            <span style={{ fontSize: 8, fontWeight: 700, color: reasonColor, letterSpacing: "0.04em" }}>
+                              {(trade.exit_reason ?? "—").replace("_", " ").toUpperCase()}
+                            </span>
+                          </td>
+                          <td style={{ ...tdS(), fontWeight: 700, color: pnl >= 0 ? T.success : T.danger }}>
+                            {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}%
+                          </td>
+                          <td style={{ ...tdS(), fontWeight: 700, color: nokPnl >= 0 ? T.success : T.danger }}>
+                            {nokPnl >= 0 ? "+" : ""}{(nokPnl / 1000).toFixed(1)}K
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
           </div>
-        </div>
-      )}
+        );
+      })()}
+
       {/* ================================================================ */}
       {/* SIMULATOR TAB                                                   */}
       {/* ================================================================ */}
