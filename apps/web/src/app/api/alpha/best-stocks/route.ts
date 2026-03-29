@@ -21,7 +21,7 @@ export const maxDuration = 60;
  * Cache miss: computes inline (fast — single pass, no param sweep).
  */
 
-const CACHE_KEY      = 'best_stocks_v12_maxreturn';
+const CACHE_KEY      = 'best_stocks_v13_top10liquid_2y';
 const CACHE_MAX_AGE_H = 25;
 
 export interface BestStockResult {
@@ -56,10 +56,9 @@ const FIXED_PARAMS: SimParams = {
 };
 
 async function computeAndCache(): Promise<object> {
-  // Need row 201 (SMA warmup) to fall before 365 days ago.
-  // Row 201 date ≈ CURRENT_DATE - TOTAL_DAYS + 291 (calendar days).
-  // To reach March 2025: TOTAL_DAYS ≥ 656. Use 700 for safety.
-  const TOTAL_DAYS = 700;
+  // Need row 201 (SMA warmup) to fall before 730 days ago.
+  // 730d window + 200d SMA warmup + buffer → use 960 calendar days.
+  const TOTAL_DAYS = 960;
 
   // 1. Top 50 liquid tickers
   const liquidRes = await pool.query(`
@@ -74,7 +73,7 @@ async function computeAndCache(): Promise<object> {
     GROUP BY ff.ticker, s.name, s.sector
     HAVING AVG(ff.nokvol::float) > 100000
     ORDER BY avg_nokvol DESC
-    LIMIT 50
+    LIMIT 10
   `);
   const tickers: string[] = liquidRes.rows.map((r: { ticker: string }) => r.ticker);
   const tickerMeta = new Map(liquidRes.rows.map((r: { ticker: string; name: string; sector: string; avg_nokvol: number }) => [r.ticker, r]));
@@ -82,7 +81,7 @@ async function computeAndCache(): Promise<object> {
   if (tickers.length === 0) throw new Error('No tickers found in universe');
 
   // 2. Prices + rolling stats. LAG(126) ≈ 6m momentum computed from raw prices
-  //    — works for all 365 days since we pull 595 days total (200d SMA warmup + 395 extra).
+  //    — works for all 730 days since we pull 960 days total (200d SMA warmup + 760 extra).
   const priceRes = await pool.query(`
     WITH raw AS (
       SELECT ticker, date, close::float
@@ -106,7 +105,7 @@ async function computeAndCache(): Promise<object> {
       END AS mom6m_price
     FROM with_stats
     WHERE rn > 200
-      AND date >= CURRENT_DATE - 365 * INTERVAL '1 day'
+      AND date >= CURRENT_DATE - 730 * INTERVAL '1 day'
     ORDER BY ticker, date ASC
   `, [tickers, TOTAL_DAYS]);
 
@@ -115,7 +114,7 @@ async function computeAndCache(): Promise<object> {
     SELECT ticker, date::text AS date, mom1m::float, mom6m::float, mom11m::float, vol1m::float
     FROM factor_technical
     WHERE ticker = ANY($1)
-      AND date >= CURRENT_DATE - 365 * INTERVAL '1 day'
+      AND date >= CURRENT_DATE - 730 * INTERVAL '1 day'
     ORDER BY ticker, date ASC
   `, [tickers]);
 
@@ -126,7 +125,7 @@ async function computeAndCache(): Promise<object> {
       ensemble_prediction::float AS pred
     FROM ml_predictions
     WHERE ticker = ANY($1)
-      AND prediction_date >= CURRENT_DATE - 365 * INTERVAL '1 day'
+      AND prediction_date >= CURRENT_DATE - 730 * INTERVAL '1 day'
       AND ensemble_prediction IS NOT NULL
     ORDER BY ticker, prediction_date::date, prediction_date DESC
   `, [tickers]);
@@ -135,7 +134,7 @@ async function computeAndCache(): Promise<object> {
   const obxRes = await pool.query(`
     SELECT date::text AS date, close::float AS obx_close
     FROM prices_daily
-    WHERE ticker = 'OBX' AND date >= CURRENT_DATE - 365 * INTERVAL '1 day'
+    WHERE ticker = 'OBX' AND date >= CURRENT_DATE - 730 * INTERVAL '1 day'
     ORDER BY date ASC
   `);
 
@@ -230,15 +229,6 @@ async function computeAndCache(): Promise<object> {
     const currentPredPct = currentPred * 100;
 
     const result = runMLSimulation(input, FIXED_PARAMS);
-    if (result.stats.trades < 3) continue;           // minimum 3 trades
-    if (result.stats.sharpe < 0.8) continue;         // Sharpe ≥ 0.8
-    if (result.stats.winRate < 0.48) continue;       // WinRate ≥ 48%
-    if (result.stats.maxDrawdown < -0.10) continue;  // MaxDD no worse than -10%
-    if (result.stats.totalReturn <= 0) continue;     // must have positive total return
-
-    // Score: historical total return × Sharpe — best actual performers rise to top
-    const sharpe = result.stats.sharpe;
-    const score = result.stats.totalReturn * Math.max(sharpe, 0.1);
 
     results.push({
       rank: 0, ticker,
@@ -249,13 +239,12 @@ async function computeAndCache(): Promise<object> {
       bestParams: FIXED_PARAMS,
       stats: result.stats,
       trades: result.trades,
-      score,
+      score: 0,
     });
   }
 
-  // Sort by score (current ML pred × Sharpe), take top 10
-  results.sort((a,b) => b.score - a.score);
-  const top10 = results.slice(0, 10).map((r,i) => ({ ...r, rank: i+1 }));
+  // Keep top-10-liquid order (already ordered by avg_nokvol DESC from the query)
+  const top10 = results.slice(0, 10).map((r, i) => ({ ...r, rank: i + 1 }));
 
   // allForwardTrades: all trades from top 10 for equity curve
   const allForwardTrades = top10.flatMap(s => s.trades.map(t => ({ ...t, ticker: s.ticker })));
@@ -265,7 +254,7 @@ async function computeAndCache(): Promise<object> {
     allForwardTrades,
     meta: {
       universe: tickers.length, combosPerTicker: 1, qualified: results.length,
-      days: 365, entryThreshold: 0.25, exitThreshold: -0.5,
+      days: 730, entryThreshold: 0.25, exitThreshold: -0.5,
       computedAt: new Date().toISOString(),
     },
   };

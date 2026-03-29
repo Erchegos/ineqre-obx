@@ -230,7 +230,6 @@ export default function AlphaPage() {
   const [bestStocksLoading, setBestStocksLoading] = useState(false);
   const [bestStocksPending, setBestStocksPending] = useState(false);
   const [bestStocksMeta, setBestStocksMeta] = useState<{ computedAt?: string; universe?: number; combosPerTicker?: number; qualified?: number; windows?: number } | null>(null);
-  const [paperTradingMode, setPaperTradingMode] = useState<'standard' | 'optimized'>('standard');
   const [expandedOptTicker, setExpandedOptTicker] = useState<string | null>(null);
 
   // Equity curve
@@ -393,7 +392,7 @@ export default function AlphaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const BEST_STOCKS_CACHE_KEY = "alpha_best_stocks_v12_maxreturn";
+  const BEST_STOCKS_CACHE_KEY = "alpha_best_stocks_v13_top10liquid_2y";
   const BEST_STOCKS_CACHE_TTL = 24 * 60 * 60 * 1000;
   const fetchBestStocks = useCallback(async (force = false) => {
     if (!token) return;
@@ -1084,18 +1083,18 @@ export default function AlphaPage() {
           </div>
 
           {/* ══════════════════════════════════════════════════════════════════
-              OPTIMIZED TOP 10 — parameter-sweep optimized best stocks 365d
+              TOP 10 LIQUID OSE — 2 Year ML signal simulation, fixed universe
           ══════════════════════════════════════════════════════════════════ */}
           <div style={{ ...cardStyle, marginBottom: 16, borderLeft: "3px solid #10b981" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 800, fontFamily: "monospace", letterSpacing: "0.04em", color: "#10b981" }}>
-                  OPTIMIZED TOP 10 — Last 365 Days
+                  TOP 10 LIQUID OSE — Last 2 Years
                 </div>
                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", marginTop: 3 }}>
                   {bestStocksMeta
-                    ? `Best 365d returns · ${bestStocksMeta.universe ?? '?'} tickers · ${bestStocksMeta.qualified ?? bestStocks.length} qualified · entry >0.25% · 2% stop · ranked by return × Sharpe · 24h cache`
-                    : "Best 365d returns · entry >0.25% · 2% stop · ranked by return × Sharpe · top 50 liquid OSE"}
+                    ? `10 largest OSE stocks by avg daily volume · 2Y window · entry >0.25% · 2% stop · 10% weight · compounding · 24h cache`
+                    : "10 most liquid OSE stocks · 2Y simulation · entry >0.25% · 2% stop · 10% weight · compounding"}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -1229,49 +1228,29 @@ export default function AlphaPage() {
                 <div>
                   <div style={sectionTitle}>TOP 10 ALPHA STOCKS — Last 12 Months (Top 50 Liquid OSE)</div>
                   <div style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", marginTop: 2 }}>
-                    {paperTradingMode === 'standard'
-                      ? "Entry: ML pred >+1% · Exit: signal <+0.25% (min 5d hold) OR −5% stop loss OR 21d max hold"
-                      : "Optimized params per ticker · 108-combo walk-forward sweep · ranked by Sharpe · click row for trade log"}
+                    Entry: ML pred &gt;+1% · Exit: signal &lt;+0.25% (min 5d hold) OR −5% stop loss OR 21d max hold
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  {/* Mode toggle */}
-                  <div style={{ display: "flex", border: "1px solid #30363d", borderRadius: 5, overflow: "hidden" }}>
-                    {(['standard', 'optimized'] as const).map(mode => (
-                      <button key={mode} onClick={() => setPaperTradingMode(mode)}
-                        style={{
-                          padding: "4px 12px", fontSize: 9, fontFamily: "monospace", fontWeight: 700,
-                          letterSpacing: "0.05em", border: "none", cursor: "pointer",
-                          background: paperTradingMode === mode ? (mode === 'optimized' ? "#10b981" : "#3b82f6") : "#0d1117",
-                          color: paperTradingMode === mode ? "#000" : "rgba(255,255,255,0.4)",
-                          transition: "all 0.15s",
-                        }}>
-                        {mode.toUpperCase()}
-                      </button>
-                    ))}
-                  </div>
                   <button
-                    onClick={() => paperTradingMode === 'standard' ? fetchTopPerformers(true) : fetchBestStocks(true)}
-                    disabled={paperTradingMode === 'standard' ? topPerfLoading : bestStocksLoading}
-                    style={{ ...btnSecondary, fontSize: 10, padding: "5px 12px", opacity: (paperTradingMode === 'standard' ? topPerfLoading : bestStocksLoading) ? 0.5 : 1 }}>
-                    {(paperTradingMode === 'standard' ? topPerfLoading : bestStocksLoading) ? "Loading..." : "Refresh"}
+                    onClick={() => fetchTopPerformers(true)}
+                    disabled={topPerfLoading}
+                    style={{ ...btnSecondary, fontSize: 10, padding: "5px 12px", opacity: topPerfLoading ? 0.5 : 1 }}>
+                    {topPerfLoading ? "Loading..." : "Refresh"}
                   </button>
                 </div>
               </div>
 
-              {/* ── STANDARD VIEW ── */}
-              {paperTradingMode === 'standard' && (
-                <>
-                  {topPerfLoading && (
-                    <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
-                      Simulating trades across liquid OSE universe...
-                    </div>
-                  )}
-                  {!topPerfLoading && topPerformers.length === 0 && (
-                    <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
-                      Loading signal data...
-                    </div>
-                  )}
+              {topPerfLoading && (
+                <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
+                  Simulating trades across liquid OSE universe...
+                </div>
+              )}
+              {!topPerfLoading && topPerformers.length === 0 && (
+                <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
+                  Loading signal data...
+                </div>
+              )}
                   {topPerformers.length > 0 && (
                     <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "monospace" }}>
                       <thead>
@@ -1318,23 +1297,7 @@ export default function AlphaPage() {
                       </tbody>
                     </table>
                   )}
-                </>
-              )}
-
-              {/* ── OPTIMIZED VIEW ── */}
-              {paperTradingMode === 'optimized' && (
-                <>
-                  {(bestStocksLoading || bestStocksPending) && (
-                    <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
-                      {bestStocksPending ? "Nightly precompute not ready — auto-retrying in 2 min..." : "Loading cached results..."}
-                    </div>
-                  )}
-                  {!bestStocksLoading && !bestStocksPending && bestStocks.length === 0 && (
-                    <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
-                      No cached results — check back after 02:00 UTC.
-                    </div>
-                  )}
-                  {bestStocks.length > 0 && (
+                  {false && bestStocks.length > 0 && (
                     <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "monospace" }}>
                       <thead>
                         <tr style={{ borderBottom: "1px solid #30363d" }}>
@@ -1347,7 +1310,7 @@ export default function AlphaPage() {
                         {bestStocks.map((s, i) => {
                           const p = s.bestParams;
                           const st = s.stats;
-                          const isExpanded = expandedOptTicker === s.ticker;
+                          const isExpanded = false && s.ticker === '';
                           const rowBg = i < 3 ? "rgba(16,185,129,0.04)" : "transparent";
                           const sharpeColor = st.sharpe >= 1.5 ? "#10b981" : st.sharpe >= 0.8 ? "#f59e0b" : "#ef4444";
                           return (
@@ -1462,37 +1425,31 @@ export default function AlphaPage() {
                       </tbody>
                     </table>
                   )}
-                </>
-              )}
             </div>
 
             {/* ── CUMULATIVE PERFORMANCE CHART ── */}
             {(() => {
-              // Switch data source based on mode
-              const isOptMode = paperTradingMode === 'optimized';
-              const activeStats = isOptMode ? optimizedEqData?.stats : equityCurveStats;
-              const activeCurve = isOptMode ? (optimizedEqData?.curve ?? []) : equityCurve;
-              const activeLoading = isOptMode ? false : equityCurveLoading;
-              const activeTradeLog = isOptMode ? (optimizedEqData?.allTrades ?? []) : tradeLog;
+              // Always show top-10-liquid 2Y equity curve
+              const activeStats = optimizedEqData?.stats;
+              const activeCurve = optimizedEqData?.curve ?? [];
+              const activeLoading = false;
+              const activeTradeLog = optimizedEqData?.allTrades ?? [];
 
               const isPos = (activeStats?.totalReturn ?? 0) >= 0;
-              const lineColor = isOptMode ? "#10b981" : (isPos ? "#10b981" : "#ef4444");
+              const lineColor = "#10b981";
               const minVal = activeCurve.length > 0 ? Math.min(...activeCurve.map(e => e.value)) : 90;
               const maxVal = activeCurve.length > 0 ? Math.max(...activeCurve.map(e => e.value)) : 110;
               const domainLo = Math.floor(minVal * 0.97);
               const domainHi = Math.ceil(maxVal * 1.02);
               return (
-                <div style={{ ...cardStyle, marginBottom: 16, borderLeft: isOptMode ? "2px solid rgba(16,185,129,0.4)" : undefined }}>
+                <div style={{ ...cardStyle, marginBottom: 16, borderLeft: "2px solid rgba(16,185,129,0.4)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
                     <div>
                       <div style={sectionTitle}>
-                        Cumulative Performance — Last 365 Days · Max 10 Positions · Equal Weight Slots
-                        {isOptMode && <span style={{ marginLeft: 8, fontSize: 9, fontWeight: 700, color: "#10b981", background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: 3, padding: "1px 6px", letterSpacing: "0.04em" }}>OPTIMIZED</span>}
+                        Cumulative Performance — Last 2 Years · 10 Largest OSE Stocks · 10% Per Slot · Compounding
                       </div>
                       <div style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", marginTop: -8 }}>
-                        {isOptMode
-                          ? "ML signal (ensemble_prediction) where available · 6m momentum proxy for older history · entry >0.25% · 2% stop · 25% TP · 10% per slot · indexed to 100"
-                          : "Top 50 liquid OSE · Entry >+1% signal · −5% stop · 21d max · Up to 10 concurrent positions · Indexed to 100"}
+                        ML signal (ensemble_prediction) where available · 6m momentum proxy for older history · entry &gt;0.25% · 2% stop · 25% TP · 10% per slot · indexed to 100
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -1504,18 +1461,12 @@ export default function AlphaPage() {
                           <span style={{ color: "rgba(255,255,255,0.4)" }}>Trades: <span style={{ color: "#fff", fontWeight: 700 }}>{activeStats.trades}</span></span>
                         </div>
                       )}
-                      {!isOptMode && (
-                        <button onClick={() => fetchEquityCurve(true)} disabled={equityCurveLoading}
-                          style={{ ...btnSecondary, fontSize: 9, padding: "4px 10px", opacity: equityCurveLoading ? 0.5 : 1 }}>
-                          {equityCurveLoading ? "Loading..." : "Refresh"}
-                        </button>
-                      )}
                     </div>
                   </div>
 
                   {activeLoading && (
                     <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
-                      Simulating portfolio across 365 days of trading...
+                      Loading equity curve...
                     </div>
                   )}
 
@@ -1564,7 +1515,7 @@ export default function AlphaPage() {
                                 contentStyle={{ background: "#0d1117", border: "1px solid #30363d", borderRadius: 6, fontFamily: "monospace", fontSize: 10 }}
                                 formatter={((v: number) => [`${v} positions active`, "Active"]) as Parameters<typeof Tooltip>[0]["formatter"]}
                                 labelFormatter={l => l} />
-                              <Bar dataKey="positions" fill={isOptMode ? "rgba(16,185,129,0.35)" : "rgba(59,130,246,0.4)"} isAnimationActive={false} />
+                              <Bar dataKey="positions" fill={"rgba(16,185,129,0.35)"} isAnimationActive={false} />
                             </BarChart>
                           </ResponsiveContainer>
                           <div style={{ fontSize: 8, fontFamily: "monospace", color: "rgba(255,255,255,0.2)", textAlign: "right", marginRight: 64, marginTop: -4 }}>
@@ -1577,7 +1528,7 @@ export default function AlphaPage() {
 
                   {!activeLoading && activeCurve.length === 0 && (
                     <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
-                      {isOptMode ? "Load optimized top 10 first (click Refresh in table above)" : "Loading equity curve..."}
+                      {"Load top 10 liquid stocks first (click Refresh in table above)"}
                     </div>
                   )}
 
@@ -1585,22 +1536,19 @@ export default function AlphaPage() {
                   {activeTradeLog.length > 0 && (
                     <div style={{ marginTop: 24 }}>
                       <div style={{ fontSize: 10, fontWeight: 700, fontFamily: "monospace", color: "rgba(255,255,255,0.5)", letterSpacing: "0.08em", marginBottom: 8 }}>
-                        TRADE LOG — {activeTradeLog.length} CLOSED POSITIONS · LAST 365 DAYS{isOptMode ? " · OPTIMIZED PARAMS" : " · MAX 10 SLOTS"}
+                        TRADE LOG — {activeTradeLog.length} CLOSED POSITIONS · LAST 2 YEARS · TOP 10 LIQUID OSE
                       </div>
                       <div style={{ overflowY: "auto", maxHeight: 420, border: "1px solid #21262d", borderRadius: 6 }}>
                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10, fontFamily: "monospace" }}>
                           <thead style={{ position: "sticky", top: 0, background: "#161b22", zIndex: 1 }}>
                             <tr>
-                              {["#", "Ticker", "Entry", "Exit", "Days", isOptMode ? "ML Pred" : null, "P&L", "Max DD", "Reason"].filter(Boolean).map(h => (
+                              {["#", "Ticker", "Entry", "Exit", "Days", "ML Pred", "P&L", "Max DD", "Reason"].map(h => (
                                 <th key={h!} style={{ padding: "6px 10px", textAlign: h === "P&L" || h === "Days" || h === "#" || h === "Max DD" || h === "ML Pred" ? "right" : "left", fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em", borderBottom: "1px solid #30363d", whiteSpace: "nowrap" }}>{h}</th>
                               ))}
                             </tr>
                           </thead>
                           <tbody>
-                            {(isOptMode
-                              ? [...activeTradeLog].sort((a, b) => a.entryDate.localeCompare(b.entryDate))
-                              : activeTradeLog
-                            ).map((t, i) => {
+                            {[...activeTradeLog].sort((a, b) => a.entryDate.localeCompare(b.entryDate)).map((t, i) => {
                               const isWin = t.pnlPct > 0;
                               const exitReason = (t as any).exitReason ?? (t as any).exit_reason ?? 'signal';
                               const reasonMap: Record<string, { color: string; label: string }> = {
@@ -1618,23 +1566,19 @@ export default function AlphaPage() {
                               return (
                                 <tr key={i} style={{ borderBottom: "1px solid #21262d", background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)" }}>
                                   <td style={{ padding: "5px 10px", textAlign: "right", color: "rgba(255,255,255,0.25)", fontSize: 9 }}>{i + 1}</td>
-                                  <td style={{ padding: "5px 10px", fontWeight: 700, color: isOptMode ? "#10b981" : "#3b82f6", letterSpacing: "0.04em" }}>{(t as any).ticker}</td>
+                                  <td style={{ padding: "5px 10px", fontWeight: 700, color: "#10b981", letterSpacing: "0.04em" }}>{(t as any).ticker}</td>
                                   <td style={{ padding: "5px 10px", color: "rgba(255,255,255,0.5)" }}>{t.entryDate}</td>
                                   <td style={{ padding: "5px 10px", color: "rgba(255,255,255,0.5)" }}>{t.exitDate}</td>
                                   <td style={{ padding: "5px 10px", textAlign: "right", color: "rgba(255,255,255,0.4)" }}>{t.daysHeld}d</td>
-                                  {isOptMode && (
-                                    <td style={{ padding: "5px 10px", textAlign: "right", fontSize: 9, color: (t as any).predAtEntry >= 0.5 ? "#10b981" : "#f59e0b" }}>
-                                      {((t as any).predAtEntry >= 0 ? "+" : "")}{((t as any).predAtEntry ?? 0).toFixed(1)}%
-                                    </td>
-                                  )}
-                                  <td style={{ padding: "5px 10px", textAlign: "right", fontWeight: 700, color: isWin ? "#10b981" : "#ef4444" }}>
-                                    {isWin ? "+" : ""}{(t.pnlPct * (isOptMode ? 100 : 1)).toFixed(2)}%
+                                  <td style={{ padding: "5px 10px", textAlign: "right", fontSize: 9, color: (t as any).predAtEntry >= 0.5 ? "#10b981" : "#f59e0b" }}>
+                                    {((t as any).predAtEntry >= 0 ? "+" : "")}{((t as any).predAtEntry ?? 0).toFixed(1)}%
                                   </td>
-                                  {isOptMode && (
-                                    <td style={{ padding: "5px 10px", textAlign: "right", fontSize: 9, color: (t as any).maxDrawdown < -0.03 ? "#ef4444" : "rgba(255,255,255,0.4)" }}>
-                                      {(((t as any).maxDrawdown ?? 0) * 100).toFixed(1)}%
-                                    </td>
-                                  )}
+                                  <td style={{ padding: "5px 10px", textAlign: "right", fontWeight: 700, color: isWin ? "#10b981" : "#ef4444" }}>
+                                    {isWin ? "+" : ""}{(t.pnlPct * 100).toFixed(2)}%
+                                  </td>
+                                  <td style={{ padding: "5px 10px", textAlign: "right", fontSize: 9, color: (t as any).maxDrawdown < -0.03 ? "#ef4444" : "rgba(255,255,255,0.4)" }}>
+                                    {(((t as any).maxDrawdown ?? 0) * 100).toFixed(1)}%
+                                  </td>
                                   <td style={{ padding: "5px 10px" }}>
                                     <span style={{ background: `${r.color}22`, color: r.color, border: `1px solid ${r.color}44`, borderRadius: 3, padding: "1px 6px", fontSize: 8, fontWeight: 700, letterSpacing: "0.05em" }}>
                                       {r.label}
@@ -1651,7 +1595,7 @@ export default function AlphaPage() {
                         <span><span style={{ color: "#3b82f6", fontWeight: 700 }}>SIG</span> — signal exit</span>
                         <span><span style={{ color: "#f59e0b", fontWeight: 700 }}>TIME</span> — max hold reached</span>
                         <span><span style={{ color: "#ef4444", fontWeight: 700 }}>SL</span> — stop loss triggered</span>
-                        {isOptMode && <span><span style={{ color: "#fb923c", fontWeight: 700 }}>VOL</span> — vol regime exit</span>}
+                        <span><span style={{ color: "#fb923c", fontWeight: 700 }}>VOL</span> — vol regime exit</span>
                       </div>
                     </div>
                   )}
