@@ -230,6 +230,7 @@ export default function AlphaPage() {
   const [bestStocksLoading, setBestStocksLoading] = useState(false);
   const [bestStocksPending, setBestStocksPending] = useState(false);
   const [bestStocksMeta, setBestStocksMeta] = useState<{ computedAt?: string; universe?: number; combosPerTicker?: number; qualified?: number; windows?: number } | null>(null);
+  const [bestStocksDays, setBestStocksDays] = useState<365 | 730 | 1825>(730);
   const [expandedOptTicker, setExpandedOptTicker] = useState<string | null>(null);
 
   // Equity curve
@@ -392,13 +393,14 @@ export default function AlphaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const BEST_STOCKS_CACHE_KEY = "alpha_best_stocks_v15_fwdret_2y";
   const BEST_STOCKS_CACHE_TTL = 24 * 60 * 60 * 1000;
   const fetchBestStocks = useCallback(async (force = false) => {
     if (!token) return;
+    const days = bestStocksDays;
+    const cacheKey = `alpha_best_stocks_v15_fwdret_${days}d`;
     if (!force) {
       try {
-        const raw = localStorage.getItem(BEST_STOCKS_CACHE_KEY);
+        const raw = localStorage.getItem(cacheKey);
         if (raw) {
           const { data, meta, fwdTrades, ts } = JSON.parse(raw);
           if (Date.now() - ts < BEST_STOCKS_CACHE_TTL) { setBestStocks(data); setBestStocksMeta(meta); if (fwdTrades) setAllForwardTrades(fwdTrades); return; }
@@ -407,7 +409,7 @@ export default function AlphaPage() {
     }
     setBestStocksLoading(true);
     try {
-      const res = await fetch('/api/alpha/best-stocks', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`/api/alpha/best-stocks?days=${days}`, { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
         const d = await res.json();
         if (d.status === 'pending') {
@@ -421,16 +423,21 @@ export default function AlphaPage() {
         setBestStocks(d.bestStocks || []);
         setBestStocksMeta(d.meta || null);
         setAllForwardTrades(d.allForwardTrades || []);
-        try { localStorage.setItem(BEST_STOCKS_CACHE_KEY, JSON.stringify({ data: d.bestStocks || [], meta: d.meta || null, fwdTrades: d.allForwardTrades || [], ts: Date.now() })); } catch { /* ignore */ }
+        try { localStorage.setItem(cacheKey, JSON.stringify({ data: d.bestStocks || [], meta: d.meta || null, fwdTrades: d.allForwardTrades || [], ts: Date.now() })); } catch { /* ignore */ }
       }
     } catch (e) { console.error("Best stocks failed:", e); }
     setBestStocksLoading(false);
-  }, [token]);
+  }, [token, bestStocksDays]);
 
   useEffect(() => {
     if (token && bestStocks.length === 0 && !bestStocksLoading) fetchBestStocks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  useEffect(() => {
+    if (token) { setBestStocks([]); setAllForwardTrades([]); fetchBestStocks(false); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bestStocksDays]);
 
   const EQ_CACHE_KEY = `alpha_equity_curve_v3_fwd21d`;
   const EQ_CACHE_TTL = 6 * 60 * 60 * 1000;
@@ -1083,356 +1090,135 @@ export default function AlphaPage() {
           </div>
 
           {/* ══════════════════════════════════════════════════════════════════
-              TOP 10 LIQUID OSE — 2 Year ML signal simulation, fixed universe
+              ML SIGNAL PAPER TRADING — TOP 10 LIQUID OSE
           ══════════════════════════════════════════════════════════════════ */}
-          <div style={{ ...cardStyle, marginBottom: 16, borderLeft: "3px solid #10b981" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 800, fontFamily: "monospace", letterSpacing: "0.04em", color: "#10b981" }}>
-                  TOP 10 LIQUID OSE — Last 2 Years
-                </div>
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", marginTop: 3 }}>
-                  {bestStocksMeta
-                    ? `10 largest OSE stocks by avg daily volume · 2Y window · fwd_ret_21d signal · entry >1% · 5% stop · 15% TP · min 3d · 10% weight · compounding · 24h cache`
-                    : "10 most liquid OSE stocks · 2Y simulation · fwd_ret_21d signal · entry >1% · 5% stop · 10% weight · compounding"}
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                {bestStocksMeta?.computedAt && (
-                  <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", fontFamily: "monospace" }}>
-                    {new Date(bestStocksMeta.computedAt).toLocaleDateString("no-NO", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-                  </span>
-                )}
-                <button onClick={() => fetchBestStocks(true)} disabled={bestStocksLoading}
-                  style={{ ...btnSecondary, fontSize: 10, padding: "5px 12px", opacity: bestStocksLoading ? 0.5 : 1 }}>
-                  {bestStocksLoading ? "Computing..." : "Refresh"}
-                </button>
-              </div>
-            </div>
-
-            {bestStocksLoading && (
-              <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
-                Loading cached rankings...
-              </div>
-            )}
-            {bestStocksPending && !bestStocksLoading && (
-              <div style={{ textAlign: "center", padding: 32, fontFamily: "monospace" }}>
-                <div style={{ color: "#f59e0b", fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Nightly precompute not ready yet</div>
-                <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 10 }}>Walk-forward results compute each night at 02:00 UTC via GitHub Actions.<br/>Auto-retrying in 2 minutes...</div>
-              </div>
-            )}
-            {!bestStocksLoading && !bestStocksPending && bestStocks.length === 0 && (
-              <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
-                No cached results — trigger a refresh or wait for tonight&apos;s scheduled run.
-              </div>
-            )}
-            {bestStocks.length > 0 && (
-              <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "monospace" }}>
-                <thead>
-                  <tr style={{ borderBottom: "1px solid #30363d" }}>
-                    {["#", "Ticker", "Sector", "ML Pred", "Sharpe", "WinRate", "AvgPnL", "MaxDD", "Trades", "Action"].map((h, hi) => (
-                      <th key={h} style={{ fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.5)", padding: "5px 8px", textAlign: hi < 3 ? "left" as const : "right" as const, letterSpacing: "0.04em" }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {bestStocks.map((s, i) => {
-                    const p = s.bestParams;
-                    const st = s.stats;
-                    const sharpeColor = st.sharpe >= 1.5 ? "#10b981" : st.sharpe >= 0.8 ? "#f59e0b" : "#ef4444";
-                    const rowBg = i < 3 ? "rgba(16,185,129,0.04)" : "transparent";
-                    return (
-                      <tr key={s.ticker}
-                        style={{ borderBottom: "1px solid rgba(48,54,61,0.3)", background: rowBg, transition: "background 0.1s" }}
-                        onMouseEnter={e => (e.currentTarget.style.background = "rgba(16,185,129,0.08)")}
-                        onMouseLeave={e => (e.currentTarget.style.background = rowBg)}>
-                        <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, color: i === 0 ? "#10b981" : i < 3 ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.35)" }}>#{s.rank}</td>
-                        <td style={{ padding: "6px 8px", fontSize: 12, fontWeight: 800, color: "#10b981" }}>{s.ticker}</td>
-                        <td style={{ padding: "6px 8px", textAlign: "right" }}>
-                          <span style={{ fontSize: 9, fontWeight: 700, color: sectorColor(s.sector) }}>{s.sector?.slice(0, 10) ?? "—"}</span>
-                        </td>
-                        <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right",
-                          color: (s as unknown as { currentPred?: number }).currentPred != null && (s as unknown as { currentPred: number }).currentPred >= 1.0 ? "#10b981" : "#f59e0b" }}>
-                          {(s as unknown as { currentPred?: number }).currentPred != null
-                            ? `+${(s as unknown as { currentPred: number }).currentPred.toFixed(2)}%`
-                            : "—"}
-                        </td>
-                        <td style={{ padding: "6px 8px", fontSize: 12, fontWeight: 800, textAlign: "right", color: sharpeColor }}>{st.sharpe.toFixed(2)}</td>
-                        <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", color: st.winRate >= 0.6 ? "#10b981" : st.winRate >= 0.5 ? "#f59e0b" : "#ef4444" }}>
-                          {(st.winRate * 100).toFixed(0)}%
-                        </td>
-                        <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", color: st.avgWinPct >= 0 ? "#10b981" : "#ef4444" }}>
-                          {st.avgWinPct >= 0 ? "+" : ""}{(st.avgWinPct * 100).toFixed(1)}%
-                        </td>
-                        <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 600, textAlign: "right", color: "#ef4444" }}>
-                          {(st.maxDrawdown * 100).toFixed(1)}%
-                        </td>
-                        <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: "rgba(255,255,255,0.5)" }}>{st.trades}</td>
-                        <td style={{ padding: "6px 8px", textAlign: "right" }}>
-                          <button
-                            onClick={() => {
-                              setSimTicker(s.ticker);
-                              setSimEntry(1.0);
-                              setSimExit(0.25);
-                              setSimStop(5.0);
-                              setSimMaxHold(21);
-                              setSimVolGate('off');
-                              setSimMom(0);
-                              setTab("simulator");
-                            }}
-                            style={{ ...btnSecondary, fontSize: 9, padding: "3px 8px", color: "#10b981", borderColor: "rgba(16,185,129,0.3)" }}>
-                            SIMULATE
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          {/* ══════════════════════════════════════════════════════════════════
-              SECTION 1 — ML SIGNAL PAPER TRADING  (research / exploration)
-          ══════════════════════════════════════════════════════════════════ */}
-          <div style={{ ...cardStyle, marginBottom: 0, borderColor: "#2d3748", borderLeft: "3px solid #f59e0b" }}>
+          <div style={{ ...cardStyle, marginBottom: 0, borderColor: "#2d3748", borderLeft: "3px solid #10b981" }}>
             {/* Section header */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 800, fontFamily: "monospace", letterSpacing: "0.04em", color: "#f59e0b" }}>
-                  SECTION 1 — ML SIGNAL PAPER TRADING
+                <div style={{ fontSize: 13, fontWeight: 800, fontFamily: "monospace", letterSpacing: "0.04em", color: "#10b981" }}>
+                  ML SIGNAL PAPER TRADING
                 </div>
                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace", marginTop: 3 }}>
-                  Research tool · 12-month window · ML signals only · Simple rule-based trading
+                  10 most liquid OSE stocks · fwd_ret_21d signal · entry &gt;1% · 5% stop · 15% TP · 10% per slot · compounding
                 </div>
               </div>
-              <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: 5, padding: "4px 10px", fontSize: 9, color: "#f59e0b", fontFamily: "monospace", fontWeight: 700 }}>
-                EXPLORATORY
+              <div style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.25)", borderRadius: 5, padding: "4px 10px", fontSize: 9, color: "#10b981", fontFamily: "monospace", fontWeight: 700 }}>
+                PAPER TRADING
               </div>
             </div>
 
-            {/* Context explanation */}
-            <div style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 6, padding: "10px 14px", marginBottom: 14, fontSize: 10, fontFamily: "monospace", lineHeight: 1.7, color: "rgba(255,255,255,0.55)" }}>
-              <span style={{ color: "#f59e0b", fontWeight: 700 }}>What this shows:</span> Per-stock paper trading using <em>only</em> the raw ML prediction signal (Yggdrasil v7).
-              Entry triggered when the predicted return crosses above <span style={{ color: "#e6edf3" }}>+1%</span>,
-              exit on signal drop or hard rules (−5% stop loss, 21-day max hold).
-              Covers the <span style={{ color: "#e6edf3" }}>last 12 months</span> per stock individually — each stock is run independently, not as a portfolio.{" "}
-              <span style={{ color: "#ef4444", fontWeight: 600 }}>Limitations:</span> short history, no portfolio construction, no diversification logic, survivor-selection bias in ranking.
-              Use this to <span style={{ color: "#e6edf3" }}>research which stocks the signal works best on</span> and to explore individual trading patterns in the Explorer tab.
-            </div>
-
-            {/* ── TOP 10 ALPHA STOCKS ── */}
+            {/* ── TOP 10 LIQUID OSE TABLE ── */}
             <div style={{ ...cardStyle, marginBottom: 16 }}>
-              {/* Header row: title + toggle + refresh */}
+              {/* Header row: title + timeframe buttons + refresh */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                 <div>
-                  <div style={sectionTitle}>TOP 10 ALPHA STOCKS — Last 12 Months (Top 50 Liquid OSE)</div>
+                  <div style={sectionTitle}>TOP 10 LIQUID OSE — {bestStocksDays === 365 ? "Last 1 Year" : bestStocksDays === 1825 ? "Last 5 Years" : "Last 2 Years"}</div>
                   <div style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", marginTop: 2 }}>
-                    Entry: ML pred &gt;+1% · Exit: signal &lt;+0.25% (min 5d hold) OR −5% stop loss OR 21d max hold
+                    Entry: fwd_ret_21d &gt;1% · Exit: signal &lt;0.25% (min 3d) OR −5% stop OR 21d max hold
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  <button
-                    onClick={() => fetchTopPerformers(true)}
-                    disabled={topPerfLoading}
-                    style={{ ...btnSecondary, fontSize: 10, padding: "5px 12px", opacity: topPerfLoading ? 0.5 : 1 }}>
-                    {topPerfLoading ? "Loading..." : "Refresh"}
+                  {([365, 730, 1825] as const).map(d => (
+                    <button key={d} onClick={() => setBestStocksDays(d)}
+                      style={{ ...btnSecondary, fontSize: 10, padding: "4px 10px",
+                        color: bestStocksDays === d ? "#10b981" : "rgba(255,255,255,0.5)",
+                        borderColor: bestStocksDays === d ? "rgba(16,185,129,0.4)" : "#30363d",
+                        background: bestStocksDays === d ? "rgba(16,185,129,0.08)" : "#21262d" }}>
+                      {d === 365 ? "1Y" : d === 730 ? "2Y" : "5Y"}
+                    </button>
+                  ))}
+                  {bestStocksMeta?.computedAt && (
+                    <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", fontFamily: "monospace" }}>
+                      {new Date(bestStocksMeta.computedAt).toLocaleDateString("no-NO", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  )}
+                  <button onClick={() => fetchBestStocks(true)} disabled={bestStocksLoading}
+                    style={{ ...btnSecondary, fontSize: 10, padding: "5px 12px", opacity: bestStocksLoading ? 0.5 : 1 }}>
+                    {bestStocksLoading ? "Computing..." : "Refresh"}
                   </button>
                 </div>
               </div>
 
-              {topPerfLoading && (
+              {bestStocksLoading && (
                 <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
-                  Simulating trades across liquid OSE universe...
+                  Loading cached rankings...
                 </div>
               )}
-              {!topPerfLoading && topPerformers.length === 0 && (
-                <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
-                  Loading signal data...
+              {bestStocksPending && !bestStocksLoading && (
+                <div style={{ textAlign: "center", padding: 32, fontFamily: "monospace" }}>
+                  <div style={{ color: "#f59e0b", fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Nightly precompute not ready yet</div>
+                  <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 10 }}>Walk-forward results compute each night at 02:00 UTC via GitHub Actions.<br/>Auto-retrying in 2 minutes...</div>
                 </div>
               )}
-                  {topPerformers.length > 0 && (
+              {!bestStocksLoading && !bestStocksPending && bestStocks.length === 0 && (
+                <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
+                  No cached results — trigger a refresh or wait for tonight&apos;s scheduled run.
+                </div>
+              )}
+              {bestStocks.length > 0 && (
                     <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "monospace" }}>
                       <thead>
                         <tr style={{ borderBottom: "1px solid #30363d" }}>
-                          {["#", "Ticker", "Name", "Sector", "ML Pred", "Trades", "Win Rate", "Avg P&L", "Avg Max DD", "Total Return", "Liquidity"].map((h, hi) => (
-                            <th key={h} style={{ fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.5)", padding: "5px 8px", textAlign: hi < 2 ? "left" as const : "right" as const, letterSpacing: "0.04em" }}>{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {topPerformers.map((p, i) => (
-                          <tr key={p.ticker}
-                            style={{ borderBottom: "1px solid rgba(48,54,61,0.3)", cursor: "pointer", transition: "background 0.1s" }}
-                            onClick={() => { setExplorerTicker(p.ticker); setTab("explorer"); setExplorerDays(365); }}
-                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(59,130,246,0.06)")}
-                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                            <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, color: i === 0 ? "#f59e0b" : i < 3 ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.35)" }}>#{i + 1}</td>
-                            <td style={{ padding: "6px 8px", fontSize: 12, fontWeight: 800, color: "#3b82f6" }}>{p.ticker}</td>
-                            <td style={{ padding: "6px 8px", fontSize: 10, color: "rgba(255,255,255,0.6)", textAlign: "right", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</td>
-                            <td style={{ padding: "6px 8px", textAlign: "right" }}>
-                              <span style={{ fontSize: 9, fontWeight: 700, color: sectorColor(p.sector) }}>{p.sector}</span>
-                            </td>
-                            <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", color: p.latestPred >= 1 ? "#10b981" : p.latestPred >= 0 ? "#f59e0b" : "#ef4444" }}>
-                              {p.latestPred >= 0 ? "+" : ""}{p.latestPred.toFixed(1)}%
-                            </td>
-                            <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: "rgba(255,255,255,0.6)" }}>{p.trades}</td>
-                            <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", color: p.winRate >= 70 ? "#10b981" : p.winRate >= 50 ? "#f59e0b" : "#ef4444" }}>
-                              {p.winRate.toFixed(0)}%
-                            </td>
-                            <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", color: p.avgPnl >= 0 ? "#10b981" : "#ef4444" }}>
-                              {p.avgPnl >= 0 ? "+" : ""}{p.avgPnl.toFixed(1)}%
-                            </td>
-                            <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 600, textAlign: "right", color: "#ef4444" }}>
-                              {(Math.min(p.avgMaxDrawdown ?? 0, 0)).toFixed(1)}%
-                            </td>
-                            <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 800, textAlign: "right", color: p.totalPnl >= 0 ? "#10b981" : "#ef4444" }}>
-                              {p.totalPnl >= 0 ? "+" : ""}{p.totalPnl.toFixed(1)}%
-                            </td>
-                            <td style={{ padding: "6px 8px", fontSize: 9, textAlign: "right", color: "rgba(255,255,255,0.4)" }}>
-                              {p.avg_nokvol >= 1e9 ? (p.avg_nokvol / 1e9).toFixed(1) + "B" : (p.avg_nokvol / 1e6).toFixed(0) + "M"} NOK
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                  {false && bestStocks.length > 0 && (
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "monospace" }}>
-                      <thead>
-                        <tr style={{ borderBottom: "1px solid #30363d" }}>
-                          {["#", "Ticker", "Sector", "Entry", "Stop", "Hold", "Vol", "Mom", "Sharpe", "Win%", "Ann.Ret", "MaxDD", "Trades", ""].map((h, hi) => (
-                            <th key={hi} style={{ fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.5)", padding: "5px 8px", textAlign: hi < 2 ? "left" as const : "right" as const, letterSpacing: "0.04em" }}>{h}</th>
+                          {["#", "Ticker", "Sector", "ML Pred", "Sharpe", "WinRate", "AvgPnL", "MaxDD", "Trades", "Action"].map((h, hi) => (
+                            <th key={h} style={{ fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.5)", padding: "5px 8px", textAlign: hi < 3 ? "left" as const : "right" as const, letterSpacing: "0.04em" }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {bestStocks.map((s, i) => {
-                          const p = s.bestParams;
                           const st = s.stats;
-                          const isExpanded = false && s.ticker === '';
-                          const rowBg = i < 3 ? "rgba(16,185,129,0.04)" : "transparent";
                           const sharpeColor = st.sharpe >= 1.5 ? "#10b981" : st.sharpe >= 0.8 ? "#f59e0b" : "#ef4444";
+                          const rowBg = i < 3 ? "rgba(16,185,129,0.04)" : "transparent";
                           return (
-                            <>
-                              <tr key={s.ticker}
-                                onClick={() => setExpandedOptTicker(isExpanded ? null : s.ticker)}
-                                style={{ borderBottom: isExpanded ? "none" : "1px solid rgba(48,54,61,0.3)", background: isExpanded ? "rgba(16,185,129,0.06)" : rowBg, cursor: "pointer", transition: "background 0.1s" }}
-                                onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = "rgba(16,185,129,0.08)"; }}
-                                onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = rowBg; }}>
-                                <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, color: i === 0 ? "#10b981" : i < 3 ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.35)" }}>#{s.rank}</td>
-                                <td style={{ padding: "6px 8px", fontSize: 12, fontWeight: 800, color: "#10b981" }}>{s.ticker}</td>
-                                <td style={{ padding: "6px 8px", textAlign: "right" }}>
-                                  <span style={{ fontSize: 9, fontWeight: 700, color: sectorColor(s.sector) }}>{s.sector?.slice(0, 8) ?? "—"}</span>
-                                </td>
-                                <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: "rgba(255,255,255,0.7)" }}>{p.entryThreshold.toFixed(1)}%</td>
-                                <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: "#ef4444" }}>{p.stopLossPct.toFixed(0)}%</td>
-                                <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: "rgba(255,255,255,0.6)" }}>{p.maxHoldDays}d</td>
-                                <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: p.volGate === 'hard' ? "#f59e0b" : "rgba(255,255,255,0.4)" }}>{p.volGate.toUpperCase()}</td>
-                                <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: p.momentumFilter > 0 ? "#3b82f6" : "rgba(255,255,255,0.4)" }}>{p.momentumFilter > 0 ? `${p.momentumFilter}/3` : "OFF"}</td>
-                                <td style={{ padding: "6px 8px", fontSize: 12, fontWeight: 800, textAlign: "right", color: sharpeColor }}>{st.sharpe.toFixed(2)}</td>
-                                <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", color: st.winRate >= 0.6 ? "#10b981" : st.winRate >= 0.5 ? "#f59e0b" : "#ef4444" }}>
-                                  {(st.winRate * 100).toFixed(0)}%
-                                </td>
-                                <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", color: st.annualizedReturn >= 0 ? "#10b981" : "#ef4444" }}>
-                                  {st.annualizedReturn >= 0 ? "+" : ""}{(st.annualizedReturn * 100).toFixed(1)}%
-                                </td>
-                                <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 600, textAlign: "right", color: "#ef4444" }}>
-                                  {(st.maxDrawdown * 100).toFixed(1)}%
-                                </td>
-                                <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: "rgba(255,255,255,0.5)" }}>{st.trades}</td>
-                                <td style={{ padding: "6px 8px", textAlign: "right", fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
-                                  {isExpanded ? "▲" : "▼"}
-                                </td>
-                              </tr>
-                              {/* Trade log expansion */}
-                              {isExpanded && s.trades && s.trades.length > 0 && (
-                                <tr key={`${s.ticker}-trades`}>
-                                  <td colSpan={14} style={{ padding: "0 8px 10px 32px", background: "rgba(16,185,129,0.03)", borderBottom: "1px solid rgba(48,54,61,0.4)" }}>
-                                    <div style={{ paddingTop: 8 }}>
-                                      {/* Mini stats bar */}
-                                      <div style={{ display: "flex", gap: 20, marginBottom: 8, fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.5)" }}>
-                                        <span>Wins: <span style={{ color: "#10b981", fontWeight: 700 }}>{s.trades.filter(t => t.pnlPct > 0).length}</span></span>
-                                        <span>Losses: <span style={{ color: "#ef4444", fontWeight: 700 }}>{s.trades.filter(t => t.pnlPct <= 0).length}</span></span>
-                                        <span>Avg P&L: <span style={{ color: st.annualizedReturn >= 0 ? "#10b981" : "#ef4444", fontWeight: 700 }}>
-                                          {s.trades.reduce((sum, t) => sum + t.pnlPct, 0) / s.trades.length >= 0 ? "+" : ""}
-                                          {(s.trades.reduce((sum, t) => sum + t.pnlPct, 0) / s.trades.length * 100).toFixed(2)}%
-                                        </span></span>
-                                        <span>Avg Hold: <span style={{ color: "rgba(255,255,255,0.7)", fontWeight: 700 }}>
-                                          {(s.trades.reduce((sum, t) => sum + t.daysHeld, 0) / s.trades.length).toFixed(1)}d
-                                        </span></span>
-                                        <button
-                                          onClick={e => { e.stopPropagation(); setSimTicker(s.ticker); setSimEntry(p.entryThreshold); setSimStop(p.stopLossPct); setSimMaxHold(p.maxHoldDays); setSimVolGate(p.volGate as 'off' | 'soft' | 'hard'); setSimMom(p.momentumFilter as 0 | 1 | 2 | 3); setTab("simulator"); }}
-                                          style={{ ...btnSecondary, fontSize: 9, padding: "2px 8px", color: "#10b981", borderColor: "rgba(16,185,129,0.3)", marginLeft: "auto" }}>
-                                          SIMULATE →
-                                        </button>
-                                      </div>
-                                      {/* Trades table */}
-                                      <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "monospace" }}>
-                                        <thead>
-                                          <tr style={{ borderBottom: "1px solid rgba(48,54,61,0.5)" }}>
-                                            {["Entry", "Exit", "Days", "ML Pred", "P&L", "Max DD", "Exit Reason"].map((h, hi) => (
-                                              <th key={h} style={{ fontSize: 8, fontWeight: 600, color: "rgba(255,255,255,0.35)", padding: "3px 6px", textAlign: hi === 0 ? "left" as const : "right" as const, letterSpacing: "0.04em" }}>{h}</th>
-                                            ))}
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {s.trades.map((t, ti) => {
-                                            const isWin = t.pnlPct > 0;
-                                            const reasonColor: Record<string, string> = {
-                                              take_profit: "#10b981", stop_loss: "#ef4444",
-                                              signal_flip: "#3b82f6", time_stop: "#f59e0b",
-                                              sma_cross: "#a78bfa", vol_regime: "#fb923c",
-                                            };
-                                            const reasonLabel: Record<string, string> = {
-                                              take_profit: "TP", stop_loss: "SL",
-                                              signal_flip: "SIG", time_stop: "TIME",
-                                              sma_cross: "SMA", vol_regime: "VOL",
-                                            };
-                                            return (
-                                              <tr key={ti} style={{ borderBottom: "1px solid rgba(48,54,61,0.2)" }}
-                                                onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.02)")}
-                                                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                                                <td style={{ padding: "3px 6px", fontSize: 9, color: "rgba(255,255,255,0.6)" }}>{t.entryDate}</td>
-                                                <td style={{ padding: "3px 6px", fontSize: 9, textAlign: "right", color: "rgba(255,255,255,0.5)" }}>{t.exitDate}</td>
-                                                <td style={{ padding: "3px 6px", fontSize: 9, textAlign: "right", color: "rgba(255,255,255,0.5)" }}>{t.daysHeld}d</td>
-                                                <td style={{ padding: "3px 6px", fontSize: 9, textAlign: "right", color: t.predAtEntry >= 0.5 ? "#10b981" : "#f59e0b" }}>
-                                                  {t.predAtEntry >= 0 ? "+" : ""}{t.predAtEntry.toFixed(1)}%
-                                                </td>
-                                                <td style={{ padding: "3px 6px", fontSize: 10, fontWeight: 700, textAlign: "right", color: isWin ? "#10b981" : "#ef4444" }}>
-                                                  {isWin ? "+" : ""}{(t.pnlPct * 100).toFixed(2)}%
-                                                </td>
-                                                <td style={{ padding: "3px 6px", fontSize: 9, textAlign: "right", color: t.maxDrawdown < -0.03 ? "#ef4444" : "rgba(255,255,255,0.4)" }}>
-                                                  {(t.maxDrawdown * 100).toFixed(1)}%
-                                                </td>
-                                                <td style={{ padding: "3px 6px", textAlign: "right" }}>
-                                                  <span style={{ fontSize: 8, fontWeight: 700, padding: "2px 5px", borderRadius: 3, background: `${reasonColor[t.exitReason] ?? "#64748b"}22`, color: reasonColor[t.exitReason] ?? "#64748b", letterSpacing: "0.04em" }}>
-                                                    {reasonLabel[t.exitReason] ?? t.exitReason}
-                                                  </span>
-                                                </td>
-                                              </tr>
-                                            );
-                                          })}
-                                        </tbody>
-                                      </table>
-                                    </div>
-                                  </td>
-                                </tr>
-                              )}
-                            </>
+                          <tr key={s.ticker}
+                            style={{ borderBottom: "1px solid rgba(48,54,61,0.3)", background: rowBg, transition: "background 0.1s" }}
+                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(16,185,129,0.08)")}
+                            onMouseLeave={e => (e.currentTarget.style.background = rowBg)}>
+                            <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, color: i === 0 ? "#10b981" : i < 3 ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.35)" }}>#{s.rank}</td>
+                            <td style={{ padding: "6px 8px", fontSize: 12, fontWeight: 800, color: "#10b981" }}>{s.ticker}</td>
+                            <td style={{ padding: "6px 8px", textAlign: "right" }}>
+                              <span style={{ fontSize: 9, fontWeight: 700, color: sectorColor(s.sector) }}>{s.sector?.slice(0, 10) ?? "—"}</span>
+                            </td>
+                            <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right",
+                              color: (s as unknown as { currentPred?: number }).currentPred != null && (s as unknown as { currentPred: number }).currentPred >= 1.0 ? "#10b981" : "#f59e0b" }}>
+                              {(s as unknown as { currentPred?: number }).currentPred != null
+                                ? `+${(s as unknown as { currentPred: number }).currentPred.toFixed(2)}%`
+                                : "—"}
+                            </td>
+                            <td style={{ padding: "6px 8px", fontSize: 12, fontWeight: 800, textAlign: "right", color: sharpeColor }}>{st.sharpe.toFixed(2)}</td>
+                            <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", color: st.winRate >= 0.6 ? "#10b981" : st.winRate >= 0.5 ? "#f59e0b" : "#ef4444" }}>
+                              {(st.winRate * 100).toFixed(0)}%
+                            </td>
+                            <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", color: st.avgWinPct >= 0 ? "#10b981" : "#ef4444" }}>
+                              {st.avgWinPct >= 0 ? "+" : ""}{(st.avgWinPct * 100).toFixed(1)}%
+                            </td>
+                            <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 600, textAlign: "right", color: "#ef4444" }}>
+                              {(st.maxDrawdown * 100).toFixed(1)}%
+                            </td>
+                            <td style={{ padding: "6px 8px", fontSize: 10, textAlign: "right", color: "rgba(255,255,255,0.5)" }}>{st.trades}</td>
+                            <td style={{ padding: "6px 8px", textAlign: "right" }}>
+                              <button
+                                onClick={() => { setSimTicker(s.ticker); setSimEntry(1.0); setSimExit(0.25); setSimStop(5.0); setSimMaxHold(21); setSimVolGate('off'); setSimMom(0); setTab("simulator"); }}
+                                style={{ ...btnSecondary, fontSize: 9, padding: "3px 8px", color: "#10b981", borderColor: "rgba(16,185,129,0.3)" }}>
+                                SIMULATE
+                              </button>
+                            </td>
+                          </tr>
                           );
                         })}
                       </tbody>
                     </table>
-                  )}
+              )}
             </div>
+
 
             {/* ── CUMULATIVE PERFORMANCE CHART ── */}
             {(() => {
-              // Always show top-10-liquid 2Y equity curve
+              const tfLabel = bestStocksDays === 365 ? '1 Year' : bestStocksDays === 1825 ? '5 Years' : '2 Years';
               const activeStats = optimizedEqData?.stats;
               const activeCurve = optimizedEqData?.curve ?? [];
-              const activeLoading = false;
+              const activeLoading = bestStocksLoading;
               const activeTradeLog = optimizedEqData?.allTrades ?? [];
 
               const isPos = (activeStats?.totalReturn ?? 0) >= 0;
@@ -1446,7 +1232,7 @@ export default function AlphaPage() {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
                     <div>
                       <div style={sectionTitle}>
-                        Cumulative Performance — Last 2 Years · 10 Largest OSE Stocks · 10% Per Slot · Compounding
+                        Cumulative Performance — Last {tfLabel} · 10 Largest OSE Stocks · 10% Per Slot · Compounding
                       </div>
                       <div style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", marginTop: -8 }}>
                         21-day forward return signal (fwd_ret_21d) · entry &gt;1% · exit &lt;0.25% · 5% stop · 15% TP · min 3d · 10% per slot · compounding · indexed to 100
@@ -1536,7 +1322,7 @@ export default function AlphaPage() {
                   {activeTradeLog.length > 0 && (
                     <div style={{ marginTop: 24 }}>
                       <div style={{ fontSize: 10, fontWeight: 700, fontFamily: "monospace", color: "rgba(255,255,255,0.5)", letterSpacing: "0.08em", marginBottom: 8 }}>
-                        TRADE LOG — {activeTradeLog.length} CLOSED POSITIONS · LAST 2 YEARS · TOP 10 LIQUID OSE
+                        TRADE LOG — {activeTradeLog.length} CLOSED POSITIONS · LAST {tfLabel.toUpperCase()} · TOP 10 LIQUID OSE
                       </div>
                       <div style={{ overflowY: "auto", maxHeight: 420, border: "1px solid #21262d", borderRadius: 6 }}>
                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10, fontFamily: "monospace" }}>

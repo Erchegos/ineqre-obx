@@ -21,8 +21,9 @@ export const maxDuration = 60;
  * Cache miss: computes inline (fast — single pass, no param sweep).
  */
 
-const CACHE_KEY      = 'best_stocks_v15_fwdret_2y';
 const CACHE_MAX_AGE_H = 25;
+const VALID_DAYS = [365, 730, 1825] as const;
+type ValidDays = typeof VALID_DAYS[number];
 
 export interface BestStockResult {
   rank: number;
@@ -55,9 +56,9 @@ const FIXED_PARAMS: SimParams = {
   valuationFilter: false,
 };
 
-async function computeAndCache(): Promise<object> {
-  // 730d display window + 200d SMA warmup + buffer → 960 calendar days total fetch.
-  const TOTAL_DAYS = 960;
+async function computeAndCache(days: ValidDays, cacheKey: string): Promise<object> {
+  // days display window + 200d SMA warmup + 30d buffer
+  const TOTAL_DAYS = days + 230;
 
   // 1. Top 10 liquid tickers (by avg NOK daily volume, last 3 months)
   const liquidRes = await pool.query(`
@@ -104,26 +105,26 @@ async function computeAndCache(): Promise<object> {
     SELECT ticker, date::text AS date, close, sma200, sma50, fwd_ret_21d
     FROM with_stats
     WHERE rn > 200
-      AND date >= CURRENT_DATE - 730 * INTERVAL '1 day'
+      AND date >= CURRENT_DATE - $3 * INTERVAL '1 day'
     ORDER BY ticker, date ASC
-  `, [tickers, TOTAL_DAYS]);
+  `, [tickers, TOTAL_DAYS, days]);
 
   // 3. Momentum factors (for momScore display and vol regime)
   const momRes = await pool.query(`
     SELECT ticker, date::text AS date, mom1m::float, mom6m::float, mom11m::float, vol1m::float
     FROM factor_technical
     WHERE ticker = ANY($1)
-      AND date >= CURRENT_DATE - 730 * INTERVAL '1 day'
+      AND date >= CURRENT_DATE - $2 * INTERVAL '1 day'
     ORDER BY ticker, date ASC
-  `, [tickers]);
+  `, [tickers, days]);
 
   // 4. OBX benchmark
   const obxRes = await pool.query(`
     SELECT date::text AS date, close::float AS obx_close
     FROM prices_daily
-    WHERE ticker = 'OBX' AND date >= CURRENT_DATE - 730 * INTERVAL '1 day'
+    WHERE ticker = 'OBX' AND date >= CURRENT_DATE - $1 * INTERVAL '1 day'
     ORDER BY date ASC
-  `);
+  `, [days]);
 
   // 5. Current ML prediction per ticker (for the ML Pred display column only)
   const currentPredRes = await pool.query(`
@@ -223,7 +224,7 @@ async function computeAndCache(): Promise<object> {
     allForwardTrades,
     meta: {
       universe: tickers.length, combosPerTicker: 1, qualified: results.length,
-      days: 730, entryThreshold: 1.0, exitThreshold: 0.25,
+      days, entryThreshold: 1.0, exitThreshold: 0.25,
       computedAt: new Date().toISOString(),
     },
   };
@@ -233,7 +234,7 @@ async function computeAndCache(): Promise<object> {
     `INSERT INTO alpha_result_cache (cache_key, result, computed_at)
      VALUES ($1, $2, NOW())
      ON CONFLICT (cache_key) DO UPDATE SET result = $2, computed_at = NOW()`,
-    [CACHE_KEY, JSON.stringify(payload)]
+    [cacheKey, JSON.stringify(payload)]
   );
 
   return payload;
@@ -244,6 +245,11 @@ export async function GET(req: NextRequest) {
   if (authError) return authError;
 
   try {
+    const url = new URL(req.url);
+    const rawDays = parseInt(url.searchParams.get('days') || '730', 10);
+    const days: ValidDays = (VALID_DAYS as readonly number[]).includes(rawDays) ? rawDays as ValidDays : 730;
+    const cacheKey = `best_stocks_v15_fwdret_${days}d`;
+
     await pool.query(`CREATE TABLE IF NOT EXISTS alpha_result_cache (
       cache_key TEXT PRIMARY KEY, result JSONB NOT NULL, computed_at TIMESTAMPTZ DEFAULT NOW()
     )`);
@@ -252,14 +258,14 @@ export async function GET(req: NextRequest) {
     const cached = await pool.query(
       `SELECT result FROM alpha_result_cache
        WHERE cache_key = $1 AND computed_at > NOW() - INTERVAL '${CACHE_MAX_AGE_H} hours'`,
-      [CACHE_KEY]
+      [cacheKey]
     );
     if (cached.rows.length > 0 && cached.rows[0].result.bestStocks?.length > 0) {
       return secureJsonResponse(cached.rows[0].result);
     }
 
     // Cache cold or empty → compute inline
-    const result = await computeAndCache();
+    const result = await computeAndCache(days, cacheKey);
     return secureJsonResponse(result);
   } catch (error) {
     return safeErrorResponse(error, 'Best stocks computation failed');
