@@ -128,19 +128,25 @@ export default function OBXVolatilityDashboard() {
     pct >= 40 ? "normal" :
     pct >= 20 ? "low" : "very low";
 
-  // Correlation reading
-  const corr = data.currentAvgCorrelation ?? null;
-  const corrLabel =
-    corr === null ? "—" :
-    corr > 0.6 ? "High" :
-    corr > 0.3 ? "Moderate" :
-    corr > 0 ? "Low" : "Negative";
-  const corrMeaning =
-    corr === null ? "" :
-    corr > 0.6 ? "Stocks are moving together — diversification is less effective. A broad market move (up or down) affects almost everyone." :
-    corr > 0.3 ? "Stocks are somewhat linked. Some diversification benefit, but broad moves still matter." :
-    corr > 0 ? "Stocks are moving fairly independently. Diversification is working well." :
-    "Stocks are moving in opposite directions, which is unusual. Very high diversification benefit.";
+  // Vol spread across constituents
+  const avgVol = data.summary.avgConstituentVol ?? null;
+  const volDisp = data.summary.volDispersion ?? null;
+  const highVolCount = data.summary.highVolCount ?? 0;
+  const lowVolCount = data.summary.lowVolCount ?? 0;
+  const total = data.constituentCount ?? 1;
+  const normalCount = total - highVolCount - lowVolCount;
+
+  const dispLabel =
+    volDisp === null ? "—" :
+    volDisp > 0.15 ? "Wide spread" :
+    volDisp > 0.08 ? "Moderate spread" : "Narrow spread";
+  const dispMeaning =
+    volDisp === null ? "" :
+    volDisp > 0.15
+      ? "Stress is concentrated — a few stocks are much more volatile than the rest. This usually points to sector-specific news rather than a broad market event."
+      : volDisp > 0.08
+        ? "Mixed picture — some stocks are calm while others are stressed. Normal for a diverse market."
+        : "All stocks are behaving similarly. Stress (or calm) is broad-based and market-wide.";
 
   return (
     <main style={{ padding: "20px 24px", maxWidth: 1400, margin: "0 auto", fontFamily: "monospace" }}>
@@ -270,75 +276,76 @@ export default function OBXVolatilityDashboard() {
 
         {/* Card 2: How many stocks are stressed */}
         <Panel>
-          <CardTitle>Which stocks are stressed?</CardTitle>
+          <CardTitle>How many stocks are stressed?</CardTitle>
           <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 12 }}>
-            Each of the {data.constituentCount} OBX stocks is assigned a stress level
+            Each of the {total} listed stocks is classified by its own stress level
           </div>
 
-          <RegimeDistribution distribution={data.summary.regimeDistribution} total={data.constituentCount} />
+          <RegimeDistribution distribution={data.summary.regimeDistribution} total={total} />
 
           <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
             <div style={{ flex: 1, padding: "10px 12px", borderRadius: 6, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", textAlign: "center" }}>
-              <div style={{ fontSize: 22, fontWeight: 800, color: "#ef4444" }}>{data.summary.highVolCount}</div>
-              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>stocks under stress</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: "#ef4444" }}>{highVolCount}</div>
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>stressed stocks</div>
+            </div>
+            <div style={{ flex: 1, padding: "10px 12px", borderRadius: 6, background: "rgba(156,163,175,0.08)", border: "1px solid rgba(156,163,175,0.2)", textAlign: "center" }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: "#9ca3af" }}>{normalCount}</div>
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>normal stocks</div>
             </div>
             <div style={{ flex: 1, padding: "10px 12px", borderRadius: 6, background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)", textAlign: "center" }}>
-              <div style={{ fontSize: 22, fontWeight: 800, color: "#10b981" }}>{data.summary.lowVolCount}</div>
-              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>stocks are calm</div>
-            </div>
-          </div>
-
-          <div style={{ marginTop: 10, padding: "8px 10px", borderRadius: 5, background: "rgba(255,255,255,0.03)", border: "1px solid #21262d" }}>
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>
-              Average stock swing: <strong style={{ color: "#fff" }}>{fmtPct(data.summary.avgConstituentVol)}</strong> per year.
-              {data.summary.volDispersion > 0.1
-                ? " Stocks vary widely — some are calm while others are stressed."
-                : " Stocks are behaving similarly to each other."}
+              <div style={{ fontSize: 22, fontWeight: 800, color: "#10b981" }}>{lowVolCount}</div>
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>calm stocks</div>
             </div>
           </div>
         </Panel>
 
-        {/* Card 3: Are stocks moving together */}
+        {/* Card 3: Is stress broad or concentrated? */}
         <Panel>
-          <CardTitle>Are stocks moving together?</CardTitle>
+          <CardTitle>Is stress broad or concentrated?</CardTitle>
           <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 12 }}>
-            When stocks move together, diversification provides less protection
+            Are most stocks equally stressed, or is it limited to a few?
           </div>
 
           <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
-            <span style={{ fontSize: 28, fontWeight: 800, color: "#fff" }}>{corrLabel}</span>
-            {corr !== null && (
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>
-                ({corr > 0 ? "+" : ""}{corr.toFixed(2)} correlation)
-              </span>
-            )}
+            <span style={{ fontSize: 24, fontWeight: 800, color: "#fff" }}>{dispLabel}</span>
           </div>
 
-          {/* Correlation bar -1 to +1 */}
-          {corr !== null && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ height: 6, borderRadius: 3, background: "#21262d", position: "relative" }}>
-                <div style={{
-                  position: "absolute",
-                  left: `${((corr + 1) / 2) * 100}%`,
-                  top: -3,
-                  width: 12, height: 12,
-                  borderRadius: "50%",
-                  background: corr > 0.6 ? "#ef4444" : corr > 0.3 ? "#f59e0b" : "#10b981",
-                  transform: "translateX(-50%)",
-                  border: "2px solid #0a0a0a",
-                }} />
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
-                <span style={{ fontSize: 9, color: "rgba(255,255,255,0.25)" }}>Moving opposite</span>
-                <span style={{ fontSize: 9, color: "rgba(255,255,255,0.25)" }}>No link</span>
-                <span style={{ fontSize: 9, color: "rgba(255,255,255,0.25)" }}>Moving together</span>
+          {/* Visual: 3 buckets as a proportional bar */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: "flex", height: 28, borderRadius: 4, overflow: "hidden", border: "1px solid #21262d", marginBottom: 6 }}>
+              {highVolCount > 0 && (
+                <div style={{ flex: highVolCount, background: "rgba(239,68,68,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "#fff" }}>{Math.round((highVolCount / total) * 100)}%</span>
+                </div>
+              )}
+              {normalCount > 0 && (
+                <div style={{ flex: normalCount, background: "rgba(156,163,175,0.25)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "#fff" }}>{Math.round((normalCount / total) * 100)}%</span>
+                </div>
+              )}
+              {lowVolCount > 0 && (
+                <div style={{ flex: lowVolCount, background: "rgba(16,185,129,0.35)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "#fff" }}>{Math.round((lowVolCount / total) * 100)}%</span>
+                </div>
+              )}
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "rgba(255,255,255,0.3)" }}>
+              <span style={{ color: "#ef4444" }}>Stressed</span>
+              <span>Normal</span>
+              <span style={{ color: "#10b981" }}>Calm</span>
+            </div>
+          </div>
+
+          {avgVol !== null && (
+            <div style={{ marginBottom: 8, padding: "6px 10px", borderRadius: 4, background: "rgba(255,255,255,0.03)", border: "1px solid #21262d" }}>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+                Average stock: <strong style={{ color: "#fff" }}>{fmtPct(avgVol)}/year</strong> volatility
               </div>
             </div>
           )}
 
-          <div style={{ padding: "10px 12px", borderRadius: 6, background: "rgba(255,255,255,0.03)", border: "1px solid #21262d" }}>
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", lineHeight: 1.6 }}>{corrMeaning}</div>
+          <div style={{ padding: "8px 10px", borderRadius: 5, background: "rgba(255,255,255,0.03)", border: "1px solid #21262d" }}>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", lineHeight: 1.5 }}>{dispMeaning}</div>
           </div>
         </Panel>
 
@@ -420,8 +427,7 @@ export default function OBXVolatilityDashboard() {
             { term: "Annualized volatility", def: "The expected total price swing over a full year if current conditions continued. 15% means the index could move ±15% from today." },
             { term: "Historical percentile", def: "If today's volatility is at the 87th percentile, it's higher than 87% of all days we've tracked. 50th = average." },
             { term: "Stress level (regime)", def: "We group each day into one of 6 stress levels based on how unusual the volatility is. From Very Calm to Market Crisis." },
-            { term: "Correlation", def: "How much stocks move together. +1 = perfectly in sync, 0 = no link, −1 = always opposite." },
-            { term: "Diversification", def: "Spreading money across different stocks. Works best when stocks don't all move the same way." },
+            { term: "Diversification", def: "Spreading money across different stocks to reduce risk. Works best when stocks don't all move the same way at the same time." },
           ].map(({ term, def }) => (
             <div key={term} style={{ padding: "10px 12px", borderRadius: 6, background: "rgba(255,255,255,0.02)", border: "1px solid #21262d" }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 4 }}>{term}</div>
