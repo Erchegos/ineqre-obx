@@ -21,7 +21,7 @@ export const maxDuration = 60;
  * Cache miss: computes inline (fast — single pass, no param sweep).
  */
 
-const CACHE_KEY      = 'best_stocks_v14_simparams_2y';
+const CACHE_KEY      = 'best_stocks_v15_fwdret_2y';
 const CACHE_MAX_AGE_H = 25;
 
 export interface BestStockResult {
@@ -56,11 +56,10 @@ const FIXED_PARAMS: SimParams = {
 };
 
 async function computeAndCache(): Promise<object> {
-  // Need row 201 (SMA warmup) to fall before 730 days ago.
-  // 730d window + 200d SMA warmup + buffer → use 960 calendar days.
+  // 730d display window + 200d SMA warmup + buffer → 960 calendar days total fetch.
   const TOTAL_DAYS = 960;
 
-  // 1. Top 50 liquid tickers
+  // 1. Top 10 liquid tickers (by avg NOK daily volume, last 3 months)
   const liquidRes = await pool.query(`
     SELECT ff.ticker, s.name, s.sector, AVG(ff.nokvol::float) AS avg_nokvol
     FROM factor_fundamentals ff
@@ -80,8 +79,10 @@ async function computeAndCache(): Promise<object> {
 
   if (tickers.length === 0) throw new Error('No tickers found in universe');
 
-  // 2. Prices + rolling stats. LAG(126) ≈ 6m momentum computed from raw prices
-  //    — works for all 730 days since we pull 960 days total (200d SMA warmup + 760 extra).
+  // 2. Prices + SMA200/SMA50 + 21-day forward return (same signal as individual simulator).
+  //    LEAD(close, 21) computes the actual 21-day forward return — identical to fwd_ret_21d
+  //    in /api/alpha/simulator/[ticker]. Last ~21 bars will have NULL (no future data) —
+  //    the engine's step-hold carries the last known signal forward.
   const priceRes = await pool.query(`
     WITH raw AS (
       SELECT ticker, date, close::float
@@ -95,21 +96,19 @@ async function computeAndCache(): Promise<object> {
       SELECT ticker, date, close,
         AVG(close) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 199 PRECEDING AND CURRENT ROW) AS sma200,
         AVG(close) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 49 PRECEDING AND CURRENT ROW) AS sma50,
-        LAG(close, 126) OVER (PARTITION BY ticker ORDER BY date) AS close_126d,
+        (LEAD(close, 21) OVER (PARTITION BY ticker ORDER BY date) - close)
+          / NULLIF(close, 0) AS fwd_ret_21d,
         ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date) AS rn
       FROM raw
     )
-    SELECT ticker, date::text AS date, close, sma200, sma50,
-      CASE WHEN close_126d IS NOT NULL AND close_126d > 0
-        THEN (close - close_126d) / close_126d
-      END AS mom6m_price
+    SELECT ticker, date::text AS date, close, sma200, sma50, fwd_ret_21d
     FROM with_stats
     WHERE rn > 200
       AND date >= CURRENT_DATE - 730 * INTERVAL '1 day'
     ORDER BY ticker, date ASC
   `, [tickers, TOTAL_DAYS]);
 
-  // 3. Momentum factors
+  // 3. Momentum factors (for momScore display and vol regime)
   const momRes = await pool.query(`
     SELECT ticker, date::text AS date, mom1m::float, mom6m::float, mom11m::float, vol1m::float
     FROM factor_technical
@@ -118,19 +117,7 @@ async function computeAndCache(): Promise<object> {
     ORDER BY ticker, date ASC
   `, [tickers]);
 
-  // 4. Real ML predictions only — no fallback
-  const mlRes = await pool.query(`
-    SELECT DISTINCT ON (ticker, prediction_date::date)
-      ticker, prediction_date::date::text AS date,
-      ensemble_prediction::float AS pred
-    FROM ml_predictions
-    WHERE ticker = ANY($1)
-      AND prediction_date >= CURRENT_DATE - 730 * INTERVAL '1 day'
-      AND ensemble_prediction IS NOT NULL
-    ORDER BY ticker, prediction_date::date, prediction_date DESC
-  `, [tickers]);
-
-  // 5. OBX benchmark
+  // 4. OBX benchmark
   const obxRes = await pool.query(`
     SELECT date::text AS date, close::float AS obx_close
     FROM prices_daily
@@ -138,7 +125,7 @@ async function computeAndCache(): Promise<object> {
     ORDER BY date ASC
   `);
 
-  // 6. Current (most recent) ML prediction per ticker for ranking
+  // 5. Current ML prediction per ticker (for the ML Pred display column only)
   const currentPredRes = await pool.query(`
     SELECT DISTINCT ON (ticker)
       ticker, ensemble_prediction::float AS pred
@@ -161,20 +148,14 @@ async function computeAndCache(): Promise<object> {
     momByTicker.get(r.ticker)!.set(r.date.slice(0,10), r);
   }
 
-  const mlByTicker = new Map<string, Map<string, number>>();
-  for (const r of mlRes.rows) {
-    if (!mlByTicker.has(r.ticker)) mlByTicker.set(r.ticker, new Map());
-    mlByTicker.get(r.ticker)!.set(r.date.slice(0,10), r.pred);
-  }
-
-  type PxRow = { ticker: string; date: string; close: number; sma200: number; sma50: number; mom6m_price: number | null };
+  type PxRow = { ticker: string; date: string; close: number; sma200: number; sma50: number; fwd_ret_21d: number | null };
   const pxByTicker = new Map<string, PxRow[]>();
   for (const r of priceRes.rows as PxRow[]) {
     if (!pxByTicker.has(r.ticker)) pxByTicker.set(r.ticker, []);
     pxByTicker.get(r.ticker)!.push(r);
   }
 
-  // 7. Build SimInputBar[] and run simulation per ticker
+  // 6. Build SimInputBar[] and run simulation per ticker
   type StockResult = {
     rank: number; ticker: string; name: string; sector: string; avg_nokvol: number;
     currentPred: number; bestParams: SimParams; stats: SimStats; trades: SimTrade[];
@@ -187,30 +168,18 @@ async function computeAndCache(): Promise<object> {
     if (!pxRows || pxRows.length < 30) continue;
 
     const momMap = momByTicker.get(ticker) ?? new Map<string, MomRow>();
-    const mlMap  = mlByTicker.get(ticker)  ?? new Map<string, number>();
 
-    // Skip tickers with no ML predictions at all
-    if (mlMap.size === 0) continue;
-
+    // Build bars identical to the individual simulator:
+    // - mlPrediction = fwd_ret_21d (21-day forward return from prices)
+    // - real OHLC from prices (only close available here, set open=close for consistency)
     const input: SimInputBar[] = pxRows.map(px => {
       const d = px.date.slice(0,10);
       const mom = momMap.get(d);
       return {
         date: d, open: px.close, close: px.close, high: px.close, low: px.close,
         volume: 0, sma200: px.sma200 ?? null, sma50: px.sma50 ?? null,
-        // Signal priority:
-        // 1. Real ML prediction (ensemble_prediction) — highest quality
-        // 2. factor_technical mom6m (pipeline-computed, same scale)
-        // 3. Price-derived mom6m via LAG(126) — covers full 365d even when
-        //    factor_technical is sparse. No look-ahead: LAG uses only past prices.
-        // Scale * 0.15: entry >1% fires when 6m momentum >6.7%,
-        //               exit <0.25% when 6m momentum drops below 1.7%
-        mlPrediction: mlMap.has(d)
-          ? mlMap.get(d)!
-          : (mom?.mom6m ?? px.mom6m_price) != null
-            ? (mom?.mom6m ?? px.mom6m_price)! * 0.15
-            : null,
-        mlConfidence: mlMap.has(d) ? 0.7 : 0.4,
+        mlPrediction: px.fwd_ret_21d ?? null,
+        mlConfidence: px.fwd_ret_21d != null ? 0.8 : null,
         mom1m: mom?.mom1m ?? null, mom6m: mom?.mom6m ?? null,
         mom11m: mom?.mom11m ?? null, vol1m: mom?.vol1m ?? null,
         volRegime: null as 'low'|'high'|null,
@@ -254,7 +223,7 @@ async function computeAndCache(): Promise<object> {
     allForwardTrades,
     meta: {
       universe: tickers.length, combosPerTicker: 1, qualified: results.length,
-      days: 730, entryThreshold: 0.25, exitThreshold: -0.5,
+      days: 730, entryThreshold: 1.0, exitThreshold: 0.25,
       computedAt: new Date().toISOString(),
     },
   };

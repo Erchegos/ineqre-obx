@@ -31,7 +31,7 @@ const pool = new Pool({
   max: 5,
 });
 
-const BEST_STOCKS_KEY = 'best_stocks_v14_simparams_2y';
+const BEST_STOCKS_KEY = 'best_stocks_v15_fwdret_2y';
 
 // Same params as the individual stock simulator (Entry 1%, Exit 0.25%, Stop 5%, TP 15%, Min 3d, Max 21d, Cooldown 2)
 const FIXED_PARAMS: SimParams = {
@@ -92,14 +92,12 @@ async function computeBestStocks() {
       SELECT ticker, date, close,
         AVG(close) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 199 PRECEDING AND CURRENT ROW) AS sma200,
         AVG(close) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 49 PRECEDING AND CURRENT ROW) AS sma50,
-        LAG(close, 126) OVER (PARTITION BY ticker ORDER BY date) AS close_126d,
+        (LEAD(close, 21) OVER (PARTITION BY ticker ORDER BY date) - close)
+          / NULLIF(close, 0) AS fwd_ret_21d,
         ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date) AS rn
       FROM raw
     )
-    SELECT ticker, date::text AS date, close, sma200, sma50,
-      CASE WHEN close_126d IS NOT NULL AND close_126d > 0
-        THEN (close - close_126d) / close_126d
-      END AS mom6m_price
+    SELECT ticker, date::text AS date, close, sma200, sma50, fwd_ret_21d
     FROM with_stats
     WHERE rn > 200
       AND date >= CURRENT_DATE - 730 * INTERVAL '1 day'
@@ -112,17 +110,6 @@ async function computeBestStocks() {
     WHERE ticker = ANY($1)
       AND date >= CURRENT_DATE - 730 * INTERVAL '1 day'
     ORDER BY ticker, date ASC
-  `, [tickers]);
-
-  const mlRes = await pool.query(`
-    SELECT DISTINCT ON (ticker, prediction_date::date)
-      ticker, prediction_date::date::text AS date,
-      ensemble_prediction::float AS pred
-    FROM ml_predictions
-    WHERE ticker = ANY($1)
-      AND prediction_date >= CURRENT_DATE - 730 * INTERVAL '1 day'
-      AND ensemble_prediction IS NOT NULL
-    ORDER BY ticker, prediction_date::date, prediction_date DESC
   `, [tickers]);
 
   const obxRes = await pool.query(`
@@ -153,13 +140,7 @@ async function computeBestStocks() {
     momByTicker.get(r.ticker)!.set(r.date.slice(0,10), r);
   }
 
-  const mlByTicker = new Map<string, Map<string, number>>();
-  for (const r of mlRes.rows) {
-    if (!mlByTicker.has(r.ticker)) mlByTicker.set(r.ticker, new Map());
-    mlByTicker.get(r.ticker)!.set(r.date.slice(0,10), r.pred);
-  }
-
-  type PxRow = { ticker: string; date: string; close: number; sma200: number; sma50: number; mom6m_price: number | null };
+  type PxRow = { ticker: string; date: string; close: number; sma200: number; sma50: number; fwd_ret_21d: number | null };
   const pxByTicker = new Map<string, PxRow[]>();
   for (const r of priceRes.rows as PxRow[]) {
     if (!pxByTicker.has(r.ticker)) pxByTicker.set(r.ticker, []);
@@ -178,8 +159,6 @@ async function computeBestStocks() {
     if (!pxRows || pxRows.length < 30) continue;
 
     const momMap = momByTicker.get(ticker) ?? new Map<string, MomRow>();
-    const mlMap  = mlByTicker.get(ticker)  ?? new Map<string, number>();
-    if (mlMap.size === 0) continue;
 
     const input: SimInputBar[] = pxRows.map(px => {
       const d = px.date.slice(0,10);
@@ -187,12 +166,8 @@ async function computeBestStocks() {
       return {
         date: d, open: px.close, close: px.close, high: px.close, low: px.close,
         volume: 0, sma200: px.sma200 ?? null, sma50: px.sma50 ?? null,
-        mlPrediction: mlMap.has(d)
-          ? mlMap.get(d)!
-          : (mom?.mom6m ?? px.mom6m_price) != null
-            ? (mom?.mom6m ?? px.mom6m_price)! * 0.15
-            : null,
-        mlConfidence: mlMap.has(d) ? 0.7 : 0.4,
+        mlPrediction: px.fwd_ret_21d ?? null,
+        mlConfidence: px.fwd_ret_21d != null ? 0.8 : null,
         mom1m: mom?.mom1m ?? null, mom6m: mom?.mom6m ?? null,
         mom11m: mom?.mom11m ?? null, vol1m: mom?.vol1m ?? null,
         volRegime: null as 'low'|'high'|null,
@@ -234,7 +209,7 @@ async function computeBestStocks() {
     allForwardTrades,
     meta: {
       universe: tickers.length, combosPerTicker: 1, qualified: results.length,
-      days: 730, entryThreshold: 0.25, exitThreshold: -0.5,
+      days: 730, entryThreshold: 1.0, exitThreshold: 0.25,
       computedAt: new Date().toISOString(),
     },
   };
