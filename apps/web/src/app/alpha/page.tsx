@@ -134,7 +134,7 @@ export default function AlphaPage() {
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
 
-  const [tab, setTab] = useState<"strategy" | "signals" | "explorer" | "simulator">("strategy");
+  const [tab, setTab] = useState<"strategy" | "signals" | "simulator" | "live">("strategy");
   const [selectedModel, setSelectedModel] = useState<ModelId>("yggdrasil_v7");
 
   // Signals
@@ -242,6 +242,31 @@ export default function AlphaPage() {
   const [tradeLog, setTradeLog] = useState<TradeLogEntry[]>([]);
   const [equityCurveLoading, setEquityCurveLoading] = useState(false);
 
+  // Live Trading
+  type LiveSignal = {
+    ticker: string; name: string; sector: string;
+    ml_pred: number; prediction_date: string;
+    last_close: number; avg_nokvol: number;
+  };
+  type LivePosition = {
+    id: number; ticker: string; name: string;
+    entry_price: number; stop_price: number; tp_price: number;
+    min_exit_date: string; max_exit_date: string; ml_pred: number;
+    accepted_at: string; days_held: number;
+    current_close?: number; price_date?: string; pnl_pct?: number;
+  };
+  type LiveTrade = {
+    id: number; ticker: string; name: string;
+    entry_price: number; exit_price: number; pnl_pct: number;
+    accepted_at: string; closed_at: string; exit_reason: string;
+    days_held: number; ml_pred: number;
+  };
+  const [liveSignals, setLiveSignals] = useState<LiveSignal[]>([]);
+  const [livePositions, setLivePositions] = useState<LivePosition[]>([]);
+  const [liveTrades, setLiveTrades] = useState<LiveTrade[]>([]);
+  const [liveLoading, setLiveLoading] = useState(false);
+  const [liveActionLoading, setLiveActionLoading] = useState<string | null>(null);
+
   // ============================================================================
   // Auth
   // ============================================================================
@@ -346,15 +371,7 @@ export default function AlphaPage() {
     if (token && tab === "signals") fetchSignals();
   }, [token, tab, fetchSignals]);
 
-  useEffect(() => {
-    if (token && tab === "explorer" && explorerTicker) {
-      if (explorerPreloadedTicker.current === explorerTicker) {
-        explorerPreloadedTicker.current = null; // consume the preload
-        return; // skip API fetch — data already set from simulator
-      }
-      fetchTickerHistory(explorerTicker);
-    }
-  }, [token, tab, explorerTicker, fetchTickerHistory]);
+  // Explorer tab removed — fetchTickerHistory kept for potential future use
 
   // Load portfolio backtest on login (from cache if available)
   useEffect(() => {
@@ -471,6 +488,43 @@ export default function AlphaPage() {
     if (token && equityCurve.length === 0 && !equityCurveLoading) fetchEquityCurve();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  // Live Trading fetcher + actions
+  const fetchLiveData = useCallback(async () => {
+    if (!token) return;
+    setLiveLoading(true);
+    try {
+      const res = await fetch("/api/alpha/live", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.status === 401) { authLogout(); return; }
+      if (res.ok) {
+        const d = await res.json();
+        setLiveSignals(d.signals || []);
+        setLivePositions(d.positions || []);
+        setLiveTrades(d.closed || []);
+      }
+    } catch (e) { console.error("Live data failed:", e); }
+    setLiveLoading(false);
+  }, [token, authLogout]);
+
+  const liveAction = useCallback(async (action: string, body: Record<string, unknown>) => {
+    if (!token) return;
+    const key = action === "enter" ? String(body.ticker) : String(body.id ?? action);
+    setLiveActionLoading(key);
+    try {
+      const res = await fetch("/api/alpha/live", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ action, ...body }),
+      });
+      if (res.status === 401) { authLogout(); return; }
+      if (res.ok) await fetchLiveData();
+    } catch (e) { console.error("Live action failed:", e); }
+    setLiveActionLoading(null);
+  }, [token, authLogout, fetchLiveData]);
+
+  useEffect(() => {
+    if (token && tab === "live") fetchLiveData();
+  }, [token, tab, fetchLiveData]);
 
   // Load full stock list for Explorer search (no auth needed)
   useEffect(() => {
@@ -1051,8 +1105,8 @@ export default function AlphaPage() {
         {[
           { id: "strategy" as const, label: "PORTFOLIO STRATEGY" },
           { id: "signals" as const, label: "SIGNALS" },
-          { id: "explorer" as const, label: "EXPLORER" },
           { id: "simulator" as const, label: "SIMULATOR" },
+          { id: "live" as const, label: "LIVE TRADING" },
         ].map(t => <button key={t.id} onClick={() => setTab(t.id)} style={tabStyle(tab === t.id)}>{t.label}</button>)}
       </div>
 
@@ -1604,7 +1658,7 @@ export default function AlphaPage() {
                             <tr key={h.ticker} style={{ borderBottom: "1px solid rgba(48,54,61,0.3)" }}>
                               <td style={{ padding: "4px 6px", fontSize: 9, color: "rgba(255,255,255,0.3)", textAlign: "right" }}>{h.rank}</td>
                               <td style={{ padding: "4px 6px", fontSize: 10, fontWeight: 700, color: "#3b82f6", textAlign: "right", cursor: "pointer" }}
-                                onClick={() => { setExplorerTicker(h.ticker); setTab("explorer"); }}>{h.ticker}</td>
+                                onClick={() => { setExplorerTicker(h.ticker); setTab("simulator"); }}>{h.ticker}</td>
                               <td style={{ padding: "4px 6px", fontSize: 9, color: "rgba(255,255,255,0.5)" }}>{h.name}</td>
                               <td style={{ padding: "4px 6px", fontSize: 9, textAlign: "right" }}>
                                 <span style={{ color: sectorColor(h.sector), fontSize: 8, fontWeight: 700 }}>{h.sector}</span>
@@ -1720,7 +1774,7 @@ export default function AlphaPage() {
                       { text: "Strong Sell", color: "#d50000" };
                     return (
                       <tr key={row.ticker} style={{ borderBottom: "1px solid rgba(48,54,61,0.3)", cursor: "pointer" }}
-                        onClick={() => { setExplorerTicker(row.ticker); setTab("explorer"); }}
+                        onClick={() => { setExplorerTicker(row.ticker); setTab("simulator"); }}
                         onMouseEnter={e => e.currentTarget.style.background = "rgba(59,130,246,0.05)"}
                         onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                         <td style={{ padding: "5px 8px", fontSize: 11, fontWeight: 700, color: "#fff", textAlign: "right" }}>{row.ticker}</td>
@@ -1752,457 +1806,254 @@ export default function AlphaPage() {
       )}
 
       {/* ================================================================ */}
-      {/* EXPLORER TAB                                                      */}
+      {/* LIVE TRADING TAB                                                  */}
       {/* ================================================================ */}
-      {tab === "explorer" && (
+      {tab === "live" && (
         <div>
-          {/* Controls */}
-          <div style={{ ...cardStyle, marginBottom: 12 }}>
-            <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
-              {/* Search box */}
-              <div style={{ flex: 1, minWidth: 220, position: "relative" }}>
-                <div style={{ position: "relative" }}>
-                  <input
-                    value={explorerSearch}
-                    onChange={e => { setExplorerSearch(e.target.value); setExplorerSearchIdx(-1); setShowExplorerSectors(false); }}
-                    onKeyDown={e => {
-                      if (e.key === "ArrowDown") { e.preventDefault(); setExplorerSearchIdx(i => Math.min(i + 1, explorerSearchResults.length - 1)); }
-                      else if (e.key === "ArrowUp") { e.preventDefault(); setExplorerSearchIdx(i => Math.max(i - 1, -1)); }
-                      else if (e.key === "Enter") {
-                        e.preventDefault();
-                        const pick = explorerSearchIdx >= 0 ? explorerSearchResults[explorerSearchIdx] : explorerSearchResults[0];
-                        if (pick) { setExplorerTicker(pick.ticker); setExplorerSearch(""); setExplorerSearchIdx(-1); }
-                      }
-                      else if (e.key === "Escape") { setExplorerSearch(""); setExplorerSearchIdx(-1); }
-                    }}
-                    placeholder="Search by ticker or company name..."
-                    style={{
-                      width: "100%", padding: "9px 14px", paddingLeft: 34,
-                      background: "#0d1117", border: "1px solid #30363d", borderRadius: 6,
-                      color: "#fff", fontSize: 12, fontFamily: "monospace",
-                      boxSizing: "border-box" as const, outline: "none",
-                    }}
-                    onFocus={e => (e.currentTarget.style.borderColor = "#3b82f6")}
-                    onBlur={e => (e.currentTarget.style.borderColor = "#30363d")}
-                  />
-                  <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "rgba(255,255,255,0.3)", fontSize: 13 }}>⌕</span>
+          {/* Header */}
+          <div style={{ ...cardStyle, marginBottom: 12, background: "linear-gradient(135deg, rgba(16,185,129,0.04), rgba(59,130,246,0.03))", border: "1px solid rgba(16,185,129,0.2)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#10b981", fontFamily: "monospace", marginBottom: 4 }}>
+                  LIVE TRADING — SEMI-AUTOMATIC
                 </div>
-                {/* Search dropdown */}
-                {explorerSearchResults.length > 0 && (
-                  <div style={{
-                    position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
-                    background: "#161b22", border: "1px solid #3b82f6", borderRadius: 6,
-                    zIndex: 30, maxHeight: 300, overflowY: "auto",
-                    boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
-                  }}>
-                    {explorerSearchResults.map((s, sIdx) => (
-                      <div key={s.ticker}
-                        onMouseDown={() => { setExplorerTicker(s.ticker); setExplorerSearch(""); setExplorerSearchIdx(-1); }}
-                        style={{ padding: "8px 14px", fontSize: 12, fontFamily: "monospace", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, borderBottom: "1px solid #21262d",
-                          background: sIdx === explorerSearchIdx ? "rgba(59,130,246,0.15)" : "transparent" }}
-                        onMouseEnter={e => { if (sIdx !== explorerSearchIdx) e.currentTarget.style.background = "rgba(59,130,246,0.1)"; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = sIdx === explorerSearchIdx ? "rgba(59,130,246,0.15)" : "transparent"; }}>
-                        <span style={{ fontWeight: 700, color: "#fff", minWidth: 56 }}>{s.ticker}</span>
-                        <span style={{ color: "rgba(255,255,255,0.5)", flex: 1, fontSize: 11 }}>{s.name}</span>
-                        <span style={{ fontSize: 8, padding: "2px 6px", borderRadius: 3, background: `${sectorColor(s.sector)}20`, color: sectorColor(s.sector), fontWeight: 700 }}>{s.sector}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>
+                  Signal: real ensemble_prediction from ML pipeline · Entry &gt;1% · Stop 5% · TP 15% · 21d max hold · 3d min hold
+                </div>
               </div>
-
-              {/* Selected ticker badge */}
-              {explorerTicker ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.3)", borderRadius: 6 }}>
-                  <span style={{ fontSize: 13, fontWeight: 800, fontFamily: "monospace", color: "#3b82f6" }}>{explorerTicker}</span>
-                  <button onClick={() => { setExplorerTicker(""); setTickerHistory(null); }}
-                    style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 14, lineHeight: 1, padding: 0 }}>×</button>
-                </div>
-              ) : (
-                <div style={{ padding: "8px 12px", background: "#0d1117", border: "1px solid #21262d", borderRadius: 6, fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.25)" }}>
-                  No stock selected
-                </div>
-              )}
-
-              {/* Timeframe buttons */}
-              <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                {[180, 365, 730, 1825, 9999].map(d => (
-                  <button key={d} onClick={() => setExplorerDays(d)}
-                    style={{ ...btnSecondary, fontSize: 9, padding: "8px 12px", background: explorerDays === d ? "#3b82f6" : "#21262d", color: explorerDays === d ? "#fff" : "rgba(255,255,255,0.6)" }}>
-                    {d === 9999 ? "MAX" : d <= 365 ? `${d}D` : `${Math.round(d / 365)}Y`}
-                  </button>
-                ))}
-              </div>
-
-              <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
-                {explorerTicker && (
-                  <span style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.3)" }}>
-                    {tickerHistory?.signals.filter(s => s.model_id === selectedModel).length || 0} signals · {tickerHistory?.actualReturns.length || 0} days
-                  </span>
-                )}
-                <button onClick={() => setExplorerShowMLGuide(v => !v)} style={guideButtonStyle(explorerShowMLGuide)}>
-                  <span style={{ fontSize: 11 }}>◈</span> {explorerShowMLGuide ? "HIDE ML GUIDE" : "HOW ML SIGNALS WORK"}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => liveAction("check_rules", {})}
+                  disabled={!!liveActionLoading}
+                  style={{ ...btnSecondary, fontSize: 10, padding: "6px 14px", borderColor: "#f59e0b", color: "#f59e0b" }}>
+                  ⚡ CHECK RULES
+                </button>
+                <button
+                  onClick={() => fetchLiveData()}
+                  disabled={liveLoading}
+                  style={{ ...btnSecondary, fontSize: 10, padding: "6px 14px" }}>
+                  {liveLoading ? "..." : "↺ REFRESH"}
                 </button>
               </div>
             </div>
-
-            {/* Sector browser toggle */}
-            <button
-              onClick={() => setShowExplorerSectors(v => !v)}
-              style={{
-                display: "flex", alignItems: "center", gap: 6, padding: "6px 0", marginTop: 10,
-                background: "none", border: "none",
-                color: showExplorerSectors ? "#3b82f6" : "rgba(255,255,255,0.4)",
-                fontSize: 10, fontFamily: "monospace", cursor: "pointer", letterSpacing: "0.05em",
-              }}
-              onMouseEnter={e => { if (!showExplorerSectors) e.currentTarget.style.color = "#3b82f6"; }}
-              onMouseLeave={e => { if (!showExplorerSectors) e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}>
-              {showExplorerSectors ? "▲ HIDE SECTOR BROWSER" : "▼ BROWSE BY SECTOR"}
-              <span style={{ fontSize: 9, opacity: 0.6 }}>({allStocks.length} stocks)</span>
-            </button>
-
-            {/* Sector browser panel */}
-            {showExplorerSectors && (
-              <div style={{ marginTop: 4, padding: 12, background: "#0d1117", border: "1px solid #30363d", borderRadius: 6, maxHeight: 400, overflowY: "auto" }}>
-                {/* Filter + sort row */}
-                <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
-                  <input
-                    value={explorerSectorFilter}
-                    onChange={e => setExplorerSectorFilter(e.target.value)}
-                    placeholder="Filter stocks..."
-                    style={{ flex: 1, padding: "5px 10px", background: "#161b22", border: "1px solid #21262d", borderRadius: 4, color: "#fff", fontSize: 11, fontFamily: "monospace", outline: "none" }}
-                  />
-                  <div style={{ display: "flex", gap: 2 }}>
-                    {(["name", "alpha"] as const).map(key => (
-                      <button key={key} onClick={() => setExplorerSectorSort(key)}
-                        style={{ padding: "4px 8px", borderRadius: 3, fontSize: 9, fontWeight: 600, fontFamily: "monospace", cursor: "pointer",
-                          border: `1px solid ${explorerSectorSort === key ? "#3b82f6" : "#21262d"}`,
-                          background: explorerSectorSort === key ? "#3b82f6" : "transparent",
-                          color: explorerSectorSort === key ? "#fff" : "rgba(255,255,255,0.4)" }}>
-                        {key === "name" ? "SECTOR" : "A-Z"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Sector groups */}
-                {explorerSectorNames.map(sector => {
-                  const stocks = explorerSectorGroups[sector];
-                  if (!stocks || stocks.length === 0) return null;
-                  const isExpanded = expandedExplorerSectors.has(sector);
-                  const color = sectorColor(sector);
-                  return (
-                    <div key={sector} style={{ marginBottom: 2 }}>
-                      <button
-                        onClick={() => setExpandedExplorerSectors(prev => {
-                          const next = new Set(prev);
-                          if (next.has(sector)) next.delete(sector); else next.add(sector);
-                          return next;
-                        })}
-                        style={{
-                          width: "100%", display: "flex", alignItems: "center", gap: 8,
-                          padding: "7px 10px", background: isExpanded ? `${color}12` : "transparent",
-                          border: "none", borderBottom: `1px solid ${isExpanded ? color + "30" : "#21262d"}`,
-                          cursor: "pointer", borderRadius: isExpanded ? "4px 4px 0 0" : 4,
-                        }}
-                        onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = "#161b2280"; }}
-                        onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = "transparent"; }}>
-                        <span style={{ width: 3, height: 14, background: color, borderRadius: 2, flexShrink: 0 }} />
-                        <span style={{ fontSize: 10, fontWeight: 700, fontFamily: "monospace", color }}>{sector}</span>
-                        <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", fontFamily: "monospace" }}>{stocks.length} stocks</span>
-                        <span style={{ marginLeft: "auto", fontSize: 9, color: "rgba(255,255,255,0.3)" }}>{isExpanded ? "▲" : "▼"}</span>
-                      </button>
-                      {isExpanded && (
-                        <div style={{ background: `${color}06`, border: `1px solid ${color}20`, borderTop: "none", borderRadius: "0 0 4px 4px", padding: "4px 0" }}>
-                          {stocks.map(s => (
-                            <div key={s.ticker}
-                              onClick={() => { setExplorerTicker(s.ticker); setShowExplorerSectors(false); setExplorerSearch(""); }}
-                              style={{
-                                display: "flex", alignItems: "center", gap: 10, padding: "6px 14px",
-                                cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.03)",
-                                background: explorerTicker === s.ticker ? "rgba(59,130,246,0.12)" : "transparent",
-                              }}
-                              onMouseEnter={e => { if (explorerTicker !== s.ticker) e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
-                              onMouseLeave={e => { e.currentTarget.style.background = explorerTicker === s.ticker ? "rgba(59,130,246,0.12)" : "transparent"; }}>
-                              <span style={{ fontSize: 11, fontWeight: 700, fontFamily: "monospace", color: explorerTicker === s.ticker ? "#3b82f6" : "#fff", minWidth: 60 }}>{s.ticker}</span>
-                              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", fontFamily: "monospace", flex: 1 }}>{s.name}</span>
-                              {explorerTicker === s.ticker && <span style={{ fontSize: 9, color: "#3b82f6" }}>●</span>}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {renderMLGuidePanel(explorerShowMLGuide)}
           </div>
 
-          {/* Fundamentals */}
-          {explorerTicker && tickerHistory?.fundamentals && (
-            <div style={{ ...cardStyle, marginBottom: 12, padding: "10px 16px", display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap" }}>
-              <span style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>FUNDAMENTALS:</span>
-              {(() => {
-                const f = tickerHistory.fundamentals!;
-                const sa = tickerHistory.sectorAvg;
-                const rel = (val: number, avg: number | undefined, invert = false) => {
-                  if (!avg || avg === 0) return "";
-                  const r = val / avg;
-                  return (invert ? r < 0.8 : r < 0.8) ? " cheap" : (invert ? r > 1.2 : r > 1.2) ? " expensive" : "";
-                };
-                return [
-                  { label: "E/P", value: f.ep ? (f.ep * 100).toFixed(1) + "%" : "—", hint: f.ep ? rel(f.ep, sa?.avg_ep) : "" },
-                  { label: "B/M", value: f.bm ? f.bm.toFixed(2) : "—", hint: "" },
-                  { label: "DY", value: f.dy ? (f.dy * 100).toFixed(1) + "%" : "—", hint: "" },
-                  { label: "EV/EBITDA", value: (f.ev_ebitda && f.ev_ebitda > 0 && f.ev_ebitda < 100) ? f.ev_ebitda.toFixed(1) + "x" : "—", hint: (f.ev_ebitda && f.ev_ebitda > 0 && f.ev_ebitda < 100) ? rel(f.ev_ebitda, sa?.avg_ev_ebitda, true) : "" },
-                  { label: "MCap", value: f.mktcap ? (f.mktcap / 1e9).toFixed(1) + "B" : "—", hint: "" },
-                ].map(item => (
-                  <div key={item.label} style={{ display: "flex", gap: 4, alignItems: "baseline" }}>
-                    <span style={{ fontSize: 8, color: "rgba(255,255,255,0.35)", fontFamily: "monospace" }}>{item.label}:</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "monospace", color: "#fff" }}>{item.value}</span>
-                    {item.hint && <span style={{ fontSize: 8, fontFamily: "monospace", color: item.hint.includes("cheap") ? "#10b981" : "#ef4444" }}>{item.hint}</span>}
+          {/* Signal Monitor */}
+          <div style={{ ...cardStyle, marginBottom: 12, border: "1px solid rgba(16,185,129,0.25)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div style={sectionTitle}>SIGNAL MONITOR — TOP LIQUID OSE</div>
+              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", fontFamily: "monospace" }}>
+                {liveSignals.length} stocks · live ensemble_prediction
+              </div>
+            </div>
+            {liveLoading ? (
+              <div style={{ textAlign: "center", padding: 24, color: "rgba(255,255,255,0.3)", fontSize: 11, fontFamily: "monospace" }}>Loading signals...</div>
+            ) : liveSignals.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 24, color: "rgba(255,255,255,0.3)", fontSize: 11, fontFamily: "monospace" }}>No signal data — ML pipeline may not have run yet</div>
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid #30363d" }}>
+                    {(["TICKER", "COMPANY", "SECTOR", "ML PRED", "LAST CLOSE", "VOL/DAY", "ACTION"] as const).map(h => (
+                      <th key={h} style={{ padding: "4px 8px", fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.5)", textAlign: h === "TICKER" || h === "ACTION" ? "center" : "right", fontFamily: "monospace", letterSpacing: "0.05em", whiteSpace: "nowrap" as const }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {liveSignals.map(sig => {
+                    const isActive = sig.ml_pred >= 1.0;
+                    const isOpen = livePositions.some(p => p.ticker === sig.ticker);
+                    const isLoading = liveActionLoading === sig.ticker;
+                    return (
+                      <tr key={sig.ticker} style={{ borderBottom: "1px solid rgba(48,54,61,0.3)", background: isActive ? "rgba(16,185,129,0.03)" : "transparent" }}>
+                        <td style={{ padding: "5px 8px", fontWeight: 700, textAlign: "center", fontFamily: "monospace" }}>
+                          <span style={{ color: isActive ? "#10b981" : "rgba(255,255,255,0.6)" }}>{sig.ticker}</span>
+                          {isActive && <span style={{ marginLeft: 4, fontSize: 8, background: "rgba(16,185,129,0.2)", color: "#10b981", padding: "1px 4px", borderRadius: 2, border: "1px solid rgba(16,185,129,0.4)" }}>SIGNAL</span>}
+                        </td>
+                        <td style={{ padding: "5px 8px", color: "rgba(255,255,255,0.6)", textAlign: "right", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{sig.name}</td>
+                        <td style={{ padding: "5px 8px", textAlign: "right" }}>
+                          <span style={{ color: sectorColor(sig.sector), fontSize: 9, fontWeight: 700 }}>{sig.sector}</span>
+                        </td>
+                        <td style={{ padding: "5px 8px", textAlign: "right", fontWeight: 700, fontFamily: "monospace",
+                          color: sig.ml_pred >= 1.0 ? "#10b981" : sig.ml_pred >= 0 ? "rgba(255,255,255,0.5)" : "#ef4444" }}>
+                          {sig.ml_pred >= 0 ? "+" : ""}{sig.ml_pred.toFixed(2)}%
+                        </td>
+                        <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace", color: "rgba(255,255,255,0.7)" }}>
+                          {sig.last_close ? (sig.last_close >= 100 ? sig.last_close.toFixed(0) : sig.last_close.toFixed(2)) : "—"}
+                        </td>
+                        <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace", color: "rgba(255,255,255,0.5)", fontSize: 10 }}>
+                          {sig.avg_nokvol >= 1e9 ? `${(sig.avg_nokvol / 1e9).toFixed(1)}B`
+                            : sig.avg_nokvol >= 1e6 ? `${(sig.avg_nokvol / 1e6).toFixed(0)}M`
+                            : `${(sig.avg_nokvol / 1e3).toFixed(0)}K`}
+                        </td>
+                        <td style={{ padding: "5px 8px", textAlign: "center" }}>
+                          {isOpen ? (
+                            <span style={{ fontSize: 9, color: "#3b82f6", fontFamily: "monospace" }}>IN POSITION</span>
+                          ) : (
+                            <button
+                              disabled={isLoading || !isActive}
+                              onClick={() => liveAction("enter", { ticker: sig.ticker, name: sig.name, entry_price: sig.last_close, ml_pred: sig.ml_pred })}
+                              style={{
+                                ...btnPrimary, padding: "4px 12px", fontSize: 10,
+                                opacity: isActive ? 1 : 0.3,
+                                background: isActive ? "linear-gradient(135deg, #10b981, #059669)" : "#21262d",
+                                cursor: isActive ? "pointer" : "not-allowed",
+                              }}>
+                              {isLoading ? "..." : "ENTER"}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Open Positions */}
+          <div style={{ ...cardStyle, marginBottom: 12, border: "1px solid rgba(59,130,246,0.25)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div style={sectionTitle}>OPEN POSITIONS ({livePositions.length})</div>
+              {livePositions.length > 0 && (
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>
+                  Stop 5% · TP 15% · 21d max hold · 3d min hold
+                </div>
+              )}
+            </div>
+            {livePositions.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "20px 0", color: "rgba(255,255,255,0.2)", fontSize: 11, fontFamily: "monospace" }}>
+                No open positions — enter a trade from the signal monitor above
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, minWidth: 780 }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid #30363d" }}>
+                      {(["TICKER", "ENTRY DATE", "ENTRY", "CURRENT", "STOP", "TP", "DAYS", "P&L", "MAX EXIT", "ACTION"] as const).map(h => (
+                        <th key={h} style={{ padding: "4px 8px", fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.5)", textAlign: h === "TICKER" || h === "ACTION" ? "left" : "right", fontFamily: "monospace", letterSpacing: "0.05em", whiteSpace: "nowrap" as const }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {livePositions.map(pos => {
+                      const pnl = pos.pnl_pct ?? 0;
+                      const atStop = pos.current_close != null && pos.current_close <= pos.stop_price;
+                      const atTP = pos.current_close != null && pos.current_close >= pos.tp_price;
+                      const atTime = (pos.days_held ?? 0) >= 21;
+                      const isLoading = liveActionLoading === String(pos.id);
+                      return (
+                        <tr key={pos.id} style={{ borderBottom: "1px solid rgba(48,54,61,0.3)", background: atStop ? "rgba(239,68,68,0.05)" : atTP ? "rgba(16,185,129,0.05)" : "transparent" }}>
+                          <td style={{ padding: "5px 8px", fontWeight: 700, color: "#fff", fontFamily: "monospace" }}>
+                            {pos.ticker}
+                            {pos.name && <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginLeft: 4 }}>{pos.name}</span>}
+                          </td>
+                          <td style={{ padding: "5px 8px", textAlign: "right", color: "rgba(255,255,255,0.5)", fontSize: 10, whiteSpace: "nowrap" as const }}>
+                            {pos.accepted_at?.slice(0, 10) ?? "—"}
+                          </td>
+                          <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace", color: "rgba(255,255,255,0.7)" }}>
+                            {pos.entry_price.toFixed(2)}
+                          </td>
+                          <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace", fontWeight: 700,
+                            color: pnl > 0 ? "#10b981" : pnl < 0 ? "#ef4444" : "rgba(255,255,255,0.5)" }}>
+                            {pos.current_close != null ? pos.current_close.toFixed(2) : "—"}
+                          </td>
+                          <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace",
+                            color: atStop ? "#ef4444" : "rgba(255,255,255,0.4)", fontWeight: atStop ? 700 : 400 }}>
+                            {pos.stop_price.toFixed(2)}{atStop ? " ⚠" : ""}
+                          </td>
+                          <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace",
+                            color: atTP ? "#10b981" : "rgba(255,255,255,0.4)", fontWeight: atTP ? 700 : 400 }}>
+                            {pos.tp_price.toFixed(2)}{atTP ? " ✓" : ""}
+                          </td>
+                          <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace",
+                            color: atTime ? "#f59e0b" : "rgba(255,255,255,0.5)", fontWeight: atTime ? 700 : 400 }}>
+                            {pos.days_held ?? 0}d{atTime ? " ⏱" : ""}
+                          </td>
+                          <td style={{ padding: "5px 8px", textAlign: "right", fontWeight: 700, fontFamily: "monospace",
+                            color: pnl > 0 ? "#10b981" : pnl < 0 ? "#ef4444" : "rgba(255,255,255,0.5)" }}>
+                            {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}%
+                          </td>
+                          <td style={{ padding: "5px 8px", textAlign: "right", fontSize: 10, fontFamily: "monospace",
+                            color: atTime ? "#f59e0b" : "rgba(255,255,255,0.4)", whiteSpace: "nowrap" as const }}>
+                            {pos.max_exit_date}
+                          </td>
+                          <td style={{ padding: "5px 8px", textAlign: "left" }}>
+                            <button
+                              disabled={isLoading}
+                              onClick={() => liveAction("close", { id: pos.id, exit_price: pos.current_close, exit_reason: "manual" })}
+                              style={{ ...btnSecondary, fontSize: 9, padding: "3px 10px", borderColor: "#ef4444", color: "#ef4444" }}>
+                              {isLoading ? "..." : "CLOSE"}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Closed Trade History */}
+          <div style={{ ...cardStyle, border: "1px solid rgba(48,54,61,0.5)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div style={sectionTitle}>CLOSED TRADES ({liveTrades.length})</div>
+              {liveTrades.length > 0 && (() => {
+                const wins = liveTrades.filter(t => (t.pnl_pct ?? 0) > 0).length;
+                const avgPnl = liveTrades.reduce((s, t) => s + (t.pnl_pct ?? 0), 0) / liveTrades.length;
+                return (
+                  <div style={{ display: "flex", gap: 16, fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.4)" }}>
+                    <span>Win rate: <span style={{ color: wins / liveTrades.length >= 0.5 ? "#10b981" : "#ef4444" }}>{(wins / liveTrades.length * 100).toFixed(0)}%</span></span>
+                    <span>Avg P&L: <span style={{ color: avgPnl >= 0 ? "#10b981" : "#ef4444" }}>{avgPnl >= 0 ? "+" : ""}{avgPnl.toFixed(2)}%</span></span>
                   </div>
-                ));
+                );
               })()}
-              <span style={{ fontSize: 9, fontFamily: "monospace", color: sectorColor(tickerHistory.sector), fontWeight: 700, marginLeft: "auto" }}>{tickerHistory.sector}</span>
             </div>
-          )}
-
-          {!explorerTicker && (
-            <div style={{ ...cardStyle, textAlign: "center", padding: 60 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", marginBottom: 8 }}>Select a stock to explore</div>
-              <div style={{ fontSize: 11, fontFamily: "monospace", color: "rgba(255,255,255,0.2)" }}>Pick a ticker from the dropdown, or click any stock from the Signals tab</div>
-            </div>
-          )}
-
-          {explorerTicker && explorerLoading && (
-            <div style={{ ...cardStyle, textAlign: "center", padding: 40, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>Loading {explorerTicker}...</div>
-          )}
-
-          {explorerTicker && !explorerLoading && explorerChartData.length > 0 && (
-            <>
-              {/* Price Chart */}
-              <div style={{ ...cardStyle, marginBottom: 12 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <div style={sectionTitle}>{explorerTicker} — Price & 200MA</div>
-                  <div style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.3)" }}>
-                    <span style={{ color: "#f59e0b" }}>— 200MA</span>
-                    &nbsp;&nbsp;<span style={{ color: "rgba(139,157,195,0.6)" }}>— 50MA</span>
-                  </div>
-                </div>
-                <ResponsiveContainer width="100%" height={320}>
-                  <ComposedChart data={chartDataWithLine} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.25} />
-                        <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: "rgba(255,255,255,0.4)", fontFamily: "monospace" }} tickFormatter={d => d.slice(5)} interval="preserveStartEnd" />
-                    <YAxis tick={{ fontSize: 9, fill: "rgba(255,255,255,0.4)", fontFamily: "monospace" }} domain={["auto", "auto"]} />
-                    <Tooltip
-                      contentStyle={{ background: "#0d1117", border: "1px solid #30363d", borderRadius: 6, fontFamily: "monospace", fontSize: 11, color: "#fff" }}
-                      labelStyle={{ color: "rgba(255,255,255,0.6)", marginBottom: 4 }}
-                      formatter={((v: number, name: string) => name === "close" ? [`NOK ${fmtPrice(v)}`, "Price"] : name === "sma200" ? [fmtPrice(v), "200MA"] : name === "sma50" ? [fmtPrice(v), "50MA"] : [null, ""]) as Parameters<typeof Tooltip>[0]["formatter"]} />
-                    <Area type="monotone" dataKey="close" stroke="#3b82f6" fill="url(#priceGrad)" strokeWidth={1.5} dot={false} isAnimationActive={false} name="close" />
-                    <Line type="monotone" dataKey="sma200" stroke="#f59e0b" strokeWidth={1.5} dot={false} strokeDasharray="6 3" connectNulls isAnimationActive={false} name="sma200" />
-                    <Line type="monotone" dataKey="sma50" stroke="rgba(139,157,195,0.5)" strokeWidth={1} dot={false} strokeDasharray="3 3" connectNulls isAnimationActive={false} name="sma50" />
-                    {/* Dotted connector line for selected trade */}
-                    <Line type="linear" dataKey="tradeLine"
-                      stroke={selectedTrade ? (selectedTrade.pnl >= 0 ? "#10b981" : "#ef4444") : "transparent"}
-                      strokeWidth={1.5} strokeDasharray="6 3" connectNulls={true}
-                      dot={false} isAnimationActive={false} legendType="none" />
-                    {/* Trade ENTRY triangles (green ▲) — click to select trade */}
-                    <Line type="monotone" dataKey="tradeEntry" stroke="none" legendType="none" isAnimationActive={false} connectNulls={false}
-                      dot={(props: { cx?: number; cy?: number; payload?: { tradeEntry?: number; date?: string } }) => {
-                        const { cx, cy, payload } = props;
-                        if (!payload?.tradeEntry || cx == null || cy == null) return <g key={`ten-${cx}-${cy}`} />;
-                        const date = payload.date ?? "";
-                        const isSelected = selectedTradeDate === date;
-                        const pts = `${cx},${cy - 10} ${cx - 7},${cy + 4} ${cx + 7},${cy + 4}`;
-                        return (
-                          <polygon key={`te-${cx}`} points={pts}
-                            fill="#10b981" stroke={isSelected ? "#fff" : "#0a0a0a"} strokeWidth={isSelected ? 2 : 1.5}
-                            style={{ cursor: "pointer" }}
-                            onClick={() => setSelectedTradeDate(prev => prev === date ? null : date)} />
-                        );
-                      }} />
-                    {/* Trade EXIT triangles (red ▼) — click to select trade */}
-                    <Line type="monotone" dataKey="tradeExit" stroke="none" legendType="none" isAnimationActive={false} connectNulls={false}
-                      dot={(props: { cx?: number; cy?: number; payload?: { tradeExit?: number; exitDot?: number; date?: string } }) => {
-                        const { cx, cy, payload } = props;
-                        if (!payload?.tradeExit || !payload?.exitDot || cx == null || cy == null) return <g key={`txn-${cx}-${cy}`} />;
-                        const exitDate = payload.date ?? "";
-                        const trade = explorerTrades.find(t => t.exitDate === exitDate);
-                        const entryDate = trade?.entryDate ?? "";
-                        const isSelected = selectedTradeDate === entryDate;
-                        const pts = `${cx},${cy + 10} ${cx - 7},${cy - 4} ${cx + 7},${cy - 4}`;
-                        return (
-                          <polygon key={`tx-${cx}`} points={pts}
-                            fill="#ef4444" stroke={isSelected ? "#fff" : "#0a0a0a"} strokeWidth={isSelected ? 2 : 1.5}
-                            style={{ cursor: "pointer" }}
-                            onClick={() => setSelectedTradeDate(prev => prev === entryDate ? null : entryDate)} />
-                        );
-                      }} />
-                  </ComposedChart>
-                </ResponsiveContainer>
+            {liveTrades.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "20px 0", color: "rgba(255,255,255,0.2)", fontSize: 11, fontFamily: "monospace" }}>
+                No closed trades yet
               </div>
-
-              {/* ML Predicted Return chart — PRIMARY TRADE SIGNAL */}
-              <div style={{ ...cardStyle, marginBottom: 12 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <div style={sectionTitle}>ML Predicted Return — Trade Signal</div>
-                  <div style={{ display: "flex", gap: 16, fontSize: 9, fontFamily: "monospace" }}>
-                    <span style={{ color: "#10b981" }}>▲ ENTER (&gt;{TRADE_ENTRY_PCT}%)</span>
-                    <span style={{ color: "#ef4444" }}>▼ EXIT (&lt;{TRADE_EXIT_PCT}%)</span>
-                    <span style={{ color: "rgba(255,255,255,0.4)" }}>{explorerTrades.length} trades simulated</span>
-                  </div>
-                </div>
-                <ResponsiveContainer width="100%" height={160}>
-                  <ComposedChart data={explorerChartData} margin={{ top: 5, right: 48, left: 10, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="predGradPos" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
-                        <stop offset="100%" stopColor="#10b981" stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    {/* Entry zone (above ENTRY threshold) */}
-                    <ReferenceArea y1={TRADE_ENTRY_PCT} y2={20} fill="#10b981" fillOpacity={0.07} />
-                    {/* Danger zone (below EXIT threshold) */}
-                    <ReferenceArea y1={-20} y2={TRADE_EXIT_PCT} fill="#ef4444" fillOpacity={0.07} />
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                    <XAxis dataKey="date" tick={{ fontSize: 8, fill: "rgba(255,255,255,0.3)", fontFamily: "monospace" }} tickFormatter={d => d.slice(5)} interval="preserveStartEnd" />
-                    <YAxis domain={["auto", "auto"]} tick={{ fontSize: 8, fill: "rgba(255,255,255,0.3)", fontFamily: "monospace" }} tickFormatter={v => `${Number(v).toFixed(0)}%`} />
-                    <ReferenceLine y={TRADE_ENTRY_PCT} stroke="#10b981" strokeDasharray="5 3" strokeOpacity={0.9} label={{ value: `ENTER +${TRADE_ENTRY_PCT}%`, position: "insideRight", fontSize: 8, fill: "#10b981", fontFamily: "monospace" }} />
-                    <ReferenceLine y={TRADE_EXIT_PCT} stroke="#ef4444" strokeDasharray="5 3" strokeOpacity={0.9} label={{ value: `EXIT +${TRADE_EXIT_PCT}%`, position: "insideRight", fontSize: 8, fill: "#ef4444", fontFamily: "monospace" }} />
-                    <ReferenceLine y={0} stroke="rgba(255,255,255,0.2)" />
-                    <Tooltip
-                      contentStyle={{ background: "#0d1117", border: "1px solid #30363d", borderRadius: 6, fontFamily: "monospace", fontSize: 11, color: "#fff" }}
-                      labelStyle={{ color: "rgba(255,255,255,0.6)", marginBottom: 4 }}
-                      formatter={((v: number, name: string) => {
-                        if (name === "pred_pct") return [Number(v).toFixed(2) + "%", "ML Predicted Return"];
-                        return [null, ""];
-                      }) as Parameters<typeof Tooltip>[0]["formatter"]} />
-                    {/* Predicted return line */}
-                    <Area type="monotone" dataKey="pred_pct" stroke="#8b9dc3" strokeWidth={1.5} fill="url(#predGradPos)" dot={false} connectNulls={false} isAnimationActive={false} name="pred_pct" />
-                    {/* Entry dots on predicted return chart */}
-                    <Line type="monotone" dataKey="entryDot" stroke="none" legendType="none" isAnimationActive={false} connectNulls={false}
-                      dot={(props: { cx?: number; cy?: number; payload?: { entryDot?: number } }) => {
-                        const { cx, cy, payload } = props;
-                        if (!payload?.entryDot || cx == null || cy == null) return <g key={`en-${cx}-${cy}`} />;
-                        return <circle key={`en-${cx}`} cx={cx} cy={cy} r={5} fill="#10b981" stroke="#0a0a0a" strokeWidth={2} />;
-                      }} />
-                    {/* Exit dots on predicted return chart */}
-                    <Line type="monotone" dataKey="exitDot" stroke="none" legendType="none" isAnimationActive={false} connectNulls={false}
-                      dot={(props: { cx?: number; cy?: number; payload?: { exitDot?: number } }) => {
-                        const { cx, cy, payload } = props;
-                        if (!payload?.exitDot || cx == null || cy == null) return <g key={`ex-${cx}-${cy}`} />;
-                        return <circle key={`ex-${cx}`} cx={cx} cy={cy} r={5} fill="#ef4444" stroke="#0a0a0a" strokeWidth={2} />;
-                      }} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Trade Log */}
-              <div style={cardStyle}>
-                {(() => {
-                  const wins = explorerTrades.filter(t => !t.open && t.pnl > 0).length;
-                  const closed = explorerTrades.filter(t => !t.open).length;
-                  const totalPnl = explorerTrades.filter(t => !t.open).reduce((s, t) => s + t.pnl, 0);
-                  const avgPnl = closed > 0 ? totalPnl / closed : 0;
-                  const avgDD = closed > 0 ? explorerTrades.filter(t => !t.open).reduce((s, t) => s + t.maxDrawdown, 0) / closed : 0;
-                  return (
-                    <>
-                      {/* ── Strategy Parameter Controls ── */}
-                      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, flexWrap: "wrap", background: "#0d1117", border: "1px solid #21262d", borderRadius: 6, padding: "8px 12px" }}>
-                        <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.4)", letterSpacing: "0.06em", textTransform: "uppercase", marginRight: 4 }}>Strategy</span>
-                        {([
-                          { label: "Entry >", unit: "%", value: TRADE_ENTRY_PCT, set: setTradeEntryPct, min: 0.1, max: 5, step: 0.1, decimals: 1 },
-                          { label: "Stop", unit: "%", value: tradeStopLossPct, set: setTradeStopLossPct, min: 1, max: 20, step: 0.5, decimals: 1, prefix: "-" },
-                          { label: "Exit <", unit: "%", value: TRADE_EXIT_PCT, set: setTradeExitPct, min: 0, max: 2, step: 0.05, decimals: 2 },
-                          { label: "Min Hold", unit: "d", value: TRADE_MIN_HOLD, set: setTradeMinHold, min: 1, max: 15, step: 1, decimals: 0 },
-                          { label: "Max Hold", unit: "d", value: TRADE_MAX_HOLD, set: setTradeMaxHold, min: 5, max: 63, step: 1, decimals: 0 },
-                        ] as { label: string; unit: string; value: number; set: (v: number) => void; min: number; max: number; step: number; decimals: number; prefix?: string }[]).map(p => (
-                          <div key={p.label} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                            <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.45)" }}>{p.label}</span>
-                            <button onClick={() => p.set(Math.max(p.min, parseFloat((p.value - p.step).toFixed(p.decimals))))}
-                              style={{ width: 18, height: 18, background: "#21262d", border: "1px solid #30363d", borderRadius: 3, color: "rgba(255,255,255,0.6)", cursor: "pointer", fontSize: 11, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "monospace" }}>−</button>
-                            <span style={{ fontSize: 10, fontFamily: "monospace", color: "#fff", fontWeight: 700, minWidth: 32, textAlign: "center" }}>{p.prefix ?? ""}{p.value.toFixed(p.decimals)}{p.unit}</span>
-                            <button onClick={() => p.set(Math.min(p.max, parseFloat((p.value + p.step).toFixed(p.decimals))))}
-                              style={{ width: 18, height: 18, background: "#21262d", border: "1px solid #30363d", borderRadius: 3, color: "rgba(255,255,255,0.6)", cursor: "pointer", fontSize: 11, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "monospace" }}>+</button>
-                          </div>
-                        ))}
-                        <button onClick={() => { setTradeEntryPct(1.0); setTradeStopLossPct(5.0); setTradeExitPct(0.25); setTradeMinHold(5); setTradeMaxHold(21); }}
-                          style={{ marginLeft: "auto", fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.35)", background: "none", border: "1px solid #30363d", borderRadius: 3, padding: "2px 8px", cursor: "pointer" }}>RESET</button>
-                      </div>
-
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                        <div>
-                          <div style={sectionTitle}>Simulated Trade Log — Entry &gt;{TRADE_ENTRY_PCT}% · Stop -{tradeStopLossPct}% · Min {TRADE_MIN_HOLD}d · Max {TRADE_MAX_HOLD}d</div>
-                          <div style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.25)", marginTop: -8 }}>
-                            Click a row (or ▲▼ on chart) to highlight the trade with a dotted connector line
-                          </div>
-                        </div>
-                        <div style={{ display: "flex", gap: 16, fontSize: 10, fontFamily: "monospace" }}>
-                          <span style={{ color: "rgba(255,255,255,0.4)" }}>Trades: <span style={{ color: "#fff", fontWeight: 700 }}>{explorerTrades.length}</span></span>
-                          <span style={{ color: "rgba(255,255,255,0.4)" }}>Win Rate: <span style={{ color: closed > 0 && wins/closed >= 0.5 ? "#10b981" : "#ef4444", fontWeight: 700 }}>{closed > 0 ? Math.round(wins/closed*100) : 0}%</span></span>
-                          <span style={{ color: "rgba(255,255,255,0.4)" }}>Avg P&L: <span style={{ color: avgPnl >= 0 ? "#10b981" : "#ef4444", fontWeight: 700 }}>{avgPnl >= 0 ? "+" : ""}{(avgPnl*100).toFixed(1)}%</span></span>
-                          <span style={{ color: "rgba(255,255,255,0.4)" }}>Avg DD: <span style={{ color: "#ef4444", fontWeight: 700 }}>{(Math.min(avgDD, 0)*100).toFixed(1)}%</span></span>
-                          <span style={{ color: "rgba(255,255,255,0.4)" }}>Total: <span style={{ color: totalPnl >= 0 ? "#10b981" : "#ef4444", fontWeight: 700 }}>{totalPnl >= 0 ? "+" : ""}{(totalPnl*100).toFixed(1)}%</span></span>
-                        </div>
-                      </div>
-                      {explorerTrades.length === 0 ? (
-                        <div style={{ textAlign: "center", padding: 24, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
-                          No trades generated. ML predictions may not cross the {TRADE_ENTRY_PCT}% threshold in the selected window.
-                        </div>
-                      ) : (
-                        <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "monospace" }}>
-                          <thead>
-                            <tr style={{ borderBottom: "1px solid #30363d" }}>
-                              {["Entry Date", "Exit Date", "Entry Price", "Exit Price", "Max DD", "P&L", "Status"].map(h => (
-                                <th key={h} style={{ fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.5)", padding: "5px 8px", textAlign: h === "Entry Date" ? "left" as const : "right" as const }}>{h}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {[...explorerTrades].reverse().map((t, i) => {
-                              const isSelected = selectedTradeDate === t.entryDate;
-                              return (
-                              <tr key={i}
-                                style={{ borderBottom: "1px solid rgba(48,54,61,0.3)", cursor: "pointer",
-                                  background: isSelected ? "rgba(59,130,246,0.14)" : t.open ? "rgba(59,130,246,0.04)" : "transparent",
-                                  outline: isSelected ? "1px solid rgba(59,130,246,0.4)" : "none" }}
-                                onClick={() => setSelectedTradeDate(prev => prev === t.entryDate ? null : t.entryDate)}
-                                onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = "rgba(59,130,246,0.07)"; }}
-                                onMouseLeave={e => { e.currentTarget.style.background = isSelected ? "rgba(59,130,246,0.14)" : t.open ? "rgba(59,130,246,0.04)" : "transparent"; }}>
-                                <td style={{ padding: "5px 8px", fontSize: 10, color: isSelected ? "#3b82f6" : "rgba(255,255,255,0.7)", fontWeight: isSelected ? 700 : 400 }}>{t.entryDate}</td>
-                                <td style={{ padding: "5px 8px", fontSize: 10, textAlign: "right", color: t.open ? "#3b82f6" : "rgba(255,255,255,0.7)" }}>{t.exitDate}{t.open ? " ●" : ""}</td>
-                                <td style={{ padding: "5px 8px", fontSize: 10, textAlign: "right", color: "rgba(255,255,255,0.5)" }}>NOK {fmtPrice(t.entryPrice)}</td>
-                                <td style={{ padding: "5px 8px", fontSize: 10, textAlign: "right", color: "rgba(255,255,255,0.5)" }}>NOK {fmtPrice(t.exitPrice)}</td>
-                                <td style={{ padding: "5px 8px", fontSize: 10, fontWeight: 600, textAlign: "right", color: t.maxDrawdown < 0 ? "#ef4444" : "rgba(255,255,255,0.3)" }}>
-                                  {t.maxDrawdown < 0 ? (t.maxDrawdown * 100).toFixed(1) + "%" : "0%"}
-                                </td>
-                                <td style={{ padding: "5px 8px", fontSize: 11, fontWeight: 700, textAlign: "right", color: t.pnl >= 0 ? "#10b981" : "#ef4444" }}>
-                                  {t.pnl >= 0 ? "+" : ""}{(t.pnl * 100).toFixed(1)}%
-                                </td>
-                                <td style={{ padding: "5px 8px", fontSize: 9, textAlign: "right", color: t.open ? "#3b82f6" : t.pnl >= 0 ? "#10b981" : "#ef4444", fontWeight: 700 }}>
-                                  {t.open ? "OPEN" : t.pnl >= 0 ? "WIN" : "LOSS"}
-                                </td>
-                              </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      )}
-                    </>
-                  );
-                })()}
-              </div>
-            </>
-          )}
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid #30363d" }}>
+                    {(["TICKER", "ENTRY DATE", "EXIT DATE", "ENTRY", "EXIT", "DAYS", "EXIT REASON", "P&L"] as const).map(h => (
+                      <th key={h} style={{ padding: "4px 8px", fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.5)", textAlign: h === "TICKER" ? "left" : "right", fontFamily: "monospace", letterSpacing: "0.05em", whiteSpace: "nowrap" as const }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {liveTrades.map(trade => {
+                    const pnl = trade.pnl_pct ?? 0;
+                    const reasonColor = trade.exit_reason === "stop" ? "#ef4444"
+                      : trade.exit_reason === "tp" ? "#10b981"
+                      : trade.exit_reason === "time" ? "#f59e0b"
+                      : "rgba(255,255,255,0.5)";
+                    return (
+                      <tr key={trade.id} style={{ borderBottom: "1px solid rgba(48,54,61,0.3)" }}>
+                        <td style={{ padding: "5px 8px", fontWeight: 700, color: "#fff", fontFamily: "monospace" }}>{trade.ticker}</td>
+                        <td style={{ padding: "5px 8px", textAlign: "right", color: "rgba(255,255,255,0.5)", fontSize: 10 }}>{trade.accepted_at?.slice(0, 10) ?? "—"}</td>
+                        <td style={{ padding: "5px 8px", textAlign: "right", color: "rgba(255,255,255,0.5)", fontSize: 10 }}>{trade.closed_at?.slice(0, 10) ?? "—"}</td>
+                        <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace", color: "rgba(255,255,255,0.6)" }}>{trade.entry_price?.toFixed(2) ?? "—"}</td>
+                        <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace", color: "rgba(255,255,255,0.6)" }}>{trade.exit_price?.toFixed(2) ?? "—"}</td>
+                        <td style={{ padding: "5px 8px", textAlign: "right", fontFamily: "monospace", color: "rgba(255,255,255,0.4)" }}>{trade.days_held ?? "—"}d</td>
+                        <td style={{ padding: "5px 8px", textAlign: "right" }}>
+                          <span style={{ fontSize: 9, fontWeight: 700, color: reasonColor, textTransform: "uppercase" as const, fontFamily: "monospace" }}>
+                            {trade.exit_reason ?? "—"}
+                          </span>
+                        </td>
+                        <td style={{ padding: "5px 8px", textAlign: "right", fontWeight: 700, fontFamily: "monospace",
+                          color: pnl > 0 ? "#10b981" : pnl < 0 ? "#ef4444" : "rgba(255,255,255,0.5)" }}>
+                          {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}%
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       )}
       {/* ================================================================ */}
