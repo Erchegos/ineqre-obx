@@ -28,6 +28,14 @@ export async function GET() {
           AND pd.date > NOW() - INTERVAL '10 days'
           AND EXTRACT(DOW FROM pd.date) NOT IN (0, 6)
       ),
+      latest_mktcap AS (
+        SELECT DISTINCT ON (ticker)
+          ticker,
+          mktcap::float
+        FROM factor_fundamentals
+        WHERE mktcap IS NOT NULL AND mktcap > 0
+        ORDER BY ticker, date DESC
+      ),
       returns AS (
         SELECT
           t1.ticker,
@@ -40,10 +48,12 @@ export async function GET() {
           CASE WHEN t2.close > 0
             THEN ((t1.close - t2.close) / t2.close * 100)::float
             ELSE NULL
-          END AS return_pct
+          END AS return_pct,
+          COALESCE(m.mktcap, 0) AS mktcap
         FROM latest_two t1
         JOIN latest_two t2 ON t2.ticker = t1.ticker AND t2.rn = 2
         JOIN stocks s ON s.ticker = t1.ticker
+        LEFT JOIN latest_mktcap m ON m.ticker = t1.ticker
         WHERE t1.rn = 1 AND t2.close > 0 AND s.sector IS NOT NULL
       )
       SELECT
@@ -53,11 +63,17 @@ export async function GET() {
           'name', name,
           'returnPct', round(return_pct::numeric, 2),
           'lastClose', last_close,
+          'mktcap', mktcap,
           'tradeDate', trade_date,
           'updatedAt', inserted_at
         ) ORDER BY return_pct DESC) AS stocks,
         count(*)::int AS stock_count,
-        round(avg(return_pct)::numeric, 2) AS avg_return,
+        round(
+          CASE
+            WHEN SUM(mktcap) > 0 THEN (SUM(return_pct * mktcap) / SUM(mktcap))::numeric
+            ELSE avg(return_pct)::numeric
+          END, 2
+        ) AS avg_return,
         round(max(return_pct)::numeric, 2) AS best_return,
         round(min(return_pct)::numeric, 2) AS worst_return,
         max(CASE WHEN return_pct = (SELECT max(return_pct) FROM returns r2 WHERE r2.sector = returns.sector) THEN ticker END) AS best_ticker,

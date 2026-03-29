@@ -66,7 +66,7 @@ type SectorData = {
   worstTicker: string | null;
   upCount: number;
   downCount: number;
-  stocks: { ticker: string; name: string; returnPct: number; lastClose: number; tradeDate: string; updatedAt: string | null }[];
+  stocks: { ticker: string; name: string; returnPct: number; lastClose: number; mktcap: number | null; tradeDate: string; updatedAt: string | null }[];
 };
 
 type Mover = {
@@ -310,7 +310,12 @@ export default function IntelligencePage() {
           : sec.stocks;
         const upCount = freshStocks.filter(s => s.returnPct > 0).length;
         const downCount = freshStocks.filter(s => s.returnPct < 0).length;
-        const avgReturn = freshStocks.length > 0 ? freshStocks.reduce((s, st) => s + st.returnPct, 0) / freshStocks.length : 0;
+        const totalMktcap = freshStocks.reduce((s, st) => s + (st.mktcap || 0), 0);
+        const avgReturn = freshStocks.length > 0
+          ? totalMktcap > 0
+            ? freshStocks.reduce((s, st) => s + st.returnPct * (st.mktcap || 0), 0) / totalMktcap
+            : freshStocks.reduce((s, st) => s + st.returnPct, 0) / freshStocks.length
+          : 0;
         return { ...sec, stocks: freshStocks, stockCount: freshStocks.length, upCount, downCount, avgReturn };
       }).filter((sec: SectorData) => sec.stockCount > 0);
       setSectors(filtered);
