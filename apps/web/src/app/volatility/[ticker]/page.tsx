@@ -279,7 +279,7 @@ export default function VolatilityPage() {
         </div>
 
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <div style={{ display: "flex", background: "#161b22", borderRadius: 4, border: "1px solid #30363d", padding: 2 }}>
+          <div style={{ display: "flex", background: "rgba(255,255,255,0.02)", borderRadius: 4, border: "1px solid #30363d", padding: 2 }}>
             {[{ label: "Raw", val: false }, { label: "Total Return", val: true }].map((opt) => {
               const isActive = isAdjusted === opt.val;
               return (
@@ -403,11 +403,11 @@ export default function VolatilityPage() {
             <span style={{ color: "#6366f1" }}>● EWMA: {fmtPct(data.current.ewma94)}</span>
           </div>
         </div>
-        <div style={{ padding: 16, borderRadius: 6, border: "1px solid #30363d", borderBottom: marketData ? "none" : undefined, borderBottomLeftRadius: marketData ? 0 : 6, borderBottomRightRadius: marketData ? 0 : 6, background: "#161b22" }}>
+        <div style={{ padding: 16, borderRadius: 6, border: "1px solid #30363d", borderBottom: marketData ? "none" : undefined, borderBottomLeftRadius: marketData ? 0 : 6, borderBottomRightRadius: marketData ? 0 : 6, background: "rgba(255,255,255,0.02)" }}>
           <VolatilityChart data={data.series} selectedMeasures={selectedMeasures} height={300} />
         </div>
         {marketData && (
-          <div style={{ padding: 16, borderRadius: "0 0 6px 6px", border: "1px solid #30363d", borderTop: "1px dashed #30363d", background: "#161b22" }}>
+          <div style={{ padding: 16, borderRadius: "0 0 6px 6px", border: "1px solid #30363d", borderTop: "1px dashed #30363d", background: "rgba(255,255,255,0.02)" }}>
             <VolatilityCorrelationChart
               stockData={data.series}
               marketData={marketData.series}
@@ -538,7 +538,7 @@ function MlSection({ title, loading, hasData, children }: {
       {loading && !hasData ? (
         <div style={{
           padding: "32px 20px", borderRadius: 6,
-          border: "1px solid #30363d", background: "#161b22",
+          border: "1px solid #30363d", background: "rgba(255,255,255,0.02)",
           textAlign: "center", fontFamily: "monospace", fontSize: 12,
           color: "rgba(255,255,255,0.5)",
         }}>
@@ -549,7 +549,7 @@ function MlSection({ title, loading, hasData, children }: {
       ) : (
         <div style={{
           padding: 20, borderRadius: 6,
-          border: "1px solid #30363d", background: "#161b22",
+          border: "1px solid #30363d", background: "rgba(255,255,255,0.02)",
         }}>
           {children}
         </div>
@@ -575,7 +575,7 @@ function EstimatorsCollapsible({ series, selectedMeasures, toggleMeasure, garchD
         style={{
           width: "100%", padding: "10px 16px",
           borderRadius: isOpen ? "6px 6px 0 0" : 6,
-          border: "1px solid #30363d", background: "#161b22",
+          border: "1px solid #30363d", background: "rgba(255,255,255,0.02)",
           color: "#fff", fontSize: 12, fontWeight: 700,
           cursor: "pointer", display: "flex", alignItems: "center",
           justifyContent: "space-between", fontFamily: "monospace",
@@ -589,7 +589,7 @@ function EstimatorsCollapsible({ series, selectedMeasures, toggleMeasure, garchD
       {isOpen && (
         <div style={{
           padding: 20, border: "1px solid #30363d", borderTop: "none",
-          borderRadius: "0 0 6px 6px", background: "#161b22",
+          borderRadius: "0 0 6px 6px", background: "rgba(255,255,255,0.02)",
         }}>
           {/* GARCH Parameters */}
           {garchData && (

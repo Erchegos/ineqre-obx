@@ -187,7 +187,7 @@ export default function MonteCarloPage() {
             padding: "8px 16px",
             border: "1px solid #30363d",
             borderRadius: 2,
-            background: "#161b22",
+            background: "rgba(255,255,255,0.02)",
             transition: "all 0.15s ease"
           }}
           onMouseEnter={(e) => {
@@ -196,7 +196,7 @@ export default function MonteCarloPage() {
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.borderColor = "#30363d";
-            e.currentTarget.style.background = "#161b22";
+            e.currentTarget.style.background = "rgba(255,255,255,0.02)";
           }}
         >
           {ticker} Analysis
@@ -250,13 +250,13 @@ export default function MonteCarloPage() {
       )}
 
       {loading && (
-        <div style={{ padding: 20, borderRadius: 4, border: "1px solid #30363d", background: "#161b22", color: "rgba(255,255,255,0.5)", fontSize: 14 }}>
+        <div style={{ padding: 20, borderRadius: 4, border: "1px solid #30363d", background: "rgba(255,255,255,0.02)", color: "rgba(255,255,255,0.5)", fontSize: 14 }}>
           Loading stock data...
         </div>
       )}
 
       {!loading && error && (
-        <div style={{ padding: 20, borderRadius: 4, border: "1px solid #ef4444", background: "#161b22" }}>
+        <div style={{ padding: 20, borderRadius: 4, border: "1px solid #ef4444", background: "rgba(255,255,255,0.02)" }}>
           <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6, color: "#ef4444" }}>Error</div>
           <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>{error}</div>
         </div>
@@ -268,7 +268,7 @@ export default function MonteCarloPage() {
           <div style={{
             marginBottom: 24,
             padding: 20,
-            background: "#161b22",
+            background: "rgba(255,255,255,0.02)",
             border: "1px solid #30363d",
             borderRadius: 8,
           }}>
@@ -370,7 +370,7 @@ export default function MonteCarloPage() {
                     padding: "8px 12px",
                     borderRadius: 4,
                     border: "1px solid #30363d",
-                    background: customDrift !== null ? "#0d1117" : "#161b22",
+                    background: customDrift !== null ? "#0d1117" : "rgba(255,255,255,0.02)",
                     color: "#fff",
                     fontSize: 14,
                     fontFamily: "monospace",
@@ -420,7 +420,7 @@ export default function MonteCarloPage() {
                     padding: "8px 12px",
                     borderRadius: 4,
                     border: "1px solid #30363d",
-                    background: customVolatility !== null ? "#0d1117" : "#161b22",
+                    background: customVolatility !== null ? "#0d1117" : "rgba(255,255,255,0.02)",
                     color: "#fff",
                     fontSize: 14,
                     fontFamily: "monospace",
@@ -450,7 +450,7 @@ export default function MonteCarloPage() {
           {/* Chart */}
           <div style={{
             padding: 20,
-            background: "#161b22",
+            background: "rgba(255,255,255,0.02)",
             border: "1px solid #30363d",
             borderRadius: 8,
           }}>

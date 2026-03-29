@@ -180,7 +180,7 @@ export default function PredictionsPage() {
         style={{
           marginBottom: 16,
           padding: "12px 16px",
-          background: "#161b22",
+          background: "rgba(255,255,255,0.02)",
           border: "1px solid #30363d",
           borderRadius: 2,
         }}
@@ -367,7 +367,7 @@ export default function PredictionsPage() {
             padding: 12,
             borderRadius: 2,
             border: mode === "optimized" ? "1px solid #f59e0b" : "1px solid #30363d",
-            background: "#161b22",
+            background: "rgba(255,255,255,0.02)",
           }}
         >
           <div
@@ -445,7 +445,7 @@ export default function PredictionsPage() {
             padding: 12,
             borderRadius: 2,
             border: "1px solid #30363d",
-            background: "#161b22",
+            background: "rgba(255,255,255,0.02)",
           }}
         >
           <div
