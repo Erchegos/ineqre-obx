@@ -1241,7 +1241,7 @@ export default function StockTickerPage() {
           display: "inline-flex",
           border: "1px solid #30363d",
           borderRadius: 6,
-          background: "#161b22",
+          background: "rgba(255,255,255,0.02)",
           padding: 2,
         }}>
           {([
@@ -1359,13 +1359,13 @@ export default function StockTickerPage() {
       )}
 
       {loading && (
-        <div style={{ padding: 20, borderRadius: 4, border: "1px solid #30363d", background: "#161b22", color: "rgba(255,255,255,0.5)", fontSize: 14 }}>
+        <div style={{ padding: 20, borderRadius: 4, border: "1px solid #30363d", background: "rgba(255,255,255,0.02)", color: "rgba(255,255,255,0.5)", fontSize: 14 }}>
           Loading analytics...
         </div>
       )}
 
       {!loading && error && (
-        <div style={{ padding: 20, borderRadius: 4, border: "1px solid #ef4444", background: "#161b22" }}>
+        <div style={{ padding: 20, borderRadius: 4, border: "1px solid #ef4444", background: "rgba(255,255,255,0.02)" }}>
           <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6, color: "#ef4444" }}>Error</div>
           <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>{error}</div>
         </div>
@@ -1541,13 +1541,13 @@ export default function StockTickerPage() {
       {!loading && viewMode === "std_channel" && (
         <>
           {stdChannelLoading && (
-            <div style={{ padding: 20, borderRadius: 4, border: "1px solid #30363d", background: "#161b22", color: "rgba(255,255,255,0.5)" }}>
+            <div style={{ padding: 20, borderRadius: 4, border: "1px solid #30363d", background: "rgba(255,255,255,0.02)", color: "rgba(255,255,255,0.5)" }}>
               Loading STD channel data...
             </div>
           )}
 
           {stdChannelError && (
-            <div style={{ padding: 20, borderRadius: 4, border: "1px solid #ef4444", background: "#161b22" }}>
+            <div style={{ padding: 20, borderRadius: 4, border: "1px solid #ef4444", background: "rgba(255,255,255,0.02)" }}>
               <div style={{ fontWeight: 600, color: "#ef4444", marginBottom: 8 }}>Error</div>
               <div style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>{stdChannelError}</div>
             </div>
@@ -1560,7 +1560,7 @@ export default function StockTickerPage() {
                 padding: 20,
                 borderRadius: 4,
                 border: "1px solid #30363d",
-                background: "#161b22",
+                background: "rgba(255,255,255,0.02)",
                 marginBottom: 20,
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -1767,7 +1767,7 @@ export default function StockTickerPage() {
                   padding: 20,
                   borderRadius: 4,
                   border: "1px solid #30363d",
-                  background: "#161b22",
+                  background: "rgba(255,255,255,0.02)",
                   marginBottom: 20,
                 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -1794,7 +1794,7 @@ export default function StockTickerPage() {
                 padding: 20,
                 borderRadius: 4,
                 border: "1px solid #30363d",
-                background: "#161b22",
+                background: "rgba(255,255,255,0.02)",
                 marginBottom: 20,
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
@@ -2308,7 +2308,7 @@ export default function StockTickerPage() {
                   padding: 20,
                   borderRadius: 4,
                   border: "1px solid #30363d",
-                  background: "#161b22",
+                  background: "rgba(255,255,255,0.02)",
                   marginBottom: 20,
                 }}>
                   <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: "#fff" }}>
@@ -2409,7 +2409,7 @@ export default function StockTickerPage() {
                 padding: 20,
                 borderRadius: 4,
                 border: "1px solid #30363d",
-                background: "#161b22",
+                background: "rgba(255,255,255,0.02)",
               }}>
                 <div
                   onClick={() => setShowMethodology(!showMethodology)}
@@ -2509,7 +2509,7 @@ export default function StockTickerPage() {
           <form
             onClick={(e) => e.stopPropagation()}
             onSubmit={(e) => { e.preventDefault(); handleModelLogin(); }}
-            style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 24, width: 340 }}
+            style={{ background: "rgba(255,255,255,0.02)", border: "1px solid #30363d", borderRadius: 8, padding: 24, width: 340 }}
           >
             <div style={{ fontSize: 16, fontWeight: 600, color: "#e0e0e0", marginBottom: 4, fontFamily: "monospace" }}>Sign In</div>
             <div style={{ fontSize: 11, color: "#8b949e", marginBottom: 16, fontFamily: "monospace" }}>Sign in to save & load model edits</div>
@@ -2557,7 +2557,7 @@ export default function StockTickerPage() {
       {/* ═══ ANALYTICS TAB SECTIONS ═══ */}
       {!loading && data && activeReturns && viewMode === "analytics" && (
         <>
-          <div style={{ marginBottom: 24, padding: 20, borderRadius: 4, border: "1px solid #30363d", background: "#161b22" }}>
+          <div style={{ marginBottom: 24, padding: 20, borderRadius: 4, border: "1px solid #30363d", background: "rgba(255,255,255,0.02)" }}>
             <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "#fff" }}>
               Return Distribution Analysis
             </h2>
@@ -2568,7 +2568,7 @@ export default function StockTickerPage() {
             <ReturnDistributionChart returns={activeReturns} height={320} />
           </div>
 
-          <div style={{ marginBottom: 24, padding: 20, borderRadius: 4, border: "1px solid #30363d", background: "#161b22" }}>
+          <div style={{ marginBottom: 24, padding: 20, borderRadius: 4, border: "1px solid #30363d", background: "rgba(255,255,255,0.02)" }}>
             <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "#fff" }}>
               Residual Squares Analysis
             </h2>
@@ -2606,7 +2606,7 @@ export default function StockTickerPage() {
             )}
           </div>
 
-          <div style={{ padding: 20, borderRadius: 4, border: "1px solid #30363d", background: "#161b22" }}>
+          <div style={{ padding: 20, borderRadius: 4, border: "1px solid #30363d", background: "rgba(255,255,255,0.02)" }}>
             <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "#fff" }}>
               Daily Returns Analysis
             </h2>
@@ -2932,7 +2932,7 @@ export default function StockTickerPage() {
             </div>
 
             {returnStats && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16, marginBottom: 24, padding: 16, borderRadius: 3, border: "1px solid #21262d", background: "#161b22" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16, marginBottom: 24, padding: 16, borderRadius: 3, border: "1px solid #21262d", background: "rgba(255,255,255,0.02)" }}>
                 <StatItem label="Win Rate" value={`${returnStats.winRate.toFixed(1)}%`} />
                 <StatItem label="Avg Gain" value={fmtPct(returnStats.avgGain, 3)} colorType="success" />
                 <StatItem label="Avg Loss" value={fmtPct(returnStats.avgLoss, 3)} colorType="danger" />
