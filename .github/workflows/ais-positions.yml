@@ -26,7 +26,7 @@ jobs:
   ais-positions:
     name: Fetch AIS Vessel Positions
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
@@ -53,8 +53,8 @@ jobs:
           echo 'BARENTSWATCH_CLIENT_SECRET="${{ secrets.BARENTSWATCH_CLIENT_SECRET }}"' >> .env.local
 
       # ─── Step 1: AISStream.io (global, WebSocket) ────────────────────
-      # 94 fleet MMSIs in 2 batches × 600s each = ~20 min total.
-      # Longer window = more broadcasts received per vessel.
+      # 94 fleet MMSIs in 2 batches × 300s each = ~10 min total.
+      # Followed by BarentsWatch + Digitraffic within 30-min budget.
       - name: "Step 1: AISStream.io global positions"
         if: ${{ github.event.inputs.skip_aisstream != 'true' }}
         working-directory: apps/web
@@ -63,7 +63,7 @@ jobs:
           AISSTREAM_API_KEY: ${{ secrets.AISSTREAM_API_KEY }}
           NODE_TLS_REJECT_UNAUTHORIZED: '0'
         run: |
-          DURATION="${{ github.event.inputs.duration || '600' }}"
+          DURATION="${{ github.event.inputs.duration || '300' }}"
           npx tsx scripts/fetch-ais-positions.ts --duration=$DURATION
         continue-on-error: true
 
@@ -99,7 +99,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Step | Source | Coverage |" >> $GITHUB_STEP_SUMMARY
           echo "|------|--------|----------|" >> $GITHUB_STEP_SUMMARY
-          echo "| 1 | AISStream.io (WebSocket 10min/batch) | Global |" >> $GITHUB_STEP_SUMMARY
+          echo "| 1 | AISStream.io (WebSocket 5min/batch) | Global |" >> $GITHUB_STEP_SUMMARY
           echo "| 2 | BarentsWatch Open AIS (OAuth2) | Norwegian waters |" >> $GITHUB_STEP_SUMMARY
           echo "| 3 | Digitraffic (REST, free) | North Sea / Baltic |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
