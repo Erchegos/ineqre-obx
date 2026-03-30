@@ -1,0 +1,93 @@
+name: AIS Vessel Positions
+
+on:
+  schedule:
+    # Run twice daily: 06:00 UTC (morning) and 14:00 UTC (afternoon)
+    # AISStream WebSocket collects for 5 minutes, then writes to DB.
+    # Digitraffic (free, no auth) runs as fallback for any missed vessels.
+    - cron: '0 6 * * *'
+    - cron: '0 14 * * *'
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: 'AISStream listen duration (seconds)'
+        default: '300'
+        required: false
+      skip_aisstream:
+        description: 'Skip AISStream (use Digitraffic only)'
+        type: boolean
+        default: false
+      skip_digitraffic:
+        description: 'Skip Digitraffic fallback'
+        type: boolean
+        default: false
+
+jobs:
+  ais-positions:
+    name: Fetch AIS Vessel Positions
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Create env file
+        working-directory: apps/web
+        run: |
+          echo 'DATABASE_URL="${{ secrets.DATABASE_URL }}"' > .env.local
+          echo 'AISSTREAM_API_KEY="${{ secrets.AISSTREAM_API_KEY }}"' >> .env.local
+
+      # ─── Step 1: AISStream.io (global coverage, 5-min WebSocket) ────
+      # Subscribes to our fleet MMSIs, collects real-time AIS positions,
+      # writes lat/lon/speed/heading/navStatus/destination to shipping_positions.
+      - name: "Step 1: AISStream.io global positions"
+        if: ${{ github.event.inputs.skip_aisstream != 'true' }}
+        working-directory: apps/web
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          AISSTREAM_API_KEY: ${{ secrets.AISSTREAM_API_KEY }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: |
+          DURATION="${{ github.event.inputs.duration || '300' }}"
+          npx tsx scripts/fetch-ais-positions.ts --duration=$DURATION
+        continue-on-error: true
+
+      # ─── Step 2: Digitraffic (free, North Sea/Baltic fallback) ───────
+      # Finnish Transport Agency AIS — covers North Sea, Baltic, Kattegat.
+      # No auth needed. Supplements AISStream for vessels missed by WebSocket.
+      - name: "Step 2: Digitraffic fallback (North Sea / Baltic)"
+        if: ${{ github.event.inputs.skip_digitraffic != 'true' }}
+        working-directory: apps/web
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: npx tsx scripts/fetch-vessel-positions.ts
+        continue-on-error: true
+
+      # ─── Summary ─────────────────────────────────────────────────────
+      - name: Pipeline Summary
+        if: always()
+        run: |
+          echo "## AIS Vessel Position Update" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Step | Source | Coverage |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 1 | AISStream.io (WebSocket 5min) | Global |" >> $GITHUB_STEP_SUMMARY
+          echo "| 2 | Digitraffic (REST, free) | North Sea / Baltic |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time**: $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY

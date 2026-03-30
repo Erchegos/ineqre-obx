@@ -43,6 +43,7 @@ jobs:
         working-directory: apps/web
         run: |
           echo 'DATABASE_URL="${{ secrets.DATABASE_URL }}"' > .env.local
+          echo 'AISSTREAM_API_KEY="${{ secrets.AISSTREAM_API_KEY }}"' >> .env.local
 
       # ─── Step 1: Parse Pareto Shipping Daily PDF ─────────────────────
       # Reads the latest Pareto Shipping Daily from research_documents,
@@ -55,6 +56,19 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NODE_TLS_REJECT_UNAUTHORIZED: '0'
         run: npx tsx scripts/parse-shipping-daily.ts
+
+      # ─── Step 1b: AIS Vessel Positions ───────────────────────────────
+      # Runs in parallel with shipping rates. AISStream 5-min WebSocket +
+      # Digitraffic fallback. Both continue-on-error so rate parse isn't blocked.
+      - name: "Step 1b: AIS vessel positions (AISStream + Digitraffic)"
+        working-directory: apps/web
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          AISSTREAM_API_KEY: ${{ secrets.AISSTREAM_API_KEY }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: |
+          npx tsx scripts/fetch-ais-positions.ts --duration=300 || true
+          npx tsx scripts/fetch-vessel-positions.ts || true
 
       # ─── Step 2: Bunker Prices from Ship & Bunker ────────────────────
       # Scrapes VLSFO/HSFO/MGO spot prices for Singapore, Rotterdam,
