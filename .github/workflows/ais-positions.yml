@@ -49,10 +49,12 @@ jobs:
         run: |
           echo 'DATABASE_URL="${{ secrets.DATABASE_URL }}"' > .env.local
           echo 'AISSTREAM_API_KEY="${{ secrets.AISSTREAM_API_KEY }}"' >> .env.local
+          echo 'BARENTSWATCH_CLIENT_ID="${{ secrets.BARENTSWATCH_CLIENT_ID }}"' >> .env.local
+          echo 'BARENTSWATCH_CLIENT_SECRET="${{ secrets.BARENTSWATCH_CLIENT_SECRET }}"' >> .env.local
 
-      # ─── Step 1: AISStream.io (global coverage, 5-min WebSocket) ────
-      # Subscribes to our fleet MMSIs, collects real-time AIS positions,
-      # writes lat/lon/speed/heading/navStatus/destination to shipping_positions.
+      # ─── Step 1: AISStream.io (global, WebSocket) ────────────────────
+      # 94 fleet MMSIs in 2 batches × 600s each = ~20 min total.
+      # Longer window = more broadcasts received per vessel.
       - name: "Step 1: AISStream.io global positions"
         if: ${{ github.event.inputs.skip_aisstream != 'true' }}
         working-directory: apps/web
@@ -61,14 +63,26 @@ jobs:
           AISSTREAM_API_KEY: ${{ secrets.AISSTREAM_API_KEY }}
           NODE_TLS_REJECT_UNAUTHORIZED: '0'
         run: |
-          DURATION="${{ github.event.inputs.duration || '300' }}"
+          DURATION="${{ github.event.inputs.duration || '600' }}"
           npx tsx scripts/fetch-ais-positions.ts --duration=$DURATION
         continue-on-error: true
 
-      # ─── Step 2: Digitraffic (free, North Sea/Baltic fallback) ───────
-      # Finnish Transport Agency AIS — covers North Sea, Baltic, Kattegat.
-      # No auth needed. Supplements AISStream for vessels missed by WebSocket.
-      - name: "Step 2: Digitraffic fallback (North Sea / Baltic)"
+      # ─── Step 2: BarentsWatch Open AIS (Norwegian waters) ────────────
+      # Free Norwegian government AIS — North Sea, Norwegian Sea, Barents.
+      # Covers SOFF, DOFG, HAVI offshore vessels + tankers transiting North Sea.
+      - name: "Step 2: BarentsWatch (Norwegian waters)"
+        working-directory: apps/web
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BARENTSWATCH_CLIENT_ID: ${{ secrets.BARENTSWATCH_CLIENT_ID }}
+          BARENTSWATCH_CLIENT_SECRET: ${{ secrets.BARENTSWATCH_CLIENT_SECRET }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: npx tsx scripts/fetch-vesselfinder-positions.ts
+        continue-on-error: true
+
+      # ─── Step 3: Digitraffic (North Sea / Baltic) ────────────────────
+      # Finnish Transport Agency AIS — supplements BarentsWatch for Baltic.
+      - name: "Step 3: Digitraffic fallback (North Sea / Baltic)"
         if: ${{ github.event.inputs.skip_digitraffic != 'true' }}
         working-directory: apps/web
         env:
@@ -85,8 +99,9 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Step | Source | Coverage |" >> $GITHUB_STEP_SUMMARY
           echo "|------|--------|----------|" >> $GITHUB_STEP_SUMMARY
-          echo "| 1 | AISStream.io (WebSocket 5min) | Global |" >> $GITHUB_STEP_SUMMARY
-          echo "| 2 | Digitraffic (REST, free) | North Sea / Baltic |" >> $GITHUB_STEP_SUMMARY
+          echo "| 1 | AISStream.io (WebSocket 10min/batch) | Global |" >> $GITHUB_STEP_SUMMARY
+          echo "| 2 | BarentsWatch Open AIS (OAuth2) | Norwegian waters |" >> $GITHUB_STEP_SUMMARY
+          echo "| 3 | Digitraffic (REST, free) | North Sea / Baltic |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Time**: $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
