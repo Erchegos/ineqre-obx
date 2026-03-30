@@ -70,6 +70,7 @@ jobs:
       # ─── Step 2: BarentsWatch Open AIS (Norwegian waters) ────────────
       # Free Norwegian government AIS — North Sea, Norwegian Sea, Barents.
       # Covers SOFF, DOFG, HAVI offshore vessels + tankers transiting North Sea.
+      # Hard-capped at 10 min via `timeout` — saves partial results and continues.
       - name: "Step 2: BarentsWatch (Norwegian waters)"
         working-directory: apps/web
         env:
@@ -77,7 +78,7 @@ jobs:
           BARENTSWATCH_CLIENT_ID: ${{ secrets.BARENTSWATCH_CLIENT_ID }}
           BARENTSWATCH_CLIENT_SECRET: ${{ secrets.BARENTSWATCH_CLIENT_SECRET }}
           NODE_TLS_REJECT_UNAUTHORIZED: '0'
-        run: npx tsx scripts/fetch-vesselfinder-positions.ts
+        run: timeout 600 npx tsx scripts/fetch-vesselfinder-positions.ts || true
         continue-on-error: true
 
       # ─── Step 3: Digitraffic (North Sea / Baltic) ────────────────────
