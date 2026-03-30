@@ -25,6 +25,26 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+const PLACEHOLDER_SIGNALS = [
+  'appears to be a template',
+  'appears to be a placeholder',
+  'template or placeholder',
+  'no actual financial data',
+  'I would need the actual report',
+  'please share the complete research report',
+  'broken link',
+  'only a header',
+  'incomplete document',
+  'not a complete',
+  'does not contain',
+  'missing the actual content',
+];
+
+const isPlaceholderSummary = (text) => {
+  const lower = text.toLowerCase();
+  return PLACEHOLDER_SIGNALS.some(s => lower.includes(s.toLowerCase()));
+};
+
 // Clean body text before sending to Claude
 function cleanBodyText(text) {
   if (!text) return '';
@@ -128,15 +148,28 @@ async function main() {
 
     let successCount = 0;
     let failCount = 0;
+    let deletedCount = 0;
 
     for (const doc of docs) {
       console.log(`Processing: ${doc.subject.substring(0, 60)}...`);
       console.log(`  Source: ${doc.source}`);
 
+      // Delete documents with trivially short body (placeholder/link-only emails)
+      const bodyLen = (doc.body_text || '').trim().length;
+      if (bodyLen < 300) {
+        console.log(`  [DELETED] Body too short (${bodyLen} chars) — placeholder\n`);
+        await pool.query('DELETE FROM research_documents WHERE id = $1', [doc.id]);
+        deletedCount++;
+        continue;
+      }
+
       const summary = await generateSummary(doc.body_text, doc.subject);
 
-      if (summary) {
-        // Update database with generated summary
+      if (summary && isPlaceholderSummary(summary)) {
+        console.log(`  [DELETED] AI detected placeholder/template content\n`);
+        await pool.query('DELETE FROM research_documents WHERE id = $1', [doc.id]);
+        deletedCount++;
+      } else if (summary) {
         await pool.query(
           'UPDATE research_documents SET ai_summary = $1 WHERE id = $2',
           [summary, doc.id]
@@ -154,6 +187,7 @@ async function main() {
 
     console.log('\n' + '='.repeat(60));
     console.log(`Successfully generated: ${successCount}`);
+    console.log(`Deleted (placeholder/empty): ${deletedCount}`);
     console.log(`Failed: ${failCount}`);
     console.log('='.repeat(60));
 
