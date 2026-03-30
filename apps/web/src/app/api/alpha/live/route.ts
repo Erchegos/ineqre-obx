@@ -1,10 +1,13 @@
 import { NextRequest } from 'next/server';
 import { pool } from '@/lib/db';
-import { requireAlphaAuth, safeErrorResponse, secureJsonResponse } from '@/lib/security';
+import { requireAlphaAuth, extractAndVerifyToken, safeErrorResponse, secureJsonResponse } from '@/lib/security';
 
 export const maxDuration = 30;
 
-const PROFILE = 'oslettebak'; // requireAlphaAuth enforces this
+function getProfile(req: NextRequest): string {
+  const payload = extractAndVerifyToken(req);
+  return payload?.profile?.toString() || 'oslettebak';
+}
 
 async function ensureTable() {
   await pool.query(`
@@ -48,6 +51,8 @@ async function ensureTable() {
 export async function GET(req: NextRequest) {
   const authError = requireAlphaAuth(req);
   if (authError) return authError;
+
+  const PROFILE = getProfile(req);
 
   try {
     await ensureTable();
@@ -303,6 +308,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const authError = requireAlphaAuth(req);
   if (authError) return authError;
+
+  const PROFILE = getProfile(req);
 
   try {
     await ensureTable();

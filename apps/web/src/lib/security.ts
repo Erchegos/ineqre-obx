@@ -121,9 +121,11 @@ export function requireAuth(req: NextRequest): NextResponse | null {
   return null;
 }
 
+const ALPHA_ALLOWED_PROFILES = ['oslettebak', 'EliasS'];
+
 /**
  * Require Alpha Engine access.
- * Only the 'oslettebak' profile may access alpha endpoints.
+ * Only profiles in ALPHA_ALLOWED_PROFILES may access alpha endpoints.
  * Returns null if authorized, or an error response if not.
  */
 export function requireAlphaAuth(req: NextRequest): NextResponse | null {
@@ -136,7 +138,7 @@ export function requireAlphaAuth(req: NextRequest): NextResponse | null {
     );
   }
 
-  if (payload.profile !== 'oslettebak') {
+  if (!ALPHA_ALLOWED_PROFILES.includes(payload.profile || '')) {
     logSecurityEvent('alpha_access_denied', { profile: payload.profile || 'unknown' }, req);
     return NextResponse.json(
       { error: 'Forbidden', message: 'Access restricted' },
