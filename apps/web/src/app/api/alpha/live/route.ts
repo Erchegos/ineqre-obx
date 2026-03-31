@@ -480,6 +480,38 @@ export async function POST(req: NextRequest) {
       return secureJsonResponse({ ok: true });
     }
 
+    if (action === 'close_all') {
+      // Close all open positions and cancel all pending orders at current price
+      const openRes = await pool.query(`
+        SELECT lts.id, lts.entry_price::float, lts.pos_size_pct::float, lts.cost_bps,
+               pd.close::float AS current_close
+        FROM live_trade_signals lts
+        LEFT JOIN (
+          SELECT DISTINCT ON (ticker) ticker, close FROM prices_daily WHERE close > 0 ORDER BY ticker, date DESC
+        ) pd ON pd.ticker = lts.ticker
+        WHERE lts.profile = $1 AND lts.status = 'open'
+      `, [PROFILE]);
+
+      for (const pos of openRes.rows) {
+        const exitPrice = pos.current_close ?? pos.entry_price;
+        const grossPnl = ((exitPrice - pos.entry_price) / pos.entry_price) * 100;
+        const costPct = ((Number(pos.cost_bps ?? 10) * 2) / 10000) * 100;
+        await pool.query(`
+          UPDATE live_trade_signals SET status='closed', closed_at=NOW(),
+            exit_price=$1, exit_reason='manual_close_all', pnl_pct=$2, gross_pnl_pct=$3
+          WHERE id=$4 AND profile=$5 AND status='open'
+        `, [exitPrice, grossPnl - costPct, grossPnl, pos.id, PROFILE]);
+      }
+
+      // Cancel all pending
+      await pool.query(`
+        UPDATE live_trade_signals SET status='cancelled', closed_at=NOW(), exit_reason='cancelled'
+        WHERE profile=$1 AND status='pending'
+      `, [PROFILE]);
+
+      return secureJsonResponse({ ok: true, closed: openRes.rows.length });
+    }
+
     if (action === 'update_trailing') {
       // Called periodically to update trailing_high for each open position
       const openRes = await pool.query(`

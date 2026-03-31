@@ -2003,6 +2003,19 @@ export default function AlphaPage() {
                     border: `1px solid ${T.warning}`, color: T.warning, cursor: "pointer", letterSpacing: "0.05em" }}>
                   CHECK RULES
                 </button>
+                {(livePositions.length > 0 || livePending.length > 0) && (
+                  <button
+                    onClick={() => {
+                      if (confirm(`Close all ${livePositions.length} position(s) and cancel ${livePending.length} pending order(s)?`)) {
+                        liveAction("close_all", {});
+                      }
+                    }}
+                    disabled={!!liveActionLoading}
+                    style={{ fontSize: 8, fontWeight: 700, padding: "3px 10px", background: "transparent",
+                      border: `1px solid ${T.danger}`, color: T.danger, cursor: "pointer", letterSpacing: "0.05em" }}>
+                    CLOSE ALL ({livePositions.length + livePending.length})
+                  </button>
+                )}
                 <button
                   onClick={() => fetchLiveData()}
                   disabled={liveLoading}
