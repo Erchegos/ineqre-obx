@@ -90,7 +90,14 @@
     "harvest:backfill:dry": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/backfill-harvest-trips.ts --dry-run",
     "harvest:backfill:replay": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/backfill-harvest-trips.ts --replay-only",
     "data:fix-spikes": "node scripts/fix-ohlc-spikes.mjs",
-    "data:fix-spikes:fix": "node scripts/fix-ohlc-spikes.mjs --fix"
+    "data:fix-spikes:fix": "node scripts/fix-ohlc-spikes.mjs --fix",
+    "flow:generate": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/generate-synthetic-ticks.ts",
+    "flow:generate:dry": "DRYRUN=1 NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/generate-synthetic-ticks.ts",
+    "flow:backtest": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/backtest-orderflow.ts",
+    "flow:backtest:dry": "DRYRUN=1 NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/backtest-orderflow.ts",
+    "flow:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-euronext-orderflow.ts",
+    "flow:fetch:dry": "DRYRUN=1 NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-euronext-orderflow.ts",
+    "flow:analyze": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/analyze-orderflow.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

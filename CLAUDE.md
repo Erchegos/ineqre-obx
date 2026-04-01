@@ -281,6 +281,7 @@ All in `apps/web/src/lib/`
 | `market.ts` | Market-level calculations |
 | `price-data-adapter.ts` | Price data normalization |
 | `portfolioOptimizer.ts` | Markowitz optimization: covariance (sample/Ledoit-Wolf/EWMA), 5 modes (EW/MinVar/MaxSharpe/RiskParity/MaxDiv), closed-form solutions + iterative constraint projection, risk decomposition, efficient frontier |
+| `orderflow.ts` | Intraday orderflow models: Bulk Volume Classification (BVC), VPIN rolling windows, Kyle's Lambda (OLS price impact), Amihud illiquidity by bar, trade informativeness, intraday regime classification (6 regimes), TWAP/VWAP execution detection, stealth accumulation, momentum ignition, algo fingerprints (4 patterns), iceberg detection, OFI proxy |
 | `shippingTCE.ts` | Baltic Exchange-based TCE calculation library: Worldscale→TCE formula, 14 vessel types, 10 reference routes (TD3C/TD20/TD6/TC1/C5 etc), VLSFO bunker cost, voyage costs, fleet quarterly earnings aggregation |
 | `sectorMapping.ts` | Sector-commodity-ticker mapping constants: 4 sectors (Energy/Seafood/Shipping/Materials), 17 commodities with metadata (category/importance/unit), used by commodity & sector dashboards |
 
@@ -399,6 +400,7 @@ Schema files in `packages/db/src/schema/`
 |-------|---------|
 | `obxEquities` | OSE daily data (VWAP, trades, turnover) |
 | `obxFeatures` | Market proxy metrics |
+| `orderflow_ticks` | Intraday tick-by-tick trades: ticker, ts (UTC), price, size, side (1=buy/-1=sell/0=unknown). Populated by `fetch-euronext-orderflow.ts` from Euronext Live |
 
 ### Portfolio Management
 | Table | Purpose |
@@ -469,6 +471,7 @@ Schema files in `packages/db/src/schema/`
 9. **BarentsWatch** - Seafood lice, disease, locality data (OAuth2 client_credentials)
 7. **Fiskeridirektoratet** - Monthly biomass/harvest/mortality CSV (no auth, free)
 8. **SSB (Statistics Norway)** - Weekly salmon export price+volume via PxWebApi v2 (no auth, free)
+9. **Euronext Live** - Intraday tick-by-tick trade data for OSE equities. CSV endpoint: `https://live.euronext.com/en/ajax/AwlIntradayPrice/getFullDownloadAjax/{ISIN}-XOSL?format=csv&full_dl_date=YYYY-MM-DD`. JSON fallback: POST `getIntradayPriceFilteredData`. Stores to `orderflow_ticks`. Run via `pnpm run flow:fetch`
 
 ### ML Pipeline (7 steps)
 Located in `apps/web/scripts/ml-daily-pipeline.ts`:
@@ -548,6 +551,10 @@ Run after market close alongside ML pipeline:
 | `lookup-harvest-mmsi.ts` | Resolve wellboat names → MMSI via Digitraffic + manual lookup |
 | `fetch-harvest-positions.ts` | AIS-based trip detection: proximity state machine (farm→slaughterhouse) with spot price matching |
 | `aggregate-harvest-estimates.ts` | Quarterly aggregation: trip volumes → per-company estimates vs actuals |
+| `fetch-euronext-orderflow.ts` | Fetch intraday tick-by-tick trade data from Euronext Live for OSE equities (CSV/JSON endpoints). Uses tick-rule side classification. Stores to `orderflow_ticks` table. CLI: `--ticker`, `--date`, `DRYRUN=1` |
+| `analyze-orderflow.ts` | Phase 3/4 orderflow intelligence report (terminal, ANSI colors). Builds 1min/5min/volume bars, computes BVC, VPIN, Kyle's Lambda, Amihud, trade informativeness, detects TWAP/VWAP execution windows, stealth accumulation, momentum ignition, algo fingerprints, icebergs, OFI proxy. |
+| `generate-synthetic-ticks.ts` | Generate synthetic tick data for orderflow backtesting |
+| `backtest-orderflow.ts` | Backtest orderflow signals (BVC, VPIN, Kyle's Lambda) on tick data |
 
 ### scripts/
 | Script | Purpose |
@@ -636,6 +643,11 @@ pnpm run fx:seed-cb               # Seed CB balance sheet / GDP ratios (6 curren
 pnpm run fx:seed-cb:dry           # Dry run
 pnpm run fx:regression            # Run FX multi-currency regression pipeline
 pnpm run fx:regression:dry        # Dry run (no DB writes)
+pnpm run flow:fetch               # Fetch Euronext intraday ticks for today (default EQNR)
+pnpm run flow:fetch:dry           # Dry run (parse only, no DB insert)
+pnpm run flow:analyze             # Run orderflow intelligence report (terminal output)
+pnpm run flow:backtest            # Backtest orderflow signals on tick data
+pnpm run flow:backtest:dry        # Dry run orderflow backtest
 ```
 
 ---
