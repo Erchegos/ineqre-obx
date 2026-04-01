@@ -100,18 +100,27 @@ function isMarketOpen() {
   return minutes >= 9 * 60 && minutes < 16 * 60 + 30;
 }
 
-/** Fetch current quotes for up to 100 Yahoo symbols in one API call */
-async function fetchBatchQuotes(yahooSymbols) {
-  const url = `https://query2.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(yahooSymbols.join(','))}&fields=regularMarketOpen,regularMarketHigh,regularMarketLow,regularMarketPrice,regularMarketVolume&formatted=false&crumb=`;
+/** Fetch today's OHLCV for a single Yahoo symbol via v8/chart (no crumb needed) */
+async function fetchQuote(yahooSymbol) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=1d&range=1d`;
   const res = await fetch(url, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (compatible; InEqRe-intraday/1.0)',
       'Accept': 'application/json',
     },
   });
-  if (!res.ok) throw new Error(`Yahoo API ${res.status}: ${await res.text()}`);
+  if (!res.ok) return null;
   const data = await res.json();
-  return data.quoteResponse?.result ?? [];
+  const meta = data?.chart?.result?.[0]?.meta;
+  if (!meta?.regularMarketPrice) return null;
+  return {
+    symbol: yahooSymbol,
+    regularMarketPrice: meta.regularMarketPrice,
+    regularMarketOpen: meta.regularMarketOpen ?? meta.regularMarketPrice,
+    regularMarketHigh: meta.regularMarketDayHigh ?? meta.regularMarketPrice,
+    regularMarketLow: meta.regularMarketDayLow ?? meta.regularMarketPrice,
+    regularMarketVolume: meta.regularMarketVolume ?? 0,
+  };
 }
 
 /** Upsert today's OHLCV row — overwrites on (ticker, date) conflict */
@@ -143,41 +152,32 @@ async function main() {
 
   const today = osloToday();
   const entries = Object.entries(OL_STOCKS);
-  const BATCH = 100;
+  const CONCURRENCY = 20;
 
   let updated = 0;
   let skipped = 0;
   const t0 = Date.now();
 
-  for (let i = 0; i < entries.length; i += BATCH) {
-    const chunk = entries.slice(i, i + BATCH);
-    const symbols = chunk.map(([, sym]) => sym);
-    const symToDb = Object.fromEntries(chunk.map(([db, sym]) => [sym, db]));
+  for (let i = 0; i < entries.length; i += CONCURRENCY) {
+    const chunk = entries.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(
+      chunk.map(async ([dbTicker, yahooSymbol]) => {
+        const q = await fetchQuote(yahooSymbol);
+        if (!q) return null;
+        return {
+          ticker: dbTicker,
+          date: today,
+          open: q.regularMarketOpen,
+          high: q.regularMarketHigh,
+          low: q.regularMarketLow,
+          close: q.regularMarketPrice,
+          volume: q.regularMarketVolume,
+        };
+      })
+    );
 
-    let quotes;
-    try {
-      quotes = await fetchBatchQuotes(symbols);
-    } catch (err) {
-      console.error(`Batch ${Math.floor(i / BATCH) + 1} fetch error: ${err.message}`);
-      continue;
-    }
-
-    const rows = [];
-    for (const q of quotes) {
-      const dbTicker = symToDb[q.symbol];
-      if (!dbTicker) continue;
-      const c = q.regularMarketPrice;
-      if (!c) { skipped++; continue; }
-      rows.push({
-        ticker: dbTicker,
-        date: today,
-        open: q.regularMarketOpen ?? c,
-        high: q.regularMarketHigh ?? c,
-        low: q.regularMarketLow ?? c,
-        close: c,
-        volume: q.regularMarketVolume ?? 0,
-      });
-    }
+    const rows = results.filter(Boolean);
+    skipped += chunk.length - rows.length;
 
     try {
       updated += await upsertBatch(rows);
