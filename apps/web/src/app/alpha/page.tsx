@@ -260,7 +260,7 @@ export default function AlphaPage() {
   const [bestStocksLoading, setBestStocksLoading] = useState(false);
   const [bestStocksPending, setBestStocksPending] = useState(false);
   const [bestStocksMeta, setBestStocksMeta] = useState<{ computedAt?: string; universe?: number; combosPerTicker?: number; qualified?: number; windows?: number } | null>(null);
-  const [bestStocksDays, setBestStocksDays] = useState<365 | 730 | 1825>(730);
+  const [bestStocksDays, setBestStocksDays] = useState<365 | 730 | 1825>(365);
   const [expandedOptTicker, setExpandedOptTicker] = useState<string | null>(null);
 
   // Equity curve
@@ -1248,6 +1248,12 @@ export default function AlphaPage() {
                 </div>
               </div>
 
+              {/* Data coverage note */}
+              <div style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 10, color: "rgba(245,158,11,0.8)", fontFamily: "monospace", lineHeight: 1.5 }}>
+                <strong>Why so few trades?</strong> ML predictions are available from Jan 2026 onwards (~65 trading days). Longer timeframes (2Y/5Y) will show very few trades because no entry signals exist for earlier dates — the strategy only trades when it has a live prediction. This is by design: no look-ahead, no synthetic signals.
+                {bestStocksDays > 365 && " Consider switching to 1Y for a more representative sample."}
+              </div>
+
               {bestStocksLoading && (
                 <div style={{ textAlign: "center", padding: 32, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", fontSize: 11 }}>
                   Loading cached rankings...
@@ -1323,7 +1329,8 @@ export default function AlphaPage() {
 
             {/* ── CUMULATIVE PERFORMANCE CHART ── */}
             {(() => {
-              const tfLabel = bestStocksDays === 365 ? '1 Year' : bestStocksDays === 1825 ? '5 Years' : '2 Years';
+              // Predictions only available from Jan 2026 — actual active window is ~65 trading days regardless of selected timeframe
+              const tfLabel = bestStocksDays === 365 ? '1 Year (active since Jan 2026)' : bestStocksDays === 1825 ? '5 Years (active since Jan 2026)' : '2 Years (active since Jan 2026)';
               const activeStats = optimizedEqData?.stats;
               const activeCurve = optimizedEqData?.curve ?? [];
               const activeLoading = bestStocksLoading;
