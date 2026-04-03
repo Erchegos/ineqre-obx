@@ -214,7 +214,7 @@ export default function FlowHeatmap({
                 </span>
                 {t.icebergsToday > 0 && (
                   <span style={{ color: "#f59e0b" }}>
-                    🧊 {t.icebergsToday}
+                    ICE {t.icebergsToday}
                   </span>
                 )}
               </div>

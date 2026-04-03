@@ -48,7 +48,7 @@ export default function IcebergCard({ detection }: { detection: Iceberg }) {
       {/* Header row */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 14 }}>🧊</span>
+          <span style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "0.06em" }}>ICE</span>
           <span
             style={{
               fontSize: 10,

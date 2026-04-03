@@ -51,7 +51,7 @@ function getVerdict(ticks: Tick[]) {
     return {
       verdict: "HIDDEN BUYERS DETECTED",
       detail: "Large orders are being broken into small pieces to avoid moving the price — a classic sign of an institution quietly buying. The total buy volume significantly outweighs selling.",
-      color: "#10b981", icon: "🟢",
+      color: "#10b981",
       action: "A buyer is working a large position. If this continues into the close, the stock often moves up in the following days.",
     };
   }
@@ -59,7 +59,7 @@ function getVerdict(ticks: Tick[]) {
     return {
       verdict: "HIDDEN SELLERS DETECTED",
       detail: "A large seller is distributing shares in small pieces to minimise their price impact. Sell volume is significantly higher than buying.",
-      color: "#ef4444", icon: "🔴",
+      color: "#ef4444",
       action: "Someone with a large position is quietly exiting. This selling pressure often keeps the price suppressed until they're done.",
     };
   }
@@ -67,7 +67,7 @@ function getVerdict(ticks: Tick[]) {
     return {
       verdict: "INFORMED BUYING",
       detail: "Recent trades are heavily skewed toward buyers, and the imbalance is statistically significant. This suggests participants who know something — not random retail trading.",
-      color: "#10b981", icon: "🟢",
+      color: "#10b981",
       action: "Bullish signal. Check if there's recent news or upcoming events. Informed flow often precedes a price move within 1-3 days.",
     };
   }
@@ -75,7 +75,7 @@ function getVerdict(ticks: Tick[]) {
     return {
       verdict: "INFORMED SELLING",
       detail: "Recent trades are heavily skewed toward sellers. Participants appear to be exiting with conviction, not reacting to random noise.",
-      color: "#ef4444", icon: "🔴",
+      color: "#ef4444",
       action: "Bearish signal. Wait for the selling pressure to normalize before considering a long position.",
     };
   }
@@ -83,7 +83,7 @@ function getVerdict(ticks: Tick[]) {
     return {
       verdict: "MODERATE BUY PRESSURE",
       detail: `Buyers have a slight edge today — ${buyPct.toFixed(0)}% of volume was buyer-initiated. Not dramatic, but the market is leaning bullish.`,
-      color: "#10b981", icon: "🟢",
+      color: "#10b981",
       action: "Mild positive flow. Not a strong signal on its own, but confirms the bullish side is more active.",
     };
   }
@@ -91,23 +91,23 @@ function getVerdict(ticks: Tick[]) {
     return {
       verdict: "MODERATE SELL PRESSURE",
       detail: `Sellers have a slight edge — ${(100 - buyPct).toFixed(0)}% of volume was seller-initiated. Market is leaning bearish today.`,
-      color: "#ef4444", icon: "🔴",
+      color: "#ef4444",
       action: "Mild negative flow. Not alarming, but sellers are more active than buyers.",
     };
   }
   return {
     verdict: "BALANCED FLOW",
     detail: `Buyers and sellers are roughly equal today (${buyPct.toFixed(0)}% buys). No strong directional signal from the order flow.`,
-    color: "#6b7280", icon: "⚪",
+    color: "#6b7280",
     action: "No actionable signal from microstructure today. Use other analysis (fundamentals, trend) to make decisions.",
   };
 }
 
 // ── Plain-English metric card ──────────────────────────────────────────────
 function MetricBlock({
-  icon, label, value, valueColor, explanation, tooltipText,
+  label, value, valueColor, explanation, tooltipText,
 }: {
-  icon: string; label: string; value: string; valueColor: string;
+  label: string; value: string; valueColor: string;
   explanation: string; tooltipText: string;
 }) {
   const [showTip, setShowTip] = useState(false);
@@ -117,7 +117,6 @@ function MetricBlock({
       padding: "16px 18px", flex: 1, minWidth: 160, position: "relative",
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <span style={{ fontSize: 16 }}>{icon}</span>
         <span style={{
           fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.5)",
           letterSpacing: "0.06em", textTransform: "uppercase" as const, flex: 1,
@@ -152,7 +151,7 @@ function MetricBlock({
 
 // ── Verdict Card ───────────────────────────────────────────────────────────
 function VerdictCard({ verdict }: {
-  verdict: { verdict: string; detail: string; color: string; icon: string; action: string } | null;
+  verdict: { verdict: string; detail: string; color: string; action: string } | null;
 }) {
   if (!verdict) return null;
   return (
@@ -161,7 +160,6 @@ function VerdictCard({ verdict }: {
       borderRadius: 8, padding: "18px 22px", marginBottom: 24,
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-        <span style={{ fontSize: 22 }}>{verdict.icon}</span>
         <span style={{
           fontSize: 18, fontWeight: 800, color: verdict.color,
           fontFamily: "monospace", letterSpacing: "0.03em",
@@ -281,7 +279,7 @@ export default function FlowPage() {
       const [tickRes, sigRes, iceRes] = await Promise.all([
         fetch(`/api/flow/ticks/${ticker}?date=${date}&limit=20000`),
         fetch(`/api/flow/signals/${ticker}`),
-        fetch(`/api/flow/icebergs/${ticker}?days=7`),
+        fetch(`/api/flow/icebergs/${ticker}?days=30`),
       ]);
       if (tickRes.ok) {
         const d = await tickRes.json();
@@ -401,7 +399,6 @@ export default function FlowPage() {
             {/* ── SESSION SUMMARY ──────────────────────────────────────── */}
             <div style={{ display: "flex", gap: 10, marginBottom: 24, flexWrap: "wrap" }}>
               <MetricBlock
-                icon="📊"
                 label="Buy vs Sell Split"
                 value={`${buyPct.toFixed(0)}% BUY`}
                 valueColor={buyPct > 53 ? "#10b981" : buyPct < 47 ? "#ef4444" : "#6b7280"}
@@ -413,7 +410,6 @@ export default function FlowPage() {
                 tooltipText="Of all trades where we could identify direction, what percentage were buyer-initiated (someone hitting the ask) vs seller-initiated (someone hitting the bid). Above 55% = buyers dominating. Below 45% = sellers dominating."
               />
               <MetricBlock
-                icon="⚖️"
                 label="Net Buy Pressure"
                 value={netOFI > 0 ? `+${(netOFI / 1000).toFixed(0)}K` : `${(netOFI / 1000).toFixed(0)}K`}
                 valueColor={netOFI > 0 ? "#10b981" : netOFI < 0 ? "#ef4444" : "#6b7280"}
@@ -425,7 +421,6 @@ export default function FlowPage() {
                 tooltipText="Order Flow Imbalance (OFI): the difference between buyer-initiated volume and seller-initiated volume. If buyers bought 300K shares and sellers sold 200K, the OFI is +100K. A large positive number means strong net demand."
               />
               <MetricBlock
-                icon="🔢"
                 label="Trades Analysed"
                 value={tradeCount.toLocaleString()}
                 valueColor="#e6edf3"
@@ -433,7 +428,6 @@ export default function FlowPage() {
                 tooltipText="Total number of individual trade executions (prints) for this stock on this day. Each tick is one transaction between a buyer and a seller."
               />
               <MetricBlock
-                icon="💰"
                 label="VWAP"
                 value={vwap > 0 ? vwap.toFixed(2) : "—"}
                 valueColor="#e6edf3"
@@ -480,7 +474,7 @@ export default function FlowPage() {
                 </div>
                 {icebergs.length === 0 ? (
                   <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 11, padding: "30px 0", textAlign: "center", lineHeight: 1.8 }}>
-                    No iceberg orders detected in the last 7 days.
+                    No iceberg orders detected in the last 30 days.
                     <br />
                     <span style={{ fontSize: 10 }}>This is normal — icebergs occur in roughly 5–15% of trading sessions.</span>
                   </div>
