@@ -21,9 +21,9 @@ export async function GET(
       const { rows: r } = await pool.query(
         `SELECT detected_at, start_ts, end_ts, direction,
                 total_volume, trade_count,
-                avg_trade_size::float, size_cv::float, vwap::float,
-                est_block_pct::float, detection_method, confidence::float,
-                features
+                avg_trade_size::float, median_trade_size::float,
+                price_range_bps::float, vwap::float,
+                est_block_pct::float, detection_method, confidence::float
          FROM orderflow_iceberg_detections
          WHERE ticker = $1
            AND (start_ts AT TIME ZONE 'Europe/Oslo')::date = $2::date
@@ -35,9 +35,9 @@ export async function GET(
       const { rows: r } = await pool.query(
         `SELECT detected_at, start_ts, end_ts, direction,
                 total_volume, trade_count,
-                avg_trade_size::float, size_cv::float, vwap::float,
-                est_block_pct::float, detection_method, confidence::float,
-                features
+                avg_trade_size::float, median_trade_size::float,
+                price_range_bps::float, vwap::float,
+                est_block_pct::float, detection_method, confidence::float
          FROM orderflow_iceberg_detections
          WHERE ticker = $1
            AND start_ts > NOW() - ($2 || ' days')::interval

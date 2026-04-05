@@ -10,7 +10,8 @@ type Iceberg = {
   total_volume: number;
   trade_count: number;
   avg_trade_size: number;
-  size_cv: number;
+  median_trade_size?: number;
+  price_range_bps?: number;
   vwap: number;
   est_block_pct: number;
   detection_method: string;
@@ -104,7 +105,7 @@ export default function IcebergCard({ detection }: { detection: Iceberg }) {
           {[
             { label: "Trades", value: String(detection.trade_count) },
             { label: "Avg Size", value: detection.avg_trade_size.toFixed(0) },
-            { label: "Size CV", value: detection.size_cv.toFixed(3) },
+            { label: "Price Rng", value: detection.price_range_bps != null ? `${detection.price_range_bps.toFixed(1)}bps` : "—" },
             { label: "VWAP", value: detection.vwap.toFixed(2) },
             { label: "Block Est", value: `${(detection.est_block_pct * 100).toFixed(1)}%` },
             { label: "Method", value: detection.detection_method || "time_cluster" },
