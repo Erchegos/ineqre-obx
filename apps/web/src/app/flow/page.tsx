@@ -5,6 +5,7 @@ import FlowPriceChart from "@/components/flow/FlowPriceChart";
 import FlowRegimeBadge from "@/components/flow/FlowRegimeBadge";
 import TradeTape from "@/components/flow/TradeTape";
 import IcebergCard from "@/components/flow/IcebergCard";
+import TradeTypeBreakdown from "@/components/flow/TradeTypeBreakdown";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type Tick = { ts: string; price: number; size: number; side: number };
@@ -451,6 +452,19 @@ export default function FlowPage() {
                 </div>
               </div>
               <FlowPriceChart ticks={ticks} />
+            </div>
+
+            {/* ── WHO IS TRADING? ──────────────────────────────────────── */}
+            <div style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 20, marginBottom: 20 }}>
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 4 }}>
+                  Who Is Moving the Price?
+                </div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", lineHeight: 1.6 }}>
+                  Each trade is classified by type — dark pool blocks, institutions building positions, algos, momentum traders, and retail. Click any row to understand what that type means and what today&apos;s direction tells you.
+                </div>
+              </div>
+              <TradeTypeBreakdown ticks={ticks} />
             </div>
 
             {/* ── 2-COL: BUY/SELL BARS + ICEBERGS ─────────────────────── */}
