@@ -276,24 +276,35 @@ export default function FlowPage() {
   const loadData = useCallback(async (ticker: string, date: string) => {
     if (!date) { setTicks([]); setLoading(false); return; }
     setLoading(true);
+
+    // Run fetches independently so one failure doesn't kill the others
+    const [tickRes, sigRes, iceRes] = await Promise.allSettled([
+      fetch(`/api/flow/ticks/${ticker}?date=${date}&limit=20000`),
+      fetch(`/api/flow/signals/${ticker}`),
+      fetch(`/api/flow/icebergs/${ticker}?date=${date}`),
+    ]);
+
     try {
-      const [tickRes, sigRes, iceRes] = await Promise.all([
-        fetch(`/api/flow/ticks/${ticker}?date=${date}&limit=20000`),
-        fetch(`/api/flow/signals/${ticker}`),
-        fetch(`/api/flow/icebergs/${ticker}?date=${date}`),
-      ]);
-      if (tickRes.ok) {
-        const d = await tickRes.json();
+      if (tickRes.status === "fulfilled" && tickRes.value.ok) {
+        const d = await tickRes.value.json();
         setTicks(d.ticks || []);
       } else setTicks([]);
-      if (sigRes.ok) setSignal(await sigRes.json());
-      else setSignal(null);
-      if (iceRes.ok) {
-        const d = await iceRes.json();
+    } catch { setTicks([]); }
+
+    try {
+      if (sigRes.status === "fulfilled" && sigRes.value.ok) {
+        setSignal(await sigRes.value.json());
+      } else setSignal(null);
+    } catch { setSignal(null); }
+
+    try {
+      if (iceRes.status === "fulfilled" && iceRes.value.ok) {
+        const d = await iceRes.value.json();
         setIcebergs(d.detections || []);
       } else setIcebergs([]);
-    } catch { setTicks([]); setIcebergs([]); }
-    finally { setLoading(false); }
+    } catch { setIcebergs([]); }
+
+    setLoading(false);
   }, []);
 
   useEffect(() => { loadDates(selectedTicker); }, [selectedTicker, loadDates]);
