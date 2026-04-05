@@ -497,19 +497,24 @@ export default function FlowPage() {
                   Hidden Large Orders (Icebergs)
                 </div>
                 <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 14, lineHeight: 1.6 }}>
-                  Institutions hide large orders by splitting them into many small trades of similar size. We detect this pattern. A hidden buy iceberg means someone is accumulating without revealing their full size.
+                  Detected from real Euronext Oslo tick data using two signals: <strong style={{ color: "rgba(255,255,255,0.6)" }}>size uniformity</strong> (many trades at identical or near-identical share counts — algo footprint) and <strong style={{ color: "rgba(255,255,255,0.6)" }}>time clustering</strong> (trades concentrated in a 60s window faster than normal flow). Confidence reflects how strongly both signals fire. Click a card for detail.
                 </div>
                 {icebergs.length === 0 ? (
                   <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 11, padding: "30px 0", textAlign: "center", lineHeight: 1.8 }}>
-                    No iceberg orders detected in the last 30 days.
+                    No iceberg orders detected for this session.
                     <br />
-                    <span style={{ fontSize: 10 }}>This is normal — icebergs occur in roughly 5–15% of trading sessions.</span>
+                    <span style={{ fontSize: 10 }}>Icebergs occur in roughly 5–15% of sessions. Try April 1 or 2 for EQNR.</span>
                   </div>
                 ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {icebergs.slice(0, 5).map((ice: any, i: number) => (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {icebergs.slice(0, 8).map((ice: any, i: number) => (
                       <IcebergCard key={i} detection={ice} />
                     ))}
+                    {icebergs.length > 8 && (
+                      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", textAlign: "center", padding: "4px 0" }}>
+                        +{icebergs.length - 8} more detections this session
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
