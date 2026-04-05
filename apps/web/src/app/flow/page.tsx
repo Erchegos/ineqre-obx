@@ -280,7 +280,7 @@ export default function FlowPage() {
       const [tickRes, sigRes, iceRes] = await Promise.all([
         fetch(`/api/flow/ticks/${ticker}?date=${date}&limit=20000`),
         fetch(`/api/flow/signals/${ticker}`),
-        fetch(`/api/flow/icebergs/${ticker}?days=30`),
+        fetch(`/api/flow/icebergs/${ticker}?date=${date}`),
       ]);
       if (tickRes.ok) {
         const d = await tickRes.json();
@@ -288,9 +288,11 @@ export default function FlowPage() {
       } else setTicks([]);
       if (sigRes.ok) setSignal(await sigRes.json());
       else setSignal(null);
-      if (iceRes.ok) { const d = await iceRes.json(); setIcebergs(d.detections || []); }
-      else setIcebergs([]);
-    } catch { setTicks([]); }
+      if (iceRes.ok) {
+        const d = await iceRes.json();
+        setIcebergs(d.detections || []);
+      } else setIcebergs([]);
+    } catch { setTicks([]); setIcebergs([]); }
     finally { setLoading(false); }
   }, []);
 

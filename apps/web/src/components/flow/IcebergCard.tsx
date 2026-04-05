@@ -4,6 +4,8 @@ import { useState } from "react";
 
 type Iceberg = {
   detected_at: string;
+  start_ts?: string;
+  end_ts?: string;
   direction: number;
   total_volume: number;
   trade_count: number;
@@ -64,7 +66,7 @@ export default function IcebergCard({ detection }: { detection: Iceberg }) {
             {dirLabel}
           </span>
           <span style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "monospace" }}>
-            {formatTime(detection.detected_at)}
+            {formatTime(detection.start_ts || detection.detected_at)}
           </span>
         </div>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
