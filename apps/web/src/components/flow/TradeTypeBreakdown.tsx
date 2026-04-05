@@ -231,12 +231,12 @@ export default function TradeTypeBreakdown({ ticks }: { ticks: Tick[] }) {
         </div>
       )}
 
-      {/* ── 5-column header ──────────────────────────────────────────── */}
+      {/* ── 5-column cards ───────────────────────────────────────────── */}
       <div style={{
         display: "grid",
         gridTemplateColumns: "repeat(5, 1fr)",
-        gap: 6,
-        marginBottom: 8,
+        gap: 8,
+        marginBottom: 10,
       }}>
         {summaries.map(s => {
           const p = PROFILES[s.type];
@@ -251,58 +251,89 @@ export default function TradeTypeBreakdown({ ticks }: { ticks: Tick[] }) {
               key={s.type}
               onClick={() => hasData && setDetail(isActive ? null : s.type)}
               style={{
-                background: isActive ? `${p.color}12` : "#0d1117",
-                border: `1px solid ${isActive ? p.color + "60" : hasData ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.05)"}`,
+                background: isActive ? `${p.color}10` : "#0d1117",
+                border: `1px solid ${isActive ? p.color + "70" : hasData ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.05)"}`,
+                borderTop: `2px solid ${isActive ? p.color : hasData ? p.color + "60" : "rgba(255,255,255,0.07)"}`,
                 borderRadius: 6,
-                padding: "12px 12px 10px",
+                padding: "16px 16px 14px",
                 cursor: hasData ? "pointer" : "default",
-                opacity: hasData ? 1 : 0.35,
+                opacity: hasData ? 1 : 0.3,
                 transition: "all 0.15s",
                 position: "relative" as const,
               }}
-              onMouseEnter={e => hasData && !isActive && ((e.currentTarget as HTMLDivElement).style.borderColor = p.color + "50")}
+              onMouseEnter={e => hasData && !isActive && ((e.currentTarget as HTMLDivElement).style.borderColor = p.color + "60")}
               onMouseLeave={e => !isActive && ((e.currentTarget as HTMLDivElement).style.borderColor = hasData ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.05)")}
             >
               {/* Type label */}
-              <div style={{ fontSize: 8, fontWeight: 800, color: p.color, letterSpacing: "0.1em", marginBottom: 8, fontFamily: "monospace" }}>
+              <div style={{
+                fontSize: 9, fontWeight: 800, color: p.color,
+                letterSpacing: "0.1em", marginBottom: 12,
+                fontFamily: "monospace",
+              }}>
                 {p.shortLabel}
               </div>
 
-              {/* Volume % — the headline number */}
-              <div style={{ fontSize: 26, fontWeight: 800, color: hasData ? "#e6edf3" : "rgba(255,255,255,0.2)", fontFamily: "monospace", lineHeight: 1, marginBottom: 6 }}>
+              {/* Volume % — headline */}
+              <div style={{
+                fontSize: 36, fontWeight: 800, lineHeight: 1,
+                color: hasData ? "#ffffff" : "rgba(255,255,255,0.15)",
+                fontFamily: "monospace", marginBottom: 12,
+              }}>
                 {hasData ? `${s.pct.toFixed(0)}%` : "—"}
               </div>
 
-              {/* Buy/sell bar */}
-              {hasData && (
-                <div style={{ height: 3, borderRadius: 1, overflow: "hidden", display: "flex", marginBottom: 6 }}>
-                  <div style={{ width: `${s.buyPct}%`, background: "#10b981" }} />
-                  <div style={{ width: `${100 - s.buyPct}%`, background: "#ef4444" }} />
-                </div>
-              )}
-
-              {/* Buy pct + trade count */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: hasData ? dirColor : "rgba(255,255,255,0.2)", fontFamily: "monospace" }}>
-                  {hasData ? `${s.buyPct.toFixed(0)}% B` : "—"}
-                </span>
-                <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", fontFamily: "monospace" }}>
-                  {hasData ? `${s.count.toLocaleString()} trades` : "no data"}
-                </span>
+              {/* Buy/sell bar — thicker, more visible */}
+              <div style={{ height: 5, borderRadius: 2, overflow: "hidden", display: "flex", marginBottom: 10, background: "#21262d" }}>
+                {hasData ? (
+                  <>
+                    <div style={{ width: `${s.buyPct}%`, background: "#10b981", transition: "width 0.3s" }} />
+                    <div style={{ width: `${100 - s.buyPct}%`, background: "#ef4444", transition: "width 0.3s" }} />
+                  </>
+                ) : null}
               </div>
 
-              {/* Volume absolute */}
-              {hasData && (
-                <div style={{ marginTop: 4, fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>
-                  {fmtVol(s.volume)} shares &middot; avg {s.avgSize.toLocaleString()}
-                </div>
-              )}
+              {/* Buy % — large and clear */}
+              <div style={{
+                fontSize: 18, fontWeight: 800,
+                color: hasData ? dirColor : "rgba(255,255,255,0.15)",
+                fontFamily: "monospace", marginBottom: 6, lineHeight: 1,
+              }}>
+                {hasData ? `${s.buyPct.toFixed(0)}% BUY` : "—"}
+              </div>
 
-              {/* Active indicator */}
+              {/* Divider */}
+              <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "8px 0" }} />
+
+              {/* Secondary stats */}
+              <div style={{ display: "flex", flexDirection: "column" as const, gap: 3 }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", fontFamily: "monospace", letterSpacing: "0.04em" }}>TRADES</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.65)", fontFamily: "monospace" }}>
+                    {hasData ? s.count.toLocaleString() : "—"}
+                  </span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", fontFamily: "monospace", letterSpacing: "0.04em" }}>VOLUME</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.65)", fontFamily: "monospace" }}>
+                    {hasData ? fmtVol(s.volume) : "—"}
+                  </span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", fontFamily: "monospace", letterSpacing: "0.04em" }}>AVG SIZE</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.65)", fontFamily: "monospace" }}>
+                    {hasData ? s.avgSize.toLocaleString() : "—"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Active caret */}
               {isActive && (
                 <div style={{
-                  position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)",
-                  width: 20, height: 2, background: p.color, borderRadius: "2px 2px 0 0",
+                  position: "absolute", bottom: -1, left: "50%", transform: "translateX(-50%)",
+                  width: 0, height: 0,
+                  borderLeft: "6px solid transparent",
+                  borderRight: "6px solid transparent",
+                  borderBottom: `6px solid ${p.color}50`,
                 }} />
               )}
             </div>
