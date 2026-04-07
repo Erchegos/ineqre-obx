@@ -259,6 +259,8 @@ export default function FlowPage() {
   const [ticks, setTicks] = useState<Tick[]>([]);
   const [signal, setSignal] = useState<TickerSignal | null>(null);
   const [icebergs, setIcebergs] = useState<any[]>([]);
+  const [icebergSort, setIcebergSort] = useState<"date" | "volume" | "conf">("date");
+  const [icebergScope, setIcebergScope] = useState<"today" | "all">("today");
   const [loading, setLoading] = useState(true);
 
   // Live mode state (EQNR only)
@@ -291,7 +293,8 @@ export default function FlowPage() {
     const [tickRes, sigRes, iceRes] = await Promise.allSettled([
       fetch(`/api/flow/ticks/${ticker}?date=${date}&limit=20000`),
       fetch(`/api/flow/signals/${ticker}`),
-      fetch(`/api/flow/icebergs/${ticker}?date=${date}`),
+      // Always fetch 30 days so scope toggle works client-side without refetch
+      fetch(`/api/flow/icebergs/${ticker}?days=30`),
     ]);
 
     try {
@@ -591,30 +594,79 @@ export default function FlowPage() {
               </div>
 
               <div style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 18 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 4 }}>
-                  Hidden Large Orders (Icebergs)
+                {/* Header + controls */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", flex: 1 }}>
+                    Hidden Large Orders (Icebergs)
+                  </div>
+                  {/* Scope toggle */}
+                  {(["today", "all"] as const).map(s => (
+                    <button key={s} onClick={() => setIcebergScope(s)} style={{
+                      padding: "3px 9px", borderRadius: 4, fontSize: 9, fontWeight: 700,
+                      fontFamily: "monospace", letterSpacing: "0.05em",
+                      border: `1px solid ${icebergScope === s ? ACCENT : "#30363d"}`,
+                      background: icebergScope === s ? `${ACCENT}15` : "#0d1117",
+                      color: icebergScope === s ? ACCENT : "rgba(255,255,255,0.35)",
+                      cursor: "pointer",
+                    }}>
+                      {s === "today" ? "TODAY" : "30 DAYS"}
+                    </button>
+                  ))}
+                  {/* Sort toggle */}
+                  {(["date", "volume", "conf"] as const).map(s => (
+                    <button key={s} onClick={() => setIcebergSort(s)} style={{
+                      padding: "3px 9px", borderRadius: 4, fontSize: 9, fontWeight: 700,
+                      fontFamily: "monospace", letterSpacing: "0.05em",
+                      border: `1px solid ${icebergSort === s ? "#f59e0b" : "#30363d"}`,
+                      background: icebergSort === s ? "rgba(245,158,11,0.1)" : "#0d1117",
+                      color: icebergSort === s ? "#f59e0b" : "rgba(255,255,255,0.35)",
+                      cursor: "pointer",
+                    }}>
+                      {s === "date" ? "DATE" : s === "volume" ? "VOL" : "CONF"}
+                    </button>
+                  ))}
                 </div>
                 <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 14, lineHeight: 1.6 }}>
-                  Detected from real Euronext Oslo tick data using two signals: <strong style={{ color: "rgba(255,255,255,0.6)" }}>size uniformity</strong> (many trades at identical or near-identical share counts — algo footprint) and <strong style={{ color: "rgba(255,255,255,0.6)" }}>time clustering</strong> (trades concentrated in a 60s window faster than normal flow). Confidence reflects how strongly both signals fire. Click a card for detail.
+                  Min 10K shares. <strong style={{ color: "rgba(255,255,255,0.6)" }}>Size uniformity</strong> (algo footprint) and <strong style={{ color: "rgba(255,255,255,0.6)" }}>time clustering</strong> (60s window). High conf ≥ 0.65 persists across sessions.
                 </div>
-                {icebergs.length === 0 ? (
-                  <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 11, padding: "30px 0", textAlign: "center", lineHeight: 1.8 }}>
-                    No iceberg orders detected for this session.
-                    <br />
-                    <span style={{ fontSize: 10 }}>Icebergs occur in roughly 5–15% of sessions. Try April 1 or 2 for EQNR.</span>
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {icebergs.slice(0, 8).map((ice: any, i: number) => (
-                      <IcebergCard key={i} detection={ice} />
-                    ))}
-                    {icebergs.length > 8 && (
-                      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", textAlign: "center", padding: "4px 0" }}>
-                        +{icebergs.length - 8} more detections this session
-                      </div>
-                    )}
-                  </div>
-                )}
+                {(() => {
+                  // Filter by scope
+                  const today = selectedDate;
+                  const filtered = icebergScope === "today"
+                    ? icebergs.filter(ice => (ice.start_ts || ice.detected_at || "").slice(0, 10) === today)
+                    : icebergs; // "all" keeps 30-day window; high-conf from older dates preserved
+
+                  // Sort
+                  const sorted = [...filtered].sort((a, b) => {
+                    if (icebergSort === "volume") return b.total_volume - a.total_volume;
+                    if (icebergSort === "conf") return b.confidence - a.confidence;
+                    // date: newest first
+                    return new Date(b.start_ts || b.detected_at).getTime() - new Date(a.start_ts || a.detected_at).getTime();
+                  });
+
+                  if (sorted.length === 0) return (
+                    <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 11, padding: "30px 0", textAlign: "center", lineHeight: 1.8 }}>
+                      {icebergScope === "today"
+                        ? `No icebergs ≥10K shares detected for ${today}.`
+                        : "No icebergs in the last 30 days."}
+                      <br />
+                      <span style={{ fontSize: 10 }}>Run the backtest pipeline to detect icebergs from stored tick data.</span>
+                    </div>
+                  );
+
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {sorted.slice(0, 10).map((ice: any, i: number) => (
+                        <IcebergCard key={i} detection={ice} />
+                      ))}
+                      {sorted.length > 10 && (
+                        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", textAlign: "center", padding: "4px 0" }}>
+                          +{sorted.length - 10} more ({icebergScope === "today" ? "today" : "30-day window"})
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 

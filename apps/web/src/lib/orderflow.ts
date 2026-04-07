@@ -525,7 +525,8 @@ export function detectIcebergs(
   ticks: Tick[],
   adv: number,
   clusterWindowMs: number = 60_000,
-  minTrades: number = 5
+  minTrades: number = 5,
+  minVolume: number = 10_000  // absolute minimum shares — filters noise/tiny prints
 ): IcebergDetection[] {
   if (ticks.length < minTrades) return [];
 
@@ -546,6 +547,7 @@ export function detectIcebergs(
 
     const totalVolume = cluster.reduce((sum, t) => sum + t.size, 0);
     if (totalVolume < volumeThreshold) continue;
+    if (totalVolume < minVolume) continue; // hard floor — skip tiny clusters
 
     const sizes = cluster.map((t) => t.size);
     const sizeCV = coefficientOfVariation(sizes);

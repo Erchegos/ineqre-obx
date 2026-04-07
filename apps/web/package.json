@@ -95,6 +95,8 @@
     "flow:generate:dry": "DRYRUN=1 NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/generate-synthetic-ticks.ts",
     "flow:backtest": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/backtest-orderflow.ts",
     "flow:backtest:dry": "DRYRUN=1 NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/backtest-orderflow.ts",
+    "flow:backtest:today": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/backtest-orderflow.ts --today",
+    "flow:backtest:days": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/backtest-orderflow.ts --days",
     "flow:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-euronext-orderflow.ts",
     "flow:fetch:dry": "DRYRUN=1 NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-euronext-orderflow.ts",
     "flow:fetch:all": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-euronext-orderflow.ts --all",

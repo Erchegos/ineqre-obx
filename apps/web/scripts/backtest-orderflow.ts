@@ -1,8 +1,7 @@
 /**
  * Backtest Orderflow Analytics Pipeline
  *
- * Reads synthetic ticks from DB, runs the full analytics stack, and validates
- * that injected patterns are detected correctly.
+ * Reads real ticks from DB, runs the full analytics stack.
  *
  * Steps per ticker per day:
  *   1. Aggregate ticks into 1-min, 5-min time bars + volume bars
@@ -10,15 +9,17 @@
  *   3. Compute rolling VPIN
  *   4. Compute Kyle's Lambda
  *   5. Compute cumulative OFI from depth snapshots
- *   6. Run iceberg detector
+ *   6. Run iceberg detector (min 10K shares)
  *   7. Classify regime
  *   8. Write bars → orderflow_bars
  *   9. Write signals → orderflow_signals
  *  10. Write icebergs → orderflow_iceberg_detections
  *
  * Usage:
- *   pnpm run flow:backtest          — run & insert
- *   DRYRUN=1 pnpm run flow:backtest — run & print only
+ *   pnpm run flow:backtest               — run all days, keep high-conf history
+ *   pnpm run flow:backtest -- --days 3   — run last N days only (incremental)
+ *   pnpm run flow:backtest -- --today    — today only (used by cron)
+ *   DRYRUN=1 pnpm run flow:backtest      — run & print only
  */
 
 import { config } from "dotenv";
@@ -48,6 +49,21 @@ const DATABASE_URL = (process.env.DATABASE_URL || "")
   .replace(/['"]/g, "")
   .replace(/[?&]sslmode=\w+/g, "");
 const DRY_RUN = process.env.DRYRUN === "1" || process.argv.includes("--dry-run");
+
+// --days N: only process the last N trading days (incremental)
+// --today:  only process today
+const TODAY_ONLY = process.argv.includes("--today");
+const DAYS_ARG = (() => {
+  const idx = process.argv.indexOf("--days");
+  if (TODAY_ONLY) return 1;
+  return idx !== -1 ? parseInt(process.argv[idx + 1], 10) : 0; // 0 = all
+})();
+
+// Min volume cap for iceberg detection — filters out tiny meaningless clusters
+const MIN_ICEBERG_VOLUME = 10_000;
+
+// High-confidence threshold: icebergs above this are kept even on re-runs
+const HIGH_CONF_KEEP = 0.65;
 
 const TICKERS = ["EQNR", "DNB", "MOWI", "YAR", "TEL"];
 
@@ -146,14 +162,20 @@ async function loadDepthForDay(
 async function getTradingDays(
   ticker: string
 ): Promise<string[]> {
-  const { rows } = await safeQuery(
-    `SELECT DISTINCT ts::date::text AS date
+  let query = `SELECT DISTINCT ts::date::text AS date
      FROM orderflow_ticks
      WHERE ticker = $1
-     ORDER BY date ASC`,
-    [ticker]
-  );
-  return rows.map((r: any) => r.date);
+     ORDER BY date ASC`;
+
+  const { rows } = await safeQuery(query, [ticker]);
+  let dates = rows.map((r: any) => r.date);
+
+  // If --days N or --today, only take the last N days
+  if (DAYS_ARG > 0) {
+    dates = dates.slice(-DAYS_ARG);
+  }
+
+  return dates;
 }
 
 async function getADV(ticker: string): Promise<number> {
@@ -267,7 +289,8 @@ async function insertIcebergs(
        (ticker, detected_at, start_ts, end_ts, direction, total_volume, trade_count,
         avg_trade_size, median_trade_size, price_range_bps, vwap, est_block_pct,
         detection_method, confidence)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+       ON CONFLICT DO NOTHING`,
       [
         ticker,
         new Date().toISOString(),
@@ -320,11 +343,37 @@ async function main() {
   console.log("Connected to DB\n");
 
   // Clean previous backtest results
+  // Strategy:
+  //   - Full run (no --days): wipe bars + signals entirely; for icebergs keep
+  //     high-confidence (>=HIGH_CONF_KEEP) history, delete low-conf ones
+  //   - Incremental (--days N / --today): only delete data for the days we're
+  //     about to re-process; preserve everything else untouched
   if (!DRY_RUN) {
-    await safeQuery("DELETE FROM orderflow_bars");
-    await safeQuery("DELETE FROM orderflow_signals");
-    await safeQuery("DELETE FROM orderflow_iceberg_detections");
-    console.log("Cleaned previous backtest data\n");
+    if (DAYS_ARG > 0) {
+      // Incremental — delete only the date range we will reprocess
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - DAYS_ARG);
+      const cutoffStr = cutoff.toISOString();
+      await safeQuery(`DELETE FROM orderflow_bars WHERE ts > $1`, [cutoffStr]);
+      await safeQuery(`DELETE FROM orderflow_signals WHERE ts > $1`, [cutoffStr]);
+      // Delete low-conf icebergs for the window; keep high-conf from any date
+      await safeQuery(
+        `DELETE FROM orderflow_iceberg_detections
+         WHERE start_ts > $1 AND confidence < $2`,
+        [cutoffStr, HIGH_CONF_KEEP]
+      );
+      console.log(`Incremental mode: cleared data after ${cutoffStr.slice(0,10)}, kept icebergs conf >= ${HIGH_CONF_KEEP}\n`);
+    } else {
+      // Full re-run
+      await safeQuery("DELETE FROM orderflow_bars");
+      await safeQuery("DELETE FROM orderflow_signals");
+      // Keep high-confidence icebergs from older dates, clear the rest
+      await safeQuery(
+        `DELETE FROM orderflow_iceberg_detections WHERE confidence < $1`,
+        [HIGH_CONF_KEEP]
+      );
+      console.log(`Full run: cleared bars + signals, kept icebergs conf >= ${HIGH_CONF_KEEP}\n`);
+    }
   }
 
   const validationResults: ValidationResult[] = [];
@@ -391,8 +440,8 @@ async function main() {
         ofi5m = recent.length > 0 ? recent[recent.length - 1] - recent[0] : 0;
       }
 
-      // 6. Iceberg detection
-      const icebergs = detectIcebergs(ticks, adv, 60_000, 5);
+      // 6. Iceberg detection (min 10K shares, filters tiny noise clusters)
+      const icebergs = detectIcebergs(ticks, adv, 60_000, 5, MIN_ICEBERG_VOLUME);
       for (const ice of icebergs) ice.ticker = ticker;
 
       // 7. Regime classification
