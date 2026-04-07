@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import FlowPriceChart from "@/components/flow/FlowPriceChart";
 import FlowRegimeBadge from "@/components/flow/FlowRegimeBadge";
 import TradeTape from "@/components/flow/TradeTape";
 import IcebergCard from "@/components/flow/IcebergCard";
 import TradeTypeBreakdown from "@/components/flow/TradeTypeBreakdown";
+
+const LIVE_REFRESH_SEC = 60; // poll Euronext every 60s in live mode
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type Tick = { ts: string; price: number; size: number; side: number };
@@ -259,6 +261,14 @@ export default function FlowPage() {
   const [icebergs, setIcebergs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Live mode state (EQNR only)
+  const [liveMode, setLiveMode] = useState(false);
+  const [liveLastUpdate, setLiveLastUpdate] = useState<Date | null>(null);
+  const [liveLastTradeTime, setLiveLastTradeTime] = useState<string | null>(null);
+  const [liveCountdown, setLiveCountdown] = useState(LIVE_REFRESH_SEC);
+  const liveIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const liveCountdownRef = useRef<NodeJS.Timeout | null>(null);
+
   // Load available dates for ticker
   const loadDates = useCallback(async (ticker: string) => {
     try {
@@ -307,8 +317,55 @@ export default function FlowPage() {
     setLoading(false);
   }, []);
 
+  // Live fetch — hits Euronext directly, no DB
+  const loadLive = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/flow/live/EQNR`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const d = await res.json();
+      setTicks(d.ticks || []);
+      setLiveLastUpdate(new Date());
+      setLiveLastTradeTime(d.lastTradeTime);
+      setLiveCountdown(LIVE_REFRESH_SEC);
+    } catch {
+      // keep existing ticks on failure
+    }
+    setLoading(false);
+  }, []);
+
+  // Start/stop live mode
+  useEffect(() => {
+    if (liveIntervalRef.current) clearInterval(liveIntervalRef.current);
+    if (liveCountdownRef.current) clearInterval(liveCountdownRef.current);
+
+    if (!liveMode) return;
+
+    // Only available for EQNR
+    setSelectedTicker("EQNR");
+    loadLive();
+
+    liveIntervalRef.current = setInterval(loadLive, LIVE_REFRESH_SEC * 1000);
+    liveCountdownRef.current = setInterval(() => {
+      setLiveCountdown(c => (c <= 1 ? LIVE_REFRESH_SEC : c - 1));
+    }, 1000);
+
+    return () => {
+      if (liveIntervalRef.current) clearInterval(liveIntervalRef.current);
+      if (liveCountdownRef.current) clearInterval(liveCountdownRef.current);
+    };
+  }, [liveMode, loadLive]);
+
+  // When ticker changes away from EQNR, turn off live mode
+  useEffect(() => {
+    if (selectedTicker !== "EQNR" && liveMode) setLiveMode(false);
+  }, [selectedTicker, liveMode]);
+
   useEffect(() => { loadDates(selectedTicker); }, [selectedTicker, loadDates]);
-  useEffect(() => { if (selectedDate) loadData(selectedTicker, selectedDate); }, [selectedTicker, selectedDate, loadData]);
+  useEffect(() => {
+    if (liveMode) return; // live mode handles its own fetching
+    if (selectedDate) loadData(selectedTicker, selectedDate);
+  }, [selectedTicker, selectedDate, loadData, liveMode]);
 
   // Derived stats from ticks
   const totalBuy = ticks.filter(t => t.side === 1).reduce((s, t) => s + t.size, 0);
@@ -345,7 +402,8 @@ export default function FlowPage() {
         {/* Ticker + Date Selector */}
         <div style={{ display: "flex", gap: 10, marginBottom: 24, flexWrap: "wrap", alignItems: "center" }}>
           {TICKERS.map(t => (
-            <button key={t} onClick={() => setSelectedTicker(t)}
+            <button key={t}
+              onClick={() => { if (liveMode && t !== "EQNR") setLiveMode(false); setSelectedTicker(t); }}
               style={{
                 padding: "8px 20px", borderRadius: 6, fontSize: 12, fontWeight: 700,
                 fontFamily: "monospace",
@@ -358,8 +416,31 @@ export default function FlowPage() {
             </button>
           ))}
 
-          {/* Date picker */}
-          {availableDates.length > 0 && (
+          {/* LIVE button — EQNR only */}
+          {selectedTicker === "EQNR" && (
+            <button
+              onClick={() => setLiveMode(m => !m)}
+              style={{
+                padding: "8px 16px", borderRadius: 6, fontSize: 11, fontWeight: 700,
+                fontFamily: "monospace", letterSpacing: "0.06em",
+                border: `1px solid ${liveMode ? "#10b981" : "#30363d"}`,
+                background: liveMode ? "rgba(16,185,129,0.12)" : "#161b22",
+                color: liveMode ? "#10b981" : "rgba(255,255,255,0.4)",
+                cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 6,
+              }}>
+              <span style={{
+                width: 7, height: 7, borderRadius: "50%",
+                background: liveMode ? "#10b981" : "#30363d",
+                display: "inline-block",
+                animation: liveMode ? "livePulse 1.5s ease-in-out infinite" : "none",
+              }} />
+              {liveMode ? `LIVE — next in ${liveCountdown}s` : "LIVE"}
+            </button>
+          )}
+
+          {/* Date picker — hidden in live mode */}
+          {!liveMode && availableDates.length > 0 && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
               <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>DATE:</span>
               <select
@@ -380,7 +461,22 @@ export default function FlowPage() {
             </div>
           )}
 
-          {signal && <FlowRegimeBadge regime={signal.regime || "neutral"} />}
+          {/* Live status */}
+          {liveMode && liveLastUpdate && (
+            <div style={{ marginLeft: "auto", fontSize: 10, color: "rgba(255,255,255,0.35)", fontFamily: "monospace" }}>
+              {liveLastTradeTime && (
+                <span>
+                  last trade{" "}
+                  <span style={{ color: "#10b981" }}>
+                    {new Date(liveLastTradeTime).toLocaleTimeString("no-NO", { timeZone: "Europe/Oslo", hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                  </span>
+                  {" "}Oslo · 15-min delayed
+                </span>
+              )}
+            </div>
+          )}
+
+          {signal && !liveMode && <FlowRegimeBadge regime={signal.regime || "neutral"} />}
         </div>
 
         {/* No data state */}
@@ -401,7 +497,9 @@ export default function FlowPage() {
 
         {loading && (
           <div style={{ textAlign: "center", padding: 80, color: "rgba(255,255,255,0.3)", fontSize: 12 }}>
-            Loading {selectedTicker} trades for {selectedDate}...
+            {liveMode
+              ? `Fetching today's EQNR trades from Euronext (15-min delayed)...`
+              : `Loading ${selectedTicker} trades for ${selectedDate}...`}
           </div>
         )}
 
@@ -557,14 +655,20 @@ export default function FlowPage() {
                 </p>
                 <p style={{ margin: 0 }}>
                   <strong style={{ color: "rgba(255,255,255,0.6)" }}>Limitations:</strong>{" "}
-                  Data is fetched once per day (not real-time). Dark trades and auction prints may affect classification accuracy. The models are statistical — not every signal plays out as expected.
+                  Live mode polls Euronext every 60 seconds and is 15 minutes delayed (Euronext policy). Historical data is fetched by cron every 5 minutes during market hours for EQNR, and once at day-end for all 5 tickers. Dark trades and auction prints are filtered out — only real on-exchange continuous trades are shown. The models are statistical — not every signal plays out as expected.
                 </p>
               </div>
             </details>
           </>
         )}
       </div>
-      <style>{`details summary::-webkit-details-marker { display: none; }`}</style>
+      <style>{`
+        details summary::-webkit-details-marker { display: none; }
+        @keyframes livePulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.4; transform: scale(1.4); }
+        }
+      `}</style>
     </div>
   );
 }

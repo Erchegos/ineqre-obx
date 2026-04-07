@@ -1587,37 +1587,6 @@ export default function ResearchPortalPage() {
                     </div>
                   )}
 
-                  {/* Full Email Content */}
-                  {doc.body_text && (
-                    <div style={{
-                      padding: 20,
-                      background: '#0a0a0a',
-                      border: '1px solid #30363d',
-                      borderRadius: 8,
-                      maxHeight: 600,
-                      overflow: 'auto',
-                    }}>
-                      <h4 style={{
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: 'rgba(255,255,255,0.5)',
-                        marginBottom: 16,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
-                      }}>
-                        Full Email Content
-                      </h4>
-                      <div style={{
-                        fontSize: 14,
-                        lineHeight: 1.7,
-                        color: '#fff',
-                        whiteSpace: 'pre-wrap',
-                        fontFamily: 'monospace',
-                      }}>
-                        {cleanBodyText(doc.body_text)}
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
             </div>

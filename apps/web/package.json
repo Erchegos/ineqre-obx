@@ -97,6 +97,8 @@
     "flow:backtest:dry": "DRYRUN=1 NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/backtest-orderflow.ts",
     "flow:fetch": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-euronext-orderflow.ts",
     "flow:fetch:dry": "DRYRUN=1 NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-euronext-orderflow.ts",
+    "flow:fetch:all": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-euronext-orderflow.ts --all",
+    "flow:fetch:backfill": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/fetch-euronext-orderflow.ts --all --backfill 30",
     "flow:analyze": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/analyze-orderflow.ts"
   },
   "dependencies": {

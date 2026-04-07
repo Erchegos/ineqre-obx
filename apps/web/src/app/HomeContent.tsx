@@ -207,6 +207,10 @@ export default function HomeContent({ stats }: { stats: SystemStats }) {
                 description="Cross-sectional ML signal explorer with animated trading simulator. Backtest ML predictions with 15 tunable parameters (entry/exit thresholds, stops, momentum filters, SMA gates, valuation screens). Live equity curve vs OBX, trade log, and factor dashboard. Plus: signal explorer with P&L connectors and a 15-position portfolio strategy with 5-year monthly backtest."
                 tags={[{ label: "ML Simulator", color: "#10b981" }, { label: "15 Params", color: "#f59e0b" }, { label: "228 Stocks", color: "#3b82f6" }]}
                 visible={modulesReveal.visible} delay={8} isPrivate />
+              <FeatureCard href="/flow" title="Flow Intelligence"
+                description="Intraday microstructure analytics for the top 5 liquid OSE stocks. Live EQNR feed direct from Euronext (15-min delayed, auto-refreshes every 60s). VPIN, Kyle's Lambda, Order Flow Imbalance, iceberg/block detection, and who-is-trading breakdown (dark pool, institutional, algo, momentum, retail)."
+                tags={[{ label: "Live Feed", color: "#10b981" }, { label: "Microstructure", color: "#06b6d4" }, { label: "Icebergs", color: "#f59e0b" }]}
+                visible={modulesReveal.visible} delay={9} />
             </div>
           </section>
 
@@ -217,15 +221,15 @@ export default function HomeContent({ stats }: { stats: SystemStats }) {
               <FeatureCard href="/seafood" title="Seafood Intelligence"
                 description="Norwegian aquaculture dashboard. Salmon spot/forward prices, sea lice monitoring, production area traffic lights, disease outbreaks, company risk matrix, biomass tracking, and live wellboat harvest detection via AIS."
                 tags={[{ label: "Salmon", color: "#f59e0b" }, { label: "Lice", color: "#ef4444" }, { label: "Harvest", color: "#10b981" }]}
-                visible={modulesReveal.visible} delay={9} />
+                visible={modulesReveal.visible} delay={10} />
               <FeatureCard href="/shipping" title="Shipping Intelligence"
                 description="OSE shipping terminal. Fleet tracking on global map with vessel-level charter rates, BDI/BDTI/BCTI indices, rate exposure matrix, contract expiry tracking, and quarterly TCE comparison across 10 companies."
                 tags={[{ label: "Fleet Map", color: "#06b6d4" }, { label: "Rates", color: "#f59e0b" }, { label: "10 Companies", color: "#10b981" }]}
-                visible={modulesReveal.visible} delay={10} />
+                visible={modulesReveal.visible} delay={11} />
               <FeatureCard href="/financials" title="Financials Intelligence"
                 description="OSE banks and insurance terminal. Interest rate sensitivity heatmap, yield curve tracking, NIBOR/policy rate history, full scorecard comparison across 12 companies, ML signals, short interest, insider transactions, and macro FX exposure."
                 tags={[{ label: "Rates", color: "#3b82f6" }, { label: "12 Companies", color: "#10b981" }, { label: "Scorecard", color: "#f59e0b" }]}
-                visible={modulesReveal.visible} delay={11} />
+                visible={modulesReveal.visible} delay={12} />
             </div>
           </section>
 
