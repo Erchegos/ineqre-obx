@@ -7,9 +7,14 @@ type Tick = {
   side: number; // 1=buy, -1=sell, 0=unknown
 };
 
+const DELAY_MS = 15 * 60 * 1000; // Euronext publishes timestamps 15 min ahead of actual trade time
+
 // Always show Oslo time (UTC+2 CEST) — trades are from Oslo Børs
-function formatTime(ts: string): string {
-  return new Date(ts).toLocaleTimeString("no-NO", {
+// In live mode, subtract 15 min because Euronext CSV timestamps are publication time, not execution time
+function formatTime(ts: string, adjustDelay: boolean): string {
+  const d = new Date(ts);
+  if (adjustDelay) d.setTime(d.getTime() - DELAY_MS);
+  return d.toLocaleTimeString("no-NO", {
     timeZone: "Europe/Oslo",
     hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
   });
@@ -88,7 +93,7 @@ export default function TradeTape({ ticks, isLive }: { ticks: Tick[]; isLive?: b
                   }}
                 >
                   <td style={{ padding: "3px 6px", color: "rgba(255,255,255,0.5)" }}>
-                    {formatTime(tick.ts)}
+                    {formatTime(tick.ts, !!isLive)}
                   </td>
                   <td style={{ padding: "3px 6px", textAlign: "right", color: "#e6edf3" }}>
                     {tick.price.toFixed(2)}
