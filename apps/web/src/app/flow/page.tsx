@@ -231,28 +231,29 @@ function BuySellBars({ ticks }: { ticks: Tick[] }) {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 8, fontFamily: "monospace" }}>
-        <span>TIME (OSLO)</span>
-        <div style={{ display: "flex", gap: 12 }}>
-          <span style={{ color: "#10b981" }}>■ BUYERS</span>
-          <span style={{ color: "#ef4444" }}>■ SELLERS</span>
-          <span>VOL</span>
+      {/* Header row — outside scroll so it stays fixed */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, paddingRight: 6 }}>
+        <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", width: 38, fontFamily: "monospace", flexShrink: 0 }}>TIME</span>
+        <div style={{ flex: 1, display: "flex", gap: 8, fontSize: 9, color: "rgba(255,255,255,0.3)", fontFamily: "monospace" }}>
+          <span style={{ color: "#10b981" }}>■ BUY</span>
+          <span style={{ color: "#ef4444" }}>■ SELL</span>
         </div>
+        <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", width: 44, textAlign: "right", fontFamily: "monospace", flexShrink: 0 }}>VOL</span>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 2, maxHeight: 320, overflowY: "auto" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, maxHeight: 320, overflowY: "auto", overflowX: "hidden" }}>
         {bars.map((b, i) => {
           const total = b.buyVol + b.sellVol;
           const buyPct = total > 0 ? (b.buyVol / total) * 100 : 50;
           const isImbalanced = buyPct > 65 || buyPct < 35;
           const barWidth = (total / maxVol) * 100;
           return (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
               <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", width: 38, fontFamily: "monospace", flexShrink: 0 }}>
                 {b.time}
               </span>
-              <div style={{ flex: 1, height: 12, borderRadius: 2, overflow: "hidden", display: "flex", background: "#1a1f26", opacity: barWidth < 8 ? 0.4 : 1 }}>
-                <div style={{ width: `${buyPct}%`, background: "#10b981" }} />
-                <div style={{ width: `${100 - buyPct}%`, background: "#ef4444" }} />
+              <div style={{ flex: 1, height: 12, borderRadius: 2, overflow: "hidden", display: "flex", background: "#1a1f26", opacity: barWidth < 8 ? 0.4 : 1, minWidth: 0 }}>
+                <div style={{ width: `${buyPct}%`, background: "#10b981", flexShrink: 0 }} />
+                <div style={{ width: `${100 - buyPct}%`, background: "#ef4444", flexShrink: 0 }} />
               </div>
               <span style={{
                 fontSize: 9, width: 44, textAlign: "right", fontFamily: "monospace", flexShrink: 0,
@@ -264,9 +265,6 @@ function BuySellBars({ ticks }: { ticks: Tick[] }) {
             </div>
           );
         })}
-      </div>
-      <div style={{ marginTop: 10, fontSize: 10, color: "rgba(255,255,255,0.35)", lineHeight: 1.6 }}>
-        Bars where one side has over 65% of volume are highlighted — these 5-minute windows show where buyers or sellers had clear control.
       </div>
     </div>
   );
@@ -635,15 +633,18 @@ export default function FlowPage() {
               <FlowPriceChart ticks={ticks} />
             </div>
 
-            {/* ── WHO IS TRADING? ──────────────────────────────────────── */}
+            {/* ── TRADE TYPE BREAKDOWN ─────────────────────────────────── */}
             <div style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 20, marginBottom: 20 }}>
               <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 4 }}>
-                  Who Is Moving the Price?
+                <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", letterSpacing: "0.08em", textTransform: "uppercase" as const, marginBottom: 6 }}>
+                  TRADE TYPE BREAKDOWN
                 </div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", lineHeight: 1.6 }}>
-                  Each trade is classified by type — dark pool blocks, institutions building positions, algos, momentum traders, and retail. Click any row to understand what that type means and what today&apos;s direction tells you.
-                </div>
+                <details>
+                  <summary style={{ fontSize: 10, color: "rgba(255,255,255,0.25)", cursor: "pointer", letterSpacing: "0.04em", listStyle: "none" }}>▸ What is this?</summary>
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", lineHeight: 1.6, marginTop: 6 }}>
+                    Each trade is classified by type — dark pool blocks, institutions building positions, algos, momentum traders, and retail. Click any row to understand what that type means and what today&apos;s direction tells you.
+                  </div>
+                </details>
               </div>
               <TradeTypeBreakdown ticks={ticks} />
             </div>
@@ -651,11 +652,8 @@ export default function FlowPage() {
             {/* ── 2-COL: BUY/SELL BARS + ICEBERGS ─────────────────────── */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
               <div style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 18 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 4 }}>
-                  Who Was in Control Each 5 Minutes?
-                </div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 14, lineHeight: 1.6 }}>
-                  Each bar shows one 5-minute window. Mostly green = buyers had more volume. Mostly red = sellers. Look for runs of consecutive green or red — that&apos;s when directional pressure was sustained.
+                <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", letterSpacing: "0.08em", textTransform: "uppercase" as const, marginBottom: 10 }}>
+                  5-MIN VOLUME BREAKDOWN
                 </div>
                 <BuySellBars ticks={ticks} />
               </div>
