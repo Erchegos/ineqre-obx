@@ -306,8 +306,8 @@ export default function FlowPage() {
       const latestDate = dates[0]?.date ?? "";
       const isToday = latestDate === today;
 
-      // Auto-enable live mode on first load if: EQNR, today has data, market is open
-      if (!autoLiveApplied.current && ticker === "EQNR" && isToday && isOsloMarketOpen()) {
+      // Auto-enable live mode on first load if: today has data and market is open (all 5 tickers)
+      if (!autoLiveApplied.current && isToday && isOsloMarketOpen()) {
         autoLiveApplied.current = true;
         setLiveMode(true);
         // Don't set selectedDate — live mode doesn't use it
@@ -355,12 +355,12 @@ export default function FlowPage() {
     setLoading(false);
   }, []);
 
-  // Live fetch — hits Euronext directly, no DB
-  // Only show full loading spinner on first fetch (no ticks yet); subsequent polls are silent
-  const loadLive = useCallback(async (isFirstLoad = false) => {
+  // Live fetch — hits Euronext directly, no DB (all 5 tickers supported)
+  // Only show full loading spinner on first fetch; subsequent polls are silent
+  const loadLive = useCallback(async (ticker: string, isFirstLoad = false) => {
     if (isFirstLoad) setLoading(true);
     try {
-      const res = await fetch(`/api/flow/live/EQNR`);
+      const res = await fetch(`/api/flow/live/${ticker}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const d = await res.json();
       setTicks(d.ticks || []);
@@ -373,18 +373,16 @@ export default function FlowPage() {
     if (isFirstLoad) setLoading(false);
   }, []);
 
-  // Start/stop live mode
+  // Start/stop live mode — works for all 5 tickers
   useEffect(() => {
     if (liveIntervalRef.current) clearInterval(liveIntervalRef.current);
     if (liveCountdownRef.current) clearInterval(liveCountdownRef.current);
 
     if (!liveMode) return;
 
-    // Only available for EQNR
-    setSelectedTicker("EQNR");
-    loadLive(true); // first load shows spinner
+    loadLive(selectedTicker, true); // first load shows spinner
 
-    liveIntervalRef.current = setInterval(() => loadLive(false), LIVE_REFRESH_SEC * 1000);
+    liveIntervalRef.current = setInterval(() => loadLive(selectedTicker, false), LIVE_REFRESH_SEC * 1000);
     liveCountdownRef.current = setInterval(() => {
       setLiveCountdown(c => (c <= 1 ? LIVE_REFRESH_SEC : c - 1));
     }, 1000);
@@ -393,12 +391,7 @@ export default function FlowPage() {
       if (liveIntervalRef.current) clearInterval(liveIntervalRef.current);
       if (liveCountdownRef.current) clearInterval(liveCountdownRef.current);
     };
-  }, [liveMode, loadLive]);
-
-  // When ticker changes away from EQNR, turn off live mode
-  useEffect(() => {
-    if (selectedTicker !== "EQNR" && liveMode) setLiveMode(false);
-  }, [selectedTicker, liveMode]);
+  }, [liveMode, selectedTicker, loadLive]);
 
   useEffect(() => { loadDates(selectedTicker); }, [selectedTicker, loadDates]);
   useEffect(() => {
@@ -480,7 +473,7 @@ export default function FlowPage() {
         <div style={{ display: "flex", gap: 10, marginBottom: 24, flexWrap: "wrap", alignItems: "center" }}>
           {TICKERS.map(t => (
             <button key={t}
-              onClick={() => { if (liveMode && t !== "EQNR") setLiveMode(false); setSelectedTicker(t); }}
+              onClick={() => { setSelectedTicker(t); if (liveMode) setTicks([]); }}
               style={{
                 padding: "8px 20px", borderRadius: 6, fontSize: 12, fontWeight: 700,
                 fontFamily: "monospace",
@@ -493,8 +486,8 @@ export default function FlowPage() {
             </button>
           ))}
 
-          {/* LIVE button — EQNR only */}
-          {selectedTicker === "EQNR" && (
+          {/* LIVE button — all 5 tickers */}
+          {(
             <button
               onClick={() => setLiveMode(m => !m)}
               style={{
