@@ -10,6 +10,26 @@ import { detectIcebergs } from "@/lib/orderflow";
 
 const LIVE_REFRESH_SEC = 60; // poll Euronext every 60s in live mode
 
+// Oslo market hours: Mon–Fri 09:00–17:30
+function isOsloMarketOpen(): boolean {
+  const now = new Date();
+  // Get Oslo local time components
+  const oslo = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Oslo",
+    weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(now);
+  const weekday = oslo.find(p => p.type === "weekday")?.value ?? "";
+  const hour = parseInt(oslo.find(p => p.type === "hour")?.value ?? "0", 10);
+  const minute = parseInt(oslo.find(p => p.type === "minute")?.value ?? "0", 10);
+  const isWeekday = !["Sat", "Sun"].includes(weekday);
+  const minuteOfDay = hour * 60 + minute;
+  return isWeekday && minuteOfDay >= 9 * 60 && minuteOfDay < 17 * 60 + 30;
+}
+
+function getTodayOslo(): string {
+  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Oslo" }).format(new Date());
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────
 type Tick = { ts: string; price: number; size: number; side: number };
 type TickerSignal = {
@@ -271,8 +291,9 @@ export default function FlowPage() {
   const [liveCountdown, setLiveCountdown] = useState(LIVE_REFRESH_SEC);
   const liveIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const liveCountdownRef = useRef<NodeJS.Timeout | null>(null);
+  const autoLiveApplied = useRef(false); // prevent re-triggering on re-renders
 
-  // Load available dates for ticker
+  // Load available dates for ticker — auto-enables live mode if today is the latest date
   const loadDates = useCallback(async (ticker: string) => {
     try {
       const res = await fetch(`/api/flow/dates?ticker=${ticker}`);
@@ -280,8 +301,21 @@ export default function FlowPage() {
       const d = await res.json();
       const dates: DateEntry[] = d.dates || [];
       setAvailableDates(dates);
-      if (dates.length > 0) setSelectedDate(dates[0].date);
-      else setSelectedDate("");
+
+      const today = getTodayOslo();
+      const latestDate = dates[0]?.date ?? "";
+      const isToday = latestDate === today;
+
+      // Auto-enable live mode on first load if: EQNR, today has data, market is open
+      if (!autoLiveApplied.current && ticker === "EQNR" && isToday && isOsloMarketOpen()) {
+        autoLiveApplied.current = true;
+        setLiveMode(true);
+        // Don't set selectedDate — live mode doesn't use it
+      } else if (dates.length > 0) {
+        setSelectedDate(dates[0].date);
+      } else {
+        setSelectedDate("");
+      }
     } catch { setAvailableDates([]); setSelectedDate(""); }
   }, []);
 
