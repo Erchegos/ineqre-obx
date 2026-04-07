@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import FlowPriceChart from "@/components/flow/FlowPriceChart";
 import FlowRegimeBadge from "@/components/flow/FlowRegimeBadge";
 import TradeTape from "@/components/flow/TradeTape";
 import IcebergCard from "@/components/flow/IcebergCard";
 import TradeTypeBreakdown from "@/components/flow/TradeTypeBreakdown";
+import { detectIcebergs } from "@/lib/orderflow";
 
 const LIVE_REFRESH_SEC = 60; // poll Euronext every 60s in live mode
 
@@ -389,6 +390,44 @@ export default function FlowPage() {
 
   const verdict = getVerdict(ticks);
 
+  // In live mode: run iceberg detection on the current live ticks client-side
+  // Estimate ADV from session volume extrapolated to full 8.5h trading day
+  const liveIcebergs = useMemo(() => {
+    if (!liveMode || ticks.length === 0) return [];
+    // Convert string-ts ticks to Date objects for the lib
+    const libTicks = ticks.map(t => ({
+      ts: new Date(new Date(t.ts).getTime() - 15 * 60 * 1000), // undo the 15-min delay offset
+      price: t.price,
+      size: t.size,
+      side: t.side,
+    }));
+    // Estimate ADV: scale session volume to full 8.5h trading day
+    const sessionVol = ticks.reduce((s, t) => s + t.size, 0);
+    const sessionMs = ticks.length > 1
+      ? new Date(ticks[ticks.length - 1].ts).getTime() - new Date(ticks[0].ts).getTime()
+      : 1;
+    const fullDayMs = 8.5 * 3600 * 1000;
+    const advEst = sessionMs > 0 ? Math.round(sessionVol * (fullDayMs / sessionMs)) : sessionVol * 3;
+
+    const raw = detectIcebergs(libTicks, advEst, 60_000, 5, 10_000);
+    // Convert IcebergDetection → IcebergCard shape (DB snake_case)
+    return raw.map(d => ({
+      detected_at: d.startTs.toISOString(),
+      start_ts: d.startTs.toISOString(),
+      end_ts: d.endTs.toISOString(),
+      direction: d.direction,
+      total_volume: d.totalVolume,
+      trade_count: d.tradeCount,
+      avg_trade_size: Math.round(d.avgTradeSize),
+      median_trade_size: Math.round(d.medianTradeSize),
+      price_range_bps: d.priceRangeBps,
+      vwap: d.vwap,
+      est_block_pct: d.estBlockPct,
+      detection_method: d.method,
+      confidence: d.confidence,
+    }));
+  }, [liveMode, ticks]);
+
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "monospace" }}>
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 24px" }}>
@@ -631,9 +670,12 @@ export default function FlowPage() {
                   Min 10K shares. <strong style={{ color: "rgba(255,255,255,0.6)" }}>Size uniformity</strong> (algo footprint) and <strong style={{ color: "rgba(255,255,255,0.6)" }}>time clustering</strong> (60s window). High conf ≥ 0.65 persists across sessions.
                 </div>
                 {(() => {
-                  // Filter by scope
+                  // In live mode: use client-side detected icebergs from live ticks
+                  // In DB mode: filter by scope
                   const today = selectedDate;
-                  const filtered = icebergScope === "today"
+                  const filtered = liveMode
+                    ? liveIcebergs
+                    : icebergScope === "today"
                     ? icebergs.filter(ice => (ice.start_ts || ice.detected_at || "").slice(0, 10) === today)
                     : icebergs; // "all" keeps 30-day window; high-conf from older dates preserved
 
@@ -647,11 +689,13 @@ export default function FlowPage() {
 
                   if (sorted.length === 0) return (
                     <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 11, padding: "30px 0", textAlign: "center", lineHeight: 1.8 }}>
-                      {icebergScope === "today"
+                      {liveMode
+                        ? "No icebergs ≥10K shares detected in today's live feed yet."
+                        : icebergScope === "today"
                         ? `No icebergs ≥10K shares detected for ${today}.`
                         : "No icebergs in the last 30 days."}
                       <br />
-                      <span style={{ fontSize: 10 }}>Run the backtest pipeline to detect icebergs from stored tick data.</span>
+                      {!liveMode && <span style={{ fontSize: 10 }}>Run the backtest pipeline to detect icebergs from stored tick data.</span>}
                     </div>
                   );
 
@@ -662,7 +706,7 @@ export default function FlowPage() {
                       ))}
                       {sorted.length > 10 && (
                         <div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", textAlign: "center", padding: "4px 0" }}>
-                          +{sorted.length - 10} more ({icebergScope === "today" ? "today" : "30-day window"})
+                          +{sorted.length - 10} more ({liveMode ? "live session" : icebergScope === "today" ? "today" : "30-day window"})
                         </div>
                       )}
                     </div>
