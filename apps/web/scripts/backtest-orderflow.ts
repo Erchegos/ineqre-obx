@@ -354,7 +354,7 @@ async function main() {
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - DAYS_ARG);
       const cutoffStr = cutoff.toISOString();
-      await safeQuery(`DELETE FROM orderflow_bars WHERE ts > $1`, [cutoffStr]);
+      await safeQuery(`DELETE FROM orderflow_bars WHERE bar_open_ts > $1`, [cutoffStr]);
       await safeQuery(`DELETE FROM orderflow_signals WHERE ts > $1`, [cutoffStr]);
       // Delete low-conf icebergs for the window; keep high-conf from any date
       await safeQuery(

@@ -321,8 +321,9 @@ export default function FlowPage() {
   }, []);
 
   // Live fetch — hits Euronext directly, no DB
-  const loadLive = useCallback(async () => {
-    setLoading(true);
+  // Only show full loading spinner on first fetch (no ticks yet); subsequent polls are silent
+  const loadLive = useCallback(async (isFirstLoad = false) => {
+    if (isFirstLoad) setLoading(true);
     try {
       const res = await fetch(`/api/flow/live/EQNR`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -334,7 +335,7 @@ export default function FlowPage() {
     } catch {
       // keep existing ticks on failure
     }
-    setLoading(false);
+    if (isFirstLoad) setLoading(false);
   }, []);
 
   // Start/stop live mode
@@ -346,9 +347,9 @@ export default function FlowPage() {
 
     // Only available for EQNR
     setSelectedTicker("EQNR");
-    loadLive();
+    loadLive(true); // first load shows spinner
 
-    liveIntervalRef.current = setInterval(loadLive, LIVE_REFRESH_SEC * 1000);
+    liveIntervalRef.current = setInterval(() => loadLive(false), LIVE_REFRESH_SEC * 1000);
     liveCountdownRef.current = setInterval(() => {
       setLiveCountdown(c => (c <= 1 ? LIVE_REFRESH_SEC : c - 1));
     }, 1000);
@@ -681,7 +682,7 @@ export default function FlowPage() {
                 <span style={{ color: "#ef4444" }}>Red = seller came to the market</span> (they hit the bid, accepting less than the mid-price).
                 Large trades (big volume) are worth watching — they often indicate institutional activity.
               </div>
-              <TradeTape ticks={ticks.slice(-200)} />
+              <TradeTape ticks={ticks.slice(-200)} isLive={liveMode} />
             </div>
 
             {/* ── METHODOLOGY ──────────────────────────────────────────── */}
