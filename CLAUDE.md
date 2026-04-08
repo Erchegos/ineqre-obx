@@ -1,8 +1,12 @@
-# InEqRe (Intelligence Equity Research) v3.0
+# InEqRe (Intelligence Equity Research) v3.1
 
 Quantitative equity research platform for Oslo Stock Exchange (OSE). Combines automated research aggregation, ML price predictions, volatility modeling, and strategy backtesting.
 
 > **Maintenance Note**: Update this file whenever changes are pushed to git. Add new features, APIs, components, or modify existing entries to keep documentation current.
+
+> **Recent Updates (2026-04-08)**: 
+> - Fixed Supabase RLS security: Enabled Row-Level Security on 6 tables (`orderflow_ticks`, `orderflow_bars`, `orderflow_depth_snapshots`, `orderflow_signals`, `orderflow_iceberg_detections`, `live_trade_signals`)
+> - Cleaned up orderflow data: Removed 1.2M duplicate trades from historical import errors. Added `UNIQUE (ticker, ts, price, size)` constraint to `orderflow_ticks` and fixed `ON CONFLICT` clause in fetch script to prevent future duplicates.
 
 ---
 
@@ -551,7 +555,7 @@ Run after market close alongside ML pipeline:
 | `lookup-harvest-mmsi.ts` | Resolve wellboat names → MMSI via Digitraffic + manual lookup |
 | `fetch-harvest-positions.ts` | AIS-based trip detection: proximity state machine (farm→slaughterhouse) with spot price matching |
 | `aggregate-harvest-estimates.ts` | Quarterly aggregation: trip volumes → per-company estimates vs actuals |
-| `fetch-euronext-orderflow.ts` | Fetch intraday tick-by-tick trade data from Euronext Live for OSE equities (CSV/JSON endpoints). Uses tick-rule side classification. Stores to `orderflow_ticks` table. CLI: `--ticker`, `--date`, `DRYRUN=1` |
+| `fetch-euronext-orderflow.ts` | Fetch intraday tick-by-tick trade data from Euronext Live for OSE equities (CSV/JSON endpoints). Uses tick-rule side classification. Stores to `orderflow_ticks` table with deduplication on `(ticker, ts, price, size)` unique constraint. CLI: `--ticker`, `--date`, `--all`, `--backfill N`, `DRYRUN=1` |
 | `analyze-orderflow.ts` | Phase 3/4 orderflow intelligence report (terminal, ANSI colors). Builds 1min/5min/volume bars, computes BVC, VPIN, Kyle's Lambda, Amihud, trade informativeness, detects TWAP/VWAP execution windows, stealth accumulation, momentum ignition, algo fingerprints, icebergs, OFI proxy. |
 | `generate-synthetic-ticks.ts` | Generate synthetic tick data for orderflow backtesting |
 | `backtest-orderflow.ts` | Backtest orderflow signals (BVC, VPIN, Kyle's Lambda) on tick data |

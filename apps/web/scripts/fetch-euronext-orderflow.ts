@@ -203,7 +203,7 @@ async function upsertTicks(ticks: ParsedTick[]): Promise<number> {
     const res = await db.query(
       `INSERT INTO orderflow_ticks (ticker, ts, price, size, side, trade_id)
        VALUES ${placeholders.join(",")}
-       ON CONFLICT DO NOTHING`,
+       ON CONFLICT (ticker, ts, price, size) DO NOTHING`,
       values
     );
     inserted += res.rowCount ?? 0;
