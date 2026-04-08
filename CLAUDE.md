@@ -7,6 +7,9 @@ Quantitative equity research platform for Oslo Stock Exchange (OSE). Combines au
 > **Recent Updates (2026-04-08)**: 
 > - Fixed Supabase RLS security: Enabled Row-Level Security on 6 tables (`orderflow_ticks`, `orderflow_bars`, `orderflow_depth_snapshots`, `orderflow_signals`, `orderflow_iceberg_detections`, `live_trade_signals`)
 > - Cleaned up orderflow data: Removed 1.2M duplicate trades from historical import errors. Added `UNIQUE (ticker, ts, price, size)` constraint to `orderflow_ticks` and fixed `ON CONFLICT` clause in fetch script to prevent future duplicates.
+> - **Near-realtime data**: Intraday prices every 5 min (was 15), NewsWeb filings every 10 min (was 5x/day), MFN.se press releases every 10 min (new)
+> - **MFN.se integration**: New `fetch-mfn-news.ts` script fetches Norwegian corporate press releases from MFN.se JSON API, filtered to OSE tickers only. Stores in `newsweb_filings` with `mfn-` prefix.
+> - **News dedup**: Server-side headline dedup prevents duplicate display when same filing appears from both NewsWeb and MFN. Source badge (MFN/NEWSWEB/IBKR) on each item.
 
 ---
 
@@ -475,7 +478,8 @@ Schema files in `packages/db/src/schema/`
 9. **BarentsWatch** - Seafood lice, disease, locality data (OAuth2 client_credentials)
 7. **Fiskeridirektoratet** - Monthly biomass/harvest/mortality CSV (no auth, free)
 8. **SSB (Statistics Norway)** - Weekly salmon export price+volume via PxWebApi v2 (no auth, free)
-9. **Euronext Live** - Intraday tick-by-tick trade data for OSE equities. CSV endpoint: `https://live.euronext.com/en/ajax/AwlIntradayPrice/getFullDownloadAjax/{ISIN}-XOSL?format=csv&full_dl_date=YYYY-MM-DD`. JSON fallback: POST `getIntradayPriceFilteredData`. Stores to `orderflow_ticks`. Run via `pnpm run flow:fetch`
+9. **MFN.se** - Nordic press release distribution. JSON API at `mfn.se/all/s.json?lang=no&type=all`. Items have `author.tickers` like `["XOSL:EQNR"]`. Filtered to OSE tickers, stored in `newsweb_filings` with `mfn-{news_id}` dedup key. Run via `pnpm run mfn:fetch`
+10. **Euronext Live** - Intraday tick-by-tick trade data for OSE equities. CSV endpoint: `https://live.euronext.com/en/ajax/AwlIntradayPrice/getFullDownloadAjax/{ISIN}-XOSL?format=csv&full_dl_date=YYYY-MM-DD`. JSON fallback: POST `getIntradayPriceFilteredData`. Stores to `orderflow_ticks`. Run via `pnpm run flow:fetch`
 
 ### ML Pipeline (7 steps)
 Located in `apps/web/scripts/ml-daily-pipeline.ts`:
@@ -535,6 +539,7 @@ Run after market close alongside ML pipeline:
 | `fetch-ssr-shorts.ts` | Fetch short positions from Finanstilsynet SSR API |
 | `fetch-commodities.ts` | Fetch 17 commodity prices from Yahoo + SSB + TradingEconomics scraper (Steel) + calculate stock sensitivity |
 | `fetch-newsweb-filings.ts` | Fetch regulatory filings from Oslo Børs NewsWeb API into `newsweb_filings` |
+| `fetch-mfn-news.ts` | Fetch Norwegian press releases from MFN.se JSON API, filtered to OSE tickers. Stores in `newsweb_filings` with `mfn-` prefix on `newsweb_id` |
 | `fetch-barentswatch-seafood.ts` | Fetch lice/disease/locality data from BarentsWatch (OAuth2) |
 | `fetch-biomass-fiskeridir.ts` | Fetch monthly biomass/harvest/mortality from Fiskeridirektoratet (no auth) |
 | `fetch-ssb-salmon-export.ts` | Fetch weekly salmon export price+volume from SSB PxWebApi (no auth) |
@@ -611,6 +616,9 @@ pnpm run import:new-tickers  # Import new tickers
 pnpm run shorts:fetch       # Fetch Finanstilsynet short positions
 pnpm run commodities:fetch  # Fetch commodity prices + sensitivity
 pnpm run newsweb:fetch      # Fetch Oslo Børs NewsWeb filings
+pnpm run mfn:fetch          # Fetch MFN.se Norwegian press releases (OSE tickers only)
+pnpm run mfn:fetch:dry      # Dry run (no DB insert)
+pnpm run mfn:fetch:deep     # Fetch 5 pages (~120 items)
 pnpm run research:redeye    # Fetch Redeye commissioned research (OSE-only)
 pnpm run research:redeye:backfill  # Backfill all Redeye history
 pnpm run research:redeye:list      # List OSE company matches
