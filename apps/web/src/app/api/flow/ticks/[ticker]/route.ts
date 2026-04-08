@@ -10,7 +10,7 @@ export async function GET(
   const { ticker } = await params;
   const t = ticker.toUpperCase();
   const { searchParams } = new URL(request.url);
-  const limit = Math.min(parseInt(searchParams.get("limit") || "20000", 10), 30000);
+  const limit = Math.min(parseInt(searchParams.get("limit") || "60000", 10), 100000);
   // date param (YYYY-MM-DD) fetches all ticks for that day (Oslo date)
   const date = searchParams.get("date");
   // fallback: minutes from now
@@ -44,9 +44,23 @@ export async function GET(
       rows = result.rows.reverse();
     }
 
+    // Fetch previous trading day close for reference
+    let prevClose: number | null = null;
+    try {
+      const refDate = date || new Date().toISOString().slice(0, 10);
+      const pcRes = await pool.query(
+        `SELECT close::float FROM prices_daily
+         WHERE upper(ticker) = $1 AND date < $2::date AND close IS NOT NULL
+         ORDER BY date DESC LIMIT 1`,
+        [t, refDate]
+      );
+      if (pcRes.rows.length > 0) prevClose = pcRes.rows[0].close;
+    } catch { /* non-critical */ }
+
     return NextResponse.json({
       ticker: t,
       count: rows.length,
+      prevClose,
       ticks: rows,
     });
   } catch (e: any) {

@@ -13,6 +13,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { pool } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -118,6 +119,18 @@ export async function GET(
     const totalVol = raw.reduce((s, r) => s + r.shares, 0);
     const vwap = totalVol > 0 ? raw.reduce((s, r) => s + r.price * r.shares, 0) / totalVol : 0;
 
+    // Fetch previous trading day close for day-change reference
+    let prevClose: number | null = null;
+    try {
+      const pcRes = await pool.query(
+        `SELECT close::float FROM prices_daily
+         WHERE upper(ticker) = $1 AND date < $2::date AND close IS NOT NULL
+         ORDER BY date DESC LIMIT 1`,
+        [t, date]
+      );
+      if (pcRes.rows.length > 0) prevClose = pcRes.rows[0].close;
+    } catch { /* non-critical */ }
+
     return NextResponse.json({
       ticker: t,
       date,
@@ -125,6 +138,7 @@ export async function GET(
       lastTradeTime,
       totalVolume: totalVol,
       vwap: Math.round(vwap * 100) / 100,
+      prevClose,
       ticks,
     });
   } catch (e: any) {

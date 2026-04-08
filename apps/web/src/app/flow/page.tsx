@@ -276,6 +276,7 @@ export default function FlowPage() {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [availableDates, setAvailableDates] = useState<DateEntry[]>([]);
   const [ticks, setTicks] = useState<Tick[]>([]);
+  const [prevClose, setPrevClose] = useState<number | null>(null);
   const [signal, setSignal] = useState<TickerSignal | null>(null);
   const [icebergs, setIcebergs] = useState<any[]>([]);
   const [icebergSort, setIcebergSort] = useState<"date" | "volume" | "conf">("date");
@@ -324,7 +325,7 @@ export default function FlowPage() {
 
     // Run fetches independently so one failure doesn't kill the others
     const [tickRes, sigRes, iceRes] = await Promise.allSettled([
-      fetch(`/api/flow/ticks/${ticker}?date=${date}&limit=20000`),
+      fetch(`/api/flow/ticks/${ticker}?date=${date}&limit=60000`),
       fetch(`/api/flow/signals/${ticker}`),
       // Always fetch 30 days so scope toggle works client-side without refetch
       fetch(`/api/flow/icebergs/${ticker}?days=30`),
@@ -334,8 +335,9 @@ export default function FlowPage() {
       if (tickRes.status === "fulfilled" && tickRes.value.ok) {
         const d = await tickRes.value.json();
         setTicks(d.ticks || []);
-      } else setTicks([]);
-    } catch { setTicks([]); }
+        setPrevClose(d.prevClose ?? null);
+      } else { setTicks([]); setPrevClose(null); }
+    } catch { setTicks([]); setPrevClose(null); }
 
     try {
       if (sigRes.status === "fulfilled" && sigRes.value.ok) {
@@ -362,6 +364,7 @@ export default function FlowPage() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const d = await res.json();
       setTicks(d.ticks || []);
+      setPrevClose(d.prevClose ?? null);
       setLiveLastUpdate(new Date());
       setLiveLastTradeTime(d.lastTradeTime);
       setLiveCountdown(LIVE_REFRESH_SEC);
@@ -412,6 +415,10 @@ export default function FlowPage() {
   const vwap = ticks.length > 0
     ? ticks.reduce((s, t) => s + t.price * t.size, 0) / ticks.reduce((s, t) => s + t.size, 0)
     : 0;
+
+  // Day change vs previous close
+  const lastPrice = ticks.length > 0 ? ticks[ticks.length - 1].price : null;
+  const dayChangePct = prevClose && lastPrice ? ((lastPrice - prevClose) / prevClose) * 100 : null;
 
   const verdict = getVerdict(ticks);
 
@@ -510,6 +517,16 @@ export default function FlowPage() {
           {/* Date picker — hidden in live mode */}
           {!liveMode && availableDates.length > 0 && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
+              {lastPrice != null && (
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#e6edf3", marginRight: 8 }}>
+                  {lastPrice.toFixed(2)}
+                  {dayChangePct != null && (
+                    <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 600, color: dayChangePct >= 0 ? "#10b981" : "#ef4444" }}>
+                      {dayChangePct >= 0 ? "+" : ""}{dayChangePct.toFixed(2)}%
+                    </span>
+                  )}
+                </span>
+              )}
               <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>DATE:</span>
               <select
                 value={selectedDate}
@@ -531,7 +548,17 @@ export default function FlowPage() {
 
           {/* Live status */}
           {liveMode && liveLastUpdate && (
-            <div style={{ marginLeft: "auto", fontSize: 10, color: "rgba(255,255,255,0.35)", fontFamily: "monospace" }}>
+            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12, fontSize: 10, color: "rgba(255,255,255,0.35)", fontFamily: "monospace" }}>
+              {lastPrice != null && (
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#e6edf3" }}>
+                  {lastPrice.toFixed(2)}
+                  {dayChangePct != null && (
+                    <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 600, color: dayChangePct >= 0 ? "#10b981" : "#ef4444" }}>
+                      {dayChangePct >= 0 ? "+" : ""}{dayChangePct.toFixed(2)}%
+                    </span>
+                  )}
+                </span>
+              )}
               {liveLastTradeTime && (
                 <span>
                   last trade{" "}
