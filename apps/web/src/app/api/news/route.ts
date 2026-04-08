@@ -119,12 +119,12 @@ export async function GET(req: NextRequest) {
 
         UNION ALL
 
-        -- Source 2: NewsWeb regulatory filings
+        -- Source 2: NewsWeb + MFN regulatory filings
         SELECT
           nf.id AS raw_id,
           nf.id + 1000000 AS id,
           nf.published_at,
-          'NEWSWEB' AS source,
+          CASE WHEN nf.newsweb_id LIKE 'mfn-%' THEN 'MFN' ELSE 'NEWSWEB' END AS source,
           nf.headline,
           nf.ai_summary AS summary,
           nf.category AS event_type,
@@ -259,7 +259,25 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    return NextResponse.json({ events, count: events.length });
+    // Step 4: Server-side dedup — same ticker + similar headline within 1h = keep higher severity
+    const deduped: typeof events = [];
+    const seen = new Map<string, number>(); // dedupKey → index in deduped array
+    for (const ev of events) {
+      const dedupKey = `${(ev.primaryTicker || "").toUpperCase()}|${ev.headline.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 80)}`;
+      const existingIdx = seen.get(dedupKey);
+      if (existingIdx != null) {
+        // Keep the one with higher severity, or prefer NewsWeb over MFN (has body text)
+        const existing = deduped[existingIdx];
+        if (ev.severity > existing.severity || (ev.severity === existing.severity && ev.source === "NEWSWEB")) {
+          deduped[existingIdx] = ev;
+        }
+      } else {
+        seen.set(dedupKey, deduped.length);
+        deduped.push(ev);
+      }
+    }
+
+    return NextResponse.json({ events: deduped, count: deduped.length });
   } catch (err) {
     console.error("[NEWS API]", err);
     return NextResponse.json({ error: "Failed to fetch news" }, { status: 500 });

@@ -120,7 +120,7 @@ export async function GET(
         SELECT
           nf.id,
           nf.published_at,
-          'newsweb' AS source,
+          CASE WHEN nf.newsweb_id LIKE 'mfn-%' THEN 'MFN' ELSE 'NEWSWEB' END AS source,
           nf.headline,
           LEFT(nf.body, 500) AS summary,
           nf.category AS event_type,
@@ -202,7 +202,7 @@ export async function GET(
       return {
         id: Number(r.id),
         publishedAt: r.published_at,
-        source: "newsweb" as string,
+        source: r.source as string,
         headline: r.headline,
         summary: r.summary || null,
         eventType: r.event_type,

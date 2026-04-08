@@ -378,7 +378,7 @@ export default function IntelligencePage() {
 
   useEffect(() => { setLoading(true); fetchAll(); }, [fetchAll]);
   useEffect(() => {
-    timerRef.current = setInterval(fetchAll, 60000);
+    timerRef.current = setInterval(fetchAll, 30000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [fetchAll]);
 
@@ -692,6 +692,7 @@ export default function IntelligencePage() {
                                 );
                               })}
                               <span style={{ fontSize: 8, fontWeight: 700, padding: "1px 4px", borderRadius: 1, background: `${typeColor}15`, color: typeColor }}>{ev.eventType.replace(/_/g, " ").toUpperCase()}</span>
+                              <span style={{ fontSize: 7, fontWeight: 600, padding: "1px 3px", borderRadius: 1, background: ev.source === "MFN" ? "rgba(147,51,234,0.15)" : ev.source === "NEWSWEB" ? "rgba(59,130,246,0.15)" : "rgba(255,255,255,0.08)", color: ev.source === "MFN" ? "#a78bfa" : ev.source === "NEWSWEB" ? "#60a5fa" : "rgba(255,255,255,0.35)" }}>{ev.source}</span>
                               {ev.dayReturnPct != null && (
                                 <span style={{ fontSize: 9, fontWeight: 600, color: ev.dayReturnPct > 0.3 ? "#22c55e" : ev.dayReturnPct < -0.3 ? "#ef4444" : "rgba(255,255,255,0.35)" }}>
                                   {fmtPctRaw(ev.dayReturnPct, 1)}
