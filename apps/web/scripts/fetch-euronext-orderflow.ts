@@ -163,11 +163,26 @@ function classifySides(trades: RawTrade[]): number[] {
   return sides;
 }
 
+/**
+ * Extract the actual trading date from CSV time field.
+ * Euronext CSV time is either "DD/MM/YYYY HH:MM:SS" or just "HH:MM:SS".
+ * Returns YYYY-MM-DD or null if no date part present.
+ */
+function extractDateFromTime(timeField: string): string | null {
+  if (!timeField.includes(" ")) return null;
+  const datePart = timeField.split(" ")[0]; // "DD/MM/YYYY"
+  const [d, m, y] = datePart.split("/");
+  if (!d || !m || !y || y.length !== 4) return null;
+  return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+}
+
 function buildTicks(ticker: string, date: string, trades: RawTrade[], sides: number[]): ParsedTick[] {
   return trades.map((t, i) => {
     const timePart = t.time.includes(" ") ? t.time.split(" ")[1] : t.time;
+    // Use actual date from CSV if available, otherwise fall back to requested date
+    const actualDate = extractDateFromTime(t.time) || date;
     const [hStr, mStr, sStr = "0"] = timePart.split(":");
-    const osloTs = new Date(`${date}T${hStr.trim().padStart(2,"0")}:${mStr.padStart(2,"0")}:${sStr.padStart(2,"0")}+02:00`);
+    const osloTs = new Date(`${actualDate}T${hStr.trim().padStart(2,"0")}:${mStr.padStart(2,"0")}:${sStr.padStart(2,"0")}+02:00`);
     return { ticker, ts: osloTs, price: t.price, size: t.shares, side: sides[i], tradeId: t.tradeId, tradeType: t.tradeType };
   });
 }
@@ -250,6 +265,15 @@ async function fetchOneTicker(ticker: string, date: string): Promise<void> {
 
   if (trades.length === 0) {
     console.log(`  No trades (market closed or future date)`);
+    return;
+  }
+
+  // Stale-data guard: check if the CSV data is actually from the requested date.
+  // Euronext returns the last trading day's data when queried for weekends/holidays/pre-open.
+  // Extract the actual date from the first trade's time field and compare.
+  const csvDate = extractDateFromTime(trades[0].time);
+  if (csvDate && csvDate !== date) {
+    console.log(`  STALE DATA — CSV contains ${csvDate} trades but requested ${date}. Skipping.`);
     return;
   }
 
