@@ -5,7 +5,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/api/", "/test-"],
+      disallow: ["/api/", "/test-", "/intelligence", "/valuation"],
     },
     sitemap: "https://ineqre.vercel.app/sitemap.xml",
   };

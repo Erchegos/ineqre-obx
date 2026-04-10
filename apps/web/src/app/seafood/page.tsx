@@ -57,6 +57,7 @@ type DiseaseOutbreak = {
   area: number | null; areaName: string | null; lat: number | null; lng: number | null;
   disease: string; weeksFlagged: number; firstDetected: string | null; lastDetected: string;
   isActive: boolean; predatesWindow: boolean;
+  latestLice: number | null; liceReportWeek: string | null;
 };
 
 type BiomassData = {
@@ -1284,14 +1285,14 @@ export default function SeafoodPage() {
                       <div style={{ padding: "16px 10px", color: "rgba(255,255,255,0.35)", fontSize: 11 }}>No active disease outbreaks detected in current reporting period.</div>
                     ) : (
                       <>
-                        <div style={{ display: "grid", gridTemplateColumns: "3px 1fr 50px 60px 140px 80px 52px", padding: "4px 8px", fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.06em", background: "#161b22", borderBottom: "1px solid #30363d" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "3px 1fr 50px 60px 140px 90px 60px", padding: "4px 8px", fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.06em", background: "#161b22", borderBottom: "1px solid #30363d" }}>
                           <div />
                           <div>LOCALITY</div>
                           <div>TYPE</div>
                           <div>COMPANY</div>
                           <div>AREA</div>
-                          <div style={{ textAlign: "right" }}>DURATION</div>
-                          <div style={{ textAlign: "center" }}>STATUS</div>
+                          <div style={{ textAlign: "right" }}>REPORTED</div>
+                          <div style={{ textAlign: "right" }}>LICE</div>
                         </div>
                         {diseases.slice(0, 50).map((d, i) => (
                           <div
@@ -1304,7 +1305,7 @@ export default function SeafoodPage() {
                                 if (mapEl) mapEl.scrollIntoView({ behavior: "smooth", block: "center" });
                               }
                             }}
-                            style={{ display: "grid", gridTemplateColumns: "3px 1fr 50px 60px 140px 80px 52px", padding: "5px 8px", borderBottom: "1px solid #21262d", alignItems: "center", transition: "background 0.08s", cursor: d.lat ? "pointer" : "default" }}
+                            style={{ display: "grid", gridTemplateColumns: "3px 1fr 50px 60px 140px 90px 60px", padding: "5px 8px", borderBottom: "1px solid #21262d", alignItems: "center", transition: "background 0.08s", cursor: d.lat ? "pointer" : "default" }}
                           >
                             <div style={{ width: 3, minHeight: 14, background: d.disease === "ILA" ? "#ef4444" : "#f59e0b", borderRadius: 1 }} />
                             <div style={{ fontSize: 11 }}>{d.localityName}</div>
@@ -1312,13 +1313,19 @@ export default function SeafoodPage() {
                             <div>{d.ticker ? <Link href={`/stocks/${d.ticker}`} style={{ color: "#58a6ff", textDecoration: "none", fontSize: 10 }} onClick={e => e.stopPropagation()}>{d.ticker}</Link> : <span style={{ color: "rgba(255,255,255,0.35)" }}>{"\u2014"}</span>}</div>
                             <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>{d.areaName ? `${d.area} — ${d.areaName}` : d.area ?? "\u2014"}</div>
                             <div style={{ textAlign: "right", fontSize: 10, color: "rgba(255,255,255,0.5)" }}>
-                              {d.predatesWindow
-                                ? <span title="Disease predates our data window">&gt;{d.weeksFlagged}w</span>
-                                : <span title={`First detected ${d.firstDetected}`}>{d.weeksFlagged}w <span style={{ color: "rgba(255,255,255,0.35)" }}>from {d.firstDetected}</span></span>
-                              }
+                              <span>{d.lastDetected}</span>
+                              {d.firstDetected && d.firstDetected !== d.lastDetected && (
+                                <span style={{ color: "rgba(255,255,255,0.3)", marginLeft: 4 }} title={`First detected ${d.firstDetected}`}>({d.weeksFlagged}w)</span>
+                              )}
                             </div>
-                            <div style={{ textAlign: "center" }}>
-                              <span style={{ ...S.badge(d.isActive ? "#ef4444" : "#22c55e"), fontSize: 8 }}>{d.isActive ? "ACTIVE" : "CLEARED"}</span>
+                            <div style={{ textAlign: "right", fontSize: 10 }}>
+                              {d.latestLice != null ? (
+                                <span style={{ color: d.latestLice >= 0.5 ? "#ef4444" : d.latestLice >= 0.2 ? "#f59e0b" : "#22c55e", fontWeight: 600 }} title={`Lice count from ${d.liceReportWeek}`}>
+                                  {d.latestLice.toFixed(2)}
+                                </span>
+                              ) : (
+                                <span style={{ color: "rgba(255,255,255,0.25)" }}>{"\u2014"}</span>
+                              )}
                             </div>
                           </div>
                         ))}

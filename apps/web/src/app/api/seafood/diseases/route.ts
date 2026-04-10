@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     const earliestYW = metaRes.rows[0]?.earliest_yearweek;
     const totalWeeks = metaRes.rows[0]?.total_weeks ?? 0;
 
-    // Find all localities with PD or ILA
+    // Find all localities with PD or ILA, plus their latest lice count
     const result = await pool.query(`
       WITH disease_flags AS (
         SELECT
@@ -57,6 +57,16 @@ export async function GET(req: NextRequest) {
         FROM seafood_lice_reports lr
         WHERE lr.has_pd = true
         GROUP BY lr.locality_id
+      ),
+      latest_lice AS (
+        SELECT DISTINCT ON (lr.locality_id)
+          lr.locality_id,
+          lr.avg_adult_female_lice,
+          lr.year AS lice_year,
+          lr.week AS lice_week
+        FROM seafood_lice_reports lr
+        WHERE lr.avg_adult_female_lice IS NOT NULL
+        ORDER BY lr.locality_id, lr.year DESC, lr.week DESC
       )
       SELECT
         df.locality_id,
@@ -71,10 +81,14 @@ export async function GET(req: NextRequest) {
         sl.production_area_number AS area,
         sl.lat,
         sl.lng,
-        spa.name AS area_name
+        spa.name AS area_name,
+        ll.avg_adult_female_lice AS latest_lice,
+        ll.lice_year,
+        ll.lice_week
       FROM disease_flags df
       JOIN seafood_localities sl ON sl.locality_id = df.locality_id
       LEFT JOIN seafood_production_areas spa ON spa.area_number = sl.production_area_number
+      LEFT JOIN latest_lice ll ON ll.locality_id = df.locality_id
       ORDER BY
         df.disease,
         df.in_latest_week DESC,
@@ -106,6 +120,8 @@ export async function GET(req: NextRequest) {
         lastDetected: fmtYW(r.last_yearweek),
         isActive: r.in_latest_week,
         predatesWindow,
+        latestLice: r.latest_lice ? parseFloat(r.latest_lice) : null,
+        liceReportWeek: r.lice_year && r.lice_week ? fmtYW(r.lice_year * 100 + r.lice_week) : null,
       };
     });
 

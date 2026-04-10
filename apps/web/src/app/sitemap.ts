@@ -26,20 +26,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/alpha`, changeFrequency: "daily" as const, priority: 0.6 },
   ];
 
-  // Dynamic stock pages
-  let stockPages: MetadataRoute.Sitemap = [];
+  // Dynamic stock pages + per-ticker sub-pages
+  let dynamicPages: MetadataRoute.Sitemap = [];
   try {
     const result = await pool.query<{ ticker: string }>(
       `SELECT ticker FROM stocks WHERE asset_type = 'equity' ORDER BY ticker`
     );
-    stockPages = result.rows.map((r) => ({
-      url: `${BASE}/stocks/${r.ticker}`,
-      changeFrequency: "daily" as const,
-      priority: 0.5,
-    }));
+    for (const r of result.rows) {
+      dynamicPages.push(
+        { url: `${BASE}/stocks/${r.ticker}`, changeFrequency: "daily" as const, priority: 0.5 },
+        { url: `${BASE}/volatility/${r.ticker}`, changeFrequency: "daily" as const, priority: 0.4 },
+        { url: `${BASE}/predictions/${r.ticker}`, changeFrequency: "daily" as const, priority: 0.4 },
+        { url: `${BASE}/montecarlo/${r.ticker}`, changeFrequency: "weekly" as const, priority: 0.3 },
+        { url: `${BASE}/backtest/${r.ticker}`, changeFrequency: "daily" as const, priority: 0.3 },
+      );
+    }
   } catch {
     // silently fail — sitemap still works with static pages
   }
 
-  return [...staticPages, ...stockPages];
+  return [...staticPages, ...dynamicPages];
 }

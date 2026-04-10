@@ -32,7 +32,7 @@ export default function RootLayout({
         className={`${GeistSans.variable} ${GeistMono.variable} antialiased bg-[#0a0a0a] text-white`}
         style={{ backgroundColor: "#0a0a0a", color: "#ffffff" }}
       >
-        {children}
+        <main>{children}</main>
       </body>
     </html>
   );
