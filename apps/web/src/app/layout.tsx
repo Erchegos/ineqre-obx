@@ -4,8 +4,11 @@ import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Intelligence Equity Research",
-  description: "Quantitative equity research platform for Oslo Børs. Historical price analysis with dividend adjustments, volatility tracking, Monte Carlo simulations, standard deviation channels, and sector correlation analysis powered by real-time Interactive Brokers data.",
+  title: {
+    default: "Intelligence Equity Research — OSE Quant Platform",
+    template: "%s | InEqRe",
+  },
+  description: "Quantitative equity research platform for 225+ Oslo Børs securities. ML price predictions, GARCH volatility models, Monte Carlo simulations, options analytics, portfolio optimization, and AI-summarized broker research.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,

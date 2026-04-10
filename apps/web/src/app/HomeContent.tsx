@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState, useRef } from "react";
+import StockSearchBar from "@/components/StockSearchBar";
+import type { SearchStock } from "@/components/StockSearchBar";
 
 type SystemStats = {
   securities: number;
@@ -32,6 +34,12 @@ function useScrollReveal() {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    // If element is already above the viewport (user refreshed mid-page), show immediately
+    const rect = el.getBoundingClientRect();
+    if (rect.bottom < window.innerHeight) {
+      setVisible(true);
+      return;
+    }
     const obs = new IntersectionObserver(
       ([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect(); } },
       { threshold: 0.1, rootMargin: "0px 0px -40px 0px" }
@@ -42,7 +50,7 @@ function useScrollReveal() {
   return { ref, visible };
 }
 
-export default function HomeContent({ stats }: { stats: SystemStats }) {
+export default function HomeContent({ stats, stocks }: { stats: SystemStats; stocks: SearchStock[] }) {
   const [heroVisible, setHeroVisible] = useState(false);
 
   useEffect(() => {
@@ -145,6 +153,14 @@ export default function HomeContent({ stats }: { stats: SystemStats }) {
               Quantitative equity research platform covering 225+ securities on Oslo Børs.
               ML price predictions with 19-factor ensemble models, GARCH/MSGARCH volatility regime detection, Monte Carlo simulations, mean-reversion channels, options analytics, portfolio optimization, and AI-summarized broker research from 6 sources.
             </p>
+            <div style={{
+              marginTop: 24,
+              opacity: heroVisible ? 1 : 0,
+              transform: heroVisible ? "translateY(0)" : "translateY(16px)",
+              transition: "all 0.7s cubic-bezier(0.4, 0, 0.2, 1) 0.35s",
+            }}>
+              <StockSearchBar stocks={stocks} />
+            </div>
           </header>
 
           {/* Stats — numbers available immediately from SSR, animate on mount */}
@@ -200,12 +216,12 @@ export default function HomeContent({ stats }: { stats: SystemStats }) {
                 tags={[{ label: "Optimization", color: "#10b981" }, { label: "ML Signals", color: "#3b82f6" }, { label: "Risk", color: "#f59e0b" }]}
                 visible={modulesReveal.visible} delay={6} />
               <FeatureCard href="/fx" title="FX Terminal"
-                description="Currency risk terminal for NOK portfolios. Multi-currency regression betas, forward curves via IRP, revenue/cost exposure decomposition, portfolio FX VaR, carry trade analytics, and interactive hedge calculators."
+                description="Currency risk terminal for NOK portfolios. Multi-currency OLS regression betas, forward curves via covered IRP, cross-currency basis monitoring with CIP arbitrage signals. Revenue/cost exposure decomposition, portfolio FX VaR, carry trade analytics with funding cost decomposition, and Kalman filter pairs trading simulator."
                 tags={[{ label: "NOK/FX", color: "#f59e0b" }, { label: "IRP", color: "#3b82f6" }, { label: "Hedging", color: "#10b981" }]}
                 visible={modulesReveal.visible} delay={7} />
               <FeatureCard href="/alpha" title="Alpha Engine Yggdrasil"
-                description="Cross-sectional ML signal explorer with animated trading simulator. Backtest ML predictions with 15 tunable parameters (entry/exit thresholds, stops, momentum filters, SMA gates, valuation screens). Live equity curve vs OBX, trade log, and factor dashboard. Plus: signal explorer with P&L connectors and a 15-position portfolio strategy with 5-year monthly backtest."
-                tags={[{ label: "ML Simulator", color: "#10b981" }, { label: "15 Params", color: "#f59e0b" }, { label: "228 Stocks", color: "#3b82f6" }]}
+                description="ML-driven trading signal explorer across 228 OSE stocks. 6-source signal combiner (XGB/LGBM, CNN, momentum, valuation, clustering, regime). Walk-forward backtesting with tunable parameters, live equity curve vs OBX, and optimized top-10 portfolio strategy."
+                tags={[{ label: "ML Simulator", color: "#10b981" }, { label: "6 Signals", color: "#f59e0b" }, { label: "228 Stocks", color: "#3b82f6" }]}
                 visible={modulesReveal.visible} delay={8} isPrivate />
               <FeatureCard href="/flow" title="Flow Intelligence"
                 description="Intraday microstructure analytics for the top 5 liquid OSE stocks. Live EQNR feed direct from Euronext (15-min delayed, auto-refreshes every 60s). VPIN, Kyle's Lambda, Order Flow Imbalance, iceberg/block detection, and who-is-trading breakdown (dark pool, institutional, algo, momentum, retail)."

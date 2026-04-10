@@ -2,12 +2,10 @@ name: Seafood Data Pipeline
 
 on:
   schedule:
-    # Monthly on 21st (Fiskeridirektoratet updates ~20th)
-    # 06:00 UTC = 07:00 CET — before market open
-    - cron: '0 6 21 * *'
-    # Weekly on Wednesday (SSB export price updates)
-    # 12:00 UTC = 13:00 CET
-    - cron: '0 12 * * 3'
+    # Daily at 14:00 UTC (15:00 CET / 16:00 CEST)
+    # Fish Pool spot prices arrive on random days — must check daily.
+    # BarentsWatch lice only on Wednesdays, biomass only on 21st.
+    - cron: '0 14 * * *'
   workflow_dispatch:
     inputs:
       skip_biomass:
@@ -26,10 +24,18 @@ on:
         description: 'Skip BarentsWatch seafood fetch'
         type: boolean
         default: false
+      skip_fishpool:
+        description: 'Skip Fish Pool SISALMON fetch'
+        type: boolean
+        default: false
+      skip_pareto:
+        description: 'Skip Pareto Seafood Weekly parse'
+        type: boolean
+        default: false
 
 jobs:
   seafood-data:
-    name: Biomass + Export + Ocean + BarentsWatch
+    name: Seafood Data Pipeline
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -55,14 +61,25 @@ jobs:
           echo 'DATABASE_URL="${{ secrets.DATABASE_URL }}"' > .env.local
           echo 'BARENTSWATCH_CLIENT_ID="${{ secrets.BARENTSWATCH_CLIENT_ID }}"' >> .env.local
           echo 'BARENTSWATCH_CLIENT_SECRET="${{ secrets.BARENTSWATCH_CLIENT_SECRET }}"' >> .env.local
+          echo 'EMAIL_USER="${{ secrets.EMAIL_USER }}"' >> .env.local
+          echo 'EMAIL_PASSWORD="${{ secrets.EMAIL_PASSWORD }}"' >> .env.local
+          echo 'NEXT_PUBLIC_SUPABASE_URL="${{ secrets.SUPABASE_URL }}"' >> .env.local
+          echo 'SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"' >> .env.local
 
-      # ─── Fiskeridirektoratet Biomass (monthly) ───────────────────
+      # ─── Check day of week / month for conditional steps ────────
+      - name: Set date flags
+        id: date
+        run: |
+          echo "dow=$(date -u +%u)" >> $GITHUB_OUTPUT
+          echo "dom=$(date -u +%d)" >> $GITHUB_OUTPUT
+
+      # ─── Fiskeridirektoratet Biomass (monthly, 21st only) ───────
       - name: "Fetch biomass data (Fiskeridirektoratet)"
         if: >-
           ${{
             github.event.inputs.skip_biomass != 'true' && (
-              github.event.schedule == '0 6 21 * *' ||
-              github.event_name == 'workflow_dispatch'
+              github.event_name == 'workflow_dispatch' ||
+              steps.date.outputs.dom == '21'
             )
           }}
         working-directory: apps/web
@@ -71,7 +88,7 @@ jobs:
           NODE_TLS_REJECT_UNAUTHORIZED: '0'
         run: npx tsx scripts/fetch-biomass-fiskeridir.ts
 
-      # ─── SSB Salmon Export Price (weekly) ────────────────────────
+      # ─── SSB Salmon Export Price (daily) ─────────────────────────
       - name: "Fetch SSB salmon export price"
         if: ${{ github.event.inputs.skip_export != 'true' }}
         working-directory: apps/web
@@ -80,9 +97,15 @@ jobs:
           NODE_TLS_REJECT_UNAUTHORIZED: '0'
         run: npx tsx scripts/fetch-ssb-salmon-export.ts --weeks=52
 
-      # ─── BarentsWatch Lice & Disease (weekly) ───────────────────
+      # ─── BarentsWatch Lice & Disease (weekly, Wednesday = dow 3) ─
       - name: "Fetch BarentsWatch seafood data"
-        if: ${{ github.event.inputs.skip_barentswatch != 'true' }}
+        if: >-
+          ${{
+            github.event.inputs.skip_barentswatch != 'true' && (
+              github.event_name == 'workflow_dispatch' ||
+              steps.date.outputs.dow == '3'
+            )
+          }}
         working-directory: apps/web
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -91,29 +114,61 @@ jobs:
           NODE_TLS_REJECT_UNAUTHORIZED: '0'
         run: npx tsx scripts/fetch-barentswatch-seafood.ts --weeks=4
 
-      # ─── Ocean Conditions Aggregation (weekly, after BW data) ───
+      # ─── Ocean Conditions Aggregation (weekly Wed, after BW) ─────
       - name: "Aggregate ocean conditions"
-        if: ${{ github.event.inputs.skip_ocean != 'true' }}
+        if: >-
+          ${{
+            github.event.inputs.skip_ocean != 'true' && (
+              github.event_name == 'workflow_dispatch' ||
+              steps.date.outputs.dow == '3'
+            )
+          }}
         working-directory: apps/web
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NODE_TLS_REJECT_UNAUTHORIZED: '0'
         run: npx tsx scripts/fetch-ocean-conditions.ts
 
+      # ─── Fish Pool SISALMON Spot + Forward (daily via IMAP) ──────
+      - name: "Fetch Fish Pool reports (IMAP)"
+        if: ${{ github.event.inputs.skip_fishpool != 'true' }}
+        working-directory: apps/web
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: npx tsx scripts/fetch-fishpool-reports.ts --weeks=4
+
+      # ─── Pareto Seafood Weekly (daily, from research docs) ───────
+      - name: "Parse Pareto Seafood Weekly"
+        if: ${{ github.event.inputs.skip_pareto != 'true' }}
+        working-directory: apps/web
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: npx tsx scripts/parse-pareto-seafood.ts --limit=5
+
       # ─── Summary ────────────────────────────────────────────────
       - name: Pipeline Summary
         if: always()
         run: |
+          DOW=${{ steps.date.outputs.dow }}
+          DOM=${{ steps.date.outputs.dom }}
           echo "## Seafood Data Pipeline" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Source | Schedule | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------|----------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Fiskeridirektoratet (Biomass) | Monthly (21st) | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| SSB (Export Price) | Weekly (Wed) | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| BarentsWatch (Lice/Disease) | Weekly (Wed) | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Ocean Conditions | Weekly (Wed) | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Source | Frequency | Ran today |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-----------|-----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Fiskeridirektoratet (Biomass) | Monthly (21st) | $([ "$DOM" = '21' ] && echo 'Yes' || echo 'Skipped') |" >> $GITHUB_STEP_SUMMARY
+          echo "| SSB (Export Price) | Daily | Yes |" >> $GITHUB_STEP_SUMMARY
+          echo "| BarentsWatch (Lice/Disease) | Weekly (Wed) | $([ "$DOW" = '3' ] && echo 'Yes' || echo 'Skipped') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Ocean Conditions | Weekly (Wed) | $([ "$DOW" = '3' ] && echo 'Yes' || echo 'Skipped') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Fish Pool SISALMON (IMAP) | Daily | Yes |" >> $GITHUB_STEP_SUMMARY
+          echo "| Pareto Seafood Weekly | Daily | Yes |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Schedule**: ${{ github.event.schedule || 'manual' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Day**: DOW=$DOW DOM=$DOM" >> $GITHUB_STEP_SUMMARY
           echo "- **Time**: $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
           echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY

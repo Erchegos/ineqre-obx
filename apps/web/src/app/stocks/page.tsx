@@ -1,5 +1,11 @@
+import type { Metadata } from "next";
 import { pool } from "@/lib/db";
 import StocksContent from "./StocksContent";
+
+export const metadata: Metadata = {
+  title: "Stock Screener — 225+ OSE Securities",
+  description: "Browse and screen 225+ Oslo Børs equities with price charts, volatility models, ML predictions, and data quality tiers. Filter by sector, market cap, and factor availability.",
+};
 
 export const dynamic = "force-dynamic";
 
