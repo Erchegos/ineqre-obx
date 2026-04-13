@@ -31,7 +31,7 @@ const pool = new Pool({
   max: 5,
 });
 
-const BEST_STOCKS_KEY = 'best_stocks_v17_ensemble_1825d';
+const BEST_STOCKS_KEY = 'best_stocks_v18_fwd21d_1825d';
 
 // Same params as the individual stock simulator (Entry 1%, Exit 0.25%, Stop 5%, TP 15%, Min 3d, Max 21d, Cooldown 2)
 const FIXED_PARAMS: SimParams = {
@@ -57,7 +57,7 @@ function log(msg: string) { console.log(`[${new Date().toISOString()}] ${msg}`);
 async function computeBestStocks() {
   log('Starting best-stocks ML signal computation...');
 
-  const TOTAL_DAYS = 2055; // 1825d window + 200d SMA warmup + buffer
+  const TOTAL_DAYS = 2075; // 1825d window + 200d SMA warmup + 50d buffer (for fwd ret LEAD)
 
   const liquidRes = await pool.query(`
     SELECT ff.ticker, s.name, s.sector, AVG(ff.nokvol::float) AS avg_nokvol
@@ -79,6 +79,8 @@ async function computeBestStocks() {
   log(`Universe: ${tickers.length} tickers`);
   if (tickers.length === 0) { log('No tickers found, aborting.'); return; }
 
+  // Prices + SMA200/SMA50 + fwd_ret_21d (daily rolling 21d forward return).
+  // Same signal as /api/alpha/simulator/[ticker] — floating daily-updated signal.
   const priceRes = await pool.query(`
     WITH raw AS (
       SELECT ticker, date, close::float
@@ -92,35 +94,16 @@ async function computeBestStocks() {
       SELECT ticker, date, close,
         AVG(close) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 199 PRECEDING AND CURRENT ROW) AS sma200,
         AVG(close) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 49 PRECEDING AND CURRENT ROW) AS sma50,
+        (LEAD(close, 21) OVER (PARTITION BY ticker ORDER BY date) - close) / NULLIF(close, 0) AS fwd_ret_21d,
         ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date) AS rn
       FROM raw
     )
-    SELECT ticker, date::text AS date, close, sma200, sma50
+    SELECT ticker, date::text AS date, close, sma200, sma50, fwd_ret_21d::float
     FROM with_stats
     WHERE rn > 200
       AND date >= CURRENT_DATE - 1825 * INTERVAL '1 day'
     ORDER BY ticker, date ASC
   `, [tickers, TOTAL_DAYS]);
-
-  const mlPredRes = await pool.query(`
-    SELECT ticker, prediction_date::text AS date, ensemble_prediction::float AS ml_pred
-    FROM ml_predictions
-    WHERE ticker = ANY($1)
-      AND prediction_date >= CURRENT_DATE - 1825 * INTERVAL '1 day'
-      AND ensemble_prediction IS NOT NULL
-    ORDER BY ticker, prediction_date ASC
-  `, [tickers]);
-
-  // Backtest predictions fill the gap before ml_predictions starts (back to 2014)
-  const btPredRes = await pool.query(`
-    SELECT DISTINCT ON (ticker, prediction_date)
-      ticker, prediction_date::text AS date, ensemble_prediction::float AS ml_pred
-    FROM backtest_predictions
-    WHERE ticker = ANY($1)
-      AND prediction_date >= CURRENT_DATE - 1825 * INTERVAL '1 day'
-      AND ensemble_prediction IS NOT NULL
-    ORDER BY ticker, prediction_date ASC, created_at DESC
-  `, [tickers]);
 
   const momRes = await pool.query(`
     SELECT ticker, date::text AS date, mom1m::float, mom6m::float, mom11m::float, vol1m::float
@@ -158,42 +141,12 @@ async function computeBestStocks() {
     momByTicker.get(r.ticker)!.set(r.date.slice(0,10), r);
   }
 
-  // Build price map first (needed for forward-fill)
-  type PxRow = { ticker: string; date: string; close: number; sma200: number; sma50: number };
+  // Build price map — fwd_ret_21d already on each row
+  type PxRow = { ticker: string; date: string; close: number; sma200: number; sma50: number; fwd_ret_21d: number | null };
   const pxByTicker = new Map<string, PxRow[]>();
   for (const r of priceRes.rows as PxRow[]) {
     if (!pxByTicker.has(r.ticker)) pxByTicker.set(r.ticker, []);
     pxByTicker.get(r.ticker)!.push(r);
-  }
-
-  // 1) Load sparse backtest predictions (monthly)
-  const btSparse = new Map<string, { date: string; pred: number }[]>();
-  for (const r of btPredRes.rows) {
-    if (!btSparse.has(r.ticker)) btSparse.set(r.ticker, []);
-    btSparse.get(r.ticker)!.push({ date: r.date.slice(0, 10), pred: r.ml_pred });
-  }
-
-  // 2) Forward-fill to every price date
-  const mlPredByTicker = new Map<string, Map<string, number>>();
-  for (const [ticker, sparse] of btSparse) {
-    const pxDates = (pxByTicker.get(ticker) ?? []).map(px => px.date.slice(0, 10));
-    const filled = new Map<string, number>();
-    let si = 0;
-    let activePred: number | null = null;
-    for (const d of pxDates) {
-      while (si < sparse.length && sparse[si].date <= d) {
-        activePred = sparse[si].pred;
-        si++;
-      }
-      if (activePred !== null) filled.set(d, activePred);
-    }
-    mlPredByTicker.set(ticker, filled);
-  }
-
-  // 3) ml_predictions (daily, recent) overwrite
-  for (const r of mlPredRes.rows) {
-    if (!mlPredByTicker.has(r.ticker)) mlPredByTicker.set(r.ticker, new Map());
-    mlPredByTicker.get(r.ticker)!.set(r.date.slice(0, 10), r.ml_pred);
   }
 
   type StockResult = {
@@ -209,11 +162,10 @@ async function computeBestStocks() {
 
     const momMap = momByTicker.get(ticker) ?? new Map<string, MomRow>();
 
-    const mlMap = mlPredByTicker.get(ticker) ?? new Map<string, number>();
     const input: SimInputBar[] = pxRows.map(px => {
       const d = px.date.slice(0,10);
       const mom = momMap.get(d);
-      const mlPred = mlMap.get(d) ?? null;
+      const mlPred = px.fwd_ret_21d ?? null;
       return {
         date: d, open: px.close, close: px.close, high: px.close, low: px.close,
         volume: 0, sma200: px.sma200 ?? null, sma50: px.sma50 ?? null,

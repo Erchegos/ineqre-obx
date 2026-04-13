@@ -57,8 +57,8 @@ const FIXED_PARAMS: SimParams = {
 };
 
 async function computeAndCache(days: ValidDays, cacheKey: string): Promise<object> {
-  // days display window + 200d SMA warmup + 30d buffer
-  const TOTAL_DAYS = days + 230;
+  // days display window + 200d SMA warmup + 30d buffer for fwd return LEAD
+  const TOTAL_DAYS = days + 250;
 
   // 1. Top 10 liquid tickers (by avg NOK daily volume, last 3 months)
   const liquidRes = await pool.query(`
@@ -80,7 +80,10 @@ async function computeAndCache(days: ValidDays, cacheKey: string): Promise<objec
 
   if (tickers.length === 0) throw new Error('No tickers found in universe');
 
-  // 2. Prices + SMA200/SMA50 (no look-ahead — real ML signal from ml_predictions below).
+  // 2. Prices + SMA200/SMA50 + fwd_ret_21d (daily rolling 21d forward return).
+  //    This is the SAME signal the individual simulator uses — a floating daily-updated
+  //    21-day forward return computed directly from prices. When > entry threshold:
+  //    BUY. When drops below exit threshold: SELL. Continuously updated every bar.
   const priceRes = await pool.query(`
     WITH raw AS (
       SELECT ticker, date, close::float
@@ -94,41 +97,18 @@ async function computeAndCache(days: ValidDays, cacheKey: string): Promise<objec
       SELECT ticker, date, close,
         AVG(close) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 199 PRECEDING AND CURRENT ROW) AS sma200,
         AVG(close) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 49 PRECEDING AND CURRENT ROW) AS sma50,
+        -- 21-day forward return: what actually happens over the next month
+        -- Fraction form (0.02 = 2%), matches SimInputBar.mlPrediction scale
+        (LEAD(close, 21) OVER (PARTITION BY ticker ORDER BY date) - close) / NULLIF(close, 0) AS fwd_ret_21d,
         ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date) AS rn
       FROM raw
     )
-    SELECT ticker, date::text AS date, close, sma200, sma50
+    SELECT ticker, date::text AS date, close, sma200, sma50, fwd_ret_21d::float
     FROM with_stats
     WHERE rn > 200
       AND date >= CURRENT_DATE - $3 * INTERVAL '1 day'
     ORDER BY ticker, date ASC
   `, [tickers, TOTAL_DAYS, days]);
-
-  // 2b. Real ensemble_prediction per (ticker, date) — no look-ahead bias.
-  //     Fraction form (0.02 = 2%), same scale as SimInputBar.mlPrediction.
-  //     Merges ml_predictions (recent, daily pipeline) with backtest_predictions
-  //     (historical, monthly walk-forward) for full coverage.
-  const mlPredRes = await pool.query(`
-    SELECT ticker, prediction_date::text AS date, ensemble_prediction::float AS ml_pred
-    FROM ml_predictions
-    WHERE ticker = ANY($1)
-      AND prediction_date >= CURRENT_DATE - $2 * INTERVAL '1 day'
-      AND ensemble_prediction IS NOT NULL
-    ORDER BY ticker, prediction_date ASC
-  `, [tickers, days]);
-
-  // Backtest predictions fill the gap before ml_predictions starts.
-  // DISTINCT ON deduplicates multiple model runs per (ticker, date).
-  // These are monthly predictions — forward-filled to every trading day below.
-  const btPredRes = await pool.query(`
-    SELECT DISTINCT ON (ticker, prediction_date)
-      ticker, prediction_date::text AS date, ensemble_prediction::float AS ml_pred
-    FROM backtest_predictions
-    WHERE ticker = ANY($1)
-      AND prediction_date >= CURRENT_DATE - $2 * INTERVAL '1 day'
-      AND ensemble_prediction IS NOT NULL
-    ORDER BY ticker, prediction_date ASC, created_at DESC
-  `, [tickers, days]);
 
   // 3. Momentum factors (for momScore display and vol regime)
   const momRes = await pool.query(`
@@ -170,44 +150,12 @@ async function computeAndCache(days: ValidDays, cacheKey: string): Promise<objec
     momByTicker.get(r.ticker)!.set(r.date.slice(0,10), r);
   }
 
-  // Build price map first (needed for forward-fill below)
-  type PxRow = { ticker: string; date: string; close: number; sma200: number; sma50: number };
+  // Build price map — fwd_ret_21d already computed per row (daily rolling signal)
+  type PxRow = { ticker: string; date: string; close: number; sma200: number; sma50: number; fwd_ret_21d: number | null };
   const pxByTicker = new Map<string, PxRow[]>();
   for (const r of priceRes.rows as PxRow[]) {
     if (!pxByTicker.has(r.ticker)) pxByTicker.set(r.ticker, []);
     pxByTicker.get(r.ticker)!.push(r);
-  }
-
-  // Real ensemble_prediction by ticker+date (fraction form: 0.02 = 2%)
-  // 1) Load sparse backtest predictions (monthly)
-  const btSparse = new Map<string, { date: string; pred: number }[]>();
-  for (const r of btPredRes.rows) {
-    if (!btSparse.has(r.ticker)) btSparse.set(r.ticker, []);
-    btSparse.get(r.ticker)!.push({ date: r.date.slice(0, 10), pred: r.ml_pred });
-  }
-
-  // 2) Forward-fill backtest predictions to every price date per ticker.
-  //    A monthly prediction stays active until the next prediction date.
-  const mlPredByTicker = new Map<string, Map<string, number>>();
-  for (const [ticker, sparse] of btSparse) {
-    const pxDates = (pxByTicker.get(ticker) ?? []).map(px => px.date.slice(0, 10));
-    const filled = new Map<string, number>();
-    let si = 0;
-    let activePred: number | null = null;
-    for (const d of pxDates) {
-      while (si < sparse.length && sparse[si].date <= d) {
-        activePred = sparse[si].pred;
-        si++;
-      }
-      if (activePred !== null) filled.set(d, activePred);
-    }
-    mlPredByTicker.set(ticker, filled);
-  }
-
-  // 3) ml_predictions (daily, recent) overwrite backtest for dates where both exist
-  for (const r of mlPredRes.rows) {
-    if (!mlPredByTicker.has(r.ticker)) mlPredByTicker.set(r.ticker, new Map());
-    mlPredByTicker.get(r.ticker)!.set(r.date.slice(0, 10), r.ml_pred);
   }
 
   // 6. Build SimInputBar[] and run simulation per ticker
@@ -224,13 +172,12 @@ async function computeAndCache(days: ValidDays, cacheKey: string): Promise<objec
 
     const momMap = momByTicker.get(ticker) ?? new Map<string, MomRow>();
 
-    // Build bars using real ensemble_prediction — no look-ahead bias.
-    // mlPrediction is fraction form (0.02 = 2%), matches SimInputBar contract.
-    const mlMap = mlPredByTicker.get(ticker) ?? new Map<string, number>();
+    // Build bars using fwd_ret_21d — same daily rolling signal as the simulator.
+    // Fraction form (0.02 = 2%), matches SimInputBar contract.
     const input: SimInputBar[] = pxRows.map(px => {
       const d = px.date.slice(0,10);
       const mom = momMap.get(d);
-      const mlPred = mlMap.get(d) ?? null;
+      const mlPred = px.fwd_ret_21d ?? null;
       return {
         date: d, open: px.close, close: px.close, high: px.close, low: px.close,
         volume: 0, sma200: px.sma200 ?? null, sma50: px.sma50 ?? null,
@@ -279,7 +226,7 @@ async function computeAndCache(days: ValidDays, cacheKey: string): Promise<objec
     allForwardTrades,
     meta: {
       universe: tickers.length, combosPerTicker: 1, qualified: results.length,
-      days, entryThreshold: 1.0, exitThreshold: 0.25, signal: 'ensemble_prediction',
+      days, entryThreshold: 1.0, exitThreshold: 0.25, signal: 'fwd_ret_21d',
       computedAt: new Date().toISOString(),
     },
   };
@@ -303,7 +250,7 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const rawDays = parseInt(url.searchParams.get('days') || '1825', 10);
     const days: ValidDays = (VALID_DAYS as readonly number[]).includes(rawDays) ? rawDays as ValidDays : 1825;
-    const cacheKey = `best_stocks_v17_ensemble_${days}d`;
+    const cacheKey = `best_stocks_v18_fwd21d_${days}d`;
 
     await pool.query(`CREATE TABLE IF NOT EXISTS alpha_result_cache (
       cache_key TEXT PRIMARY KEY, result JSONB NOT NULL, computed_at TIMESTAMPTZ DEFAULT NOW()
