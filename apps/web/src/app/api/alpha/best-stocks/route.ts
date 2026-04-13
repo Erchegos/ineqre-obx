@@ -22,7 +22,7 @@ export const maxDuration = 60;
  */
 
 const CACHE_MAX_AGE_H = 25;
-const VALID_DAYS = [365, 730, 1825] as const;
+const VALID_DAYS = [365, 1095, 1825] as const;
 type ValidDays = typeof VALID_DAYS[number];
 
 export interface BestStockResult {

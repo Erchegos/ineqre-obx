@@ -260,7 +260,7 @@ export default function AlphaPage() {
   const [bestStocksLoading, setBestStocksLoading] = useState(false);
   const [bestStocksPending, setBestStocksPending] = useState(false);
   const [bestStocksMeta, setBestStocksMeta] = useState<{ computedAt?: string; universe?: number; combosPerTicker?: number; qualified?: number; windows?: number } | null>(null);
-  const [bestStocksDays, setBestStocksDays] = useState<365 | 730 | 1825>(1825);
+  const [bestStocksDays, setBestStocksDays] = useState<365 | 1095 | 1825>(1825);
   const [expandedOptTicker, setExpandedOptTicker] = useState<string | null>(null);
 
   // Equity curve
@@ -1221,19 +1221,19 @@ export default function AlphaPage() {
               {/* Header row: title + timeframe buttons + refresh */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                 <div>
-                  <div style={sectionTitle}>TOP 10 LIQUID OSE — {bestStocksDays === 365 ? "Last 1 Year" : bestStocksDays === 1825 ? "Last 5 Years" : "Last 2 Years"}</div>
+                  <div style={sectionTitle}>TOP 10 LIQUID OSE — {bestStocksDays === 365 ? "Last 1 Year" : bestStocksDays === 1095 ? "Last 3 Years" : "Last 5 Years"}</div>
                   <div style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", marginTop: 2 }}>
                     Entry: ensemble_prediction &gt;1% · Exit: signal &lt;0.25% (min 3d) OR −5% stop OR 21d max hold
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  {([365, 730, 1825] as const).map(d => (
+                  {([365, 1095, 1825] as const).map(d => (
                     <button key={d} onClick={() => setBestStocksDays(d)}
                       style={{ ...btnSecondary, fontSize: 10, padding: "4px 10px",
                         color: bestStocksDays === d ? "#10b981" : "rgba(255,255,255,0.5)",
                         borderColor: bestStocksDays === d ? "rgba(16,185,129,0.4)" : "#30363d",
                         background: bestStocksDays === d ? "rgba(16,185,129,0.08)" : "#21262d" }}>
-                      {d === 365 ? "1Y" : d === 730 ? "2Y" : "5Y"}
+                      {d === 365 ? "1Y" : d === 1095 ? "3Y" : "5Y"}
                     </button>
                   ))}
                   {bestStocksMeta?.computedAt && (
@@ -1329,7 +1329,7 @@ export default function AlphaPage() {
             {/* ── CUMULATIVE PERFORMANCE CHART ── */}
             {(() => {
               // Predictions only available from Jan 2026 — actual active window is ~65 trading days regardless of selected timeframe
-              const tfLabel = bestStocksDays === 365 ? '1 Year (active since Jan 2026)' : bestStocksDays === 1825 ? '5 Years (active since Jan 2026)' : '2 Years (active since Jan 2026)';
+              const tfLabel = bestStocksDays === 365 ? 'Last 1 Year' : bestStocksDays === 1095 ? 'Last 3 Years' : 'Last 5 Years';
               const activeStats = optimizedEqData?.stats;
               const activeCurve = optimizedEqData?.curve ?? [];
               const activeLoading = bestStocksLoading;
