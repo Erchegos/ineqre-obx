@@ -4,7 +4,7 @@ import HomeContent from "./HomeContent";
 import type { SearchStock } from "@/components/StockSearchBar";
 
 export const metadata: Metadata = {
-  title: "Intelligence Equity Research — OSE Quant Platform",
+  title: "Intelligence Equity Research | OSE Quant Platform",
   description: "Quantitative equity research platform covering 225+ Oslo Børs securities. ML predictions, GARCH volatility, Monte Carlo simulations, options analytics, portfolio optimization, and broker research.",
 };
 
