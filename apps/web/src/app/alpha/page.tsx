@@ -1249,9 +1249,8 @@ export default function AlphaPage() {
               </div>
 
               {/* Data coverage note */}
-              <div style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 10, color: "rgba(245,158,11,0.8)", fontFamily: "monospace", lineHeight: 1.5 }}>
-                <strong>Why so few trades?</strong> ML predictions are available from Jan 2026 onwards (~65 trading days). Longer timeframes (2Y/5Y) will show very few trades because no entry signals exist for earlier dates — the strategy only trades when it has a live prediction. This is by design: no look-ahead, no synthetic signals.
-                {bestStocksDays > 365 && " Consider switching to 1Y for a more representative sample."}
+              <div style={{ background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 10, color: "rgba(59,130,246,0.8)", fontFamily: "monospace", lineHeight: 1.5 }}>
+                <strong>Signal sources:</strong> Live ML predictions (daily pipeline, Jan 2026+) merged with walk-forward backtest predictions (monthly, back to 2014). Recent signals use the latest daily model; older dates use out-of-sample backtest predictions — no look-ahead bias.
               </div>
 
               {bestStocksLoading && (

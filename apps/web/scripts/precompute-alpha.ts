@@ -31,7 +31,7 @@ const pool = new Pool({
   max: 5,
 });
 
-const BEST_STOCKS_KEY = 'best_stocks_v16_ensemble_730d';
+const BEST_STOCKS_KEY = 'best_stocks_v17_ensemble_730d';
 
 // Same params as the individual stock simulator (Entry 1%, Exit 0.25%, Stop 5%, TP 15%, Min 3d, Max 21d, Cooldown 2)
 const FIXED_PARAMS: SimParams = {
@@ -111,6 +111,16 @@ async function computeBestStocks() {
     ORDER BY ticker, prediction_date ASC
   `, [tickers]);
 
+  // Backtest predictions fill the gap before ml_predictions starts (back to 2014)
+  const btPredRes = await pool.query(`
+    SELECT ticker, prediction_date::text AS date, ensemble_prediction::float AS ml_pred
+    FROM backtest_predictions
+    WHERE ticker = ANY($1)
+      AND prediction_date >= CURRENT_DATE - 730 * INTERVAL '1 day'
+      AND ensemble_prediction IS NOT NULL
+    ORDER BY ticker, prediction_date ASC
+  `, [tickers]);
+
   const momRes = await pool.query(`
     SELECT ticker, date::text AS date, mom1m::float, mom6m::float, mom11m::float, vol1m::float
     FROM factor_technical
@@ -147,7 +157,12 @@ async function computeBestStocks() {
     momByTicker.get(r.ticker)!.set(r.date.slice(0,10), r);
   }
 
+  // Backtest predictions first (historical), then ml_predictions overwrites (recent, higher quality)
   const mlPredByTicker = new Map<string, Map<string, number>>();
+  for (const r of btPredRes.rows) {
+    if (!mlPredByTicker.has(r.ticker)) mlPredByTicker.set(r.ticker, new Map());
+    mlPredByTicker.get(r.ticker)!.set(r.date.slice(0,10), r.ml_pred);
+  }
   for (const r of mlPredRes.rows) {
     if (!mlPredByTicker.has(r.ticker)) mlPredByTicker.set(r.ticker, new Map());
     mlPredByTicker.get(r.ticker)!.set(r.date.slice(0,10), r.ml_pred);

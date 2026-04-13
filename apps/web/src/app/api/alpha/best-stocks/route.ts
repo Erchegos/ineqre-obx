@@ -106,9 +106,21 @@ async function computeAndCache(days: ValidDays, cacheKey: string): Promise<objec
 
   // 2b. Real ensemble_prediction per (ticker, date) — no look-ahead bias.
   //     Fraction form (0.02 = 2%), same scale as SimInputBar.mlPrediction.
+  //     Merges ml_predictions (recent, daily pipeline) with backtest_predictions
+  //     (historical, monthly walk-forward) for full coverage.
   const mlPredRes = await pool.query(`
     SELECT ticker, prediction_date::text AS date, ensemble_prediction::float AS ml_pred
     FROM ml_predictions
+    WHERE ticker = ANY($1)
+      AND prediction_date >= CURRENT_DATE - $2 * INTERVAL '1 day'
+      AND ensemble_prediction IS NOT NULL
+    ORDER BY ticker, prediction_date ASC
+  `, [tickers, days]);
+
+  // Backtest predictions fill the gap before ml_predictions starts
+  const btPredRes = await pool.query(`
+    SELECT ticker, prediction_date::text AS date, ensemble_prediction::float AS ml_pred
+    FROM backtest_predictions
     WHERE ticker = ANY($1)
       AND prediction_date >= CURRENT_DATE - $2 * INTERVAL '1 day'
       AND ensemble_prediction IS NOT NULL
@@ -156,7 +168,12 @@ async function computeAndCache(days: ValidDays, cacheKey: string): Promise<objec
   }
 
   // Real ensemble_prediction by ticker+date (fraction form: 0.02 = 2%)
+  // Backtest predictions first (historical), then ml_predictions overwrites (recent, higher quality)
   const mlPredByTicker = new Map<string, Map<string, number>>();
+  for (const r of btPredRes.rows) {
+    if (!mlPredByTicker.has(r.ticker)) mlPredByTicker.set(r.ticker, new Map());
+    mlPredByTicker.get(r.ticker)!.set(r.date.slice(0,10), r.ml_pred);
+  }
   for (const r of mlPredRes.rows) {
     if (!mlPredByTicker.has(r.ticker)) mlPredByTicker.set(r.ticker, new Map());
     mlPredByTicker.get(r.ticker)!.set(r.date.slice(0,10), r.ml_pred);
@@ -262,7 +279,7 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const rawDays = parseInt(url.searchParams.get('days') || '730', 10);
     const days: ValidDays = (VALID_DAYS as readonly number[]).includes(rawDays) ? rawDays as ValidDays : 730;
-    const cacheKey = `best_stocks_v16_ensemble_${days}d`;
+    const cacheKey = `best_stocks_v17_ensemble_${days}d`;
 
     await pool.query(`CREATE TABLE IF NOT EXISTS alpha_result_cache (
       cache_key TEXT PRIMARY KEY, result JSONB NOT NULL, computed_at TIMESTAMPTZ DEFAULT NOW()
