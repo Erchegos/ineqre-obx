@@ -31,7 +31,7 @@ const pool = new Pool({
   max: 5,
 });
 
-const BEST_STOCKS_KEY = 'best_stocks_v17_ensemble_730d';
+const BEST_STOCKS_KEY = 'best_stocks_v17_ensemble_1825d';
 
 // Same params as the individual stock simulator (Entry 1%, Exit 0.25%, Stop 5%, TP 15%, Min 3d, Max 21d, Cooldown 2)
 const FIXED_PARAMS: SimParams = {
@@ -57,7 +57,7 @@ function log(msg: string) { console.log(`[${new Date().toISOString()}] ${msg}`);
 async function computeBestStocks() {
   log('Starting best-stocks ML signal computation...');
 
-  const TOTAL_DAYS = 960; // 730d window + 200d SMA warmup + buffer
+  const TOTAL_DAYS = 2055; // 1825d window + 200d SMA warmup + buffer
 
   const liquidRes = await pool.query(`
     SELECT ff.ticker, s.name, s.sector, AVG(ff.nokvol::float) AS avg_nokvol
@@ -98,7 +98,7 @@ async function computeBestStocks() {
     SELECT ticker, date::text AS date, close, sma200, sma50
     FROM with_stats
     WHERE rn > 200
-      AND date >= CURRENT_DATE - 730 * INTERVAL '1 day'
+      AND date >= CURRENT_DATE - 1825 * INTERVAL '1 day'
     ORDER BY ticker, date ASC
   `, [tickers, TOTAL_DAYS]);
 
@@ -106,33 +106,34 @@ async function computeBestStocks() {
     SELECT ticker, prediction_date::text AS date, ensemble_prediction::float AS ml_pred
     FROM ml_predictions
     WHERE ticker = ANY($1)
-      AND prediction_date >= CURRENT_DATE - 730 * INTERVAL '1 day'
+      AND prediction_date >= CURRENT_DATE - 1825 * INTERVAL '1 day'
       AND ensemble_prediction IS NOT NULL
     ORDER BY ticker, prediction_date ASC
   `, [tickers]);
 
   // Backtest predictions fill the gap before ml_predictions starts (back to 2014)
   const btPredRes = await pool.query(`
-    SELECT ticker, prediction_date::text AS date, ensemble_prediction::float AS ml_pred
+    SELECT DISTINCT ON (ticker, prediction_date)
+      ticker, prediction_date::text AS date, ensemble_prediction::float AS ml_pred
     FROM backtest_predictions
     WHERE ticker = ANY($1)
-      AND prediction_date >= CURRENT_DATE - 730 * INTERVAL '1 day'
+      AND prediction_date >= CURRENT_DATE - 1825 * INTERVAL '1 day'
       AND ensemble_prediction IS NOT NULL
-    ORDER BY ticker, prediction_date ASC
+    ORDER BY ticker, prediction_date ASC, created_at DESC
   `, [tickers]);
 
   const momRes = await pool.query(`
     SELECT ticker, date::text AS date, mom1m::float, mom6m::float, mom11m::float, vol1m::float
     FROM factor_technical
     WHERE ticker = ANY($1)
-      AND date >= CURRENT_DATE - 730 * INTERVAL '1 day'
+      AND date >= CURRENT_DATE - 1825 * INTERVAL '1 day'
     ORDER BY ticker, date ASC
   `, [tickers]);
 
   const obxRes = await pool.query(`
     SELECT date::text AS date, close::float AS obx_close
     FROM prices_daily
-    WHERE ticker = 'OBX' AND date >= CURRENT_DATE - 730 * INTERVAL '1 day'
+    WHERE ticker = 'OBX' AND date >= CURRENT_DATE - 1825 * INTERVAL '1 day'
     ORDER BY date ASC
   `);
 
@@ -157,22 +158,42 @@ async function computeBestStocks() {
     momByTicker.get(r.ticker)!.set(r.date.slice(0,10), r);
   }
 
-  // Backtest predictions first (historical), then ml_predictions overwrites (recent, higher quality)
-  const mlPredByTicker = new Map<string, Map<string, number>>();
-  for (const r of btPredRes.rows) {
-    if (!mlPredByTicker.has(r.ticker)) mlPredByTicker.set(r.ticker, new Map());
-    mlPredByTicker.get(r.ticker)!.set(r.date.slice(0,10), r.ml_pred);
-  }
-  for (const r of mlPredRes.rows) {
-    if (!mlPredByTicker.has(r.ticker)) mlPredByTicker.set(r.ticker, new Map());
-    mlPredByTicker.get(r.ticker)!.set(r.date.slice(0,10), r.ml_pred);
-  }
-
+  // Build price map first (needed for forward-fill)
   type PxRow = { ticker: string; date: string; close: number; sma200: number; sma50: number };
   const pxByTicker = new Map<string, PxRow[]>();
   for (const r of priceRes.rows as PxRow[]) {
     if (!pxByTicker.has(r.ticker)) pxByTicker.set(r.ticker, []);
     pxByTicker.get(r.ticker)!.push(r);
+  }
+
+  // 1) Load sparse backtest predictions (monthly)
+  const btSparse = new Map<string, { date: string; pred: number }[]>();
+  for (const r of btPredRes.rows) {
+    if (!btSparse.has(r.ticker)) btSparse.set(r.ticker, []);
+    btSparse.get(r.ticker)!.push({ date: r.date.slice(0, 10), pred: r.ml_pred });
+  }
+
+  // 2) Forward-fill to every price date
+  const mlPredByTicker = new Map<string, Map<string, number>>();
+  for (const [ticker, sparse] of btSparse) {
+    const pxDates = (pxByTicker.get(ticker) ?? []).map(px => px.date.slice(0, 10));
+    const filled = new Map<string, number>();
+    let si = 0;
+    let activePred: number | null = null;
+    for (const d of pxDates) {
+      while (si < sparse.length && sparse[si].date <= d) {
+        activePred = sparse[si].pred;
+        si++;
+      }
+      if (activePred !== null) filled.set(d, activePred);
+    }
+    mlPredByTicker.set(ticker, filled);
+  }
+
+  // 3) ml_predictions (daily, recent) overwrite
+  for (const r of mlPredRes.rows) {
+    if (!mlPredByTicker.has(r.ticker)) mlPredByTicker.set(r.ticker, new Map());
+    mlPredByTicker.get(r.ticker)!.set(r.date.slice(0, 10), r.ml_pred);
   }
 
   type StockResult = {
@@ -239,7 +260,7 @@ async function computeBestStocks() {
     allForwardTrades,
     meta: {
       universe: tickers.length, combosPerTicker: 1, qualified: results.length,
-      days: 730, entryThreshold: 1.0, exitThreshold: 0.25,
+      days: 1825, entryThreshold: 1.0, exitThreshold: 0.25,
       computedAt: new Date().toISOString(),
     },
   };

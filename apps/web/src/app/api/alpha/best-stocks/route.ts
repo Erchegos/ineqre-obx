@@ -117,14 +117,17 @@ async function computeAndCache(days: ValidDays, cacheKey: string): Promise<objec
     ORDER BY ticker, prediction_date ASC
   `, [tickers, days]);
 
-  // Backtest predictions fill the gap before ml_predictions starts
+  // Backtest predictions fill the gap before ml_predictions starts.
+  // DISTINCT ON deduplicates multiple model runs per (ticker, date).
+  // These are monthly predictions — forward-filled to every trading day below.
   const btPredRes = await pool.query(`
-    SELECT ticker, prediction_date::text AS date, ensemble_prediction::float AS ml_pred
+    SELECT DISTINCT ON (ticker, prediction_date)
+      ticker, prediction_date::text AS date, ensemble_prediction::float AS ml_pred
     FROM backtest_predictions
     WHERE ticker = ANY($1)
       AND prediction_date >= CURRENT_DATE - $2 * INTERVAL '1 day'
       AND ensemble_prediction IS NOT NULL
-    ORDER BY ticker, prediction_date ASC
+    ORDER BY ticker, prediction_date ASC, created_at DESC
   `, [tickers, days]);
 
   // 3. Momentum factors (for momScore display and vol regime)
@@ -167,23 +170,44 @@ async function computeAndCache(days: ValidDays, cacheKey: string): Promise<objec
     momByTicker.get(r.ticker)!.set(r.date.slice(0,10), r);
   }
 
-  // Real ensemble_prediction by ticker+date (fraction form: 0.02 = 2%)
-  // Backtest predictions first (historical), then ml_predictions overwrites (recent, higher quality)
-  const mlPredByTicker = new Map<string, Map<string, number>>();
-  for (const r of btPredRes.rows) {
-    if (!mlPredByTicker.has(r.ticker)) mlPredByTicker.set(r.ticker, new Map());
-    mlPredByTicker.get(r.ticker)!.set(r.date.slice(0,10), r.ml_pred);
-  }
-  for (const r of mlPredRes.rows) {
-    if (!mlPredByTicker.has(r.ticker)) mlPredByTicker.set(r.ticker, new Map());
-    mlPredByTicker.get(r.ticker)!.set(r.date.slice(0,10), r.ml_pred);
-  }
-
+  // Build price map first (needed for forward-fill below)
   type PxRow = { ticker: string; date: string; close: number; sma200: number; sma50: number };
   const pxByTicker = new Map<string, PxRow[]>();
   for (const r of priceRes.rows as PxRow[]) {
     if (!pxByTicker.has(r.ticker)) pxByTicker.set(r.ticker, []);
     pxByTicker.get(r.ticker)!.push(r);
+  }
+
+  // Real ensemble_prediction by ticker+date (fraction form: 0.02 = 2%)
+  // 1) Load sparse backtest predictions (monthly)
+  const btSparse = new Map<string, { date: string; pred: number }[]>();
+  for (const r of btPredRes.rows) {
+    if (!btSparse.has(r.ticker)) btSparse.set(r.ticker, []);
+    btSparse.get(r.ticker)!.push({ date: r.date.slice(0, 10), pred: r.ml_pred });
+  }
+
+  // 2) Forward-fill backtest predictions to every price date per ticker.
+  //    A monthly prediction stays active until the next prediction date.
+  const mlPredByTicker = new Map<string, Map<string, number>>();
+  for (const [ticker, sparse] of btSparse) {
+    const pxDates = (pxByTicker.get(ticker) ?? []).map(px => px.date.slice(0, 10));
+    const filled = new Map<string, number>();
+    let si = 0;
+    let activePred: number | null = null;
+    for (const d of pxDates) {
+      while (si < sparse.length && sparse[si].date <= d) {
+        activePred = sparse[si].pred;
+        si++;
+      }
+      if (activePred !== null) filled.set(d, activePred);
+    }
+    mlPredByTicker.set(ticker, filled);
+  }
+
+  // 3) ml_predictions (daily, recent) overwrite backtest for dates where both exist
+  for (const r of mlPredRes.rows) {
+    if (!mlPredByTicker.has(r.ticker)) mlPredByTicker.set(r.ticker, new Map());
+    mlPredByTicker.get(r.ticker)!.set(r.date.slice(0, 10), r.ml_pred);
   }
 
   // 6. Build SimInputBar[] and run simulation per ticker
@@ -277,8 +301,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const url = new URL(req.url);
-    const rawDays = parseInt(url.searchParams.get('days') || '730', 10);
-    const days: ValidDays = (VALID_DAYS as readonly number[]).includes(rawDays) ? rawDays as ValidDays : 730;
+    const rawDays = parseInt(url.searchParams.get('days') || '1825', 10);
+    const days: ValidDays = (VALID_DAYS as readonly number[]).includes(rawDays) ? rawDays as ValidDays : 1825;
     const cacheKey = `best_stocks_v17_ensemble_${days}d`;
 
     await pool.query(`CREATE TABLE IF NOT EXISTS alpha_result_cache (
