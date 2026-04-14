@@ -485,8 +485,13 @@ export default function SectorsPage() {
                 </span>
               </div>
               <div style={{ padding: 16, display: "flex", flexWrap: "wrap", gap: 4 }}>
-                {sectors.flatMap(s =>
-                  s.topStocks.map(st => {
+                {(() => {
+                  const seen = new Set<string>();
+                  return sectors.flatMap(s =>
+                    s.topStocks.map(st => ({ ...st, _sector: s.name }))
+                  ).filter(st => { if (seen.has(st.ticker)) return false; seen.add(st.ticker); return true; })
+                  .sort((a, b) => (stockPerfVal(b) ?? -999) - (stockPerfVal(a) ?? -999))
+                  .map(st => {
                     const val = stockPerfVal(st);
                     const abs = Math.abs(val ?? 0);
                     const intensity = Math.min(abs / 5, 1);
@@ -494,7 +499,7 @@ export default function SectorsPage() {
                       : val >= 0 ? `rgba(16,185,129,${0.06 + intensity * 0.25})`
                       : `rgba(239,68,68,${0.06 + intensity * 0.25})`;
                     return (
-                      <Link key={`${s.name}-${st.ticker}`} href={`/stocks/${st.ticker}`} style={{ textDecoration: "none" }}>
+                      <Link key={st.ticker} href={`/stocks/${st.ticker}`} style={{ textDecoration: "none" }}>
                         <div style={{
                           background: bg, borderRadius: 4, padding: "8px 12px",
                           minWidth: 80, textAlign: "center", transition: "all 0.15s",
@@ -508,8 +513,8 @@ export default function SectorsPage() {
                         </div>
                       </Link>
                     );
-                  })
-                )}
+                  });
+                })()}
               </div>
             </div>
           </>
