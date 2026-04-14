@@ -549,7 +549,7 @@ export default function StocksContent({
                 const hasVal = valuationTickers.has(stock.ticker);
 
                 return (
-                  <tr key={stock.ticker} onClick={() => router.push(`/stocks/${stock.ticker}`)}>
+                  <tr key={stock.ticker} onClick={() => router.push(`/stocks/${stock.ticker}`)} onMouseEnter={() => router.prefetch(`/stocks/${stock.ticker}`)}>
 
                     {/* Company: ticker + name */}
                     <td style={{ padding: "13px 18px" }}>
