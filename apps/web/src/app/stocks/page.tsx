@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   description: "Browse and screen 225+ Oslo Børs equities with price charts, volatility models, ML predictions, and data quality tiers. Filter by sector, market cap, and factor availability.",
 };
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300; // ISR: refresh every 5 min (data updates once daily)
 
 async function getEquityStocks() {
   try {

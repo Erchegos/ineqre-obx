@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: "Quantitative equity research platform covering 225+ Oslo Børs securities. ML predictions, GARCH volatility, Monte Carlo simulations, options analytics, portfolio optimization, and broker research.",
 };
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300; // ISR: refresh every 5 min
 
 type SystemStats = {
   securities: number;
