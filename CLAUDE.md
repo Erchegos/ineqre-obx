@@ -290,7 +290,7 @@ All in `apps/web/src/lib/`
 | `portfolioOptimizer.ts` | Markowitz optimization: covariance (sample/Ledoit-Wolf/EWMA), 5 modes (EW/MinVar/MaxSharpe/RiskParity/MaxDiv), closed-form solutions + iterative constraint projection, risk decomposition, efficient frontier |
 | `orderflow.ts` | Intraday orderflow models: Bulk Volume Classification (BVC), VPIN rolling windows, Kyle's Lambda (OLS price impact), Amihud illiquidity by bar, trade informativeness, intraday regime classification (6 regimes), TWAP/VWAP execution detection, stealth accumulation, momentum ignition, algo fingerprints (4 patterns), iceberg detection, OFI proxy |
 | `shippingTCE.ts` | Baltic Exchange-based TCE calculation library: Worldscale→TCE formula, 14 vessel types, 10 reference routes (TD3C/TD20/TD6/TC1/C5 etc), VLSFO bunker cost, voyage costs, fleet quarterly earnings aggregation |
-| `sectorMapping.ts` | Sector-commodity-ticker mapping constants: 4 sectors (Energy/Seafood/Shipping/Materials), 17 commodities with metadata (category/importance/unit), used by commodity & sector dashboards |
+| `sectorMapping.ts` | Sector-commodity-ticker mapping constants: 10 sectors (Energy/Seafood/Shipping/Materials/Financials/Technology/Industrials/Consumer Staples/Real Estate/Health Care), 17 commodities with metadata (category/importance/unit), used by commodity & sector dashboards |
 
 ---
 
