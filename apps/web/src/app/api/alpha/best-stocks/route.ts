@@ -1,21 +1,18 @@
 import { NextRequest } from 'next/server';
 import { pool } from '@/lib/db';
 import { requireAlphaAuth, safeErrorResponse, secureJsonResponse } from '@/lib/security';
-import { runMLSimulation, type SimInputBar, type SimParams, type SimStats, type SimTrade } from '@/lib/mlTradingEngine';
+import { runMLSimulation, SIM_DEFAULTS, type SimInputBar, type SimParams, type SimStats, type SimTrade } from '@/lib/mlTradingEngine';
 
 export const maxDuration = 60;
 
 /**
  * GET /api/alpha/best-stocks
  *
- * Ranks top 10 OSE stocks by ML signal strength + historical backtest performance.
- *
- * Strategy:
- *  - Entry:  ML prediction > 1%  (real ensemble_prediction only, no fallback)
- *  - Exit:   ML prediction drops below 0.25%  (signal_flip exit)
- *  - Stop:   5% hard stop
- *  - MaxHold: 21 days
- *  - Ranking: current ML prediction × max(Sharpe, 0.1) — most bullish + historically consistent
+ * Ranks top 10 OSE stocks by liquidity and runs the SAME daily-rolling
+ * fwd_ret_21d signal + SAME default params as the individual stock simulator
+ * (`/api/alpha/simulator/[ticker]`). This guarantees the paper-trading table
+ * on the landing page is a faithful preview of what the user sees in the
+ * Simulator tab — no signal drift, no parameter drift.
  *
  * Cache: 25h TTL (warm by nightly GitHub Actions precompute).
  * Cache miss: computes inline (fast — single pass, no param sweep).
@@ -37,24 +34,9 @@ export interface BestStockResult {
   trades: SimTrade[];
 }
 
-// Same params as the individual stock simulator (Entry 1%, Exit 0.25%, Stop 5%, TP 15%, Min 3d, Max 21d, Cooldown 2)
-const FIXED_PARAMS: SimParams = {
-  entryThreshold:  1.0,    // enter when ML prediction > 1%
-  exitThreshold:   0.25,   // exit when prediction drops below 0.25%
-  stopLossPct:     5.0,    // 5% hard stop
-  takeProfitPct:   15.0,   // 15% take profit
-  maxHoldDays:     21,     // 21d max hold — matches prediction horizon
-  minHoldDays:     3,      // 3d min hold — prevents whipsaw
-  positionSizePct: 10,
-  cooldownBars:    2,      // 2 bar cooldown after exit
-  costBps:         10,
-  volGate:         'off',
-  momentumFilter:  0,
-  sma200Require:   false,
-  sma50Require:    false,
-  smaExitOnCross:  false,
-  valuationFilter: false,
-};
+// Use the SAME defaults as the individual simulator (SIM_DEFAULTS in mlTradingEngine.ts).
+// Any drift here causes the landing page table to disagree with the Simulator tab.
+const FIXED_PARAMS: SimParams = { ...SIM_DEFAULTS };
 
 async function computeAndCache(days: ValidDays, cacheKey: string): Promise<object> {
   // days display window + 200d SMA warmup + 30d buffer for fwd return LEAD
@@ -226,7 +208,7 @@ async function computeAndCache(days: ValidDays, cacheKey: string): Promise<objec
     allForwardTrades,
     meta: {
       universe: tickers.length, combosPerTicker: 1, qualified: results.length,
-      days, entryThreshold: 1.0, exitThreshold: 0.25, signal: 'fwd_ret_21d',
+      days, entryThreshold: FIXED_PARAMS.entryThreshold, exitThreshold: FIXED_PARAMS.exitThreshold, signal: 'fwd_ret_21d',
       computedAt: new Date().toISOString(),
     },
   };
@@ -250,7 +232,7 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const rawDays = parseInt(url.searchParams.get('days') || '1825', 10);
     const days: ValidDays = (VALID_DAYS as readonly number[]).includes(rawDays) ? rawDays as ValidDays : 1825;
-    const cacheKey = `best_stocks_v18_fwd21d_${days}d`;
+    const cacheKey = `best_stocks_v19_fwd21d_${days}d`;
 
     await pool.query(`CREATE TABLE IF NOT EXISTS alpha_result_cache (
       cache_key TEXT PRIMARY KEY, result JSONB NOT NULL, computed_at TIMESTAMPTZ DEFAULT NOW()

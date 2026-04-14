@@ -484,7 +484,7 @@ export default function AlphaPage() {
   const fetchBestStocks = useCallback(async (force = false) => {
     if (!token) return;
     const days = bestStocksDays;
-    const cacheKey = `alpha_best_stocks_v15_fwdret_${days}d`;
+    const cacheKey = `alpha_best_stocks_v19_fwd21d_${days}d`;
     if (!force) {
       try {
         const raw = localStorage.getItem(cacheKey);

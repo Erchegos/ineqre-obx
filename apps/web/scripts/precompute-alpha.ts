@@ -23,7 +23,7 @@ config({ path: resolve(__dirname, '../.env.local') });
 config({ path: resolve(__dirname, '../.env') });
 
 import { Pool } from 'pg';
-import { runMLSimulation, type SimInputBar, type SimParams, type SimStats, type SimTrade } from '../src/lib/mlTradingEngine';
+import { runMLSimulation, SIM_DEFAULTS, type SimInputBar, type SimParams, type SimStats, type SimTrade } from '../src/lib/mlTradingEngine';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -31,26 +31,11 @@ const pool = new Pool({
   max: 5,
 });
 
-const BEST_STOCKS_KEY = 'best_stocks_v18_fwd21d_1825d';
+const BEST_STOCKS_KEY = 'best_stocks_v19_fwd21d_1825d';
 
-// Same params as the individual stock simulator (Entry 1%, Exit 0.25%, Stop 5%, TP 15%, Min 3d, Max 21d, Cooldown 2)
-const FIXED_PARAMS: SimParams = {
-  entryThreshold:  1.0,
-  exitThreshold:   0.25,
-  stopLossPct:     5.0,
-  takeProfitPct:   15.0,
-  maxHoldDays:     21,
-  minHoldDays:     3,
-  positionSizePct: 10,
-  cooldownBars:    2,
-  costBps:         10,
-  volGate:         'off',
-  momentumFilter:  0,
-  sma200Require:   false,
-  sma50Require:    false,
-  smaExitOnCross:  false,
-  valuationFilter: false,
-};
+// Use SIM_DEFAULTS — single source of truth shared with the individual
+// simulator (`/api/alpha/simulator/[ticker]`). No parameter drift.
+const FIXED_PARAMS: SimParams = { ...SIM_DEFAULTS };
 
 function log(msg: string) { console.log(`[${new Date().toISOString()}] ${msg}`); }
 
@@ -212,7 +197,7 @@ async function computeBestStocks() {
     allForwardTrades,
     meta: {
       universe: tickers.length, combosPerTicker: 1, qualified: results.length,
-      days: 1825, entryThreshold: 1.0, exitThreshold: 0.25,
+      days: 1825, entryThreshold: FIXED_PARAMS.entryThreshold, exitThreshold: FIXED_PARAMS.exitThreshold,
       computedAt: new Date().toISOString(),
     },
   };
