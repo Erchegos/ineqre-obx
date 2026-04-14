@@ -260,7 +260,7 @@ export default function AlphaPage() {
   const [bestStocksLoading, setBestStocksLoading] = useState(false);
   const [bestStocksPending, setBestStocksPending] = useState(false);
   const [bestStocksMeta, setBestStocksMeta] = useState<{ computedAt?: string; universe?: number; combosPerTicker?: number; qualified?: number; windows?: number } | null>(null);
-  const [bestStocksDays, setBestStocksDays] = useState<365 | 1095 | 1825>(1825);
+  const [bestStocksDays, setBestStocksDays] = useState<365 | 1095 | 1825>(365);
   const [expandedOptTicker, setExpandedOptTicker] = useState<string | null>(null);
 
   // Equity curve
