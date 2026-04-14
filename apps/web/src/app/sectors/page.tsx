@@ -31,7 +31,7 @@ type SectorData = {
   bestPerformer: { ticker: string; name: string; dailyPct: number | null } | null;
   worstPerformer: { ticker: string; name: string; dailyPct: number | null } | null;
   avgBeta: number | null;
-  topStocks: { ticker: string; name: string; dailyPct: number | null; weeklyPct?: number | null; monthlyPct?: number | null; ytdPct?: number | null; beta: number | null }[];
+  topStocks: { ticker: string; name: string; dailyPct: number | null; weeklyPct?: number | null; monthlyPct?: number | null; ytdPct?: number | null; beta: number | null; mktcap?: number | null }[];
 };
 
 /* ─── Helpers ───────────────────────────────────────── */

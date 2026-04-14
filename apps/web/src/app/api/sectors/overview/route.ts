@@ -121,6 +121,7 @@ async function getSectorStockPerformance(tickers: string[]): Promise<{
   monthlyPct: number | null;
   ytdPct: number | null;
   beta: number | null;
+  mktcap: number | null;
 }[]> {
   if (!tickers.length) return [];
   try {
@@ -167,6 +168,12 @@ async function getSectorStockPerformance(tickers: string[]): Promise<{
         FROM factor_technical ft
         WHERE ft.ticker = ANY($1) AND ft.beta IS NOT NULL
         ORDER BY ft.ticker, ft.date DESC
+      ),
+      latest_mktcap AS (
+        SELECT DISTINCT ON (ff.ticker) ff.ticker, ff.mktcap::float
+        FROM factor_fundamentals ff
+        WHERE ff.ticker = ANY($1) AND ff.mktcap IS NOT NULL
+        ORDER BY ff.ticker, ff.date DESC
       )
       SELECT
         t1.ticker,
@@ -176,7 +183,8 @@ async function getSectorStockPerformance(tickers: string[]): Promise<{
         wr.close AS week_close,
         mr.close AS month_close,
         yr.close AS ytd_close,
-        lb.beta
+        lb.beta,
+        lm.mktcap
       FROM latest_two t1
       JOIN latest_two t2 ON t2.ticker = t1.ticker AND t2.rn = 2
       JOIN stocks s ON s.ticker = t1.ticker
@@ -184,6 +192,7 @@ async function getSectorStockPerformance(tickers: string[]): Promise<{
       LEFT JOIN month_ref mr ON mr.ticker = t1.ticker
       LEFT JOIN ytd_ref yr ON yr.ticker = t1.ticker
       LEFT JOIN latest_beta lb ON lb.ticker = t1.ticker
+      LEFT JOIN latest_mktcap lm ON lm.ticker = t1.ticker
       WHERE t1.rn = 1`,
       [tickers]
     );
@@ -194,7 +203,7 @@ async function getSectorStockPerformance(tickers: string[]): Promise<{
     return r.rows.map((row: {
       ticker: string; name: string; latest: number; prev: number;
       week_close: number | null; month_close: number | null; ytd_close: number | null;
-      beta: number | null;
+      beta: number | null; mktcap: number | null;
     }) => ({
       ticker: row.ticker,
       name: row.name,
@@ -203,6 +212,7 @@ async function getSectorStockPerformance(tickers: string[]): Promise<{
       monthlyPct: calcPct(row.latest, row.month_close),
       ytdPct: calcPct(row.latest, row.ytd_close),
       beta: row.beta,
+      mktcap: row.mktcap,
     }));
   } catch (e) {
     console.error("[SECTOR STOCK PERF]", e);
@@ -260,7 +270,7 @@ export async function GET(_req: NextRequest) {
           bestPerformer,
           worstPerformer,
           avgBeta,
-          topStocks: stocks,
+          topStocks: [...stocks].sort((a, b) => (b.mktcap ?? 0) - (a.mktcap ?? 0)).slice(0, 10),
         };
       })
     );
