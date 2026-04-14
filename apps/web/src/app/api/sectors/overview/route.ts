@@ -2,8 +2,10 @@
  * Sectors Overview API
  * GET /api/sectors/overview
  *
- * Returns per-sector aggregate intelligence: performance, commodity driver,
- * best/worst performer, and average beta.
+ * Returns per-sector aggregate intelligence: multi-period performance,
+ * commodity driver, best/worst performer, average beta, and top stocks.
+ *
+ * Uses ticker-based joins (same pattern as /api/intelligence/sectors).
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -122,81 +124,88 @@ async function getSectorStockPerformance(tickers: string[]): Promise<{
 }[]> {
   if (!tickers.length) return [];
   try {
+    // Single efficient query: get latest 2 prices for daily return + reference prices for weekly/monthly/ytd
     const r = await pool.query(
-      `WITH prices AS (
-        SELECT s.ticker, s.name,
-          FIRST_VALUE(pd.adj_close::float) OVER (PARTITION BY s.ticker ORDER BY pd.date DESC) AS latest,
-          NTH_VALUE(pd.adj_close::float, 2) OVER (PARTITION BY s.ticker ORDER BY pd.date DESC ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS prev,
-          ROW_NUMBER() OVER (PARTITION BY s.ticker ORDER BY pd.date DESC) AS rn
+      `WITH latest_two AS (
+        SELECT
+          pd.ticker,
+          pd.close::float,
+          pd.adj_close::float AS adj_close,
+          pd.date,
+          ROW_NUMBER() OVER (PARTITION BY pd.ticker ORDER BY pd.date DESC) AS rn
         FROM prices_daily pd
-        JOIN stocks s ON s.id = pd.stock_id
-        WHERE upper(s.ticker) = ANY($1::text[])
-          AND pd.date >= NOW() - INTERVAL '400 days'
+        WHERE pd.ticker = ANY($1)
+          AND pd.close IS NOT NULL AND pd.close > 0
+          AND pd.date > NOW() - INTERVAL '10 days'
+      ),
+      week_ref AS (
+        SELECT DISTINCT ON (pd.ticker) pd.ticker, pd.adj_close::float AS close
+        FROM prices_daily pd
+        WHERE pd.ticker = ANY($1)
+          AND pd.close > 0
+          AND pd.date <= NOW() - INTERVAL '5 days'
+        ORDER BY pd.ticker, pd.date DESC
+      ),
+      month_ref AS (
+        SELECT DISTINCT ON (pd.ticker) pd.ticker, pd.adj_close::float AS close
+        FROM prices_daily pd
+        WHERE pd.ticker = ANY($1)
+          AND pd.close > 0
+          AND pd.date <= NOW() - INTERVAL '21 days'
+        ORDER BY pd.ticker, pd.date DESC
+      ),
+      ytd_ref AS (
+        SELECT DISTINCT ON (pd.ticker) pd.ticker, pd.adj_close::float AS close
+        FROM prices_daily pd
+        WHERE pd.ticker = ANY($1)
+          AND pd.close > 0
+          AND pd.date >= date_trunc('year', CURRENT_DATE)
+        ORDER BY pd.ticker, pd.date ASC
+      ),
+      latest_beta AS (
+        SELECT DISTINCT ON (ft.ticker) ft.ticker, ft.beta::float
+        FROM factor_technical ft
+        WHERE ft.ticker = ANY($1) AND ft.beta IS NOT NULL
+        ORDER BY ft.ticker, ft.date DESC
       )
-      SELECT ticker, name, latest, prev FROM prices WHERE rn = 1`,
-      [tickers.map((t) => t.toUpperCase())]
+      SELECT
+        t1.ticker,
+        s.name,
+        COALESCE(t1.adj_close, t1.close) AS latest,
+        COALESCE(t2.adj_close, t2.close) AS prev,
+        wr.close AS week_close,
+        mr.close AS month_close,
+        yr.close AS ytd_close,
+        lb.beta
+      FROM latest_two t1
+      JOIN latest_two t2 ON t2.ticker = t1.ticker AND t2.rn = 2
+      JOIN stocks s ON s.ticker = t1.ticker
+      LEFT JOIN week_ref wr ON wr.ticker = t1.ticker
+      LEFT JOIN month_ref mr ON mr.ticker = t1.ticker
+      LEFT JOIN ytd_ref yr ON yr.ticker = t1.ticker
+      LEFT JOIN latest_beta lb ON lb.ticker = t1.ticker
+      WHERE t1.rn = 1`,
+      [tickers]
     );
-
-    // Get weekly, monthly, YTD closes separately
-    const weekR = await pool.query(
-      `SELECT DISTINCT ON (s.ticker) s.ticker, pd.adj_close::float AS close
-       FROM prices_daily pd
-       JOIN stocks s ON s.id = pd.stock_id
-       WHERE upper(s.ticker) = ANY($1::text[])
-         AND pd.date <= NOW() - INTERVAL '5 days'
-       ORDER BY s.ticker, pd.date DESC`,
-      [tickers.map((t) => t.toUpperCase())]
-    );
-    const monthR = await pool.query(
-      `SELECT DISTINCT ON (s.ticker) s.ticker, pd.adj_close::float AS close
-       FROM prices_daily pd
-       JOIN stocks s ON s.id = pd.stock_id
-       WHERE upper(s.ticker) = ANY($1::text[])
-         AND pd.date <= NOW() - INTERVAL '21 days'
-       ORDER BY s.ticker, pd.date DESC`,
-      [tickers.map((t) => t.toUpperCase())]
-    );
-    const ytdR = await pool.query(
-      `SELECT DISTINCT ON (s.ticker) s.ticker, pd.adj_close::float AS close
-       FROM prices_daily pd
-       JOIN stocks s ON s.id = pd.stock_id
-       WHERE upper(s.ticker) = ANY($1::text[])
-         AND pd.date >= date_trunc('year', CURRENT_DATE)
-       ORDER BY s.ticker, pd.date ASC`,
-      [tickers.map((t) => t.toUpperCase())]
-    );
-
-    const weekMap = new Map(weekR.rows.map((r: { ticker: string; close: number }) => [r.ticker.toUpperCase(), r.close]));
-    const monthMap = new Map(monthR.rows.map((r: { ticker: string; close: number }) => [r.ticker.toUpperCase(), r.close]));
-    const ytdMap = new Map(ytdR.rows.map((r: { ticker: string; close: number }) => [r.ticker.toUpperCase(), r.close]));
-
-    // Get betas from factor_technical
-    const betaR = await pool.query(
-      `SELECT DISTINCT ON (s.ticker) s.ticker, ft.beta::float
-       FROM factor_technical ft
-       JOIN stocks s ON s.id = ft.stock_id
-       WHERE upper(s.ticker) = ANY($1::text[])
-       ORDER BY s.ticker, ft.date DESC`,
-      [tickers.map((t) => t.toUpperCase())]
-    );
-    const betaMap = new Map(betaR.rows.map((r: { ticker: string; beta: number }) => [r.ticker.toUpperCase(), r.beta]));
 
     const calcPct = (cur: number | null, ref: number | null) =>
       cur && ref && ref > 0 ? ((cur - ref) / ref) * 100 : null;
 
-    return r.rows.map((row: { ticker: string; name: string; latest: number; prev: number }) => {
-      const t = row.ticker.toUpperCase();
-      return {
-        ticker: t,
-        name: row.name,
-        dailyPct: calcPct(row.latest, row.prev),
-        weeklyPct: calcPct(row.latest, weekMap.get(t) ?? null),
-        monthlyPct: calcPct(row.latest, monthMap.get(t) ?? null),
-        ytdPct: calcPct(row.latest, ytdMap.get(t) ?? null),
-        beta: betaMap.get(t) ?? null,
-      };
-    });
-  } catch {
+    return r.rows.map((row: {
+      ticker: string; name: string; latest: number; prev: number;
+      week_close: number | null; month_close: number | null; ytd_close: number | null;
+      beta: number | null;
+    }) => ({
+      ticker: row.ticker,
+      name: row.name,
+      dailyPct: calcPct(row.latest, row.prev),
+      weeklyPct: calcPct(row.latest, row.week_close),
+      monthlyPct: calcPct(row.latest, row.month_close),
+      ytdPct: calcPct(row.latest, row.ytd_close),
+      beta: row.beta,
+    }));
+  } catch (e) {
+    console.error("[SECTOR STOCK PERF]", e);
     return [];
   }
 }
@@ -251,7 +260,7 @@ export async function GET(_req: NextRequest) {
           bestPerformer,
           worstPerformer,
           avgBeta,
-          topStocks: stocks.slice(0, 6),
+          topStocks: stocks,
         };
       })
     );
