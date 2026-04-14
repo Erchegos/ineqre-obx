@@ -176,7 +176,7 @@ export default function PredictionsPage() {
         overflowX: "hidden" as const,
       }}
     >
-      <PageNav crumbs={[{label:"Home",href:"/"},{label:"Stocks",href:"/stocks"},{label:ticker,href:`/stocks/${ticker}`},{label:"Predictions"}]} actions={[{label:"Backtest",href:`/backtest/${ticker}`}]} />
+      <PageNav crumbs={[{label:"Home",href:"/"},{label:"Stocks",href:"/stocks"},{label:ticker,href:`/stocks/${ticker}`},{label:"Predictions"}]} actions={[{label:"Volatility",href:`/volatility/${ticker}`},{label:"Montecarlo",href:`/montecarlo/${ticker}`},{label:"Backtest",href:`/backtest/${ticker}`},{label:"Options",href:`/options/${ticker}.US`}]} />
       {/* Terminal-style Header */}
       <div
         style={{

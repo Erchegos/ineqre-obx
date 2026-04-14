@@ -534,7 +534,7 @@ export default function OptionsPage() {
       {/* ═══ HEADER ═══ */}
       <header style={{ padding: "16px 24px 10px", background: "transparent" }}>
         <div style={{ maxWidth: 1400, margin: "0 auto" }}>
-          <PageNav crumbs={[{label:"Home",href:"/"},{label:"Options",href:"/options"},{label:data?.symbol||ticker}]} actions={[{label:"Stocks",href:"/stocks"}]} />
+          <PageNav crumbs={[{label:"Home",href:"/"},{label:"Options",href:"/options"},{label:data?.symbol||ticker}]} actions={(() => { const base = (data?.symbol || ticker).replace(/\.US$/, ""); return [{label:"Stock",href:`/stocks/${base}`},{label:"Predictions",href:`/predictions/${base}`},{label:"Volatility",href:`/volatility/${base}`},{label:"Backtest",href:`/backtest/${base}`}]; })()} />
         </div>
         <div style={{ maxWidth: 1400, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 24 }}>

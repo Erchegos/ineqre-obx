@@ -172,7 +172,7 @@ export default function MonteCarloPage() {
 
   return (
     <main style={{ padding: 24, maxWidth: 1400, margin: "0 auto" }}>
-      <PageNav crumbs={[{label:"Home",href:"/"},{label:"Stocks",href:"/stocks"},{label:ticker||"?",href:`/stocks/${ticker}`},{label:"Monte Carlo"}]} />
+      <PageNav crumbs={[{label:"Home",href:"/"},{label:"Stocks",href:"/stocks"},{label:ticker||"?",href:`/stocks/${ticker}`},{label:"Monte Carlo"}]} actions={ticker ? [{label:"Predictions",href:`/predictions/${ticker}`},{label:"Volatility",href:`/volatility/${ticker}`},{label:"Backtest",href:`/backtest/${ticker}`},{label:"Options",href:`/options/${ticker}.US`}] : undefined} />
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: "-0.02em", color: "#fff", fontFamily: "monospace" }}>

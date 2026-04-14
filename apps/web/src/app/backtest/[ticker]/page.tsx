@@ -466,7 +466,7 @@ export default function TickerBacktestPage() {
         background: "#0a0a0a",
       }}
     >
-      <PageNav crumbs={[{label:"Home",href:"/"},{label:"Stocks",href:"/stocks"},{label:ticker,href:`/stocks/${ticker}`},{label:"Backtest"}]} actions={[{label:"Predictions",href:`/predictions/${ticker}`},{label:"All Backtests",href:"/backtest"}]} />
+      <PageNav crumbs={[{label:"Home",href:"/"},{label:"Stocks",href:"/stocks"},{label:ticker,href:`/stocks/${ticker}`},{label:"Backtest"}]} actions={[{label:"Predictions",href:`/predictions/${ticker}`},{label:"Volatility",href:`/volatility/${ticker}`},{label:"Montecarlo",href:`/montecarlo/${ticker}`},{label:"Options",href:`/options/${ticker}.US`},{label:"All Backtests",href:"/backtest"}]} />
       {/* Header */}
       <div
         style={{
