@@ -47,6 +47,8 @@ type SensitivityRow = {
   tstatSek: number;
   rSquared: number;
   rSquaredFxOnly: number;
+  hasDivergence: boolean;
+  divergenceCount: number;
 };
 
 type ForwardTenor = {
@@ -771,6 +773,8 @@ export default function FXTerminalPage() {
                 tstatSek: d.statistical.tstatSek,
                 rSquared: d.statistical.rSquared,
                 rSquaredFxOnly: d.statistical.rSquaredFxOnly,
+                hasDivergence: !!d.hasDivergence,
+                divergenceCount: d.divergences?.length ?? 0,
               });
             }
           }
@@ -1432,6 +1436,7 @@ export default function FXTerminalPage() {
               <thead>
                 <tr>
                   <SortHeader label="TICKER" col="ticker" sort={expSort} onSort={(c) => setExpSort(p => ({ col: c, asc: p.col === c ? !p.asc : true }))} />
+                  <th style={{ ...S.th, width: 24, textAlign: "center", padding: "6px 2px" }} title="Statistical vs Fundamental divergence">DIV</th>
                   <SortHeader label="USD" col="usd" sort={expSort} onSort={(c) => setExpSort(p => ({ col: c, asc: p.col === c ? !p.asc : false }))} />
                   <SortHeader label="EUR" col="eur" sort={expSort} onSort={(c) => setExpSort(p => ({ col: c, asc: p.col === c ? !p.asc : false }))} />
                   <SortHeader label="GBP" col="gbp" sort={expSort} onSort={(c) => setExpSort(p => ({ col: c, asc: p.col === c ? !p.asc : false }))} />
@@ -1446,6 +1451,11 @@ export default function FXTerminalPage() {
                     onClick={() => { setCompanyTicker(row.ticker); setTab("company"); }}
                   >
                     <td style={{ ...S.td, fontWeight: 600, color: "#3b82f6" }}>{row.ticker}</td>
+                    <td style={{ ...S.td, textAlign: "center", padding: "6px 2px" }}>
+                      {allSensitivity.find(s => s.ticker === row.ticker)?.hasDivergence && (
+                        <span style={{ color: "#f59e0b", fontSize: 11, fontWeight: 700 }} title="Statistical vs Fundamental FX mismatch">!</span>
+                      )}
+                    </td>
                     {(["usd", "eur", "gbp", "sek"] as const).map((ccy) => (
                       <td
                         key={ccy}
@@ -1467,6 +1477,11 @@ export default function FXTerminalPage() {
             </div>
           ) : (
             <div style={S.dim}>Run seed-fx-exposures.ts to populate</div>
+          )}
+          {allSensitivity.some(s => s.hasDivergence) && (
+            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginTop: 4 }}>
+              <span style={{ color: "#f59e0b", fontWeight: 700 }}>!</span> = statistical (regression) exposure differs materially from reported (fundamental) exposure. Click ticker for details.
+            </div>
           )}
         </div>
       </>
@@ -1563,8 +1578,10 @@ export default function FXTerminalPage() {
             <div style={S.cardTitle}>{selectedSensTicker} &mdash; DETAILED FX SENSITIVITY</div>
 
             <HelpToggle id="sens-detail-intro" label="Statistical vs Fundamental — what's the difference?" showHelp={showHelp} setShowHelp={setShowHelp}>
-              <strong style={{ color: "rgba(255,255,255,0.5)" }}>Statistical</strong> = how the stock price actually moves with currencies (regression on 252 trading days).
-              <strong style={{ color: "rgba(255,255,255,0.5)" }}> Fundamental</strong> = where the company earns and spends money (from annual reports). Large gaps suggest active hedging or pricing power.
+              <strong style={{ color: "rgba(255,255,255,0.5)" }}>Statistical</strong> = how the stock price actually moves with currencies (OLS regression on 252 trading days).
+              <strong style={{ color: "rgba(255,255,255,0.5)" }}> Fundamental</strong> = where the company earns and spends money (from annual reports).
+              Large gaps suggest active hedging, pricing power, or indirect commodity/supply-chain links.
+              For listed companies, the statistical (reduced-form) approach is preferred over structural models, because market prices incorporate hedging, pricing power, and indirect exposures that are difficult to observe from financial statements alone.
             </HelpToggle>
             <div style={S.grid2}>
               {/* Statistical betas */}
@@ -1793,11 +1810,11 @@ export default function FXTerminalPage() {
 
             {/* Divergence alerts */}
             {sensDetail.divergences?.length > 0 && (
-              <div style={{ marginTop: 12, padding: 14, background: "rgba(59,130,246,0.06)", borderRadius: 4, border: "1px solid rgba(59,130,246,0.15)" }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#3b82f6", marginBottom: 2 }}>STATISTICAL vs FUNDAMENTAL GAPS</div>
+              <div style={{ marginTop: 12, padding: 14, background: "rgba(245,158,11,0.06)", borderRadius: 4, border: "1px solid rgba(245,158,11,0.2)" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#f59e0b", marginBottom: 2 }}>STATISTICAL vs FUNDAMENTAL GAPS</div>
                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 10 }}>
-                  Comparing how the stock actually moves with currencies (regression) vs what the company reports (annual report).
-                  Difference = beta minus reported net exposure. A positive difference means the market sees more sensitivity than the company reports.
+                  Regression beta minus reported net exposure. Betas are estimated from stock returns; net exposure is from annual reports.
+                  They measure different things &mdash; divergence is expected and informative.
                 </div>
                 <table style={{ ...S.table, background: "transparent" }}>
                   <thead>
@@ -1817,7 +1834,7 @@ export default function FXTerminalPage() {
                           <td style={{ ...S.td, color: CCY_COLORS[d.currency] || "rgba(255,255,255,0.5)", fontWeight: 600 }}>{d.currency}</td>
                           <td style={S.td}>{d.statistical >= 0 ? "+" : ""}{d.statistical.toFixed(3)}</td>
                           <td style={S.td}>{d.fundamental >= 0 ? "+" : ""}{(d.fundamental * 100).toFixed(1)}%</td>
-                          <td style={{ ...S.td, fontWeight: 600, color: Math.abs(diff) > 0.3 ? "#ef4444" : "#3b82f6" }}>
+                          <td style={{ ...S.td, fontWeight: 600, color: Math.abs(diff) > 0.3 ? "#ef4444" : "#f59e0b" }}>
                             {diff >= 0 ? "+" : ""}{diff.toFixed(3)}
                           </td>
                           <td style={{ ...S.td, fontSize: 10, color: "rgba(255,255,255,0.6)" }}>
@@ -1828,6 +1845,19 @@ export default function FXTerminalPage() {
                     })}
                   </tbody>
                 </table>
+                <HelpToggle id="divergence-methodology" label="Why do divergences occur?" showHelp={showHelp} setShowHelp={setShowHelp}>
+                  Common reasons for gaps between statistical (market) and fundamental (reported) FX exposure:
+                  <br /><br />
+                  <strong style={{ color: "rgba(255,255,255,0.6)" }}>1. Operational hedging:</strong> The company uses financial instruments (forwards, options) to reduce FX risk, so the stock price moves less than reported exposure would suggest.
+                  <br />
+                  <strong style={{ color: "rgba(255,255,255,0.6)" }}>2. Pricing power:</strong> The company can pass FX changes through to customers (e.g., price increases when NOK weakens), reducing effective exposure.
+                  <br />
+                  <strong style={{ color: "rgba(255,255,255,0.6)" }}>3. Supply chain / commodity links:</strong> Currency moves may affect input costs or commodity prices the company depends on, creating indirect exposure not visible in revenue/cost splits.
+                  <br />
+                  <strong style={{ color: "rgba(255,255,255,0.6)" }}>4. Natural hedging:</strong> Revenue and cost are in the same foreign currency, so net exposure is lower than gross figures suggest. The regression captures this automatically.
+                  <br /><br />
+                  <em style={{ color: "rgba(255,255,255,0.35)" }}>Statistical approach: Reduced-form OLS regression of stock returns on currency returns (252-day rolling window). Preferred for listed companies over structural models (Adler &amp; Dumas 1984, Jorion 1990).</em>
+                </HelpToggle>
               </div>
             )}
 
@@ -2031,6 +2061,60 @@ export default function FXTerminalPage() {
                   </tbody>
                 </table>
                 </div>
+              </div>
+            )}
+
+            {/* FX Assumption: Spot (Random Walk) vs Forward (IRP) */}
+            {forwardData && forwardData.forwards.length > 0 && (
+              <div style={{ ...S.card, background: "#0d1117", border: "1px solid #21262d" }}>
+                <div style={S.cardTitle}>FX ASSUMPTION &mdash; SPOT (RANDOM WALK) VS FORWARD (MARKET-IMPLIED)</div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 10 }}>
+                  Which {hedgeCurrency}/NOK rate should you use for budgets, NPV, or hedging decisions?
+                </div>
+                <div style={{ overflowX: "auto" as const }}>
+                <table style={S.table}>
+                  <thead>
+                    <tr>
+                      <th style={S.th}>HORIZON</th>
+                      <th style={S.th}>SPOT (RANDOM WALK)</th>
+                      <th style={S.th}>FORWARD (IRP)</th>
+                      <th style={S.th}>DIFFERENCE</th>
+                      <th style={S.th}>ANNUALIZED</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {forwardData.forwards.map((f: ForwardTenor) => {
+                      const diff = f.forward - f.spot;
+                      const diffPct = (diff / f.spot) * 100;
+                      return (
+                        <tr key={f.tenor}>
+                          <td style={{ ...S.td, fontWeight: 600 }}>{f.tenor}</td>
+                          <td style={S.td}>{f.spot.toFixed(4)}</td>
+                          <td style={{ ...S.td, fontWeight: 600 }}>{f.forward.toFixed(4)}</td>
+                          <td style={{ ...S.td, color: diffPct > 0 ? "#10b981" : diffPct < 0 ? "#ef4444" : "rgba(255,255,255,0.4)" }}>
+                            {diffPct >= 0 ? "+" : ""}{diffPct.toFixed(2)}%
+                          </td>
+                          <td style={{ ...S.td, color: f.annualizedCarryPct > 0 ? "#10b981" : f.annualizedCarryPct < 0 ? "#ef4444" : "rgba(255,255,255,0.4)" }}>
+                            {fmtPct(f.annualizedCarryPct)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                </div>
+                <HelpToggle id="fx-assumption-help" label="Which assumption should I use?" showHelp={showHelp} setShowHelp={setShowHelp}>
+                  <strong style={{ color: "rgba(255,255,255,0.6)" }}>Spot (Random Walk):</strong> Assumes today&apos;s exchange rate persists indefinitely.
+                  Empirically, the random walk is hard to beat for short-term FX forecasting (Meese &amp; Rogoff 1983).
+                  Use for: mark-to-market, current period earnings sensitivity, short-term budgets.
+                  <br /><br />
+                  <strong style={{ color: "rgba(255,255,255,0.6)" }}>Forward (Interest Rate Parity):</strong> Market-implied future rate based on the interest rate differential between NOK and {hedgeCurrency}.
+                  This is the rate you can lock in today via a forward contract &mdash; it is a no-arbitrage price, not a forecast.
+                  Use for: hedging cost/benefit analysis, NPV calculations, multi-year budgets.
+                  <br /><br />
+                  <strong style={{ color: "#ef4444" }}>PPP (Purchasing Power Parity):</strong> Not used. PPP has poor empirical support at horizons relevant for corporate hedging (1&ndash;12 months).
+                  Academic evidence strongly favors random walk over PPP for FX forecasting.
+                </HelpToggle>
               </div>
             )}
 

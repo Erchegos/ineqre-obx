@@ -192,6 +192,8 @@ export async function GET(
           assessment = "Market prices in more exposure than reported — may reflect supply chain or commodity links";
         } else if (Math.abs(beta) < Math.abs(net) * 0.5) {
           assessment = "Market prices in less than reported — company may be actively hedging";
+        } else if (Math.abs(beta) > Math.abs(net)) {
+          assessment = "Possible pricing power — company may pass FX moves to customers, or natural cost hedging reduces effective exposure";
         } else {
           assessment = "Moderate gap — within normal range for hedged companies";
         }
