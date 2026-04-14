@@ -40,6 +40,48 @@ export const SECTOR_MAP: Record<string, {
     primaryCommodity: "ALI=F",
     tickers: ["NHY", "ELK"],
   },
+  Financials: {
+    color: "#6366f1",
+    icon: "landmark",
+    commodities: [],
+    primaryCommodity: null,
+    tickers: ["DNB", "NOBA", "MING", "SRBNK", "NOFI", "HELG", "PARB", "GJENSIDI", "STB", "PROTCT", "AKER", "ABG"],
+  },
+  Technology: {
+    color: "#06b6d4",
+    icon: "cpu",
+    commodities: [],
+    primaryCommodity: null,
+    tickers: ["NOD", "CRAYN", "KAHOT", "OTEC", "LINK", "NORBT", "BWLPG"],
+  },
+  Industrials: {
+    color: "#8b5cf6",
+    icon: "cog",
+    commodities: [],
+    primaryCommodity: null,
+    tickers: ["AKSO", "TOM", "KOG", "WWASA", "SCHB", "HYON", "NEL"],
+  },
+  "Consumer Staples": {
+    color: "#14b8a6",
+    icon: "cart",
+    commodities: [],
+    primaryCommodity: null,
+    tickers: ["ORK", "AEGA", "GYL"],
+  },
+  "Real Estate": {
+    color: "#a78bfa",
+    icon: "building",
+    commodities: [],
+    primaryCommodity: null,
+    tickers: ["ENTRA", "OBOS", "SBO"],
+  },
+  "Health Care": {
+    color: "#ec4899",
+    icon: "heart",
+    commodities: [],
+    primaryCommodity: null,
+    tickers: ["PHO", "MEDI", "PCIB"],
+  },
 };
 
 export const COMMODITY_META: Record<string, {
