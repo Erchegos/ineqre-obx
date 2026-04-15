@@ -6,7 +6,7 @@ import GlobalNav from "@/components/GlobalNav";
 
 export const metadata: Metadata = {
   title: {
-    default: "Intelligence Equity Research — OSE Quant Platform",
+    default: "Intelligence Equity Research | OSE Quant Platform",
     template: "%s | InEqRe",
   },
   description: "Quantitative equity research platform for 225+ Oslo Børs securities. ML price predictions, GARCH volatility models, Monte Carlo simulations, options analytics, portfolio optimization, and AI-summarized broker research.",

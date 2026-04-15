@@ -6,7 +6,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { ticker } = await params;
   const t = ticker.toUpperCase();
   return {
-    title: `${t} — ML Price Prediction`,
+    title: `${t} | ML Price Prediction`,
     description: `XGBoost/LightGBM ensemble prediction for ${t}. 1-month forward return forecast with SHAP feature importance and confidence intervals.`,
   };
 }

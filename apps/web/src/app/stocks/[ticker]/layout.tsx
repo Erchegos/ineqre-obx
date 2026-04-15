@@ -6,7 +6,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { ticker } = await params;
   const t = ticker.toUpperCase();
   return {
-    title: `${t} — Stock Analysis`,
+    title: `${t} | Stock Analysis`,
     description: `Price chart, volatility, ML predictions, fundamentals, and technical factors for ${t} on Oslo Børs.`,
   };
 }
