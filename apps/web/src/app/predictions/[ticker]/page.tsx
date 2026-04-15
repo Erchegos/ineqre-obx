@@ -3,11 +3,17 @@
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import PageNav from "@/components/ui/PageNav";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid,
+  ResponsiveContainer, Tooltip, ReferenceLine,
+} from "recharts";
 import FactorDashboard from "@/components/FactorDashboard";
 import PredictionChart from "@/components/PredictionChart";
 import FeatureImportance from "@/components/FeatureImportance";
 import ModelModeToggle from "@/components/ModelModeToggle";
+import { runMLSimulation, SIM_DEFAULTS } from "@/lib/mlTradingEngine";
+import type { SimInputBar, SimResult } from "@/lib/mlTradingEngine";
 
 type Prediction = {
   ticker: string;
@@ -93,6 +99,38 @@ export default function PredictionsPage() {
   const [dataComplete, setDataComplete] = useState(true);
   const [mode, setMode] = useState<"default" | "optimized">("default");
   const [optimizerData, setOptimizerData] = useState<OptimizerData | null>(null);
+
+  // ── Backtest state ──
+  const [btInput, setBtInput] = useState<SimInputBar[] | null>(null);
+  const [btLoading, setBtLoading] = useState(false);
+  const [btOpen, setBtOpen] = useState(false);
+  const [btTradesOpen, setBtTradesOpen] = useState(false);
+
+  const BACKTEST_PARAMS = useMemo(() => ({
+    ...SIM_DEFAULTS,
+    entryThreshold: 1.0,
+    exitThreshold: 0.25,
+    stopLossPct: 5.0,
+    takeProfitPct: 20.0,
+    minHoldDays: 3,
+    maxHoldDays: 21,
+    cooldownBars: 2,
+    costBps: 10,
+  }), []);
+
+  const fetchBacktest = useCallback(() => {
+    if (btInput || btLoading || !ticker) return;
+    setBtLoading(true);
+    fetch(`/api/predictions/${ticker}/backtest?days=756`)
+      .then(r => r.json())
+      .then(d => { setBtInput(d.input || []); setBtLoading(false); })
+      .catch(() => setBtLoading(false));
+  }, [btInput, btLoading, ticker]);
+
+  const btResult: SimResult | null = useMemo(() => {
+    if (!btInput || btInput.length < 50) return null;
+    return runMLSimulation(btInput, BACKTEST_PARAMS);
+  }, [btInput, BACKTEST_PARAMS]);
 
   // Fetch optimizer config on mount
   useEffect(() => {
@@ -342,6 +380,147 @@ export default function PredictionsPage() {
       {/* Factor Dashboard */}
       <div style={{ marginBottom: 16 }}>
         <FactorDashboard ticker={ticker} />
+      </div>
+
+      {/* ═══ ML SIGNAL BACKTEST ═══ */}
+      <div style={{ marginBottom: 16, background: "#161b22", border: "1px solid #30363d", borderRadius: 8, overflow: "hidden" }}>
+        <button
+          onClick={() => { setBtOpen(!btOpen); if (!btOpen) fetchBacktest(); }}
+          style={{
+            width: "100%", padding: "14px 16px", background: "transparent", border: "none",
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            cursor: "pointer", fontFamily: "monospace",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>
+              ML Signal Backtest
+            </span>
+            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", fontWeight: 600 }}>
+              ENTRY ≥1% 21D PRED · EXIT ≤0.25% · DAILY ROLLING
+            </span>
+          </div>
+          <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>{btOpen ? "▲" : "▼"}</span>
+        </button>
+
+        {btOpen && (
+          <div style={{ padding: "0 16px 16px" }}>
+            {btLoading && (
+              <div style={{ padding: 40, textAlign: "center", color: "rgba(255,255,255,0.4)", fontSize: 11, fontFamily: "monospace" }}>
+                Loading backtest data...
+              </div>
+            )}
+
+            {btResult && (
+              <>
+                {/* Stats strip */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8, marginBottom: 16 }}>
+                  {[
+                    { label: "TOTAL RETURN", value: `${btResult.stats.totalReturn >= 0 ? "+" : ""}${btResult.stats.totalReturn.toFixed(1)}%`, color: btResult.stats.totalReturn >= 0 ? "#10b981" : "#ef4444" },
+                    { label: "ANN. RETURN", value: `${btResult.stats.annualizedReturn >= 0 ? "+" : ""}${btResult.stats.annualizedReturn.toFixed(1)}%`, color: btResult.stats.annualizedReturn >= 0 ? "#10b981" : "#ef4444" },
+                    { label: "SHARPE", value: btResult.stats.sharpe.toFixed(2), color: btResult.stats.sharpe >= 1 ? "#10b981" : btResult.stats.sharpe >= 0.5 ? "#f59e0b" : "#ef4444" },
+                    { label: "WIN RATE", value: `${(btResult.stats.winRate * 100).toFixed(0)}%`, color: btResult.stats.winRate >= 0.5 ? "#10b981" : "#ef4444" },
+                    { label: "MAX DD", value: `${(btResult.stats.maxDrawdown * 100).toFixed(1)}%`, color: "#ef4444" },
+                    { label: "TRADES", value: String(btResult.stats.trades), color: "#3b82f6" },
+                  ].map(m => (
+                    <div key={m.label} style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 4, padding: "10px 8px", textAlign: "center" }}>
+                      <div style={{ fontSize: 8, fontWeight: 600, color: "rgba(255,255,255,0.4)", letterSpacing: "0.06em", marginBottom: 4, fontFamily: "monospace" }}>{m.label}</div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: m.color, fontFamily: "monospace" }}>{m.value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Equity curve */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.4)", letterSpacing: "0.06em", marginBottom: 8, fontFamily: "monospace" }}>EQUITY CURVE (INDEXED 100)</div>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <LineChart data={btResult.series.filter((_, i) => i % 3 === 0)} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#21262d" />
+                      <XAxis dataKey="date" tick={{ fontSize: 8, fill: "rgba(255,255,255,0.3)" }} tickFormatter={(d: string) => d.slice(5, 10)} interval="preserveStartEnd" />
+                      <YAxis tick={{ fontSize: 8, fill: "rgba(255,255,255,0.3)" }} domain={["auto", "auto"]} />
+                      <Tooltip
+                        contentStyle={{ background: "#0d1117", border: "1px solid #30363d", borderRadius: 4, fontSize: 10, fontFamily: "monospace" }}
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        formatter={(v: any, name: any) => [`${Number(v ?? 0).toFixed(1)}`, name === "equityValue" ? "Strategy" : "OBX"]}
+                        labelFormatter={(d: string) => d}
+                      />
+                      <ReferenceLine y={100} stroke="#30363d" strokeDasharray="3 3" />
+                      <Line type="monotone" dataKey="equityValue" stroke="#3b82f6" dot={false} strokeWidth={2} name="Strategy" />
+                      <Line type="monotone" dataKey="benchmarkValue" stroke="rgba(255,255,255,0.2)" dot={false} strokeWidth={1} name="OBX" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Secondary stats */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 16 }}>
+                  {[
+                    { label: "AVG WIN", value: `+${btResult.stats.avgWinPct.toFixed(2)}%` },
+                    { label: "AVG LOSS", value: `${btResult.stats.avgLossPct.toFixed(2)}%` },
+                    { label: "AVG HOLD", value: `${btResult.stats.avgHoldDays.toFixed(0)}d` },
+                    { label: "PROFIT FACTOR", value: btResult.stats.profitFactor === Infinity ? "∞" : btResult.stats.profitFactor.toFixed(2) },
+                  ].map(m => (
+                    <div key={m.label} style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 4, padding: "8px", textAlign: "center" }}>
+                      <div style={{ fontSize: 8, fontWeight: 600, color: "rgba(255,255,255,0.35)", letterSpacing: "0.06em", fontFamily: "monospace" }}>{m.label}</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#e6edf3", fontFamily: "monospace", marginTop: 2 }}>{m.value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Trade log toggle */}
+                <button
+                  onClick={() => setBtTradesOpen(!btTradesOpen)}
+                  style={{
+                    background: "transparent", border: "1px solid #21262d", borderRadius: 4,
+                    padding: "6px 12px", fontSize: 9, fontWeight: 600, fontFamily: "monospace",
+                    color: "rgba(255,255,255,0.5)", cursor: "pointer", letterSpacing: "0.05em",
+                  }}
+                >
+                  {btTradesOpen ? "HIDE" : "SHOW"} TRADE LOG ({btResult.trades.length})
+                </button>
+
+                {btTradesOpen && btResult.trades.length > 0 && (
+                  <div style={{ marginTop: 8, maxHeight: 300, overflowY: "auto", border: "1px solid #21262d", borderRadius: 4 }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "monospace", fontSize: 9 }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid #30363d" }}>
+                          {["ENTRY", "EXIT", "DAYS", "SIGNAL", "RETURN", "EXIT REASON"].map(h => (
+                            <th key={h} style={{ padding: "6px 8px", textAlign: "left", fontSize: 8, fontWeight: 600, color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {btResult.trades.map((t, i) => (
+                          <tr key={i} style={{ borderBottom: "1px solid #161b22" }}>
+                            <td style={{ padding: "5px 8px", color: "rgba(255,255,255,0.6)" }}>{t.entryDate.slice(5)}</td>
+                            <td style={{ padding: "5px 8px", color: "rgba(255,255,255,0.6)" }}>{t.exitDate.slice(5)}</td>
+                            <td style={{ padding: "5px 8px", color: "rgba(255,255,255,0.5)" }}>{t.daysHeld}</td>
+                            <td style={{ padding: "5px 8px", color: "#3b82f6" }}>{(t.predAtEntry).toFixed(1)}%</td>
+                            <td style={{ padding: "5px 8px", fontWeight: 700, color: t.pnlPct >= 0 ? "#10b981" : "#ef4444" }}>
+                              {t.pnlPct >= 0 ? "+" : ""}{(t.pnlPct * 100).toFixed(2)}%
+                            </td>
+                            <td style={{ padding: "5px 8px", color: "rgba(255,255,255,0.35)" }}>{t.exitReason.replace(/_/g, " ")}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Methodology note */}
+                <div style={{ marginTop: 12, fontSize: 9, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", lineHeight: 1.6 }}>
+                  Signal: 21-day forward return from daily prices (rolling). Entry when signal ≥ 1%. Exit when signal drops to ≤ 0.25%.
+                  Stop loss: 5%. Take profit: 20%. Max hold: 21 days. Cost: 10 bps round-trip. Last 3 years of data.
+                </div>
+              </>
+            )}
+
+            {!btLoading && btInput && !btResult && (
+              <div style={{ padding: 20, textAlign: "center", color: "rgba(255,255,255,0.4)", fontSize: 11, fontFamily: "monospace" }}>
+                Insufficient data for backtest (need 50+ bars)
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Bottom Info Grid */}
