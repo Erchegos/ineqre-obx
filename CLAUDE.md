@@ -1165,3 +1165,23 @@ Planned extension of the pairs trading simulator concept to single-stock and mul
 - Parameterized SQL queries (injection prevention)
 - Ticker validation (alphanumeric, max 10 chars)
 - Secure error handling (no internal details exposed)
+
+### Supabase RLS — MANDATORY on every new table
+
+**Every new table in the `public` schema MUST have Row-Level Security enabled before deployment.** Supabase exposes the `public` schema via the anon key, so any table without RLS is world-readable/writable — this is a critical security vulnerability and Supabase will flag it in Security Advisor.
+
+**When adding a new table** (via migration, Drizzle schema, or ad-hoc `CREATE TABLE`):
+
+1. Enable RLS: `ALTER TABLE public."<table>" ENABLE ROW LEVEL SECURITY`
+2. Add read policies for the app's access pattern:
+   ```sql
+   CREATE POLICY "anon_select_<table>" ON public."<table>" FOR SELECT TO anon USING (true);
+   CREATE POLICY "auth_select_<table>" ON public."<table>" FOR SELECT TO authenticated USING (true);
+   ```
+3. For writes, either restrict to `service_role` (most common for this project — scripts use service key) or add explicit INSERT/UPDATE/DELETE policies as needed.
+
+**Audit & fix scripts** (run after any schema change):
+- `node apps/web/scripts/check-rls-status.mjs` — lists tables missing RLS
+- `node apps/web/scripts/fix-all-rls.mjs` — auto-enables RLS + read policies on all exposed tables
+
+**Do not ship a new table without running check-rls-status.mjs first.** If it reports any tables, run fix-all-rls.mjs before pushing.
