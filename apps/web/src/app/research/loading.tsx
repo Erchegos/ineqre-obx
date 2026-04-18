@@ -1,3 +1,5 @@
+import GlobeLoaderWrapper from "@/components/ui/GlobeLoaderWrapper";
+
 export default function ResearchLoading() {
   return (
     <div
@@ -13,10 +15,6 @@ export default function ResearchLoading() {
         @keyframes shimmer {
           0%   { background-position: -600px 0; }
           100% { background-position: 600px 0; }
-        }
-        @keyframes scanline {
-          0%   { transform: translateX(-100%); }
-          100% { transform: translateX(100vw); }
         }
         @keyframes pulse-dot {
           0%, 100% { opacity: 0.5; transform: scale(0.9); }
@@ -41,28 +39,8 @@ export default function ResearchLoading() {
         .fade { animation: fade-in 0.3s ease both; }
       `}</style>
 
-      {/* ── Top progress bar ── */}
-      <div
-        style={{
-          position: "fixed",
-          top: 0, left: 0, right: 0,
-          height: 3,
-          background: "#161b22",
-          zIndex: 9999,
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            top: 0, left: 0,
-            height: "100%",
-            width: 240,
-            background: "linear-gradient(90deg, transparent, #3b82f6, #8b5cf6, #3b82f6, transparent)",
-            animation: "scanline 1.1s ease-in-out infinite",
-          }}
-        />
-      </div>
+      {/* ── Globe loader hero ── */}
+      <GlobeLoaderWrapper size={180} label="Loading research documents..." accentColor="#8b5cf6" />
 
       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
 
@@ -78,9 +56,7 @@ export default function ResearchLoading() {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {/* "Research Portal" title */}
             <div className="shimmer" style={{ width: 160, height: 24, borderRadius: 4 }} />
-            {/* "Data from 2026" badge */}
             <div
               className="shimmer"
               style={{
@@ -97,7 +73,7 @@ export default function ResearchLoading() {
           </div>
         </div>
 
-        {/* sub-line: "0 documents · 0 shown" */}
+        {/* sub-line */}
         <div className="fade" style={{ marginBottom: 20, animationDelay: "30ms" }}>
           <div className="shimmer" style={{ width: 140, height: 11, borderRadius: 3 }} />
         </div>
@@ -130,7 +106,6 @@ export default function ResearchLoading() {
             animationDelay: "90ms",
           }}
         >
-          {/* "All" chip — accented */}
           <div
             style={{
               width: 52,
@@ -142,7 +117,6 @@ export default function ResearchLoading() {
               border: "1px solid #3b82f640",
             }}
           />
-          {/* other chips */}
           {[110, 108, 100, 98, 68, 62, 62].map((w, i) => (
             <div
               key={i}
@@ -150,30 +124,6 @@ export default function ResearchLoading() {
               style={{ width: w, height: 28, borderRadius: 14 }}
             />
           ))}
-        </div>
-
-        {/* ── Status line ── */}
-        <div
-          className="fade"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 7,
-            marginBottom: 16,
-            animationDelay: "110ms",
-          }}
-        >
-          <div
-            style={{
-              width: 7, height: 7,
-              borderRadius: "50%",
-              background: "#8b5cf6",
-              animation: "pulse-dot 1s ease-in-out infinite",
-            }}
-          />
-          <span style={{ color: "rgba(139,92,246,0.7)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase" }}>
-            Loading research documents...
-          </span>
         </div>
 
         {/* ── Document cards ── */}

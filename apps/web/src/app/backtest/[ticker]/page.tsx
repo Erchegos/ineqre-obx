@@ -887,7 +887,7 @@ export default function TickerBacktestPage() {
                 stroke="#10b981"
                 strokeWidth={2}
                 dot={false}
-                isAnimationActive={false}
+                isAnimationActive={true} animationDuration={800} animationEasing="ease-out"
                 name="Strategy"
               />
               <Line
@@ -897,7 +897,7 @@ export default function TickerBacktestPage() {
                 strokeWidth={1.5}
                 strokeDasharray="5 5"
                 dot={false}
-                isAnimationActive={false}
+                isAnimationActive={true} animationDuration={800} animationEasing="ease-out"
                 name="Buy & Hold"
               />
             </LineChart>

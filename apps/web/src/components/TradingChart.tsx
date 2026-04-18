@@ -681,7 +681,7 @@ export default function TradingChart({ data, height = 500, initialBars }: Tradin
             <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
             <XAxis dataKey="date" stroke={DIM} fontSize={9} tickFormatter={fmtDate} minTickGap={60} tickMargin={4} axisLine={{ stroke: "rgba(255,255,255,0.08)" }} tickLine={false} />
             <YAxis stroke={DIM} fontSize={9} domain={[minP, maxP]} tickFormatter={fmtP} width={55} orientation="right" axisLine={false} tickLine={false} tickCount={8} />
-            <Line type="monotone" dataKey="close" stroke="transparent" strokeWidth={0} dot={false} activeDot={false} isAnimationActive={false} />
+            <Line type="monotone" dataKey="close" stroke="transparent" strokeWidth={0} dot={false} activeDot={false} isAnimationActive={true} animationDuration={800} animationEasing="ease-out" />
             {lastC && <ReferenceLine y={lastC} stroke={lastC >= (prevC || 0) ? BULL : BEAR} strokeDasharray="2 4" strokeWidth={1} strokeOpacity={0.4} />}
           </ComposedChart>
         </ResponsiveContainer>

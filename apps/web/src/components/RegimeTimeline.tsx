@@ -228,7 +228,7 @@ export default function RegimeTimeline({
               stroke="var(--foreground)"
               strokeWidth={2}
               dot={false}
-              isAnimationActive={false}
+              isAnimationActive={true} animationDuration={800} animationEasing="ease-out"
             />
           </ComposedChart>
         </ResponsiveContainer>

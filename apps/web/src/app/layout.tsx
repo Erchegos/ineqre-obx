@@ -3,6 +3,8 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import GlobalNav from "@/components/GlobalNav";
+import TopLoadingBar from "@/components/ui/TopLoadingBar";
+import { ToastProvider } from "@/components/ui/Toast";
 
 export const metadata: Metadata = {
   title: {
@@ -33,8 +35,11 @@ export default function RootLayout({
         className={`${GeistSans.variable} ${GeistMono.variable} antialiased bg-[#0a0a0a] text-white`}
         style={{ backgroundColor: "#0a0a0a", color: "#ffffff" }}
       >
-        <GlobalNav />
-        <main>{children}</main>
+        <ToastProvider>
+          <TopLoadingBar />
+          <GlobalNav />
+          <main>{children}</main>
+        </ToastProvider>
       </body>
     </html>
   );

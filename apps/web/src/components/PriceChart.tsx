@@ -172,7 +172,9 @@ export default function PriceChart({
             dot={false}
             activeDot={{ r: 4 }}
             connectNulls={true}
-            isAnimationActive={false} 
+            isAnimationActive={true}
+            animationDuration={800}
+            animationEasing="ease-out"
           />
 
           {/* SECONDARY LINE */}
@@ -181,12 +183,14 @@ export default function PriceChart({
               type="monotone"
               dataKey="total"
               name="Total Return"
-              stroke="#3b82f6" 
+              stroke="#3b82f6"
               strokeWidth={2}
               dot={false}
               activeDot={{ r: 4 }}
               connectNulls={true}
-              isAnimationActive={false}
+              isAnimationActive={true}
+              animationDuration={800}
+              animationEasing="ease-out"
             />
           )}
 

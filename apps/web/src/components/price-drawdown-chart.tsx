@@ -93,7 +93,7 @@ export default function PriceDrawdownChart({ data, height = 280 }: PriceDrawdown
           stroke={lineColor}
           strokeWidth={2}
           dot={false}
-          isAnimationActive={false}
+          isAnimationActive={true} animationDuration={800} animationEasing="ease-out"
         />
       </LineChart>
     </ResponsiveContainer>

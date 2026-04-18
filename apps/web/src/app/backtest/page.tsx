@@ -405,7 +405,7 @@ export default function BacktestPage() {
                 fill="url(#icFill)"
                 fillOpacity={1}
                 dot={false}
-                isAnimationActive={false}
+                isAnimationActive={true} animationDuration={800} animationEasing="ease-out"
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -459,7 +459,7 @@ export default function BacktestPage() {
                 stroke="#3b82f6"
                 strokeWidth={2}
                 dot={false}
-                isAnimationActive={false}
+                isAnimationActive={true} animationDuration={800} animationEasing="ease-out"
               />
             </LineChart>
           </ResponsiveContainer>

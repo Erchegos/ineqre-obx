@@ -790,7 +790,7 @@ export default function CommoditiesPage() {
         {loading ? (
           <div style={{ padding: 40, textAlign: "center", color: "rgba(255,255,255,0.4)", fontSize: 13 }}>Loading commodity data…</div>
         ) : (
-          <div style={{ padding: "24px", maxWidth: 1400, margin: "0 auto" }}>
+          <div key={tab} style={{ padding: "24px", maxWidth: 1400, margin: "0 auto", animation: "fadeIn 0.15s ease-out" }}>
 
             {/* DASHBOARD TAB */}
             {tab === "dashboard" && (

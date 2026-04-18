@@ -544,7 +544,7 @@ export default function ReturnDistributionChart({
                 fill={dist.color}
                 fillOpacity={0.3}
                 strokeWidth={1.5}
-                isAnimationActive={false}
+                isAnimationActive={true} animationDuration={800} animationEasing="ease-out"
               />
             );
           })}

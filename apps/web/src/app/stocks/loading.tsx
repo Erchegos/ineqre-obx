@@ -1,3 +1,5 @@
+import GlobeLoaderWrapper from "@/components/ui/GlobeLoaderWrapper";
+
 export default function StocksLoading() {
   return (
     <div
@@ -13,10 +15,6 @@ export default function StocksLoading() {
         @keyframes shimmer {
           0%   { background-position: -600px 0; }
           100% { background-position: 600px 0; }
-        }
-        @keyframes scanline {
-          0%   { transform: translateX(-100%); }
-          100% { transform: translateX(100vw); }
         }
         @keyframes pulse-bar {
           0%, 100% { opacity: 0.6; }
@@ -43,31 +41,8 @@ export default function StocksLoading() {
         }
       `}</style>
 
-      {/* ── Top progress bar ── */}
-      <div
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 3,
-          background: "#161b22",
-          zIndex: 9999,
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            height: "100%",
-            width: 240,
-            background: "linear-gradient(90deg, transparent, #3b82f6, #10b981, #3b82f6, transparent)",
-            animation: "scanline 1.1s ease-in-out infinite",
-          }}
-        />
-      </div>
+      {/* ── Globe loader hero ── */}
+      <GlobeLoaderWrapper size={180} label="Loading universe..." />
 
       {/* ── Header row ── */}
       <div
@@ -94,30 +69,6 @@ export default function StocksLoading() {
       </div>
 
       <div style={{ maxWidth: 1400, margin: "0 auto" }}>
-        {/* ── Scan status line ── */}
-        <div
-          className="row-fade"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: 16,
-            animationDelay: "40ms",
-          }}
-        >
-          <div
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: "#3b82f6",
-              animation: "pulse-bar 0.9s ease-in-out infinite",
-            }}
-          />
-          <span style={{ color: "rgba(59,130,246,0.7)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase" }}>
-            Loading universe...
-          </span>
-        </div>
 
         {/* ── Tier + filter strip ── */}
         <div

@@ -10,6 +10,8 @@
  *   <PageSkeleton title="Shipping Intelligence" cards={3} />
  */
 
+import GlobeLoaderWrapper from "@/components/ui/GlobeLoaderWrapper";
+
 export function SkeletonLine({
   width = "100%",
   height = 12,
@@ -124,20 +126,13 @@ export default function PageSkeleton({
         }
       `}</style>
 
-      {/* Nav skeleton bar */}
-      <div style={{ padding: "10px 24px", borderBottom: "1px solid #21262d", display: "flex", alignItems: "center", gap: 6 }}>
-        <SkeletonLine width={36} height={10} />
-        <span style={{ color: "#30363d", fontSize: 9 }}>/</span>
-        <SkeletonLine width={60} height={10} />
-        {title && (
-          <>
-            <span style={{ color: "#30363d", fontSize: 9 }}>/</span>
-            <SkeletonLine width={80} height={10} />
-          </>
-        )}
-      </div>
+      {/* Globe loader hero */}
+      <GlobeLoaderWrapper
+        size={200}
+        label={title ? `Loading ${title}...` : "Loading data..."}
+      />
 
-      <div style={{ padding: "20px 24px", maxWidth: 1400, margin: "0 auto" }}>
+      <div style={{ padding: "0 24px 20px", maxWidth: 1400, margin: "0 auto" }}>
         {/* Title */}
         {title ? (
           <div style={{ fontSize: 22, fontWeight: 700, color: "#fff", marginBottom: 20 }}>{title}</div>

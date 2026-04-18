@@ -243,7 +243,7 @@ export default function VolatilityCorrelationChart({
             stroke="#f97316"
             strokeWidth={2}
             dot={false}
-            isAnimationActive={false}
+            isAnimationActive={true} animationDuration={800} animationEasing="ease-out"
           />
         </LineChart>
       </ResponsiveContainer>

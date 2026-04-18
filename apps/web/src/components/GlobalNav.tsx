@@ -176,6 +176,17 @@ export default function GlobalNav() {
         >
           <span style={{ color: "#3b82f6" }}>◆</span>
           <span>INEQRE</span>
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              backgroundColor: "#10b981",
+              animation: "pulse-dot 2s ease-in-out infinite",
+              marginLeft: 2,
+            }}
+            title="Live data connection"
+          />
         </Link>
 
         {/* Groups */}
@@ -192,6 +203,7 @@ export default function GlobalNav() {
               >
                 <button
                   type="button"
+                  onClick={() => setOpenGroup(isOpen ? null : group.label)}
                   style={{
                     background: "none",
                     border: "none",
@@ -207,43 +219,46 @@ export default function GlobalNav() {
                 >
                   {group.label}
                 </button>
-                {isOpen && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "100%",
-                      left: 0,
-                      minWidth: 160,
-                      background: "#161b22",
-                      border: "1px solid #30363d",
-                      borderRadius: 6,
-                      padding: 4,
-                      boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
-                    }}
-                  >
-                    {group.links.map(link => (
-                      <Link
-                        key={link.href}
-                        href={link.href}
-                        onClick={() => setOpenGroup(null)}
-                        style={{
-                          display: "block",
-                          padding: "8px 12px",
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: isActive(link.href) ? "#3b82f6" : "rgba(255,255,255,0.8)",
-                          textDecoration: "none",
-                          borderRadius: 4,
-                          letterSpacing: "0.04em",
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.background = "rgba(59,130,246,0.08)"; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
-                      >
-                        {link.label}
-                      </Link>
-                    ))}
-                  </div>
-                )}
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    left: 0,
+                    minWidth: 160,
+                    background: "#161b22",
+                    border: "1px solid #30363d",
+                    borderRadius: 6,
+                    padding: 4,
+                    boxShadow: isOpen ? "0 8px 24px rgba(0,0,0,0.5)" : "none",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(-4px)",
+                    pointerEvents: isOpen ? "auto" as const : "none" as const,
+                    transition: "opacity 0.15s ease, transform 0.15s ease",
+                    zIndex: 50,
+                  }}
+                >
+                  {group.links.map(link => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setOpenGroup(null)}
+                      style={{
+                        display: "block",
+                        padding: "8px 12px",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: isActive(link.href) ? "#3b82f6" : "rgba(255,255,255,0.8)",
+                        textDecoration: "none",
+                        borderRadius: 4,
+                        letterSpacing: "0.04em",
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = "rgba(59,130,246,0.08)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </div>
               </div>
             );
           })}
@@ -284,6 +299,7 @@ export default function GlobalNav() {
                 borderRadius: 6,
                 padding: 4,
                 boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+                animation: "slideDown 0.15s ease-out",
               }}
             >
               {suggestions.map(s => (

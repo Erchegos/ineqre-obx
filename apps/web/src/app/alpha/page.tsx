@@ -1164,6 +1164,7 @@ export default function AlphaPage() {
         ].map(t => <button key={t.id} onClick={() => setTab(t.id)} style={tabStyle(tab === t.id)}>{t.label}</button>)}
       </div>
 
+      <div key={tab} style={{ animation: "fadeIn 0.15s ease-out" }}>
       {/* ================================================================ */}
       {/* PORTFOLIO STRATEGY TAB                                           */}
       {/* ================================================================ */}
@@ -1400,7 +1401,7 @@ export default function AlphaPage() {
                             <ReferenceLine yAxisId="left" y={100} stroke="rgba(255,255,255,0.25)" strokeDasharray="4 4" />
                             <Area yAxisId="left" type="monotone" dataKey="value"
                               stroke={lineColor} strokeWidth={2} fill="url(#eqGrad)"
-                              dot={false} isAnimationActive={false} name="value" />
+                              dot={false} isAnimationActive={true} animationDuration={800} animationEasing="ease-out" name="value" />
                           </ComposedChart>
                         </ResponsiveContainer>
 
@@ -1415,7 +1416,7 @@ export default function AlphaPage() {
                                 contentStyle={{ background: "#0d1117", border: "1px solid #30363d", borderRadius: 6, fontFamily: "monospace", fontSize: 10 }}
                                 formatter={((v: number) => [`${v} positions active`, "Active"]) as Parameters<typeof Tooltip>[0]["formatter"]}
                                 labelFormatter={l => l} />
-                              <Bar dataKey="positions" fill={"rgba(16,185,129,0.35)"} isAnimationActive={false} />
+                              <Bar dataKey="positions" fill={"rgba(16,185,129,0.35)"} isAnimationActive={true} animationDuration={800} animationEasing="ease-out" />
                             </BarChart>
                           </ResponsiveContainer>
                           <div style={{ fontSize: 8, fontFamily: "monospace", color: "rgba(255,255,255,0.2)", textAlign: "right", marginRight: 64, marginTop: -4 }}>
@@ -1650,8 +1651,8 @@ export default function AlphaPage() {
                           <Tooltip contentStyle={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 6, fontFamily: "monospace", fontSize: 11, color: "#fff" }}
                             formatter={((v: number, name: string) => [Number(v).toFixed(1), name === "portfolio" ? "Strategy" : "Benchmark"]) as Parameters<typeof Tooltip>[0]["formatter"]} />
                           <ReferenceLine y={100} stroke="rgba(255,255,255,0.1)" strokeDasharray="4 4" />
-                          <Area type="monotone" dataKey="portfolio" stroke="#10b981" fill="url(#portGrad)" strokeWidth={2} dot={false} isAnimationActive={false} name="portfolio" />
-                          <Line type="monotone" dataKey="benchmark" stroke="rgba(255,255,255,0.25)" strokeWidth={1.5} dot={false} isAnimationActive={false} strokeDasharray="4 4" name="benchmark" />
+                          <Area type="monotone" dataKey="portfolio" stroke="#10b981" fill="url(#portGrad)" strokeWidth={2} dot={false} isAnimationActive={true} animationDuration={800} animationEasing="ease-out" name="portfolio" />
+                          <Line type="monotone" dataKey="benchmark" stroke="rgba(255,255,255,0.25)" strokeWidth={1.5} dot={false} isAnimationActive={true} animationDuration={800} animationEasing="ease-out" strokeDasharray="4 4" name="benchmark" />
                         </ComposedChart>
                       </ResponsiveContainer>
                     </div>
@@ -3133,11 +3134,11 @@ export default function AlphaPage() {
                             if (name === "sma50") return [fmtPrice(v), "50MA"];
                             return [null, ""];
                           }} />
-                        <Area type="monotone" dataKey="price" stroke="#3b82f6" fill="url(#simPriceGrad)" strokeWidth={1.5} dot={false} isAnimationActive={false} name="price" />
-                        <Line type="monotone" dataKey="sma200" stroke="#f59e0b" strokeWidth={1.5} dot={false} strokeDasharray="6 3" connectNulls isAnimationActive={false} name="sma200" />
-                        <Line type="monotone" dataKey="sma50" stroke="rgba(139,157,195,0.5)" strokeWidth={1} dot={false} strokeDasharray="3 3" connectNulls isAnimationActive={false} name="sma50" />
+                        <Area type="monotone" dataKey="price" stroke="#3b82f6" fill="url(#simPriceGrad)" strokeWidth={1.5} dot={false} isAnimationActive={true} animationDuration={800} animationEasing="ease-out" name="price" />
+                        <Line type="monotone" dataKey="sma200" stroke="#f59e0b" strokeWidth={1.5} dot={false} strokeDasharray="6 3" connectNulls isAnimationActive={true} animationDuration={800} animationEasing="ease-out" name="sma200" />
+                        <Line type="monotone" dataKey="sma50" stroke="rgba(139,157,195,0.5)" strokeWidth={1} dot={false} strokeDasharray="3 3" connectNulls isAnimationActive={true} animationDuration={800} animationEasing="ease-out" name="sma50" />
                         {/* Entry markers (green ▲) */}
-                        <Line type="monotone" dataKey="price" stroke="none" legendType="none" isAnimationActive={false} connectNulls={false} name="priceEntry" tooltipType="none"
+                        <Line type="monotone" dataKey="price" stroke="none" legendType="none" isAnimationActive={true} animationDuration={800} animationEasing="ease-out" connectNulls={false} name="priceEntry" tooltipType="none"
                           dot={(props: { cx?: number; cy?: number; payload?: any; index?: number }) => {
                             const { cx, cy, payload } = props;
                             if (!payload?.entryMarker || cx == null || cy == null) return <g key={`se-${cx}-${cy}`} />;
@@ -3145,7 +3146,7 @@ export default function AlphaPage() {
                             return <polygon key={`se-${cx}`} points={pts} fill="#10b981" stroke="#0a0a0a" strokeWidth={1.5} />;
                           }} />
                         {/* Exit markers (red ▼) */}
-                        <Line type="monotone" dataKey="price" stroke="none" legendType="none" isAnimationActive={false} connectNulls={false} name="priceExit" tooltipType="none"
+                        <Line type="monotone" dataKey="price" stroke="none" legendType="none" isAnimationActive={true} animationDuration={800} animationEasing="ease-out" connectNulls={false} name="priceExit" tooltipType="none"
                           dot={(props: { cx?: number; cy?: number; payload?: any }) => {
                             const { cx, cy, payload } = props;
                             if (!payload?.exitMarker || cx == null || cy == null) return <g key={`sx-${cx}-${cy}`} />;
@@ -3289,9 +3290,9 @@ export default function AlphaPage() {
                       <ReferenceLine y={simEntry} stroke="#10b981" strokeDasharray="5 3" strokeWidth={1} />
                       <ReferenceLine y={simExit} stroke="#ef4444" strokeDasharray="5 3" strokeWidth={1} />
                       <ReferenceLine y={0} stroke="rgba(255,255,255,0.15)" strokeWidth={1} />
-                      <Area type="stepAfter" dataKey="mlPrediction" stroke="#3b82f6" fill="url(#simPredGrad)" strokeWidth={1.5} dot={false} isAnimationActive={false} connectNulls name="mlPred" />
+                      <Area type="stepAfter" dataKey="mlPrediction" stroke="#3b82f6" fill="url(#simPredGrad)" strokeWidth={1.5} dot={false} isAnimationActive={true} animationDuration={800} animationEasing="ease-out" connectNulls name="mlPred" />
                       {/* Entry dots */}
-                      <Line type="stepAfter" dataKey="mlPrediction" stroke="none" legendType="none" isAnimationActive={false} connectNulls={false} name="mlPredEntry" tooltipType="none"
+                      <Line type="stepAfter" dataKey="mlPrediction" stroke="none" legendType="none" isAnimationActive={true} animationDuration={800} animationEasing="ease-out" connectNulls={false} name="mlPredEntry" tooltipType="none"
                         dot={(props: { cx?: number; cy?: number; payload?: any }) => {
                           const { cx, cy, payload } = props;
                           if (!payload?.entryMarker || cx == null || cy == null) return <g key={`spe-${cx}-${cy}`} />;
@@ -3299,7 +3300,7 @@ export default function AlphaPage() {
                           return <polygon key={`spe-${cx}`} points={pts} fill="#10b981" stroke="#0a0a0a" strokeWidth={1} />;
                         }} />
                       {/* Exit markers (red ▼) */}
-                      <Line type="stepAfter" dataKey="mlPrediction" stroke="none" legendType="none" isAnimationActive={false} connectNulls={false} name="mlPredExit" tooltipType="none"
+                      <Line type="stepAfter" dataKey="mlPrediction" stroke="none" legendType="none" isAnimationActive={true} animationDuration={800} animationEasing="ease-out" connectNulls={false} name="mlPredExit" tooltipType="none"
                         dot={(props: { cx?: number; cy?: number; payload?: any }) => {
                           const { cx, cy, payload } = props;
                           if (!payload?.exitMarker || cx == null || cy == null) return <g key={`spx-${cx}-${cy}`} />;
@@ -3411,8 +3412,8 @@ export default function AlphaPage() {
                       <YAxis tick={{ fontSize: 9, fill: "rgba(255,255,255,0.4)", fontFamily: "monospace" }} />
                       <Tooltip contentStyle={{ background: "#0d1117", border: "1px solid #30363d", borderRadius: 6, fontFamily: "monospace", fontSize: 11, color: "#fff" }}
                         formatter={(v: number | undefined, name: string | undefined) => [v?.toFixed(1) ?? "—", name === "equityValue" ? "Strategy" : "OBX"]} />
-                      <Line type="monotone" dataKey="equityValue" stroke="#3b82f6" strokeWidth={2} dot={false} isAnimationActive={false} name="equityValue" />
-                      <Line type="monotone" dataKey="benchmarkValue" stroke="rgba(255,255,255,0.25)" strokeWidth={1} dot={false} isAnimationActive={false} strokeDasharray="4 3" name="benchmarkValue" />
+                      <Line type="monotone" dataKey="equityValue" stroke="#3b82f6" strokeWidth={2} dot={false} isAnimationActive={true} animationDuration={800} animationEasing="ease-out" name="equityValue" />
+                      <Line type="monotone" dataKey="benchmarkValue" stroke="rgba(255,255,255,0.25)" strokeWidth={1} dot={false} isAnimationActive={true} animationDuration={800} animationEasing="ease-out" strokeDasharray="4 3" name="benchmarkValue" />
                       <ReferenceLine y={100} stroke="rgba(255,255,255,0.1)" strokeWidth={1} />
                     </LineChart>
                   </ResponsiveContainer>
@@ -3426,6 +3427,7 @@ export default function AlphaPage() {
           )}
         </div>
       )}
+      </div>
 
     </main>
   );

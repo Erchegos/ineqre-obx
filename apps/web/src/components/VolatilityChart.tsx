@@ -106,7 +106,7 @@ export default function VolatilityChart({
                 dot={false}
                 activeDot={{ r: 6, fill: config.color, stroke: "#fff", strokeWidth: 2 }}
                 connectNulls={true}
-                isAnimationActive={false}
+                isAnimationActive={true} animationDuration={800} animationEasing="ease-out"
               />
             );
           })}

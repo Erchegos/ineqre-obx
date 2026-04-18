@@ -1368,12 +1368,14 @@ export default function FinancialsPage() {
             <SkeletonBlock height={250} />
           </div>
         )}
-        {tab === "OVERVIEW" && renderOverview()}
-        {tab === "RATES" && renderRates()}
-        {tab === "SCORECARD" && renderScorecard()}
-        {tab === "SIGNALS" && renderSignals()}
-        {tab === "MACRO" && renderMacro()}
-        {tab === "EXPLORER" && renderExplorer()}
+        <div key={tab} style={{ animation: "fadeIn 0.15s ease-out" }}>
+          {tab === "OVERVIEW" && renderOverview()}
+          {tab === "RATES" && renderRates()}
+          {tab === "SCORECARD" && renderScorecard()}
+          {tab === "SIGNALS" && renderSignals()}
+          {tab === "MACRO" && renderMacro()}
+          {tab === "EXPLORER" && renderExplorer()}
+        </div>
 
         {/* Footer */}
         <div style={{ borderTop: "1px solid #21262d", marginTop: 28, padding: "12px 0", fontSize: 9, color: "rgba(255,255,255,0.25)", lineHeight: 1.9 }}>

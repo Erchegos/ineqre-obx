@@ -1407,7 +1407,7 @@ export default function STDChannelStrategyPage() {
                     fill="url(#cumGradient)"
                     dot={{ fill: "#10b981", r: 2, strokeWidth: 0 }}
                     activeDot={{ r: 4, fill: "#10b981" }}
-                    isAnimationActive={false}
+                    isAnimationActive={true} animationDuration={800} animationEasing="ease-out"
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -1431,7 +1431,7 @@ export default function STDChannelStrategyPage() {
                       <span key="l" style={{ color: "#a1a1aa" }}>of trades</span>,
                     ]}
                   />
-                  <Bar dataKey="value" radius={[0, 4, 4, 0]} isAnimationActive={false}>
+                  <Bar dataKey="value" radius={[0, 4, 4, 0]} isAnimationActive={true} animationDuration={800} animationEasing="ease-out">
                     {exitReasonData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}

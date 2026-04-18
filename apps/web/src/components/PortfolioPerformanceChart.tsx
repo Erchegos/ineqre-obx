@@ -228,7 +228,7 @@ export default function PortfolioPerformanceChart({
                 strokeWidth={0.8}
                 strokeOpacity={0.4}
                 dot={false}
-                isAnimationActive={false}
+                isAnimationActive={true} animationDuration={800} animationEasing="ease-out"
                 legendType="none"
               />
             );
@@ -243,7 +243,7 @@ export default function PortfolioPerformanceChart({
               strokeWidth={1}
               strokeDasharray="4 4"
               dot={false}
-              isAnimationActive={false}
+              isAnimationActive={true} animationDuration={800} animationEasing="ease-out"
             />
           )}
 
@@ -254,7 +254,7 @@ export default function PortfolioPerformanceChart({
             stroke={PORTFOLIO_COLOR}
             strokeWidth={2.5}
             dot={false}
-            isAnimationActive={false}
+            isAnimationActive={true} animationDuration={800} animationEasing="ease-out"
           />
         </LineChart>
       </ResponsiveContainer>

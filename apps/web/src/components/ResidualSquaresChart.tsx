@@ -402,7 +402,7 @@ export default function ResidualSquaresChart({
               stroke="#d97706"
               strokeWidth={2.5}
               dot={false}
-              isAnimationActive={false}
+              isAnimationActive={true} animationDuration={800} animationEasing="ease-out"
             />
 
             {/* Scatter dots */}

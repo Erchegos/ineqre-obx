@@ -4,29 +4,13 @@ import Link from "next/link";
 import { useEffect, useState, useRef } from "react";
 import StockSearchBar from "@/components/StockSearchBar";
 import type { SearchStock } from "@/components/StockSearchBar";
+import { useCountUp } from "@/lib/useCountUp";
 
 type SystemStats = {
   securities: number;
   last_updated: string | null;
   data_points: number;
 };
-
-function useCountUp(target: number, duration = 1500) {
-  const [value, setValue] = useState(0);
-  useEffect(() => {
-    if (target === 0) return;
-    let start: number | null = null;
-    const step = (ts: number) => {
-      if (!start) start = ts;
-      const progress = Math.min((ts - start) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setValue(Math.round(eased * target));
-      if (progress < 1) requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
-  }, [target, duration]);
-  return value;
-}
 
 function useScrollReveal() {
   const ref = useRef<HTMLDivElement>(null);

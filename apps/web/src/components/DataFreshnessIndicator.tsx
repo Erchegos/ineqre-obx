@@ -95,6 +95,7 @@ export function DataFreshnessIndicator() {
             height: 8,
             borderRadius: '50%',
             backgroundColor: statusColors[status],
+            animation: status === 'fresh' ? 'pulse-dot 2s ease-in-out infinite' : 'none',
           }}
         />
         <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>
