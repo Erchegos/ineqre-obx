@@ -3,10 +3,8 @@
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import PageNav from "@/components/ui/PageNav";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
-  BarChart,
-  Bar,
   LineChart,
   Line,
   XAxis,
@@ -15,361 +13,248 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
-  Cell,
+  ReferenceArea,
 } from "recharts";
-import ModelModeToggle from "@/components/ModelModeToggle";
 
-type Prediction = {
-  prediction_date: string;
-  target_date: string;
-  ensemble_prediction: number;
-  gb_prediction: number;
-  rf_prediction: number;
-  actual_return: number | null;
-  p05: number;
-  p25: number;
-  p50: number;
-  p75: number;
-  p95: number;
-  confidence_score: number;
-  size_regime: string;
-  turnover_regime: string;
-  quintile: number;
-  direction_correct: boolean | null;
+/* ─── Types ─── */
+
+type SimStats = {
+  totalReturn: number;
+  annualizedReturn: number;
+  benchmarkReturn: number;
+  benchmarkAnnReturn: number;
+  excessReturn: number;
+  sharpe: number;
+  maxDrawdown: number;
+  winRate: number;
+  trades: number;
+  avgHoldDays: number;
+  avgWinPct: number;
+  avgLossPct: number;
+  profitFactor: number;
 };
 
-type Summary = {
-  n_predictions: number;
-  n_total: number;
-  hit_rate: number;
-  mae: number;
-  avg_quintile: number;
-  avg_confidence: number;
-  size_regime: string;
+type SimTrade = {
+  entryDate: string;
+  exitDate: string;
+  entryPrice: number;
+  exitPrice: number;
+  predictedReturn: number;
+  actualReturn: number;
+  pnlPct: number;
+  daysHeld: number;
+  exitReason: string;
+  maxDrawdown: number;
+  momAtEntry: number;
+  volAtEntry: string | null;
+  predAtEntry: number;
 };
 
-type OptimizerData = {
-  hasOptimized: boolean;
-  config?: {
-    factors: string[];
-    gb_weight: number;
-    rf_weight: number;
-    n_factors: number;
-    optimization_method: string;
-    optimized_at: string;
-  };
-  performance?: {
-    optimized: {
-      hit_rate: number;
-      mae: number;
-      r2: number;
-      ic: number;
-      sharpe: number;
-    };
-    default_baseline: {
-      hit_rate: number;
-      mae: number;
-      r2: number;
-    };
-    improvement: {
-      hit_rate_delta: number;
-      mae_delta: number;
-    };
-  };
+type SeriesPoint = {
+  date: string;
+  price: number;
+  equity: number;
+  benchmark: number;
+  inPosition: boolean;
+  entryMarker: boolean;
+  exitMarker: boolean;
+  exitWin: boolean | null;
+  mlPrediction: number | null;
 };
+
+type BacktestResult = {
+  success: boolean;
+  ticker: string;
+  sector: string;
+  signal: "daily" | "monthly";
+  days: number;
+  params: Record<string, number | string | boolean>;
+  stats: SimStats;
+  trades: SimTrade[];
+  series: SeriesPoint[];
+  error?: string;
+  availableTickers?: string[];
+};
+
+/* ─── Styles ─── */
 
 const cardStyle = {
-  padding: 10,
-  borderRadius: 2,
-  background: "#161b22",
-  border: "1px solid #30363d",
-};
-
-const labelStyle = {
-  fontSize: 9,
-  color: "rgba(255,255,255,0.5)",
-  marginBottom: 2,
-  fontFamily: "monospace" as const,
-  fontWeight: 600,
-};
-
-const valueStyle = {
-  fontSize: 22,
-  fontWeight: 700,
-  fontFamily: "monospace" as const,
-};
-
-const subLabelStyle = {
-  fontSize: 8,
-  color: "rgba(255,255,255,0.5)",
-  marginTop: 2,
-  fontFamily: "monospace" as const,
-  fontWeight: 600,
+  padding: "10px 12px",
+  borderRadius: 4,
+  background: "#0d1117",
+  border: "1px solid #21262d",
 };
 
 const tooltipStyle = {
   background: "#161b22",
   border: "1px solid #3b82f6",
   borderRadius: 4,
-  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-  fontSize: 11,
-  fontFamily: "monospace",
-  padding: "8px 12px",
-};
-
-const chartCardStyle = {
-  padding: 12,
-  borderRadius: 2,
-  border: "1px solid #30363d",
-  background: "#161b22",
-};
-
-const sectionStyle = {
-  padding: 12,
-  borderRadius: 2,
-  border: "1px solid #30363d",
-  background: "#161b22",
-};
-
-const sectionTitle = {
   fontSize: 10,
-  fontWeight: 700,
-  marginBottom: 10,
-  color: "#fff",
-  fontFamily: "monospace" as const,
+  fontFamily: "monospace",
+  padding: "6px 10px",
 };
 
-const GLOSSARY = [
-  { term: "Hit Rate", def: "Percentage of predictions where the direction (up/down) was correct. 50% is random." },
-  { term: "MAE", def: "Mean Absolute Error — Average of |predicted return - actual return|. Lower is more accurate." },
-  { term: "Quintile", def: "Stocks ranked 1-5 each month by predicted return. Q5 = highest predicted, Q1 = lowest predicted." },
-  { term: "Confidence", def: "Model confidence score based on ensemble tree agreement. Higher means models agree more on the prediction." },
-  { term: "Ensemble", def: "Combined prediction from Gradient Boosting (60%) and Random Forest (40%) models." },
-  { term: "Direction", def: "Whether the model correctly predicted up or down movement. Check = correct, cross = incorrect." },
-  { term: "Sharpe Ratio", def: "Risk-adjusted return: (Return - Risk-free) / Volatility. Higher is better. >1.0 is excellent." },
-  { term: "Sortino Ratio", def: "Like Sharpe but only penalizes downside volatility. Better for asymmetric strategies." },
-  { term: "Calmar Ratio", def: "Annualized return / Max drawdown. Measures return per unit of drawdown risk." },
-  { term: "Max Drawdown", def: "Largest peak-to-trough decline. Shows worst-case loss if you invested at the peak." },
+const EXIT_COLORS: Record<string, string> = {
+  signal_flip: "#3b82f6",
+  take_profit: "#10b981",
+  stop_loss: "#ef4444",
+  time_stop: "#f59e0b",
+  sma_cross: "#8b5cf6",
+  vol_regime: "#f97316",
+};
+
+const EXIT_LABELS: Record<string, string> = {
+  signal_flip: "Signal",
+  take_profit: "TP",
+  stop_loss: "SL",
+  time_stop: "Time",
+  sma_cross: "SMA",
+  vol_regime: "Vol",
+};
+
+/* ─── Param Config ─── */
+
+type ParamDef = {
+  key: string;
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  suffix: string;
+};
+
+const PARAM_DEFS: ParamDef[] = [
+  { key: "entry", label: "ENTRY", min: 0.1, max: 5.0, step: 0.1, suffix: "%" },
+  { key: "exit", label: "EXIT", min: -2.0, max: 2.0, step: 0.05, suffix: "%" },
+  { key: "stop", label: "STOP LOSS", min: 1, max: 15, step: 0.5, suffix: "%" },
+  { key: "tp", label: "TAKE PROFIT", min: 3, max: 50, step: 1, suffix: "%" },
+  { key: "maxHold", label: "MAX HOLD", min: 5, max: 60, step: 1, suffix: "d" },
+  { key: "minHold", label: "MIN HOLD", min: 1, max: 10, step: 1, suffix: "d" },
 ];
+
+const DEFAULT_PARAMS: Record<string, number> = {
+  entry: 1.0,
+  exit: 0.25,
+  stop: 5.0,
+  tp: 15.0,
+  maxHold: 21,
+  minHold: 3,
+};
+
+/* ─── Component ─── */
 
 export default function TickerBacktestPage() {
   const params = useParams();
   const ticker = (params?.ticker as string)?.toUpperCase() || "";
 
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [result, setResult] = useState<BacktestResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [availableTickers, setAvailableTickers] = useState<string[]>([]);
-  const [mode, setMode] = useState<"default" | "optimized">("default");
-  const [optimizerData, setOptimizerData] = useState<OptimizerData | null>(null);
-  const [strategy, setStrategy] = useState<"long-short" | "long-only">("long-only");
+  const [signal, setSignal] = useState<"daily" | "monthly">("daily");
+  const [days, setDays] = useState(1260);
+  const [simParams, setSimParams] = useState<Record<string, number>>({ ...DEFAULT_PARAMS });
+  const [pendingParams, setPendingParams] = useState<Record<string, number>>({ ...DEFAULT_PARAMS });
+  const [expandedTrades, setExpandedTrades] = useState(false);
 
-  // Fetch optimizer config on mount
-  useEffect(() => {
-    if (!ticker) return;
-    fetch(`/api/optimizer-config/${ticker}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.success) {
-          setOptimizerData(data);
-        }
-      })
-      .catch(() => {});
-  }, [ticker]);
-
-
-  useEffect(() => {
-    if (!ticker) return;
-
-    async function fetchData() {
+  const fetchBacktest = useCallback(
+    async (p: Record<string, number>, sig: string, d: number) => {
+      if (!ticker) return;
       setLoading(true);
       setError(null);
       try {
-        // Pass model_type to get optimized predictions when in optimized mode
-        const modelType = mode === "optimized" ? "optimized" : "default";
-        const res = await fetch(`/api/backtest/${ticker}?model_type=${modelType}`);
-        const data = await res.json();
+        const qs = new URLSearchParams({
+          signal: sig,
+          days: String(d),
+          ...Object.fromEntries(Object.entries(p).map(([k, v]) => [k, String(v)])),
+        });
+        const res = await fetch(`/api/backtest/${ticker}?${qs}`);
+        const data: BacktestResult = await res.json();
         if (!res.ok || !data.success) {
-          if (data.availableTickers) setAvailableTickers(data.availableTickers);
-          throw new Error(data.message || data.error || "Failed to fetch backtest data");
+          throw new Error(data.error || "Failed to fetch backtest");
         }
-        setSummary(data.summary);
-        setPredictions(data.predictions);
+        setResult(data);
       } catch (err: any) {
         setError(err.message);
       } finally {
         setLoading(false);
       }
-    }
-    fetchData();
-  }, [ticker, mode]);
+    },
+    [ticker]
+  );
 
-  const hasOptimized = optimizerData?.hasOptimized ?? false;
-  const optPerf = optimizerData?.performance;
+  // Initial fetch
+  useEffect(() => {
+    fetchBacktest(simParams, signal, days);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticker]);
 
-  if (loading) {
-    return (
-      <div
-        style={{
-          maxWidth: 1600,
-          margin: "0 auto",
-          padding: "100px 16px 16px",
-          fontFamily: "monospace",
-          color: "rgba(255,255,255,0.5)",
-          textAlign: "center",
-        }}
-      >
-        LOADING BACKTEST DATA FOR {ticker}...
-      </div>
-    );
+  const handleRun = () => {
+    setSimParams({ ...pendingParams });
+    fetchBacktest(pendingParams, signal, days);
+  };
+
+  const handleSignalChange = (s: "daily" | "monthly") => {
+    setSignal(s);
+    fetchBacktest(simParams, s, days);
+  };
+
+  const handleDaysChange = (d: number) => {
+    setDays(d);
+    fetchBacktest(simParams, signal, d);
+  };
+
+  const stats = result?.stats;
+  const trades = result?.trades || [];
+  const series = result?.series || [];
+
+  // Format helpers
+  const pct = (v: number, decimals = 1) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(decimals)}%`;
+  const pctRaw = (v: number, decimals = 1) => `${v >= 0 ? "+" : ""}${v.toFixed(decimals)}%`;
+
+  // Equity curve data — thin to ~300 points for perf
+  const stride = Math.max(1, Math.floor(series.length / 300));
+  const chartData = series.filter((_, i) => i % stride === 0 || i === series.length - 1);
+
+  // Trade position bands for chart shading
+  const positionBands: { start: string; end: string; win: boolean }[] = [];
+  for (const t of trades) {
+    positionBands.push({
+      start: t.entryDate,
+      end: t.exitDate,
+      win: t.pnlPct > 0,
+    });
   }
 
-  if (error || !summary) {
-    const hasAvailable = availableTickers.length > 0;
+  // Exit reason breakdown
+  const exitBreakdown: Record<string, number> = {};
+  for (const t of trades) {
+    exitBreakdown[t.exitReason] = (exitBreakdown[t.exitReason] || 0) + 1;
+  }
+
+  if (error && !result) {
+    const availableTickers = (result as any)?.availableTickers || [];
     return (
-      <div
-        style={{
-          maxWidth: 1200,
-          margin: "0 auto",
-          padding: "60px 16px 16px",
-          fontFamily: "monospace",
-        }}
-      >
-        {/* Processing banner */}
-        <div
-          style={{
-            padding: "24px 32px",
-            background: "#161b22",
-            border: "1px solid #f59e0b",
-            borderRadius: 2,
-            marginBottom: 24,
-            textAlign: "center",
-          }}
-        >
-          <div
-            style={{
-              fontSize: 14,
-              fontWeight: 700,
-              color: "#f59e0b",
-              marginBottom: 8,
-            }}
-          >
-            INSUFFICIENT BACKTEST DATA FOR {ticker}
+      <div style={{ maxWidth: 1600, margin: "0 auto", padding: "60px 16px", fontFamily: "monospace" }}>
+        <div style={{ padding: "24px 32px", background: "#161b22", border: "1px solid #f59e0b", borderRadius: 4, textAlign: "center" }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#f59e0b", marginBottom: 8 }}>
+            NO DATA FOR {ticker}
           </div>
-          <div
-            style={{
-              fontSize: 11,
-              color: "rgba(255,255,255,0.5)",
-              lineHeight: 1.6,
-              maxWidth: 600,
-              margin: "0 auto",
-            }}
-          >
-            {error || "This stock does not have enough realized predictions for a meaningful backtest. At least 3 monthly predictions with actual returns are needed."}
-          </div>
-          <div
-            style={{
-              marginTop: 16,
-              display: "flex",
-              justifyContent: "center",
-              gap: 12,
-            }}
-          >
-            <Link
-              href={`/predictions/${ticker}`}
-              style={{
-                fontSize: 10,
-                color: "#3b82f6",
-                textDecoration: "none",
-                fontWeight: 600,
-                padding: "6px 14px",
-                border: "1px solid #3b82f6",
-                borderRadius: 2,
-                background: "#0d1117",
-              }}
-            >
-              VIEW {ticker} PREDICTIONS
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>{error}</div>
+          <div style={{ marginTop: 16, display: "flex", justifyContent: "center", gap: 12 }}>
+            <Link href="/backtest" style={{ fontSize: 10, color: "#3b82f6", textDecoration: "none", fontWeight: 600, padding: "6px 14px", border: "1px solid #3b82f6", borderRadius: 4, background: "#0d1117" }}>
+              ALL BACKTESTS
             </Link>
-            <Link
-              href="/backtest"
-              style={{
-                fontSize: 10,
-                color: "#10b981",
-                textDecoration: "none",
-                fontWeight: 600,
-                padding: "6px 14px",
-                border: "1px solid #10b981",
-                borderRadius: 2,
-                background: "#0d1117",
-              }}
-            >
-              AGGREGATE BACKTEST
+            <Link href={`/stocks/${ticker}`} style={{ fontSize: 10, color: "#10b981", textDecoration: "none", fontWeight: 600, padding: "6px 14px", border: "1px solid #10b981", borderRadius: 4, background: "#0d1117" }}>
+              VIEW {ticker}
             </Link>
           </div>
         </div>
-
-        {/* Available stocks grid */}
-        {hasAvailable && (
-          <div
-            style={{
-              padding: 16,
-              background: "#161b22",
-              border: "1px solid #30363d",
-              borderRadius: 2,
-            }}
-          >
-            <div
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                color: "#fff",
-                marginBottom: 4,
-              }}
-            >
-              STOCKS WITH BACKTEST DATA ({availableTickers.length})
-            </div>
-            <div
-              style={{
-                fontSize: 9,
-                color: "rgba(255,255,255,0.5)",
-                marginBottom: 12,
-              }}
-            >
-              Click any ticker to view its walk-forward backtest results
-            </div>
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 4,
-              }}
-            >
-              {availableTickers.map((t) => (
-                <Link
-                  key={t}
-                  href={`/backtest/${t}`}
-                  style={{
-                    fontSize: 9,
-                    fontWeight: 600,
-                    padding: "3px 8px",
-                    borderRadius: 2,
-                    textDecoration: "none",
-                    background:
-                      t === ticker
-                        ? "#ef4444"
-                        : "#161b22",
-                    color:
-                      t === ticker
-                        ? "#fff"
-                        : "#3b82f6",
-                    border: `1px solid ${
-                      t === ticker
-                        ? "#ef4444"
-                        : "#30363d"
-                    }`,
-                  }}
-                >
+        {availableTickers.length > 0 && (
+          <div style={{ marginTop: 16, padding: 16, background: "#161b22", border: "1px solid #30363d", borderRadius: 4 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#fff", marginBottom: 8 }}>AVAILABLE TICKERS</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+              {availableTickers.map((t: string) => (
+                <Link key={t} href={`/backtest/${t}`} style={{ fontSize: 9, fontWeight: 600, padding: "3px 8px", borderRadius: 3, textDecoration: "none", background: "#0d1117", color: "#3b82f6", border: "1px solid #30363d" }}>
                   {t}
                 </Link>
               ))}
@@ -380,764 +265,322 @@ export default function TickerBacktestPage() {
     );
   }
 
-  // Prepare chart data — group by month for predicted vs actual
-  const withActual = predictions.filter((p) => p.actual_return !== null);
-
-  const barData = withActual.map((p) => {
-    const month =
-      typeof p.prediction_date === "string"
-        ? p.prediction_date.slice(0, 7)
-        : p.prediction_date;
-    return {
-      month,
-      predicted: p.ensemble_prediction * 100,
-      actual: (p.actual_return as number) * 100,
-    };
-  });
-
-  // Calculate cumulative returns for both buy-and-hold and strategy
-  const cumData = withActual.map((p, i) => {
-    const cumReturn = withActual
-      .slice(0, i + 1)
-      .reduce((sum, r) => {
-        const actualRet = r.actual_return as number;
-        const predicted = r.ensemble_prediction;
-        let strategyReturn: number;
-        if (strategy === "long-only") {
-          // Long only: go long when prediction > 0, stay flat otherwise
-          strategyReturn = predicted >= 0 ? actualRet : 0;
-        } else {
-          // Long/short: go long when prediction > 0, short when < 0
-          strategyReturn = predicted >= 0 ? actualRet : -actualRet;
-        }
-        return sum + strategyReturn;
-      }, 0);
-
-    const buyHoldReturn = withActual
-      .slice(0, i + 1)
-      .reduce((sum, r) => sum + (r.actual_return as number), 0);
-
-    const month =
-      typeof p.prediction_date === "string"
-        ? p.prediction_date.slice(0, 7)
-        : p.prediction_date;
-    return {
-      month,
-      cumReturn: cumReturn * 100,
-      buyHold: buyHoldReturn * 100,
-    };
-  });
-
-  // Final returns for display
-  const finalStrategyReturn = cumData.length > 0 ? cumData[cumData.length - 1].cumReturn : 0;
-  const finalBuyHoldReturn = cumData.length > 0 ? cumData[cumData.length - 1].buyHold : 0;
-
-  const formatMonth = (val: string) => {
-    if (!val || val.length < 7) return val;
-    return val.slice(2, 7);
-  };
-
-  // Color helpers for default mode
-  const defaultHitColor =
-    summary.hit_rate > 0.55
-      ? "#10b981"
-      : summary.hit_rate > 0.5
-        ? "#f59e0b"
-        : "#ef4444";
-
-  const quintileColor =
-    summary.avg_quintile > 3.2
-      ? "#10b981"
-      : summary.avg_quintile > 2.8
-        ? "#fff"
-        : "#ef4444";
-
-  // Optimized mode: use optimizer's precomputed metrics
-  const optHitRate = optPerf?.optimized.hit_rate ?? 0;
-  const optHitColor = optHitRate > 55 ? "#10b981" : optHitRate > 50 ? "#f59e0b" : "#ef4444";
-
   return (
-    <div
-      style={{
-        maxWidth: 1600,
-        margin: "0 auto",
-        padding: 16,
-        fontFamily: "monospace",
-        background: "#0a0a0a",
-      }}
-    >
-      <PageNav crumbs={[{label:"Home",href:"/"},{label:"Stocks",href:"/stocks"},{label:ticker,href:`/stocks/${ticker}`},{label:"Backtest"}]} actions={[{label:"Predictions",href:`/predictions/${ticker}`},{label:"Volatility",href:`/volatility/${ticker}`},{label:"Montecarlo",href:`/montecarlo/${ticker}`},{label:"Options",href:`/options/${ticker}.US`},{label:"All Backtests",href:"/backtest"}]} />
-      {/* Header */}
-      <div
-        style={{
-          marginBottom: 16,
-          padding: "12px 16px",
-          background: "#161b22",
-          border: "1px solid #30363d",
-          borderRadius: 2,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-          }}
-        >
-          <div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                marginBottom: 8,
-              }}
-            >
-              <h1
-                style={{
-                  fontSize: 18,
-                  fontWeight: 700,
-                  color: "#fff",
-                  fontFamily: "monospace",
-                  letterSpacing: "0.5px",
-                }}
-              >
-                BACKTEST: {ticker}
-              </h1>
-              {summary.size_regime && (
-                <span
+    <div style={{ maxWidth: 1600, margin: "0 auto", padding: 16, fontFamily: "monospace", background: "#0a0a0a" }}>
+      <PageNav
+        crumbs={[
+          { label: "Home", href: "/" },
+          { label: "Stocks", href: "/stocks" },
+          { label: ticker, href: `/stocks/${ticker}` },
+          { label: "Backtest" },
+        ]}
+        actions={[
+          { label: "Predictions", href: `/predictions/${ticker}` },
+          { label: "Volatility", href: `/volatility/${ticker}` },
+          { label: "Montecarlo", href: `/montecarlo/${ticker}` },
+          { label: "All Backtests", href: "/backtest" },
+        ]}
+      />
+
+      {/* ── Header ── */}
+      <div style={{ marginBottom: 12, padding: "12px 16px", background: "#161b22", border: "1px solid #30363d", borderRadius: 4 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <h1 style={{ fontSize: 18, fontWeight: 700, color: "#fff", fontFamily: "monospace" }}>
+              BACKTEST: {ticker}
+            </h1>
+            {result?.sector && (
+              <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", background: "rgba(59,130,246,0.15)", color: "#3b82f6", borderRadius: 3, border: "1px solid rgba(59,130,246,0.3)" }}>
+                {result.sector}
+              </span>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            {/* Signal mode toggle */}
+            <div style={{ display: "flex", gap: 0 }}>
+              {(["daily", "monthly"] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => handleSignalChange(s)}
                   style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    fontFamily: "monospace",
-                    padding: "3px 10px",
-                    background: "#3b82f6",
-                    color: "#ffffff",
-                    borderRadius: 2,
-                    textTransform: "uppercase",
+                    fontSize: 9, fontWeight: 600, fontFamily: "monospace", padding: "4px 10px",
+                    border: "1px solid #30363d",
+                    borderRadius: s === "daily" ? "4px 0 0 4px" : "0 4px 4px 0",
+                    borderLeft: s === "monthly" ? "none" : undefined,
+                    background: signal === s ? "#3b82f6" : "#0d1117",
+                    color: signal === s ? "#fff" : "rgba(255,255,255,0.5)",
+                    cursor: "pointer",
                   }}
                 >
-                  {summary.size_regime}
-                </span>
-              )}
+                  {s === "daily" ? "DAILY SIGNAL" : "MONTHLY ML"}
+                </button>
+              ))}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <ModelModeToggle
-                mode={mode}
-                onChange={setMode}
-                hasOptimized={hasOptimized}
-              />
-              <div
-                style={{
-                  fontSize: 10,
-                  color: "rgba(255,255,255,0.5)",
-                  fontFamily: "monospace",
-                }}
-              >
-                {mode === "optimized" && optPerf
-                  ? `OPTIMIZER WALK-FORWARD • ${optPerf.optimized.hit_rate.toFixed(1)}% HIT RATE • ${optimizerData?.config?.n_factors} FACTORS`
-                  : `${summary.n_predictions} REALIZED PREDICTIONS • ${summary.n_total} TOTAL • WALK-FORWARD OUT-OF-SAMPLE`}
-              </div>
+            {/* Lookback */}
+            <div style={{ display: "flex", gap: 0 }}>
+              {[{ label: "2Y", d: 504 }, { label: "3Y", d: 756 }, { label: "5Y", d: 1260 }].map(({ label, d }, i) => (
+                <button
+                  key={d}
+                  onClick={() => handleDaysChange(d)}
+                  style={{
+                    fontSize: 9, fontWeight: 600, fontFamily: "monospace", padding: "4px 8px",
+                    border: "1px solid #30363d",
+                    borderRadius: i === 0 ? "4px 0 0 4px" : i === 2 ? "0 4px 4px 0" : "0",
+                    borderLeft: i > 0 ? "none" : undefined,
+                    background: days === d ? "#3b82f6" : "#0d1117",
+                    color: days === d ? "#fff" : "rgba(255,255,255,0.5)",
+                    cursor: "pointer",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
         </div>
+        <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginTop: 6 }}>
+          {signal === "daily" ? "21-day forward return signal (daily rolling)" : "ML ensemble predictions (monthly, step-held)"} · {result?.days || "—"} trading days · {trades.length} trades
+        </div>
       </div>
 
-      {/* Summary Cards - switches between default and optimized */}
-      {mode === "optimized" && optPerf ? (
-        <>
-          {/* Optimized mode: 5 cards with optimizer's precomputed metrics */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(5, 1fr)",
-              gap: 8,
-              marginBottom: 8,
-            }}
-          >
-            <div style={{ ...cardStyle, borderColor: optHitColor, borderWidth: 2 }}>
-              <div style={labelStyle}>HIT RATE</div>
-              <div style={{ ...valueStyle, color: optHitColor }}>
-                {optPerf.optimized.hit_rate.toFixed(1)}%
+      {/* ── Parameter Controls ── */}
+      <div style={{ marginBottom: 12, padding: "10px 16px", background: "#161b22", border: "1px solid #30363d", borderRadius: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: "#fff", letterSpacing: "0.05em" }}>STRATEGY PARAMETERS</span>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button
+              onClick={() => setPendingParams({ ...DEFAULT_PARAMS })}
+              style={{ fontSize: 8, fontWeight: 600, fontFamily: "monospace", padding: "3px 10px", border: "1px solid #30363d", borderRadius: 4, background: "#0d1117", color: "rgba(255,255,255,0.5)", cursor: "pointer" }}
+            >
+              RESET
+            </button>
+            <button
+              onClick={handleRun}
+              disabled={loading}
+              style={{
+                fontSize: 9, fontWeight: 700, fontFamily: "monospace", padding: "4px 16px",
+                border: "none", borderRadius: 4,
+                background: loading ? "#21262d" : "linear-gradient(135deg, #3b82f6, #2563eb)",
+                color: "#fff", cursor: loading ? "default" : "pointer",
+                opacity: loading ? 0.5 : 1,
+              }}
+            >
+              {loading ? "RUNNING..." : "RUN BACKTEST"}
+            </button>
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10 }}>
+          {PARAM_DEFS.map((p) => (
+            <div key={p.key}>
+              <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", marginBottom: 3, fontWeight: 600, letterSpacing: "0.08em" }}>
+                {p.label}
               </div>
-              <div style={subLabelStyle}>DIRECTION ACCURACY</div>
-            </div>
-
-            <div style={{ ...cardStyle, borderColor: "#06b6d4", borderWidth: 2 }}>
-              <div style={labelStyle}>MAE</div>
-              <div style={{ ...valueStyle, color: "#06b6d4" }}>
-                {optPerf.optimized.mae.toFixed(2)}%
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <input
+                  type="range"
+                  min={p.min}
+                  max={p.max}
+                  step={p.step}
+                  value={pendingParams[p.key]}
+                  onChange={(e) => setPendingParams((prev) => ({ ...prev, [p.key]: parseFloat(e.target.value) }))}
+                  style={{ flex: 1, accentColor: "#3b82f6", height: 2 }}
+                />
+                <span style={{ fontSize: 10, fontWeight: 700, color: "#fff", minWidth: 36, textAlign: "right" }}>
+                  {Number.isInteger(p.step) ? pendingParams[p.key] : pendingParams[p.key].toFixed(p.step < 0.1 ? 2 : 1)}{p.suffix}
+                </span>
               </div>
-              <div style={subLabelStyle}>MEAN ABSOLUTE ERROR</div>
             </div>
+          ))}
+        </div>
+      </div>
 
-            <div style={{ ...cardStyle, borderColor: optPerf.optimized.r2 > 0 ? "#10b981" : "rgba(255,255,255,0.5)", borderWidth: 2 }}>
-              <div style={labelStyle}>R²</div>
-              <div style={{ ...valueStyle, color: optPerf.optimized.r2 > 0 ? "#10b981" : "rgba(255,255,255,0.5)" }}>
-                {optPerf.optimized.r2.toFixed(3)}
-              </div>
-              <div style={subLabelStyle}>EXPLAINED VARIANCE</div>
+      {/* ── Stats Cards ── */}
+      {stats && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8, marginBottom: 12 }}>
+          <div style={{ ...cardStyle, borderColor: stats.totalReturn >= 0 ? "#10b981" : "#ef4444" }}>
+            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontWeight: 600 }}>TOTAL RETURN</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: stats.totalReturn >= 0 ? "#10b981" : "#ef4444" }}>
+              {pct(stats.totalReturn)}
             </div>
-
-            <div style={{ ...cardStyle, borderColor: "#8b5cf6", borderWidth: 2 }}>
-              <div style={labelStyle}>IC</div>
-              <div style={{ ...valueStyle, color: "#8b5cf6" }}>
-                {optPerf.optimized.ic.toFixed(3)}
-              </div>
-              <div style={subLabelStyle}>INFORMATION COEFF</div>
-            </div>
-
-            <div style={{ ...cardStyle, borderColor: optPerf.optimized.sharpe > 1 ? "#10b981" : "#f59e0b", borderWidth: 2 }}>
-              <div style={labelStyle}>SHARPE</div>
-              <div style={{ ...valueStyle, color: optPerf.optimized.sharpe > 1 ? "#10b981" : "#f59e0b" }}>
-                {optPerf.optimized.sharpe.toFixed(2)}
-              </div>
-              <div style={subLabelStyle}>RISK-ADJ RETURN</div>
-            </div>
+            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.35)" }}>Ann: {pct(stats.annualizedReturn)}</div>
           </div>
-
-          {/* Improvement comparison banner */}
-          <div
-            style={{
-              marginBottom: 16,
-              padding: "8px 12px",
-              background: "rgba(245, 158, 11, 0.1)",
-              border: "1px solid #f59e0b",
-              borderRadius: 2,
-              fontFamily: "monospace",
-              fontSize: 10,
-              display: "flex",
-              alignItems: "center",
-              gap: 24,
-            }}
-          >
-            <span style={{ color: "#f59e0b", fontWeight: 700 }}>
-              IMPROVEMENT vs DEFAULT:
-            </span>
-            <span>
-              <span style={{ color: "#fff", fontWeight: 600 }}>Hit Rate</span>{" "}
-              <span style={{ color: optPerf.improvement.hit_rate_delta > 0 ? "#10b981" : "#ef4444" }}>
-                {optPerf.improvement.hit_rate_delta > 0 ? "+" : ""}
-                {optPerf.improvement.hit_rate_delta.toFixed(1)}pp
-              </span>
-              <span style={{ color: "rgba(255,255,255,0.5)", marginLeft: 4 }}>
-                ({optPerf.default_baseline.hit_rate.toFixed(1)}% → {optPerf.optimized.hit_rate.toFixed(1)}%)
-              </span>
-            </span>
-            <span>
-              <span style={{ color: "#fff", fontWeight: 600 }}>MAE</span>{" "}
-              <span style={{ color: optPerf.improvement.mae_delta > 0 ? "#10b981" : "#ef4444" }}>
-                {optPerf.improvement.mae_delta > 0 ? "-" : "+"}
-                {Math.abs(optPerf.improvement.mae_delta).toFixed(2)}%
-              </span>
-            </span>
-            <span>
-              <span style={{ color: "#fff", fontWeight: 600 }}>R²</span>{" "}
-              <span style={{ color: "#10b981" }}>
-                +{(optPerf.optimized.r2 - optPerf.default_baseline.r2).toFixed(3)}
-              </span>
-            </span>
-          </div>
-          <div
-            style={{
-              marginBottom: 8,
-              padding: "6px 12px",
-              background: "rgba(16, 185, 129, 0.1)",
-              border: "1px solid #10b981",
-              borderRadius: 2,
-              fontFamily: "monospace",
-              fontSize: 9,
-              color: "#10b981",
-            }}
-          >
-            Charts and predictions below use the optimized factor selection ({optimizerData?.config?.n_factors} factors).
-          </div>
-        </>
-      ) : (
-        /* Default mode: original 4 cards */
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: 8,
-            marginBottom: 16,
-          }}
-        >
-          <div style={{ ...cardStyle, borderColor: defaultHitColor, borderWidth: 2 }}>
-            <div style={labelStyle}>HIT RATE</div>
-            <div style={{ ...valueStyle, color: defaultHitColor }}>
-              {(summary.hit_rate * 100).toFixed(1)}%
+          <div style={{ ...cardStyle, borderColor: stats.excessReturn >= 0 ? "#10b981" : "#ef4444" }}>
+            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontWeight: 600 }}>VS BENCHMARK</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: stats.excessReturn >= 0 ? "#10b981" : "#ef4444" }}>
+              {pct(stats.excessReturn)}
             </div>
-            <div style={subLabelStyle}>DIRECTION ACCURACY</div>
+            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.35)" }}>OBX: {pct(stats.benchmarkAnnReturn)}</div>
           </div>
-
-          <div
-            style={{
-              ...cardStyle,
-              borderColor: "#06b6d4",
-              borderWidth: 2,
-            }}
-          >
-            <div style={labelStyle}>MAE</div>
-            <div style={{ ...valueStyle, color: "#06b6d4" }}>
-              {(summary.mae * 100).toFixed(2)}%
+          <div style={{ ...cardStyle, borderColor: stats.sharpe >= 1 ? "#10b981" : stats.sharpe >= 0.5 ? "#f59e0b" : "#ef4444" }}>
+            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontWeight: 600 }}>SHARPE</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: stats.sharpe >= 1 ? "#10b981" : stats.sharpe >= 0.5 ? "#f59e0b" : "#ef4444" }}>
+              {stats.sharpe.toFixed(2)}
             </div>
-            <div style={subLabelStyle}>MEAN ABSOLUTE ERROR</div>
+            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.35)" }}>Risk-adj return</div>
           </div>
-
-          <div
-            style={{
-              ...cardStyle,
-              borderColor: quintileColor,
-              borderWidth: 2,
-            }}
-          >
-            <div style={labelStyle}>AVG QUINTILE</div>
-            <div style={{ ...valueStyle, color: quintileColor }}>
-              {summary.avg_quintile.toFixed(1)}
+          <div style={{ ...cardStyle, borderColor: stats.winRate >= 0.55 ? "#10b981" : stats.winRate >= 0.45 ? "#f59e0b" : "#ef4444" }}>
+            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontWeight: 600 }}>WIN RATE</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: stats.winRate >= 0.55 ? "#10b981" : stats.winRate >= 0.45 ? "#f59e0b" : "#ef4444" }}>
+              {(stats.winRate * 100).toFixed(0)}%
             </div>
-            <div style={subLabelStyle}>PREDICTED RANK (1-5)</div>
+            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.35)" }}>{stats.trades} trades</div>
           </div>
-
-          <div
-            style={{
-              ...cardStyle,
-              borderColor: "#3b82f6",
-              borderWidth: 2,
-            }}
-          >
-            <div style={labelStyle}>CONFIDENCE</div>
-            <div style={{ ...valueStyle, color: "#3b82f6" }}>
-              {(summary.avg_confidence * 100).toFixed(0)}%
+          <div style={cardStyle}>
+            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontWeight: 600 }}>MAX DRAWDOWN</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: "#ef4444" }}>
+              {(stats.maxDrawdown * 100).toFixed(1)}%
             </div>
-            <div style={subLabelStyle}>AVG MODEL CONFIDENCE</div>
+            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.35)" }}>Peak to trough</div>
+          </div>
+          <div style={cardStyle}>
+            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontWeight: 600 }}>PROFIT FACTOR</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: stats.profitFactor >= 1.5 ? "#10b981" : stats.profitFactor >= 1.0 ? "#f59e0b" : "#ef4444" }}>
+              {stats.profitFactor === Infinity ? "∞" : stats.profitFactor.toFixed(2)}
+            </div>
+            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.35)" }}>
+              W: {pct(stats.avgWinPct)} / L: {pct(stats.avgLossPct)}
+            </div>
           </div>
         </div>
       )}
 
-
-      {/* Charts */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 16,
-          marginBottom: 16,
-        }}
-      >
-        {/* Predicted vs Actual */}
-        <div style={chartCardStyle}>
-          <div style={sectionTitle}>PREDICTED vs ACTUAL RETURNS</div>
-          <ResponsiveContainer width="100%" height={340}>
-            <BarChart
-              data={barData}
-              margin={{ top: 5, right: 5, left: -20, bottom: 5 }}
-              barGap={1}
-              barSize={6}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="#21262d"
-                vertical={false}
-              />
-              <XAxis
-                dataKey="month"
-                stroke="#30363d"
-                style={{ fontSize: 9, fontFamily: "monospace" }}
-                tick={{ fill: "rgba(255,255,255,0.5)" }}
-                tickFormatter={formatMonth}
-                minTickGap={40}
-              />
-              <YAxis
-                stroke="#30363d"
-                style={{ fontSize: 9, fontFamily: "monospace" }}
-                tick={{ fill: "rgba(255,255,255,0.5)" }}
-                tickFormatter={(v: number) => `${v.toFixed(0)}%`}
-              />
-              <ReferenceLine
-                y={0}
-                stroke="rgba(255,255,255,0.5)"
-                strokeWidth={1}
-              />
-              <Tooltip
-                contentStyle={tooltipStyle}
-                formatter={(value: any, name?: string) => [
-                  <span key="val" style={{ color: "#10b981" }}>{Number(value).toFixed(2)}%</span>,
-                  <span key="label" style={{ color: "#fff" }}>{name === "predicted" ? "Predicted" : "Actual"}</span>,
-                ]}
-                labelFormatter={(label: string) => <span style={{ color: "#fff", fontWeight: 600 }}>{label}</span>}
-              />
-              <Bar dataKey="predicted" fill="#3b82f6" opacity={0.7} radius={[1, 1, 0, 0]} />
-              <Bar dataKey="actual" radius={[1, 1, 0, 0]}>
-                {barData.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={entry.actual >= 0 ? "#10b981" : "#ef4444"}
-                    opacity={0.8}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-          <div
-            style={{
-              display: "flex",
-              gap: 16,
-              justifyContent: "center",
-              marginTop: 6,
-              fontSize: 9,
-              fontFamily: "monospace",
-              color: "rgba(255,255,255,0.5)",
-            }}
-          >
-            <span>
-              <span style={{ color: "#3b82f6" }}>&#9632;</span> Predicted
+      {/* ── Secondary stats strip ── */}
+      {stats && (
+        <div style={{ display: "flex", gap: 16, padding: "6px 16px", marginBottom: 12, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, fontSize: 9, color: "rgba(255,255,255,0.5)" }}>
+          <span>Avg hold: <b style={{ color: "#fff" }}>{stats.avgHoldDays.toFixed(1)}d</b></span>
+          <span>Avg win: <b style={{ color: "#10b981" }}>{pct(stats.avgWinPct)}</b></span>
+          <span>Avg loss: <b style={{ color: "#ef4444" }}>{pct(stats.avgLossPct)}</b></span>
+          <span>Benchmark: <b style={{ color: "#fff" }}>{pct(stats.benchmarkReturn)}</b></span>
+          {/* Exit breakdown */}
+          <span style={{ marginLeft: "auto" }}>Exits:</span>
+          {Object.entries(exitBreakdown).sort((a, b) => b[1] - a[1]).map(([reason, count]) => (
+            <span key={reason}>
+              <b style={{ color: EXIT_COLORS[reason] || "#fff" }}>{count}</b>{" "}
+              <span style={{ color: "rgba(255,255,255,0.35)" }}>{EXIT_LABELS[reason] || reason}</span>
             </span>
-            <span>
-              <span style={{ color: "#10b981" }}>&#9632;</span> Actual (+)
-            </span>
-            <span>
-              <span style={{ color: "#ef4444" }}>&#9632;</span> Actual (-)
-            </span>
-          </div>
+          ))}
         </div>
+      )}
 
-        {/* Cumulative Strategy Return */}
-        <div style={chartCardStyle}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <div style={sectionTitle}>
-              CUMULATIVE STRATEGY RETURN ({strategy === "long-only" ? "LONG ONLY" : "LONG/SHORT"})
-            </div>
-            <div style={{ display: "flex", gap: 0 }}>
-              <button
-                onClick={() => setStrategy("long-only")}
-                style={{
-                  fontSize: 8,
-                  fontWeight: 600,
-                  fontFamily: "monospace",
-                  padding: "3px 8px",
-                  border: "1px solid #30363d",
-                  borderRadius: "3px 0 0 3px",
-                  background: strategy === "long-only" ? "#3b82f6" : "#161b22",
-                  color: strategy === "long-only" ? "#fff" : "rgba(255,255,255,0.5)",
-                  cursor: "pointer",
-                }}
-              >
-                LONG ONLY
-              </button>
-              <button
-                onClick={() => setStrategy("long-short")}
-                style={{
-                  fontSize: 8,
-                  fontWeight: 600,
-                  fontFamily: "monospace",
-                  padding: "3px 8px",
-                  border: "1px solid #30363d",
-                  borderLeft: "none",
-                  borderRadius: "0 3px 3px 0",
-                  background: strategy === "long-short" ? "#3b82f6" : "#161b22",
-                  color: strategy === "long-short" ? "#fff" : "rgba(255,255,255,0.5)",
-                  cursor: "pointer",
-                }}
-              >
-                LONG/SHORT
-              </button>
-            </div>
-          </div>
-          <ResponsiveContainer width="100%" height={340}>
-            <LineChart
-              data={cumData}
-              margin={{ top: 5, right: 5, left: -20, bottom: 5 }}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="#21262d"
-                vertical={false}
+      {/* ── Equity Curve Chart ── */}
+      <div style={{ marginBottom: 12, padding: 12, background: "#161b22", border: "1px solid #30363d", borderRadius: 4 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#fff", marginBottom: 8 }}>EQUITY CURVE</div>
+        <ResponsiveContainer width="100%" height={360}>
+          <LineChart data={chartData} margin={{ top: 5, right: 5, left: -15, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#21262d" vertical={false} />
+            <XAxis
+              dataKey="date"
+              stroke="#30363d"
+              style={{ fontSize: 8, fontFamily: "monospace" }}
+              tick={{ fill: "rgba(255,255,255,0.4)" }}
+              tickFormatter={(v: string) => v.slice(2, 7)}
+              minTickGap={50}
+            />
+            <YAxis
+              stroke="#30363d"
+              style={{ fontSize: 8, fontFamily: "monospace" }}
+              tick={{ fill: "rgba(255,255,255,0.4)" }}
+              tickFormatter={(v: number) => v.toFixed(0)}
+            />
+            <ReferenceLine y={100} stroke="rgba(255,255,255,0.2)" strokeWidth={1} />
+            {/* Position shading */}
+            {positionBands.map((b, i) => (
+              <ReferenceArea
+                key={i}
+                x1={b.start}
+                x2={b.end}
+                fill={b.win ? "rgba(16,185,129,0.06)" : "rgba(239,68,68,0.06)"}
+                strokeOpacity={0}
               />
-              <XAxis
-                dataKey="month"
-                stroke="#30363d"
-                style={{ fontSize: 9, fontFamily: "monospace" }}
-                tick={{ fill: "rgba(255,255,255,0.5)" }}
-                tickFormatter={formatMonth}
-                minTickGap={40}
-              />
-              <YAxis
-                stroke="#30363d"
-                style={{ fontSize: 9, fontFamily: "monospace" }}
-                tick={{ fill: "rgba(255,255,255,0.5)" }}
-                tickFormatter={(v: number) => `${v.toFixed(0)}%`}
-              />
-              <ReferenceLine
-                y={0}
-                stroke="rgba(255,255,255,0.5)"
-                strokeWidth={1}
-              />
-              <Tooltip
-                contentStyle={tooltipStyle}
-                formatter={(value, name) => [
-                  <span key="val" style={{ color: Number(value) >= 0 ? "#10b981" : "#ef4444" }}>{Number(value).toFixed(1)}%</span>,
-                  <span key="label" style={{ color: "#fff" }}>{name === "cumReturn" ? "Strategy" : "Buy & Hold"}</span>,
-                ]}
-                labelFormatter={(label) => <span style={{ color: "#fff", fontWeight: 600 }}>{label}</span>}
-              />
-              <Line
-                type="monotone"
-                dataKey="cumReturn"
-                stroke="#10b981"
-                strokeWidth={2}
-                dot={false}
-                isAnimationActive={true} animationDuration={800} animationEasing="ease-out"
-                name="Strategy"
-              />
-              <Line
-                type="monotone"
-                dataKey="buyHold"
-                stroke="#3b82f6"
-                strokeWidth={1.5}
-                strokeDasharray="5 5"
-                dot={false}
-                isAnimationActive={true} animationDuration={800} animationEasing="ease-out"
-                name="Buy & Hold"
-              />
-            </LineChart>
-          </ResponsiveContainer>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              gap: 16,
-              fontSize: 8,
-              fontFamily: "monospace",
-              color: "rgba(255,255,255,0.5)",
-              marginTop: 6,
-            }}
-          >
-            <span>
-              <span style={{ color: "#10b981" }}>━━</span> Strategy: {finalStrategyReturn.toFixed(1)}%
-            </span>
-            <span>
-              <span style={{ color: "#3b82f6" }}>- - -</span> Buy & Hold: {finalBuyHoldReturn.toFixed(1)}%
-            </span>
-          </div>
+            ))}
+            <Tooltip
+              contentStyle={tooltipStyle}
+              formatter={(value: any, name?: string) => [
+                <span key="v" style={{ color: name === "equity" ? "#10b981" : "#3b82f6" }}>{Number(value).toFixed(1)}</span>,
+                <span key="n" style={{ color: "#fff" }}>{name === "equity" ? "Strategy" : "OBX"}</span>,
+              ]}
+              labelFormatter={(l: string) => <span style={{ color: "#fff", fontWeight: 600 }}>{l}</span>}
+            />
+            <Line type="monotone" dataKey="equity" stroke="#10b981" strokeWidth={2} dot={false} isAnimationActive={true} animationDuration={800} animationEasing="ease-out" />
+            <Line type="monotone" dataKey="benchmark" stroke="#3b82f6" strokeWidth={1.2} strokeDasharray="5 5" dot={false} isAnimationActive={true} animationDuration={800} animationEasing="ease-out" />
+          </LineChart>
+        </ResponsiveContainer>
+        <div style={{ display: "flex", justifyContent: "center", gap: 16, fontSize: 8, color: "rgba(255,255,255,0.5)", marginTop: 4 }}>
+          <span><span style={{ color: "#10b981" }}>━━</span> Strategy: {stats ? pct(stats.totalReturn) : "—"}</span>
+          <span><span style={{ color: "#3b82f6" }}>- - -</span> OBX: {stats ? pct(stats.benchmarkReturn) : "—"}</span>
+          <span style={{ color: "rgba(255,255,255,0.3)" }}>Green shading = in position (win) · Red = in position (loss)</span>
         </div>
       </div>
 
-      {/* Prediction History Table */}
-      <div
-        style={{
-          marginBottom: 16,
-          borderRadius: 2,
-          border: "1px solid #30363d",
-          background: "#161b22",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            padding: "8px 12px",
-            borderBottom: "1px solid #30363d",
-          }}
-        >
-          <span
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              fontFamily: "monospace",
-              color: "#fff",
-            }}
+      {/* ── Trade Log ── */}
+      <div style={{ marginBottom: 12, background: "#161b22", border: "1px solid #30363d", borderRadius: 4, overflow: "hidden" }}>
+        <div style={{ padding: "8px 12px", borderBottom: "1px solid #30363d", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "#fff" }}>TRADE LOG</span>
+            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginLeft: 8 }}>{trades.length} trades</span>
+          </div>
+          <button
+            onClick={() => setExpandedTrades(!expandedTrades)}
+            style={{ fontSize: 8, fontWeight: 600, fontFamily: "monospace", padding: "3px 10px", border: "1px solid #30363d", borderRadius: 4, background: "#0d1117", color: "rgba(255,255,255,0.5)", cursor: "pointer" }}
           >
-            PREDICTION HISTORY
-          </span>
-          <span
-            style={{
-              fontSize: 9,
-              color: "rgba(255,255,255,0.5)",
-              fontFamily: "monospace",
-              marginLeft: 8,
-            }}
-          >
-            {predictions.length} PREDICTIONS
-          </span>
+            {expandedTrades ? "COLLAPSE" : "SHOW ALL"}
+          </button>
         </div>
-        <div style={{ maxHeight: 500, overflowY: "auto" }}>
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontFamily: "monospace",
-              fontSize: 9,
-            }}
-          >
+        <div style={{ maxHeight: expandedTrades ? "none" : 350, overflowY: expandedTrades ? "visible" : "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "monospace", fontSize: 9 }}>
             <thead>
-              <tr
-                style={{
-                  borderBottom: "1px solid #30363d",
-                  position: "sticky",
-                  top: 0,
-                  background: "#161b22",
-                  zIndex: 1,
-                }}
-              >
-                {[
-                  "DATE",
-                  "PREDICTED",
-                  "ACTUAL",
-                  "ERROR",
-                  "DIR",
-                  "QUINTILE",
-                  "CONFIDENCE",
-                ].map((h) => (
-                  <th
-                    key={h}
-                    style={{
-                      textAlign: h === "DATE" ? "left" : "right",
-                      padding: "6px 8px",
-                      color: "rgba(255,255,255,0.5)",
-                      fontWeight: 600,
-                    }}
-                  >
+              <tr style={{ borderBottom: "1px solid #30363d", position: "sticky", top: 0, background: "#161b22", zIndex: 1 }}>
+                {["#", "ENTRY", "EXIT", "DAYS", "SIGNAL", "RETURN", "P&L", "EXIT TYPE", "MAX DD", "MOM"].map((h) => (
+                  <th key={h} style={{ textAlign: h === "ENTRY" || h === "EXIT" ? "left" : "right", padding: "5px 8px", color: "rgba(255,255,255,0.4)", fontWeight: 600, fontSize: 8 }}>
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {predictions.map((p) => {
-                const dateStr =
-                  typeof p.prediction_date === "string"
-                    ? p.prediction_date.slice(0, 10)
-                    : p.prediction_date;
-                const hasActual = p.actual_return !== null;
-                const err = hasActual
-                  ? Math.abs(
-                      p.ensemble_prediction - (p.actual_return as number)
-                    )
-                  : null;
-                return (
-                  <tr
-                    key={dateStr}
-                    style={{
-                      borderBottom: "1px solid #21262d",
-                    }}
-                  >
-                    <td
-                      style={{
-                        padding: "4px 8px",
-                        color: "#fff",
-                      }}
-                    >
-                      {dateStr}
-                    </td>
-                    <td
-                      style={{
-                        padding: "4px 8px",
-                        textAlign: "right",
-                        color:
-                          p.ensemble_prediction >= 0
-                            ? "#10b981"
-                            : "#ef4444",
-                      }}
-                    >
-                      {p.ensemble_prediction >= 0 ? "+" : ""}
-                      {(p.ensemble_prediction * 100).toFixed(2)}%
-                    </td>
-                    <td
-                      style={{
-                        padding: "4px 8px",
-                        textAlign: "right",
-                        color: !hasActual
-                          ? "rgba(255,255,255,0.5)"
-                          : (p.actual_return as number) >= 0
-                            ? "#10b981"
-                            : "#ef4444",
-                      }}
-                    >
-                      {hasActual
-                        ? `${(p.actual_return as number) >= 0 ? "+" : ""}${((p.actual_return as number) * 100).toFixed(2)}%`
-                        : "—"}
-                    </td>
-                    <td
-                      style={{
-                        padding: "4px 8px",
-                        textAlign: "right",
-                        color: "#fff",
-                      }}
-                    >
-                      {err !== null ? `${(err * 100).toFixed(2)}%` : "—"}
-                    </td>
-                    <td
-                      style={{
-                        padding: "4px 8px",
-                        textAlign: "right",
-                        color:
-                          p.direction_correct === null
-                            ? "rgba(255,255,255,0.5)"
-                            : p.direction_correct
-                              ? "#10b981"
-                              : "#ef4444",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {p.direction_correct === null
-                        ? "—"
-                        : p.direction_correct
-                          ? "Y"
-                          : "N"}
-                    </td>
-                    <td
-                      style={{
-                        padding: "4px 8px",
-                        textAlign: "right",
-                        color:
-                          p.quintile >= 4
-                            ? "#10b981"
-                            : p.quintile <= 2
-                              ? "#ef4444"
-                              : "#fff",
-                        fontWeight: 600,
-                      }}
-                    >
-                      Q{p.quintile}
-                    </td>
-                    <td
-                      style={{
-                        padding: "4px 8px",
-                        textAlign: "right",
-                        color: "rgba(255,255,255,0.5)",
-                      }}
-                    >
-                      {(p.confidence_score * 100).toFixed(0)}%
-                    </td>
-                  </tr>
-                );
-              })}
+              {trades.map((t, i) => (
+                <tr key={i} style={{ borderBottom: "1px solid #21262d" }}>
+                  <td style={{ padding: "4px 8px", textAlign: "right", color: "rgba(255,255,255,0.3)" }}>{i + 1}</td>
+                  <td style={{ padding: "4px 8px", color: "#fff" }}>{t.entryDate.slice(2)}</td>
+                  <td style={{ padding: "4px 8px", color: "#fff" }}>{t.exitDate.slice(2)}</td>
+                  <td style={{ padding: "4px 8px", textAlign: "right", color: "rgba(255,255,255,0.5)" }}>{t.daysHeld}</td>
+                  <td style={{ padding: "4px 8px", textAlign: "right", color: t.predAtEntry >= 0 ? "#10b981" : "#ef4444" }}>
+                    {pctRaw(t.predAtEntry)}
+                  </td>
+                  <td style={{ padding: "4px 8px", textAlign: "right", color: t.actualReturn >= 0 ? "#10b981" : "#ef4444", fontWeight: 600 }}>
+                    {pct(t.actualReturn)}
+                  </td>
+                  <td style={{ padding: "4px 8px", textAlign: "right", color: t.pnlPct >= 0 ? "#10b981" : "#ef4444" }}>
+                    {pct(t.pnlPct)}
+                  </td>
+                  <td style={{ padding: "4px 8px", textAlign: "right" }}>
+                    <span style={{ fontSize: 8, fontWeight: 600, padding: "1px 5px", borderRadius: 3, background: `${EXIT_COLORS[t.exitReason] || "#fff"}20`, color: EXIT_COLORS[t.exitReason] || "#fff" }}>
+                      {EXIT_LABELS[t.exitReason] || t.exitReason}
+                    </span>
+                  </td>
+                  <td style={{ padding: "4px 8px", textAlign: "right", color: "rgba(255,255,255,0.4)" }}>
+                    {(t.maxDrawdown * 100).toFixed(1)}%
+                  </td>
+                  <td style={{ padding: "4px 8px", textAlign: "right", color: t.momAtEntry >= 2 ? "#10b981" : t.momAtEntry >= 1 ? "#f59e0b" : "rgba(255,255,255,0.3)" }}>
+                    {t.momAtEntry}/3
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Glossary */}
-      <div style={{ ...sectionStyle, marginBottom: 16 }}>
-        <div style={sectionTitle}>GLOSSARY</div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr 1fr",
-            gap: "6px 24px",
-            fontSize: 9,
-            fontFamily: "monospace",
-            lineHeight: 1.5,
-          }}
-        >
-          {GLOSSARY.map((g) => (
-            <div key={g.term}>
-              <span style={{ color: "#3b82f6", fontWeight: 700 }}>
-                {g.term}
-              </span>
-              <span style={{ color: "rgba(255,255,255,0.5)" }}> &mdash; {g.def}</span>
-            </div>
-          ))}
+      {/* ── Methodology ── */}
+      <div style={{ padding: "10px 16px", background: "#161b22", border: "1px solid #30363d", borderRadius: 4, fontSize: 9, color: "rgba(255,255,255,0.4)", lineHeight: 1.6 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.6)", marginBottom: 6 }}>METHODOLOGY</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px 24px" }}>
+          <div><b style={{ color: "#3b82f6" }}>Daily Signal</b> — 21-day forward return from prices. BUY when signal exceeds entry threshold, SELL when below exit threshold.</div>
+          <div><b style={{ color: "#3b82f6" }}>Monthly ML</b> — Ensemble predictions (XGBoost + LightGBM) step-held daily. Same buy/sell logic applied to monthly signal.</div>
+          <div><b style={{ color: "#3b82f6" }}>Equity Curve</b> — Compounded returns from trade P&L after costs. Position sizing not applied (shows raw signal quality).</div>
+          <div><b style={{ color: "#3b82f6" }}>Exit Priority</b> — Stop loss (always) → Take profit → Signal flip → Time stop → SMA cross → Vol regime.</div>
+          <div><b style={{ color: "#3b82f6" }}>Costs</b> — {simParams.cost || 10} bps round-trip deducted from each trade return.</div>
+          <div><b style={{ color: "#3b82f6" }}>Benchmark</b> — OBX total return index over same period. Excess return = strategy annualized − OBX annualized.</div>
         </div>
       </div>
     </div>
