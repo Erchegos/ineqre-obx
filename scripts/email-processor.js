@@ -473,9 +473,21 @@ async function processEmail(message, imap) {
     // Extract metadata
     const sender = envelope.from[0].address;
     const subject = envelope.subject || '(No Subject)';
-    const ticker = extractTicker(subject);
+    let ticker = extractTicker(subject);
     const source = identifySource(sender);
     const receivedDate = envelope.date;
+
+    // Validate ticker exists in stocks table to avoid FK constraint violation
+    if (ticker) {
+      const tickerCheck = await pool.query(
+        'SELECT 1 FROM stocks WHERE ticker = $1 LIMIT 1',
+        [ticker]
+      );
+      if (tickerCheck.rows.length === 0) {
+        console.log(`  ⚠️  Ticker "${ticker}" not in stocks table, setting to NULL`);
+        ticker = null;
+      }
+    }
 
     console.log(`Processing: ${subject} from ${sender}`);
 
